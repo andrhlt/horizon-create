@@ -2445,12 +2445,13 @@ adds the signed Clipboard actions above:
   guest large-cog placement and guest Clipboard copy/paste. Resulting host state
   matches; settings/clipboard delivery checks do not claim Java packet-arrival
   or interpolation timing.
-* On `native-9f42064-16db3a2836ef` (Horizon source
+* On the freshly rebuilt `native-9f42064-e442e57aa9ac` (Horizon source
   `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, prepared pack SHA-256
   `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`), the
-  selected existing parity/regression checks passed 17/17; the new solo and LAN
-  Clipboard checks passed 2/2. The compatible-launcher build took 5m01s. Test
-  outputs are retained in `.local/parity/`.
+  bounded controller suite and selected neighbor regressions passed 19/19.
+  The compatible-launcher rebuild took 54 seconds (incremental); the test run
+  used this build's `horizon-client` and resource directory. Test outputs are
+  retained in `.local/parity/`.
 
 One consequential shared-network mismatch remains and is tracked as a blocking
 dependency on [APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and):
