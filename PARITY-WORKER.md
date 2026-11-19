@@ -48,6 +48,21 @@ through the coordinator. Do not assume separate git worktrees alone isolate
 builds. Do not change another worker's selected instance, game installation or
 normal Create Parity Lab. Runtime paths must be verified locally, not guessed.
 
+The current port is a source-mixin build, not a current-SDK native crate.
+Launcher 0.2.82 rejects that format. The build script detects this and selects
+the official launcher 0.2.67 in the worktree's `.local/toolchains/` instead.
+`tools/pinned-launcher.py` downloads its macOS arm64 ZIP and checks SHA256SUMS
+through `gh` when absent; it does not replace the installed Horizon app.
+This restores the existing build route. It does not migrate the port to
+`horizon-mod.toml` or prove compatibility with the latest Horizon SDK.
+Do not rename the manifest or independently migrate shared integration code
+as part of a gameplay ticket. Coordinate the SDK migration separately.
+The modern SDK supports native mixins/modules/bridges, so migration is possible
+in principle. It must translate the current 202 support modules and 378
+injections, validate the separate engine patches, and use the exact SDK/build
+contract. Merely adding Cargo.toml/src or renaming the manifest is insufficient.
+Reference: https://github.com/horizon-rust/horizon/blob/main/docs/modding/src/concepts/native-route.md
+
 The script prints a native build identifier. Use that exact build's horizon-ctl,
 horizon-client and prepared .local/horizon-client/26.3 resources. Run:
 
