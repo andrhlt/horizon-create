@@ -1,0 +1,91 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..218ffcf 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..b48b409 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.rotationSpeedControllerWrench"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..684a12c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,59 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 15)
++	public static void rotationSpeedControllerWrench(CreateGameTestHelper helper) {
++		var controller = com.simibubi.create.AllBlocks.ROTATION_SPEED_CONTROLLER;
++		var motor = com.simibubi.create.AllBlocks.CREATIVE_MOTOR;
++		var shaft = com.simibubi.create.AllBlocks.SHAFT;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var z = net.minecraft.core.Direction.Axis.Z;
++		var south = net.minecraft.core.Direction.SOUTH;
++		var pos = new BlockPos(12, 2, 2);
++		helper.setBlock(pos, controller.getDefaultState().setValue(horizontal, z));
++		var regulator = helper.getBlockEntity(AllBlockEntityTypes.ROTATION_SPEED_CONTROLLER.get(), pos);
++		regulator.targetSpeed.setValue(-73);
++		helper.setBlock(pos.north(), motor.getDefaultState().setValue(facing, south));
++		var source = helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), pos.north());
++		source.generatedSpeed.setValue(24);
++		helper.setBlock(pos.south(), shaft.getDefaultState().setValue(axis, z));
++		var output = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), pos.south());
++		var level = helper.getLevel();
++		var worldPos = helper.absolutePos(pos);
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var wrench = new ItemStack(com.simibubi.create.AllItems.WRENCH.get());
++		player.setItemInHand(hand, wrench);
++		int count = player.getInventory().countItem(controller.asItem());
++
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var state = level.getBlockState(worldPos);
++			boolean present = controller.has(state);
++			var current = present ? helper.getBlockEntity(AllBlockEntityTypes.ROTATION_SPEED_CONTROLLER.get(), pos) : null;
++			System.out.printf(java.util.Locale.ROOT, "CREATE_CONTROLLER_WRENCH %d,%s,%d,%.4f,%.4f,%.4f,%d%n",
++				tick, present ? state.getValue(horizontal).getName() : "air",
++				present ? current.targetSpeed.getValue() : 0, present ? current.getSpeed() : 0.0,
++				source.getSpeed(), output.getSpeed(), player.getInventory().countItem(controller.asItem()) - count);
++			var face = switch ((int) tick) {
++				case 3 -> net.minecraft.core.Direction.UP;
++				case 5, 9 -> net.minecraft.core.Direction.WEST;
++				case 7 -> net.minecraft.core.Direction.DOWN;
++				default -> null;
++			};
++			if (face != null) {
++				player.setShiftKeyDown(tick == 9);
++				var hit = new net.minecraft.world.phys.BlockHitResult(worldPos.getCenter().relative(face, 0.5),
++					face, worldPos, false);
++				wrench.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++				player.setShiftKeyDown(false);
++			}
++			if (tick < 11)
++				helper.fail("Waiting for final speed controller Wrench sample");
++		});
++	}
+ }

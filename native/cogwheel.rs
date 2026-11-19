@@ -35,7 +35,7 @@ fn small_cog(name: &str) -> bool {
     name == COG || encased_size(name) == Some(false)
 }
 
-fn large_cog(name: &str) -> bool {
+pub(super) fn large_cog(name: &str) -> bool {
     name == LARGE_COG || encased_size(name) == Some(true)
 }
 

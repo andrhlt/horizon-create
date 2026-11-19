@@ -10,6 +10,7 @@ use super::create_clockwork::{self, CLOCKWORK};
 use super::create_cogwheel::encased_size;
 use super::create_fluids::name;
 use super::create_portable_interface::{FLUID as FLUID_PORT, ITEM as ITEM_PORT};
+use super::create_speed_controller::{self, CONTROLLER as SPEED_CONTROLLER};
 
 const WRENCH: &str = "create:wrench";
 
@@ -90,6 +91,12 @@ pub(super) fn change_pose(game: &mut Game<'_>, pos: [i32; 3], face: Direction, b
         super::create_sequencer::SEQUENCER => return super::create_sequencer::wrench_pose(game, pos, face),
         super::create_shaft::GIRDER_SHAFT => {
             return super::create_shaft::remove_from_girder(game, pos);
+        }
+        SPEED_CONTROLLER if axis(face) == "y" => {
+            let Some(prior) = game.native_block_property(pos, "axis") else {
+                return false;
+            };
+            ("axis", create_speed_controller::cross_axis(&prior), prior)
         }
         _ if encased_size(block).is_some() => return change_cased_cog(game, pos, face),
         "create:shaft" | "create:cogwheel" | "create:gearbox" | "create:clutch"
@@ -177,6 +184,7 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> boo
             | "create:gearbox"
             | "create:clutch"
             | "create:gearshift"
+            | SPEED_CONTROLLER
             | "create:creative_motor"
             | "create:encased_fan"
             | "create:item_drain"

@@ -724,19 +724,13 @@ impl Kinetic {
     }
 
     fn speed_controller_link(self, other: Self, delta: [i32; 3]) -> Option<bool> {
-        match (self, other, delta) {
-            (Self::SpeedController(axis), Self::Cog(gear, true), [0, 1, 0])
-                if gear != 1 && gear != axis =>
-            {
-                Some(true)
-            }
-            (Self::Cog(gear, true), Self::SpeedController(axis), [0, -1, 0])
-                if gear != 1 && gear != axis =>
-            {
-                Some(false)
-            }
-            _ => None,
-        }
+        let (cog, axis, controller_first) = match (self, other, delta) {
+            (Self::SpeedController(axis), cog, [0, 1, 0]) => (cog, axis, true),
+            (cog, Self::SpeedController(axis), [0, -1, 0]) => (cog, axis, false),
+            _ => return None,
+        };
+        let (cog_axis, large) = cog.gear()?;
+        (large && cog_axis != 1 && cog_axis != axis).then_some(controller_first)
     }
 
     fn ratio_to(self, other: Self, offset: [i32; 3]) -> Option<f32> {
@@ -1284,6 +1278,44 @@ pub(super) fn motor_setting_changed(game: &mut Game<'_>, pos: [i32; 3]) {
         resolve_motor_speed(game, pos, speed);
         refresh_connected_network(game, pos);
     }
+}
+
+pub(super) fn controller_setting_changed(game: &mut Game<'_>, pos: [i32; 3]) {
+    let Some((entity, controller)) = mod_entity(game, pos).zip(Kinetic::at(game, pos)) else {
+        return;
+    };
+    let up = [0, 1, 0];
+    let cog_pos = offset(pos, up);
+    let Some(cog) = Kinetic::at(game, cog_pos) else {
+        return;
+    };
+    if controller.speed_controller_link(cog, up) != Some(true) {
+        return;
+    }
+
+    let rpm = create_speed_controller::target(Some(entity));
+    let exceeds_limit = cog.neighbors().any(|delta| {
+        Kinetic::at(game, offset(cog_pos, delta))
+            .and_then(|neighbor| cog.ratio_to(neighbor, delta))
+            .is_some_and(|ratio| {
+                (rpm * ratio).abs() > create_speed_controller::MAX_ROTATION_SPEED as f32
+            })
+    });
+    if exceeds_limit {
+        let ticking = (pos, entity);
+        let shaft_input = walk_network(game, pos, ticking, false, |_, _| {}).rpm;
+        let cog_input = walk_network(game, cog_pos, ticking, false, |_, _| {}).rpm;
+        // With power supplied from the shaft side, the large cog is the block
+        // propagating the configured speed into the step-up mesh.
+        if shaft_input != 0.0 && cog_input == 0.0 {
+            game.native_machine_destroy_block(cog_pos, None, false);
+            return;
+        }
+    }
+
+    // Create removes and reattaches the controller when its target changes,
+    // updating every connected kinetic entity in the settings callback.
+    refresh_connected_network(game, pos);
 }
 
 fn opposing_controller_output(
@@ -2116,7 +2148,8 @@ fn tick_upward_chute(
             && bounds[5] == 1.0
     });
     let voiding = super::create_creative_crate::accepts_items(game, above);
-    let container = voiding || game
+    let container = voiding
+        || game
             .native_container_slots(game.native_dimension(), above, Direction::Down)
             .is_some();
     let position = float(&entity.nbt, "ItemPosition").unwrap_or(0.0);
