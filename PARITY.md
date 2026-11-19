@@ -1227,6 +1227,32 @@ saw the same delayed step and comparator output. The
 [Java GameTest patch](tools/java-sequenced-gearshift-comparator-trace.patch)
 cover the powered turn, delay, redstone wait, distance step and active save.
 
+The [reload replay](tools/test-sequenced-gearshift-reload.py) saves an idle
+configured program and an active turn, closes and reopens the same world, then
+checks the persisted Java fields and continuation from tick 5 to tick 6. The
+[metadata](fixtures/sequenced-gearshift-reload-java.metadata.json) records the
+pinned Java BlockEntity read/write fields and links the active checkpoint to
+the existing Java GameTest trace. Other instruction types and persistence
+boundaries remain open.
+
+On rebuilt `native-9f42064-370918737e07` (built with
+`sh tools/build-native.sh /Applications/Horizon.app/Contents/MacOS/horizon-launcher
+'/private/tmp/horizon-create-app1949-build'`), the sequenced-gearshift parity
+group passed all 9 checks using the `horizon-ctl` and `horizon-client` binaries
+from that build: editor, render, LAN editing, comparator, stop, reload,
+orientation and Wrench. The reopened active sequencer matched Java's tick-6
+state on its first resumed tick. On the same build, the sequenced pulley
+consumer trace passed, as did 13 affected piston, gantry, roller and bearing
+regressions (including piston modes, moving actors and reload, both mounted
+dispenser cases, both roller tracks, and the 105-tick contraption-controls
+trace). Checks that did not need rendering used the headless client.
+
+The gantry distance-limit integration still lacks a valid repeatable setup:
+the attempted headless rig did not assemble a gantry, so it is not counted as
+coverage. The existing gantry and roller checks above cover their affected
+regressions, while the sequenced pulley and bearing traces cover downstream
+sequence timing. Full 1:1 remains open.
+
 When the original threshold-switch pulley finishes its rotation while the
 lever remains powered, the downstream pulley stops and the gearshift retains
 64 RPM. The [original fixture](fixtures/threshold_switch_pulley-java.csv)

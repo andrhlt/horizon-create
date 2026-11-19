@@ -905,6 +905,17 @@ pub(super) fn rpm_at(game: &Game<'_>, pos: [i32; 3]) -> f32 {
     mod_entity(game, pos).map_or(0.0, |entity| network(game, pos, entity).speed())
 }
 
+pub(super) fn drive_speed_and_distance(game: &Game<'_>, pos: [i32; 3]) -> (f32, Option<f32>) {
+    let Some(entity) = mod_entity(game, pos) else {
+        return (0.0, None);
+    };
+    let state = network(game, pos, entity);
+    (
+        state.speed(),
+        create_sequencer::distance_limit(state.sequence, state.rpm),
+    )
+}
+
 pub(super) fn crank_input_rpm(game: &Game<'_>, pos: [i32; 3]) -> f32 {
     // The crank's generation is zero without its InUse tag.
     network(game, pos, &ModBlockEntity::default()).rpm
@@ -2674,7 +2685,8 @@ pub(super) fn block_entity_tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut
             let state = network(game, pos, entity);
             let rpm = state.speed();
             publish_network(entity, &state);
-            super::create_mechanical_piston::tick(game, pos, entity, rpm);
+            let distance_limit = create_sequencer::distance_limit(state.sequence, state.rpm);
+            super::create_mechanical_piston::tick(game, pos, entity, rpm, distance_limit);
         }
         WINDMILL => {
             let state = network(game, pos, entity);

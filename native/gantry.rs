@@ -8,7 +8,7 @@ use super::create_bearing::{
 };
 use super::create_depot::compound;
 use super::create_fan::facing;
-use super::create_machines::{int, mod_entity, offset, rpm_at};
+use super::create_machines::{int, mod_entity, offset};
 
 pub(super) const SHAFT: &str = "create:gantry_shaft";
 pub(super) const CARRIAGE: &str = "create:gantry_carriage";
@@ -37,14 +37,15 @@ fn side(game: &Game<'_>, at: [i32; 3]) -> Option<Direction> {
     facing(game, game.world.block(at[0], at[1], at[2]))
 }
 
-fn drive(game: &Game<'_>, shaft: [i32; 3]) -> Option<(Direction, f32, bool)> {
+fn drive(game: &Game<'_>, shaft: [i32; 3]) -> Option<(Direction, f32, bool, Option<f32>)> {
     if game.native_block(shaft) != SHAFT
         || game.native_block_property(shaft, "powered").as_deref() == Some("true")
     {
         return None;
     }
     let facing = side(game, shaft)?;
-    let speed = (-rpm_at(game, shaft) / 512.0).clamp(-0.49, 0.49);
+    let (rpm, sequence_limit) = super::create_machines::drive_speed_and_distance(game, shaft);
+    let speed = (-rpm / 512.0).clamp(-0.49, 0.49);
     if speed == 0.0 {
         return None;
     }
@@ -54,7 +55,7 @@ fn drive(game: &Game<'_>, shaft: [i32; 3]) -> Option<(Direction, f32, bool)> {
         "middle" => true,
         _ => false,
     };
-    Some((facing, speed, can_move))
+    Some((facing, speed, can_move, sequence_limit))
 }
 
 fn matches_shaft(game: &Game<'_>, at: [i32; 3], facing: Direction) -> bool {
@@ -129,7 +130,7 @@ fn assemble(game: &mut Game<'_>, origin: [i32; 3]) {
     };
     let support = body.opposite().normal();
     let shaft = offset(origin, support);
-    let Some((track, speed, true)) = drive(game, shaft) else {
+    let Some((track, speed, true, sequence_limit)) = drive(game, shaft) else {
         return;
     };
     let direction = if speed > 0.0 { track } else { track.opposite() };
@@ -180,6 +181,9 @@ fn assemble(game: &mut Game<'_>, origin: [i32; 3]) {
         ("Support".into(), Tag::IntArray(support.to_vec())),
     ]);
     set_num(&mut data, "Offset", 0.0);
+    if let Some(limit) = sequence_limit {
+        set_num(&mut data, "SequencedOffsetLimit", f64::from(limit));
+    }
     save(game, id, data, blocks);
 }
 
@@ -224,10 +228,15 @@ fn move_one(game: &mut Game<'_>, id: u32, mut data: Compound) {
     let dimension = game.native_dimension();
     let mut next = distance;
     let mut stop = true;
-    if let Some((direction, speed, allowed)) = drive(game, offset(current, support))
+    let sequence_limit = match data.get(&"SequencedOffsetLimit".into()) {
+        Some(Tag::Double(bits)) => Some(f64::from_bits(*bits)),
+        _ => None,
+    };
+    if let Some((direction, speed, allowed, _)) = drive(game, offset(current, support))
         && direction.normal() == axis
     {
-        let change = if age > 2 { f64::from(speed) } else { 0.0 };
+        let raw_change = if age > 2 { f64::from(speed) } else { 0.0 };
+        let change = sequence_limit.map_or(raw_change, |limit| raw_change.clamp(-limit, limit));
         let candidate = distance + change;
         let next_block = target(origin, axis, candidate);
         let grid_offset = (0..3)
@@ -236,11 +245,19 @@ fn move_one(game: &mut Game<'_>, id: u32, mut data: Compound) {
         // The pinion compares the next world coordinate with the center
         // of its current shaft block. Equality counts as crossing west/down/north.
         let axis_sign = f64::from(axis.into_iter().sum::<i32>());
-        let crossing = (grid_offset * axis_sign < candidate * axis_sign)
-            != (f64::from(speed) * axis_sign < 0.0);
+        let crossing = change != 0.0
+            && (grid_offset * axis_sign < candidate * axis_sign)
+                != (change * axis_sign < 0.0);
         if (allowed || !crossing) && space_for(game, next_block, &blocks, &[]) {
             next = candidate;
             stop = false;
+            if let Some(limit) = sequence_limit {
+                set_num(
+                    &mut data,
+                    "SequencedOffsetLimit",
+                    (limit - change.abs()).max(0.0),
+                );
+            }
         }
     }
     let contact_origin =

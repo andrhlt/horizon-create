@@ -148,6 +148,7 @@ CHECKS = (
     ("sequenced-gearshift-lan", "test-multiplayer-sequenced-gearshift"),
     ("sequenced-gearshift-comparator", "test-sequenced-gearshift-comparator"),
     ("sequenced-gearshift-stop-lan", "test-sequenced-gearshift-comparator", "--lan"),
+    ("sequenced-gearshift-reload", "test-sequenced-gearshift-reload"),
     ("sequenced-gearshift-orientation", "test-sequenced-gearshift-orientation"),
     ("sequenced-gearshift-wrench-lan", "test-sequenced-gearshift-orientation", "--lan"),
     ("sequenced-gearshift-render", "test-sequenced-gearshift-render"),
