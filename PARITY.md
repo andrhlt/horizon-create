@@ -1055,6 +1055,193 @@ in [54 horizontal render samples](fixtures/clutch-gearshift-render-java.csv).
 Gearshift's output insert reverses on the lever action, and Clutch's stops
 while the input insert keeps turning. Both actual LAN renderers submitted
 the same Gearshift motion on the host's and guest's lever actions.
+The solo client and LAN guest each matched another 84 offscreen samples
+on `native-9f42064-5feaea81a3da`. The checks cover source face, RPM,
+phase, angle and both shaft-half draws for both blocks on all three axes
+and from both source directions at the submitted frame fraction 1.0.
+[Java axis samples](fixtures/transmission-render-axes-java.csv) ·
+[Java capture metadata](fixtures/transmission-render-axes-java.metadata.json)
+
+The headless replay for a Clutch closing into a second drive through a
+Gearshift matched all 26 Java samples on `native-9f42064-fa80052f1dec`.
+Both horizontal Clutches closed on tick 8 and kept +32 RPM. On tick 9,
+the Clutch facing an opposing drive broke and dropped one item. The
+powered Gearshift reversed the other drive and let its Clutch take
++64 RPM. The unchanged `native-9f42064-a5156e57df79` kept the opposing
+Clutch at −64 RPM through all four samples on ticks 9–12. The Java tick
+origin is the first sample after the left motors were set to +32 RPM.
+Each sample records block state, theoretical RPM and dropped item count
+after the scheduled or lever action for that tick.
+[Java reconnect samples](fixtures/clutch-gearshift-reconnect-java.csv)
+
+Breaking the two Gearshifts after the last reconnect sample dropped
+one item in both power states. Horizon sampled the outcome one tick after
+the break command. Pack preparation now translates the Java explosion
+survival condition for both blocks. The two loot tables were the only
+changes among 9,258 entries. The rebuilt pack SHA-256 is
+`5b4d4ee88226ae8b55dacb341e14c8906e13b9ff028e6f079994a1e548cd4cc0`.
+The pinned Java GameTest took 22 seconds with JDK 21. The same Horizon
+build and pack passed the five existing timing, competing-input, and
+solo and LAN render checks. The six Horizon checks took 65 seconds.
+[Java Gearshift drop outcomes](fixtures/clutch-gearshift-drop-java.csv) ·
+[GameTest patch](tools/java-clutch-gearshift-reconnect.patch) ·
+[Reference revisions and hashes](fixtures/clutch-gearshift-reconnect-java.metadata.json)
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check clutch-gearshift-reconnect
+```
+
+On `native-9f42064-f8f56d21ecc8` with the same pack, Clutch and Gearshift
+matched all 84 samples on X, Y and Z when an adjacent redstone block was
+placed or removed on four consecutive ticks. Each block held +32 RPM
+at the gate. The output stopped on each power change and resumed or
+reversed on the following tick when the block state allowed transmission.
+[Consecutive redstone replay](fixtures/clutch-gearshift-consecutive-java.csv)
+
+A new Gearshift between two independently rotating drives held zero RPM
+on the placement tick, then broke and dropped one item on the following
+tick when the drives opposed the new ratio. The compatible Gearshifts
+acquired the positive-axis source and −64 RPM. Both activating redstone
+after the block was placed and placing the item against an existing
+redstone block matched Java on X, Y and Z. The updated build matched
+108 state, RPM and drop samples and all 54 block entity presence, source
+and RPM samples from the hand placements. The preceding
+`native-9f42064-bc1b4f4d38cf` differed in 18 of 54 samples for each route.
+The five headless gearing replays took 91 seconds.
+[Java direct redstone](fixtures/gearshift-two-sources-java.csv) ·
+[Java powered placement](fixtures/gearshift-powered-placement-java.csv) ·
+[Java block entities](fixtures/gearshift-powered-placement-entities-java.csv) ·
+[Java patch and capture metadata](fixtures/transmission-transition-java.metadata.json)
+
+The updated build passed three offscreen render replays. The host and
+guest drew both Clutch inserts with +32 RPM input and zero output while
+powered, then +32 RPM on both halves after the guest closed the Clutch.
+Gearshift and Clutch both matched the sampled shaft angles. These
+comparisons use eventual guest render samples.
+[Split-shaft render checks](tools/test-clutch-gearshift-render.py)
+
+The headless vanilla Crafter accepted both original shapeless recipes,
+consumed all three ingredients, and placed one block into the output chest.
+Without redstone it kept the other two ingredients and produced no output.
+The survival menu driver required a renderer for slot clicks.
+[Original Java recipes](fixtures/clutch-gearshift-recipes-java.json)
+
+A headless cold reopen matched 54 Java records from separate save and
+reopen processes. Four driven X-axis rigs kept the west input at +32 RPM.
+Their outputs remained +32 RPM when unpowered, zero through the powered
+Clutch, and −32 RPM through the powered Gearshift. One undriven Clutch and
+one undriven Gearshift kept their block entities and output shafts at zero
+RPM with no source. The test samples the stable state before shutdown and
+eight ticks after startup.
+[Cold reopen samples](fixtures/clutch-gearshift-cold-reopen-java.csv) ·
+[Java capture setup](fixtures/clutch-gearshift-cold-reopen-java.metadata.json)
+
+The mixed Clutch and Gearshift chain matched all 60 headless samples on
+the updated build. Each X-axis device order was tested with the upstream
+redstone change first and with the downstream change first. The test
+sampled each callback on the same tick, the intervening shaft's RPM, and
+the scheduled reconnection on the following tick.
+[Mixed callback samples](fixtures/clutch-gearshift-mixed-callbacks-java.csv) ·
+[Java capture metadata](fixtures/clutch-gearshift-mixed-callbacks-java.metadata.json)
+
+Another 60 headless samples matched Java when a Z-axis Gearbox carried
+the drive from an X-axis transmission into a Y-axis transmission. The
+four rigs exercised both device orders and both redstone callback orders.
+[Java Gearbox bend samples](fixtures/clutch-gearshift-mixed-bend-java.csv) ·
+[Java capture metadata](fixtures/clutch-gearshift-mixed-bend-java.metadata.json)
+
+On `native-9f42064-d8c0290a2281`, two Mechanical Presses on a Hand Crank
+matched all 34 Java overload samples. A Clutch placed already powered
+kept driving the input at −32 RPM while the presses were isolated.
+Closing it overloaded the shared drive. Reopening it stopped the
+presses immediately and restored the input speed after the next stress
+update. The Gearshift reversed the theoretical press RPM while the
+effective speed stayed at zero. The earlier build differed in six
+samples across crank actuation, powered isolation and recovery.
+[Overload trace](fixtures/clutch-gearshift-overload-java.csv) ·
+[Java capture metadata](fixtures/clutch-gearshift-overload-java.metadata.json)
+
+On `native-9f42064-65c9b559787b`, initialized Gearshifts with adjacent
+Creative Motors matched 90 Java samples across all three axes. The
+64-RPM motor took over from the 32-RPM motor before two redstone changes.
+The weaker motor stopped on each action tick and resumed at the conveyed
+speed on the next tick. The previous build continued publishing +32 RPM
+for the weaker motor in all 12 action samples.
+[Initialized Gearshift samples](fixtures/initialized-gearshift-java.csv) ·
+[Java capture metadata](fixtures/initialized-gearshift-java.metadata.json)
+
+The headless Wrench replay matched Java event IDs and counts on all 38
+actions. Rotating either block played one cue, clicking along its axis
+was silent, and each survival pickup played both removal cues.
+[Wrench sound events](fixtures/clutch-gearshift-wrench-audio-java.csv) ·
+[Java capture metadata](fixtures/clutch-gearshift-wrench-audio-java.metadata.json)
+
+Both hidden LAN clients matched the Java Clutch break boundary and the
+single dropped item. Both drew the Clutch and Gearshift before reconnection.
+The Gearshift continued drawing after the scheduled break and neither
+client submitted the removed Clutch's shaft halves.
+
+The scheduled Clutch break played Java's stone break cue once on tick 9
+in headless solo and on both hidden LAN clients. Both Gearshift conflict
+replays matched three stone break cues on tick 5, one per axis. The
+direct Horizon destroy-command replay omitted the two Gearshift break
+cues emitted by Java's `level.destroyBlock`.
+[Java break effects](fixtures/transmission-break-effects-java.csv) ·
+[Java capture metadata](fixtures/transmission-break-effects-java.metadata.json)
+
+On `native-9f42064-5feaea81a3da`, two X-axis Clutches closed on the save
+tick between adjacent Creative Motors. After cold reopen, the opposing
+motor broke and its Clutch retained +32 RPM. The compatible rig kept both
+motors at +64 RPM. Two initialized Gearshifts reversed on their save tick.
+On reopen each kept its ±64 RPM input, and each formerly subordinate
+motor broke. The four headless replays matched all 32 saved and settled
+observations with block drops enabled and disabled. Earlier builds kept
+the opposing motors across three Clutch and six Gearshift post-reopen
+observations.
+[Java pending Clutch samples](fixtures/clutch-pending-reopen-java.csv) ·
+[Clutch capture metadata](fixtures/clutch-pending-reopen-java.metadata.json) ·
+[Java pending Gearshift samples](fixtures/gearshift-pending-reopen-java.csv) ·
+[Gearshift capture metadata](fixtures/gearshift-pending-reopen-java.metadata.json)
+
+The headless command harness sampled the saved game time and the first
+two explicit simulation ticks on `native-9f42064-01ed5c97c72e`. All 24
+Java state, RPM and motor-presence observations matched across the
+original and mirrored adjacent-motor layouts. Java checks the dependent
+Gearshift motor's configured speed against its conveyed speed as signed
+values. The +32 motor driven at −64 broke on the first restored tick.
+The mirrored −32 motor driven at +64 remained in the network. The previous
+native build reached the first block-entity tick before its pending check
+could see the restored entities. The new check runs before motor startup
+also when the entity ticker table is still being built.
+[Mirrored Clutch startup](fixtures/clutch-pending-reopen-mirrored-java.csv) ·
+[Clutch capture metadata](fixtures/clutch-pending-reopen-mirrored-java.metadata.json) ·
+[Mirrored Gearshift startup](fixtures/gearshift-pending-reopen-mirrored-java.csv) ·
+[Gearshift capture metadata](fixtures/gearshift-pending-reopen-mirrored-java.metadata.json)
+
+The loaded opposing-motor break uses the regular native loot result first.
+If it returns no stacks with block drops enabled, the captured break path
+emits one motor item. The shipped pack remains byte-identical. An explicitly
+empty custom motor loot result also triggers this scoped fallback.
+
+Final focused verification used the client reinstalled by
+`tools/build-native.sh` as `native-9f42064-01ed5c97c72e`. Its content-addressed
+ID is unchanged because the native inputs match the previously validated
+source; the previous version directory was archived before rebuilding. The
+eight headless gates passed: cold reopen, mixed callbacks, mixed Gearbox bend,
+overload, both pending first-tick directions, recipes and host/guest actions.
+Four hidden offscreen checks passed: guest axis rendering, Clutch break
+rendering, and both settings cursor-warp cases. Client SHA-256 is
+`e5ddb923ca11ae2a28e71da91e967dc84c7161f8600cc0abe45f81f871ba0da3`,
+controller SHA-256 is
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`, and
+the prepared pack SHA-256 remains
+`5b4d4ee88226ae8b55dacb341e14c8906e13b9ff028e6f079994a1e548cd4cc0`.
+
+Other mixed networks, initialized transitions with other load and source
+combinations and pending reload layouts still need direct comparisons.
+The exact queued callback lifetime and wider startup ordering remain
+open. Measuring break gain, pitch and debris requires event-specific
+client telemetry. Shared kinetic ambience remains open.
 
 ## Vertical Gearbox
 

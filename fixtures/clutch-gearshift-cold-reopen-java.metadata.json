@@ -1,0 +1,16 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_test": "TestMisc.transmissionColdReopen",
+  "patch_sha256": "c1481fb5f2092e4cb0e9a1d1e799bf91716f0adb68e1576898dcdee43e0850a2",
+  "trace_sha256": "09ea3983c0ef39b6760950622b682c1227ebadc7de79d00da20c7050ce510ccb",
+  "records": 54,
+  "gradle_elapsed_seconds": {
+    "write": 22,
+    "read": 11
+  },
+  "capture": "Apply the patch to a disposable checkout. Run ./gradlew --offline runGameTestServer with CREATE_TRANSMISSION_REOPEN=write, then open the same save in a separate process with CREATE_TRANSMISSION_REOPEN=read. The read phase samples six saved, force-loaded rigs and places no blocks. Four rigs have a running input and two have neither a motor nor a redstone input.",
+  "tick_origin": "Write tick 7 is the last Java GameTest sample before shutdown. Read ticks 0 through 7 are GameTest samples after the second server opens the saved world and completes its startup."
+}

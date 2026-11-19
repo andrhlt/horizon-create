@@ -1,0 +1,102 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..218ffcf 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..a81b10b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.clutchGearshiftReconnect"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..5b0b80b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,70 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 20)
++	public static void clutchGearshiftReconnect(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var powered = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++		var attach = net.minecraft.world.level.block.state.properties.BlockStateProperties.ATTACH_FACE;
++		var floor = net.minecraft.world.level.block.state.properties.AttachFace.FLOOR;
++		var east = net.minecraft.core.Direction.EAST;
++		var left = com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east);
++		var right = left.setValue(facing, east.getOpposite());
++		var clutch = com.simibubi.create.AllBlocks.CLUTCH.getDefaultState().setValue(axis, east.getAxis());
++		var gearshift = com.simibubi.create.AllBlocks.GEARSHIFT.getDefaultState().setValue(axis, east.getAxis());
++		var level = helper.getLevel();
++		var rigs = java.util.List.of(new BlockPos(12, 3, 9), new BlockPos(12, 3, 13));
++		for (var pos : rigs) {
++			helper.setBlock(pos.west(), left);
++			helper.setBlock(pos, clutch);
++			helper.setBlock(pos.above(), Blocks.STONE.defaultBlockState());
++			helper.setBlock(pos.above(2), Blocks.LEVER.defaultBlockState().setValue(attach, floor));
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int lane = 0; lane < rigs.size(); lane++) {
++				var pos = rigs.get(lane);
++				if (tick == 0)
++					helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), pos.west()).generatedSpeed.setValue(32);
++				if (tick == 3 || tick == 8)
++					helper.pullLever(pos.above(2));
++				if (tick == 5) {
++					if (lane == 1)
++						helper.setBlock(pos.east().below(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++					helper.setBlock(pos.east(), gearshift.setValue(powered, lane == 1));
++					helper.setBlock(pos.east(2), right);
++					helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), pos.east(2)).generatedSpeed.setValue(64);
++				}
++				var state = helper.getBlockState(pos);
++				String gate = state.isAir() ? "missing" : state.getValue(powered) ? "open" : "closed";
++				var gear = helper.getBlockState(pos.east());
++				String reverse = gear.isAir() ? "missing" : gear.getValue(powered).toString();
++				var center = helper.absolutePos(pos);
++				int drops = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
++					new net.minecraft.world.phys.AABB(center).inflate(1.0), item -> item.getItem().is(clutch.getBlock().asItem())).size();
++				System.out.printf(java.util.Locale.ROOT, "CREATE_CLUTCH_MIXED,%d,%d,%s,%s,%.0f,%.0f,%.0f,%.0f,%d%n",
++					lane, tick, gate, reverse, transmissionSpeed(helper, pos.west()), transmissionSpeed(helper, pos),
++					transmissionSpeed(helper, pos.east()), transmissionSpeed(helper, pos.east(2)), drops);
++			}
++			if (tick < 12) helper.fail("Waiting for both Clutches to reconnect");
++			for (int lane = 0; lane < rigs.size(); lane++) {
++				var at = helper.absolutePos(rigs.get(lane).east());
++				var before = level.getBlockState(at);
++				boolean destroyed = level.destroyBlock(at, true);
++				var drops = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
++					new net.minecraft.world.phys.AABB(at).inflate(1.0), item -> item.getItem().is(gearshift.getBlock().asItem()));
++				int count = drops.stream().mapToInt(item -> item.getItem().getCount()).sum();
++				System.out.printf("CREATE_GEARSHIFT_DROP,%d,%s,%s,%s,%d%n", lane, before.getValue(powered),
++					destroyed, level.getBlockState(at).isAir(), count);
++			}
++		});
++	}
++
++	private static float transmissionSpeed(CreateGameTestHelper helper, BlockPos relative) {
++		var entity = helper.getLevel().getBlockEntity(helper.absolutePos(relative));
++		return entity instanceof com.simibubi.create.content.kinetics.base.KineticBlockEntity kinetic
++			? kinetic.getTheoreticalSpeed() : 0;
++	}
+ }

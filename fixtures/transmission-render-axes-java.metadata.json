@@ -1,0 +1,13 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_test": "TestMisc.transmissionRenderAxes",
+  "patch_sha256": "9497a75fc386ccac171e662b194560e21c1343264ba2279e2bb792df6c076796",
+  "trace_sha256": "43923f12b193211c652a79c3c6cc0c068477460a05492c2b75768e6db63a3615",
+  "records": 84,
+  "gradle_elapsed_seconds": 14,
+  "layout": "One Clutch and one Gearshift per input face across X, Y and Z, with a +32 Creative Motor setting on the chosen input face and a Shaft on the other. The server adds redstone on tick 4 and removes it on tick 7.",
+  "sampling": "Record the block state and the pinned entity's actual source direction and per-side kinetic modifiers. Use the original renderer's positional angle offset and time-to-angle formula. The final two columns evaluate that formula at Java partial tick 0.5. Horizon compares both resulting draw angles at its actual submitted tick and fraction and checks that both half-shaft draws have vertices."
+}

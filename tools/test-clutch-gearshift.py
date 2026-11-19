@@ -2,10 +2,14 @@
 """Replay ordinary Clutch and Gearshift placement and Wrench interaction against Java."""
 
 import argparse
+from collections import Counter
 import csv
+import json
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+import re
 from tempfile import TemporaryDirectory
+from zipfile import ZipFile
 
 from fixture_world import ROOT, fixture_world
 
@@ -36,7 +40,7 @@ def verify_placement(args):
     expected = java_rows("placement")
     assert len(expected) == 14
     differences = []
-    with fixture_world(args, 'PlainTransmissionPlacement', render=True, pack=args.pack) as control:
+    with fixture_world(args, 'PlainTransmissionPlacement', pack=args.pack) as control:
         control.commands((
             '/fill 4 100 -15 14 100 -5 minecraft:smooth_stone',
             '/gamemode survival',
@@ -95,12 +99,20 @@ def pose(control, face):
     control.call('wait', 3)
 
 
+def wrench_sounds(control):
+    return Counter({sound: count for sound, count in control.call('status')['heard'].items()
+                    if sound.startswith('create:wrench_')})
+
+
 def verify_wrench(args):
     rotation = java_rows("wrench")
     pickups = java_rows("pickup")
+    sounds = {(block, action, axis, face): Counter(cue.split('|')[0] for cue in cues.split(';') if cue)
+              for block, action, axis, face, cues in java_rows("wrench-audio")}
     assert len(rotation) == 36 and len(pickups) == 2
     changes = []
-    with fixture_world(args, 'PlainTransmissionWrench', render=True, pack=args.pack) as control:
+    audio = {'HORIZON_NO_AUDIO': '1', 'HORIZON_CREATE_TEST_AUDIO': '1'}
+    with fixture_world(args, 'PlainTransmissionWrench', pack=args.pack, env=audio) as control:
         control.commands((
             '/fill 4 100 -15 14 100 -5 minecraft:smooth_stone',
             '/fill 4 101 -15 14 107 -5 minecraft:air',
@@ -108,13 +120,18 @@ def verify_wrench(args):
             '/gamemode survival',
             '/item replace entity @s hotbar.0 with create:wrench',
         ))
+        control.call('wait', 3)
         control.call('select', 'create:wrench')
         for block_index, previous, face, axis, consumed in rotation:
             block = BLOCKS[int(block_index)]
             control.command(f'/setblock {coords(POSITION)} create:{block}[axis={previous},powered=false]')
             pose(control, face)
+            before = wrench_sounds(control)
             control.call('interact', *POSITION, face)
             control.call('wait', 2)
+            case = (block_index, 'turn', previous, face)
+            heard = wrench_sounds(control) - before
+            assert heard == sounds[case], (case, sounds[case], heard)
             actual = control.call('block', *POSITION)['state']
             expected = f'create:{block}[axis={axis},powered=false]'
             if consumed != 'true' or actual != expected:
@@ -127,6 +144,7 @@ def verify_wrench(args):
             pose(control, 'up')
             control.call('key', 'shift', 'down')
             control.call('wait', 4)
+            before = wrench_sounds(control)
             try:
                 control.call('look-at', 8.5, 104.999, -9.5)
                 control.call('wait', 2)
@@ -139,7 +157,10 @@ def verify_wrench(args):
             actual_count = control.call('inventory')['counts'].get(f'create:{block}', 0)
             actual_block = control.call('block', *POSITION)['block']
             assert (consumed, cleared, int(count), actual_block, actual_count) == ('true', 'true', 1, 'minecraft:air', 1), (block, actual_block, actual_count)
-    print('Clutch and Gearshift matched all 36 Java Wrench rotations and both survival pickups.')
+            case = (block_index, 'remove', 'x', 'up')
+            heard = wrench_sounds(control) - before
+            assert heard == sounds[case], (case, sounds[case], heard)
+    print('Clutch and Gearshift matched all 36 Java Wrench rotations, both survival pickups, and their sound events.')
 
 
 def verify_lan(args, scratch):
@@ -148,7 +169,7 @@ def verify_lan(args, scratch):
     spec.loader.exec_module(multiplayer)
     guest_name = "PlainClutch"
     pos = (8, 102, -10)
-    with fixture_world(args, 'PlainClutchLAN', render=True, pack=args.pack) as host:
+    with fixture_world(args, 'PlainClutchLAN', pack=args.pack) as host:
         host.commands((
             '/fill 4 100 -14 14 100 -5 minecraft:smooth_stone',
             '/fill 4 101 -13 14 106 -6 minecraft:air',
@@ -158,7 +179,7 @@ def verify_lan(args, scratch):
         ))
         host.step_to(host.clock() + 1)
         address = f"127.0.0.1:{host.call('lan', 'open', '0', 'commands', 'force')['port']}"
-        with multiplayer.joined_client(args, scratch, address, guest_name, render=True, scenario='plain-clutch', pack=args.pack) as guest:
+        with multiplayer.joined_client(args, scratch, address, guest_name, scenario='plain-clutch', pack=args.pack) as guest:
             multiplayer.until('the survival builder to join', lambda: any(
                 user['name'] == guest_name and user['placed'] for user in host.call('lan', 'status')['guests']
             ))
@@ -201,6 +222,54 @@ def verify_lan(args, scratch):
     print('A survival guest placed a powered Clutch and picked it back up. Both clients saw the same state.')
 
 
+def verify_recipes(args):
+    expected = json.loads((ROOT / 'fixtures/clutch-gearshift-recipes-java.json').read_text())['recipes']
+    with ZipFile(args.pack or ROOT / '.local/create.hmod') as archive:
+        for block, java in expected.items():
+            ingredients = [entry['item'] if 'item' in entry else f"#{entry['tag']}"
+                           for entry in java['ingredients']]
+            actual = json.loads(archive.read(f'data/create/recipe/crafting/kinetics/{block}.json'))
+            assert actual == java | {'ingredients': ingredients}, (block, actual)
+    def contents(world, pos):
+        data = world.command(f'/data get block {coords(pos)} Items')
+        result = {}
+        for slot in re.findall(r'\{[^{}]*\bSlot:[^{}]+\}', data):
+            item = re.search(r'\bid: "([^"]+)"', slot)[1]
+            count = int(re.search(r'\bcount: (\d+)', slot)[1])
+            result[item] = result.get(item, 0) + count
+        return result
+
+    with fixture_world(args, 'ClutchGearshiftRecipes', pack=args.pack) as world:
+        world.commands((
+            '/fill 4 100 -15 14 100 -5 minecraft:smooth_stone',
+            '/fill 4 101 -15 14 106 -5 minecraft:air',
+            '/tp @s 11.5 101 -9.5',
+        ))
+        for z, (block, java) in zip((-12, -7), expected.items(), strict=True):
+            crafter, chest, signal = (8, 102, z), (9, 102, z), (8, 102, z - 1)
+            ingredients = [entry.get('item', 'minecraft:redstone') for entry in java['ingredients']]
+            world.commands((
+                f'/setblock {coords(crafter)} minecraft:crafter[orientation=east_up]',
+                f'/setblock {coords(chest)} minecraft:chest',
+                f'/item replace block {coords(crafter)} container.6 with {ingredients[0]}',
+                f'/item replace block {coords(crafter)} container.2 with {ingredients[1]}',
+            ))
+            for with_redstone in (False, True):
+                if with_redstone:
+                    world.command(f'/item replace block {coords(crafter)} container.4 with {ingredients[2]}')
+                world.command(f'/setblock {coords(signal)} minecraft:redstone_block')
+                start = world.clock()
+                for tick in range(1, 9):
+                    world.step_to(start + tick)
+                world.command(f'/setblock {coords(signal)} minecraft:air')
+                result = java['result']
+                remaining = {} if with_redstone else dict.fromkeys(ingredients[:2], 1)
+                expected_outputs = {result['id']: result['count']} if with_redstone else {}
+                actual = (contents(world, crafter), contents(world, chest))
+                assert actual == (remaining, expected_outputs), (block, with_redstone, actual)
+    print('The headless Crafter matched both Java recipes and rejected each recipe without redstone.')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for arg in ("ctl", "client", "resources"):
@@ -209,12 +278,15 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--wrench", action="store_true")
     mode.add_argument("--lan", action="store_true")
+    mode.add_argument("--recipes", action="store_true")
     args = parser.parse_args()
     if args.lan:
         with TemporaryDirectory(prefix="hc-pcl-") as scratch:
             verify_lan(args, Path(scratch))
     elif args.wrench:
         verify_wrench(args)
+    elif args.recipes:
+        verify_recipes(args)
     else:
         verify_placement(args)
 
