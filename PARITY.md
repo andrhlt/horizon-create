@@ -866,6 +866,88 @@ python3 tools/test-adjustable-chain-gearshift.py /path/to/horizon-ctl /path/to/h
 python3 tools/test-multiplayer-adjustable-chain.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
 
+The mixed-cog speed-limit replay uses 64 and 96 RPM motors, each driving
+a large cog, a small cog, and an adjustable gearshift linked to an encased
+chain drive. A weaker motor joins each output side before full redstone
+power is applied. Java transmits −256 RPM in the 64 RPM case. In the 96 RPM
+case it breaks the gearshift when the chain would transmit −384 RPM, leaving
+the output at −32 RPM from the backup motor. Removing the primary motors
+tests reverse drive through the surviving gearshift, then removing the
+signal restores its 1:1 ratio.
+
+The two rigs are sampled at Java GameTest ticks 0–19 and compared from
+tick 1, after Horizon publishes its first RPM. The comparison uses exact
+values for block survival, ratio and signed RPM at both cogs, the
+gearshift, and the output shaft. Capture from Create revision
+`ac0c444d9828da3453ae8cc65338e8de063286fb` with Java 21 by applying
+`tools/java-adjustable-chain-speed-limit.patch` in a disposable checkout,
+running `./gradlew --offline runGameTestServer`, and taking the
+`CREATE_CHAIN_SPEED_LIMIT` rows in order.
+
+The capture patch SHA-256 is
+`f4e2b95520ac9d1c50209043cc6d9f64364fdb49e04ed0149ed5b4e87b47ff6f`.
+The Java capture passed its GameTest in 13 seconds and produced 40 rows.
+The pre-fix Horizon build `native-9f42064-a5156e57df79` differed on all 13
+samples of the 96 RPM case starting at tick 7. It retained the gearshift
+and reported −384 RPM at the output through tick 11.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check adjustable-chain-speed-limit
+```
+
+The chain placement replay covers each shaft axis and both perpendicular
+chain axes. Each arrangement records three positions through nine stages,
+starting with an unlinked placement and adding both ends. It checks removal
+and restoration of an end and the middle, a neighbor with a different
+perpendicular shaft axis, and a neighbor whose shaft points along the
+chain and prevents a link. It compares the block type, shaft axis,
+`axis_along_first`, `part`, and the gearshift's unpowered state. Both
+blocks start with `axis_along_first=true` when placed unlinked. Linked
+blocks calculate the value from their connection direction.
+
+Capture the 54 `CREATE_CHAIN_PLACEMENT` rows by applying
+`tools/java-chain-drive-placement.patch` to the pinned Java revision in
+a disposable checkout and running `./gradlew --offline runGameTestServer`
+with Java 21. The Horizon replay uses an offscreen client to place both
+items through the normal input path and reads their block states after
+each action.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check chain-drive-placement
+```
+
+On rebuilt `native-9f42064-75906adc2576` with pack SHA-256
+`1f6abc604c1840a87dd662eb616580b056d0cb3a4b3bbaf7fe8821e7ddb2be79`,
+the mixed-cog speed-limit check passed all 38 Java samples in headless
+mode. The adjustable gearshift replay passed 75 simulated ticks in both
+directions offscreen. Placement matched all 54 snapshots offscreen; the
+split snapshot advances one game tick after removing the middle link to
+sample the settled neighbor state. The same offscreen replay submitted
+chain-drive shaft geometry on all three axes in 5,253 frames; each frame's
+rotation and shaft phase matched the renderer calculation.
+
+The bounded save/reopen replay configures both gearshifts to analog signal 3.
+It saves a connected but idle network and confirms signal, connection state,
+and zero RPM after reopen. It then reconnects both motors, records each
+gearshift/output speed and sign, saves while transmitting, and verifies the
+same state across three post-reopen ticks. This follows Create's
+`ChainGearshiftBlockEntity.write/read` persistence of `Signal`; it is a
+Horizon gameplay save/reopen check, not an exact Java reload comparison.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check adjustable-chain-persistence
+```
+
+The persistence check passed on `native-9f42064-75906adc2576` with the
+`1f6abc60…` pack. The same final build passed the 75-tick gearshift replay,
+the survival guest action, all 38 mixed-cog samples, all 54 placement
+snapshots and the idle/active persistence replay. The issue shares
+`native/machines.rs` kinetic-network
+behavior with APP-1943; its existing Linear relation is retained. The
+focused gearshift, LAN, mixed-size, placement/render, and persistence checks
+all pass. Other layouts, lifecycle combinations, and exact cosmetic
+animation parity remain outside this bounded delivery.
+
 ## Cogwheel placement
 
 The ten-case Java reference compares normal small and large cog placement

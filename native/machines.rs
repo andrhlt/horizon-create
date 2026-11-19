@@ -928,6 +928,34 @@ fn network(game: &Game<'_>, start: [i32; 3], ticking: &ModBlockEntity) -> Networ
     walk_network(game, start, (start, ticking), true, |_, _| {})
 }
 
+pub(super) fn chain_gearshift_overspeed(game: &Game<'_>, pos: [i32; 3]) -> bool {
+    // Java checks both sides of the chain link against the default kinetic limit
+    // when the redstone change detaches and reattaches the gearshift.
+    const MAX_RPM: f32 = 256.0;
+    let Some(block @ Kinetic::ChainDrive(_, axis, _)) = Kinetic::at(game, pos) else {
+        return false;
+    };
+    let Some(entity) = mod_entity(game, pos) else {
+        return false;
+    };
+    let rpm = network(game, pos, entity).rpm.abs();
+    let modifier = create_chain_gearshift::modifier(entity);
+    [-1, 1].into_iter().any(|side| {
+        let mut delta = [0; 3];
+        delta[axis] = side;
+        let neighbor = offset(pos, delta);
+        let Some(other @ Kinetic::ChainDrive(..)) = Kinetic::at(game, neighbor) else {
+            return false;
+        };
+        if block.ratio_to(other, delta).is_none() {
+            return false;
+        }
+        let other_modifier =
+            mod_entity(game, neighbor).map_or(1.0, create_chain_gearshift::modifier);
+        rpm > MAX_RPM || rpm * (modifier / other_modifier) > MAX_RPM
+    })
+}
+
 fn walk_network(
     game: &Game<'_>,
     start: [i32; 3],
@@ -2116,7 +2144,8 @@ fn tick_upward_chute(
             && bounds[5] == 1.0
     });
     let voiding = super::create_creative_crate::accepts_items(game, above);
-    let container = voiding || game
+    let container = voiding
+        || game
             .native_container_slots(game.native_dimension(), above, Direction::Down)
             .is_some();
     let position = float(&entity.nbt, "ItemPosition").unwrap_or(0.0);

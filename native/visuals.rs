@@ -32,6 +32,7 @@ const STRESS_HEAD: &str = "create:block/gauge/stressometer/head";
 const LARGE_WHEEL_MODEL: &str = "create:block/large_water_wheel/block";
 const LARGE_WHEEL_EXTENSION: &str = "create:block/large_water_wheel/block_extension";
 const SHAFT_MODEL: &str = "create:block/shaft";
+const CHAIN_DRIVE: &str = "create:encased_chain_drive";
 const COG_MODEL: &str = "create:block/cogwheel";
 const CASED_COG_MODEL: &str = "create:block/cogwheel_shaftless";
 const SHAFT_HALF_MODEL: &str = "create:block/shaft_half";
@@ -626,6 +627,7 @@ pub(super) fn submit(
     }
     if (matches!(block, COG | LARGE_COG | SHAFT) && entity.id == "create:simple_kinetic")
         || (block == super::create_chain_gearshift::ADJUSTABLE && entity.id == block)
+        || (block == CHAIN_DRIVE && entity.id == "create:encased_shaft")
         || (block == super::create_shaft::GIRDER_SHAFT && entity.id == "create:encased_shaft")
     {
         let Some(axis) = game
@@ -650,7 +652,20 @@ pub(super) fn submit(
             }
         }
         let angle = wheel_angle(draw.game_time, draw.partial, rpm, phase);
+        let first = draw.vertices_mut().len();
         draw_rotating(game, draw, axis, angle, model);
+        static CHAIN_DRIVE_TRACE: OnceLock<bool> = OnceLock::new();
+        if block == CHAIN_DRIVE
+            && *CHAIN_DRIVE_TRACE.get_or_init(|| std::env::var_os("CREATE_CHAIN_DRIVE_RENDER").is_some())
+        {
+            let game_time = draw.game_time;
+            let partial = draw.partial;
+            let vertices = draw.vertices_mut().len() - first;
+            println!(
+                "CREATE_CHAIN_DRIVE_FRAME {} {} {} {} {} {:.8} {:.8} {:.8} {:.8} {}",
+                pos[0], pos[1], pos[2], axis, game_time, partial, rpm, phase, angle, vertices
+            );
+        }
         return;
     }
     if !matches!(block, WHEEL | LARGE_WHEEL | SPEEDOMETER | STRESSOMETER) || entity.id != block {
