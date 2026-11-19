@@ -25,7 +25,7 @@ the two measure different levels of evidence.
 | --- | --- | --- | --- | --- | --- |
 | Kinetic network propagation, speed, stress and overload | Yes | Pass | Small and large wheel networks, loaded meter, competing sources and controller cascades | Open | Broader split, merge and overload transitions across source and network types |
 | Shafts, andesite and brass encased shafts | Yes | Pass | Placement, casing, material and LAN interaction | Open | Remaining adjacency, rotation and effects |
-| Small and large cogwheels, encased cogwheels | Yes | Pass | Rim assists, gear engagement, casings and rendered geometry | Open | Remaining gear layouts, presentation and lifecycle |
+| Small and large cogwheels, encased cogwheels | Yes | Pass | Rim assists, gear engagement, casings, rendered geometry and Java axe/pickaxe tag membership | Open | Remaining gear layouts, presentation and lifecycle |
 | Gearbox and Vertical Gearbox | Yes | Pass | Placement, drops, crafting, piston interaction and LAN rendering | Open | Remaining network orientations and reassembly |
 | Clutch and Gearshift | Yes | Pass | Redstone timing, competing inputs, placement, Wrench and rendered states | Open | Additional network transition and mixed-device cases |
 | Encased Chain Drive and Adjustable Chain Gearshift | Yes | Pass | Direction, speed ratio, placement and LAN | Open | Mixed-size network transitions and full visual comparison |

@@ -892,8 +892,27 @@ diagonals, and axial fallback. The capture is
 `tools/java-cogwheel-placement-trace.patch` captures the comparison in
 `fixtures/cogwheel-placement-java.csv`.
 
+The pinned Create 6.0.10 axe and pickaxe block tags both include the small
+and large cogs and all four encased variants. The headless mining-tag check
+places each variant and queries both tags. Tool-specific break timing and
+drop behavior need separate gameplay comparisons.
+
+The bounded gameplay pass also checks a zero-speed idle large-to-small gear
+train, a powered train at +24/-48 RPM, and save/reopen retention followed by
+resumed operation. The existing gear-train fixture covers the -2 and +0.5
+ratios and source removal/reconnection. The existing encased-cogwheel LAN
+check covers guest shaft toggling and uncasing while the host observes the
+resulting gear speed. Separate source-conflict coverage remains linked to
+[APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and).
+Initial persistence fixture attempts were invalid: the helper steps one tick
+per call, and the first rig omitted the motor's input shaft. After correcting
+the harness and matching the existing Java gear layout, the persistence check
+passed.
+
 ```sh
 python3 tools/test-cogwheel-placement.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check cogwheel-mining-tags
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check cogwheel-reopen
 python3 tools/test-cogwheel-rim-assist.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-cogwheel-rim-assist.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --encased
 python3 tools/test-multiplayer-cogwheel-rim-assist.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
