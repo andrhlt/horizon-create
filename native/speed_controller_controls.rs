@@ -15,9 +15,9 @@ use super::create_chassis_range;
 use super::create_clockwork::{self, CLOCKWORK};
 use super::create_ejector::{self, EJECTOR};
 use super::create_latches;
+use super::create_machines::{axis_index, mod_entity};
 use super::create_mechanical_piston;
 use super::create_linear_chassis::{self, RADIAL_CHASSIS};
-use super::create_machines::{axis_index, mod_entity};
 use super::create_speed_controller::{self, CONTROLLER, ValueBoard};
 use super::create_valve;
 use super::create_windmill_settings::{self, IconBoard};
@@ -146,7 +146,7 @@ impl ValueBlock {
         }
     }
 
-    fn selection(self, game: &Game<'_>, pos: [i32; 3]) -> Selection {
+    pub(super) fn selection(self, game: &Game<'_>, pos: [i32; 3]) -> Selection {
         if let Some(board) = self.icon_board() {
             let value = mod_entity(game, pos)
                 .and_then(|entity| super::create_machines::int(&entity.nbt, "ScrollValue"))
@@ -277,6 +277,23 @@ impl ValueBlock {
                 .then(|| side.map(|component| 0.5 + f64::from(component) * 0.46875)),
         }
     }
+}
+
+pub(super) fn apply_clipboard_setting(
+    game: &mut Game<'_>,
+    pos: [i32; 3],
+    block: ValueBlock,
+    selection: Selection,
+) {
+    block.apply(
+        game,
+        Setting {
+            target: Target { pos, block },
+            selection,
+            bulk: false,
+            short: false,
+        },
+    );
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]

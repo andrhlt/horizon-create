@@ -1,0 +1,118 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..218ffcf 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/ControllerRestartProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/ControllerRestartProbe.java
+new file mode 100644
+index 0000000..6418157
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/ControllerRestartProbe.java
+@@ -0,0 +1,99 @@
++package com.simibubi.create.infrastructure.gametest;
++
++import java.util.List;
++import java.util.Locale;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
++import com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity;
++import com.simibubi.create.content.kinetics.speedController.SpeedControllerBlockEntity;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.event.tick.ServerTickEvent;
++
++@EventBusSubscriber
++public class ControllerRestartProbe {
++    private record Rig(BlockPos base, boolean cogDriven, int setting) {
++        BlockPos cog() { return base.above(); }
++        BlockPos motor() { return cogDriven ? cog().west() : base.north(); }
++        BlockPos shaft() { return base.south(); }
++        BlockPos cogShaft() { return cog().east(); }
++    }
++
++    private static final BlockPos READY = new BlockPos(4, 98, -10);
++    private static final List<Rig> RIGS = List.of(
++        new Rig(new BlockPos(6, 101, -10), true, -73),
++        new Rig(new BlockPos(14, 101, -10), false, 83),
++        new Rig(new BlockPos(22, 101, -10), true, 0),
++        new Rig(new BlockPos(30, 101, -10), false, 0));
++    private static long origin = -1;
++    private static long previous = -1;
++    private static boolean finished;
++
++    @SubscribeEvent
++    public static void tick(ServerTickEvent.Pre event) {
++        String phase = System.getProperty("create.controller.restart");
++        if (phase == null || finished)
++            return;
++        ServerLevel level = event.getServer().overworld();
++        if (!level.hasChunkAt(READY) || !level.getBlockState(READY).is(Blocks.GOLD_BLOCK)
++            || RIGS.stream().anyMatch(rig -> !level.hasChunkAt(rig.base()) || !level.hasChunkAt(rig.cogShaft())))
++            return;
++        long clock = level.getGameTime();
++        if (clock == previous)
++            return;
++        previous = clock;
++        if (origin < 0)
++            origin = clock;
++        int tick = (int) (clock - origin);
++        if (phase.equals("save")) {
++            if (tick == 0)
++                RIGS.forEach(rig -> setUp(level, rig));
++            if (tick == 6) {
++                trace(level, -1);
++                event.getServer().tickRateManager().setFrozen(true);
++                finished = true;
++            }
++        } else {
++            trace(level, tick);
++            if (tick == 6)
++                finished = true;
++        }
++    }
++
++    private static void setUp(ServerLevel level, Rig rig) {
++        var x = Direction.Axis.X;
++        var z = Direction.Axis.Z;
++        var axis = BlockStateProperties.AXIS;
++        level.setBlockAndUpdate(rig.base(), AllBlocks.ROTATION_SPEED_CONTROLLER.getDefaultState()
++            .setValue(BlockStateProperties.HORIZONTAL_AXIS, z));
++        ((SpeedControllerBlockEntity) level.getBlockEntity(rig.base())).targetSpeed.setValue(rig.setting());
++        level.setBlockAndUpdate(rig.cog(), AllBlocks.LARGE_COGWHEEL.getDefaultState().setValue(axis, x));
++        level.setBlockAndUpdate(rig.shaft(), AllBlocks.SHAFT.getDefaultState().setValue(axis, z));
++        level.setBlockAndUpdate(rig.cogShaft(), AllBlocks.SHAFT.getDefaultState().setValue(axis, x));
++        level.setBlockAndUpdate(rig.motor(), AllBlocks.CREATIVE_MOTOR.getDefaultState()
++            .setValue(BlockStateProperties.FACING, rig.cogDriven() ? Direction.EAST : Direction.SOUTH));
++        ((CreativeMotorBlockEntity) level.getBlockEntity(rig.motor())).generatedSpeed.setValue(24);
++    }
++
++    private static void trace(ServerLevel level, int tick) {
++        for (int id = 0; id < RIGS.size(); id++) {
++            Rig rig = RIGS.get(id);
++            var controller = (SpeedControllerBlockEntity) level.getBlockEntity(rig.base());
++            System.out.printf(Locale.ROOT, "CREATE_CONTROLLER_RESTART %d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f%n",
++                tick, id, controller.targetSpeed.getValue(), controller.getSpeed(),
++                speed(level, rig.cog()), speed(level, rig.shaft()), speed(level, rig.cogShaft()),
++                speed(level, rig.motor()));
++        }
++    }
++
++    private static float speed(ServerLevel level, BlockPos pos) {
++        return ((KineticBlockEntity) level.getBlockEntity(pos)).getSpeed();
++    }
++}
