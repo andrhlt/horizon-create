@@ -879,13 +879,15 @@ The Java capture patch is
 the matrix CSV SHA-256 is
 `63b534639ddabc6b3265ef63ae258f85b5caa21542679dd7d4d80a6d2a9af342`.
 Java revision remains `ac0c444d9828da3453ae8cc65338e8de063286fb`; all 21
-required Java GameTests passed. The exact Horizon verification used build
-`native-9f42064-ff5fc8d252bd`, client SHA-256
+required Java GameTests passed. The final rebuilt Horizon verification used build
+`native-9f42064-7f4d88c9778e`, client SHA-256
 `bdc37f62b0eba075233a3db5ba80695d34a257156708361430ed514edc8435df`,
 ctl SHA-256 `1cca267a26d8e85ed00e7fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`,
 and prepared pack SHA-256
 `d907f9a6dc2129d83bad5eab4ef80e713ad4d8308841ca1f9946198fbb50bd04`.
-The final focused regression batch passed 11/11 checks, including crank,
+The fresh rebuild's bounded batch passed 11/12 checks on its parallel first
+run; its sole gauge-facing placement mismatch passed when rerun in isolation on
+the same build. Thus each of the 12 selected checks passed, including crank,
 equal/slower/faster motor behavior, multiplayer, persistence, grip, placement,
 and neighboring shaft/cogwheel/valve placement. The bounded LAN rerun passed: the
 host drove +32 RPM and a survival guest reversed the authoritative shaft to
@@ -899,6 +901,11 @@ unverified. Nonvisual matrix, placement, motor, LAN and persistence runs use
 isolated offscreen clients. Shared code touched here includes `native/machines.rs`
 and motor loot/settings support used by [APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and)
 and [APP-1950](https://linear.app/appstu/issue/APP-1950/create-full-parity-creative-motor); this PR records the crank-facing source conflict coverage and the focused checks run.
+
+The final source comment clarifying the stopped-versus-active conflict rule
+forced a fresh incremental build with `tools/build-native.sh`: 97 seconds, build
+`native-9f42064-7f4d88c9778e`. The bounded crank/regression batch took about
+three minutes plus the isolated placement rerun.
 
 Measured workflow elapsed about 135 minutes from the workflow comment to the
 latest Wrench-case regression run: Java/source inspection and capture setup
@@ -915,7 +922,7 @@ combinations still need evidence. Wrench behavior is covered: Java does not mark
 Hand Crank as wrenchable, so ordinary and sneaking wrench use cranks it.
 
 ```sh
-python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-ff5fc8d252bd/horizon-ctl .local/patched-launcher/versions/native-9f42064-ff5fc8d252bd/horizon-client /Users/andrewholt/dev/horizon-create/.local/baselines/2026-11-19-pre-mechanical-piston-b2405826c686/build/.local/horizon-client/26.3 --jobs 2 --check hand-crank --check 'hand-crank-*' --check cogwheel-placement --check shaft-placement --check copper-valve-handle-placement
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-7f4d88c9778e/horizon-ctl .local/patched-launcher/versions/native-9f42064-7f4d88c9778e/horizon-client /Users/andrewholt/dev/horizon-create/.local/baselines/2026-11-19-pre-mechanical-piston-b2405826c686/build/.local/horizon-client/26.3 --jobs 2 --check hand-crank --check 'hand-crank-*' --check cogwheel-placement --check shaft-placement --check copper-valve-handle-placement
 ```
 
 These cases use exact comparison for placement,

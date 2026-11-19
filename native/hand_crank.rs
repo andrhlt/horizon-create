@@ -138,9 +138,9 @@ pub(super) fn click(game: &mut Game<'_>, pos: [i32; 3]) -> bool {
         })
         .unwrap_or((true, false));
     if changed_rotation && let Some(face) = facing(game, game.world.block(pos[0], pos[1], pos[2])) {
-        // A newly connected crank is rejected by the propagator if its
-        // rotation opposes the existing source. Once driving, it can reverse
-        // a slower source, but an equal or faster opposing source breaks it.
+        // A stopped crank's first click joins the existing network, so even a
+        // slower opposing source rejects it. Once driving, it can reverse a
+        // slower source, but an equal or faster opposing source breaks it.
         let external = crank_input_rpm(game, pos);
         let negative_face = matches!(face, Direction::Down | Direction::West | Direction::North);
         let opposing = external != 0.0 && (external < 0.0) != (backwards ^ negative_face);
