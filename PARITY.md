@@ -2122,9 +2122,36 @@ shaft preference, a crouched override, conflicting axes, and two shafts on
 one axis. Java captures are in `fixtures/creative-motor-placement-java.csv`
 from `tools/java-creative-motor-placement-trace.patch`.
 
+The original renderer and a world reload are covered too. Java’s
+`CreativeMotorRenderer` draws one `SHAFT_HALF` partial on the motor’s `facing`
+side, rotating about that axis with the 22.5° position phase. A [render
+replay](tools/test-creative-motor-render.py) matches Java’s rotation axis,
+half-shaft side, RPM, phase and angle for all six facings at +32 and −48 RPM in
+solo and for a LAN host and guest, from
+`fixtures/creative-motor-render-java.csv`
+([capture](tools/capture-creative-motor-java.py) with
+`tools/java-creative-motor-family-trace.patch`). A [save/reopen
+replay](tools/test-creative-motor-reload.py) keeps `ScrollValue` and regenerates
+the driven speed for two connected motors and one disconnected idle motor after
+the world is saved and reopened.
+
+Java’s core `RotationPropagator` still owns what happens when two motors share
+one network. The same Java probe records
+`fixtures/creative-motor-competition-java.csv`: an opposing equal pair settles
+at the first motor’s speed, and a mid-network sign flip tears the lane down.
+`tools/test-creative-motor-competition.py` currently reports 75 of 144 samples
+differing, because Horizon picks a different winning generator for the shared
+network. That source-overpower and flicker rule belongs to the wider kinetic
+family and remains open here
+([APP-1943](https://linear.app/appstu/issue/APP-1943)); the check is a
+diagnostic and is not registered until it matches.
+
 ```sh
 python3 tools/test-creative-motor.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-creative-motor-placement.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-creative-motor-render.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-creative-motor-render.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --lan
+python3 tools/test-creative-motor-reload.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-multiplayer-creative-motor.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
 
