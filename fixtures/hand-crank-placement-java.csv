@@ -1,0 +1,9 @@
+case,facing,waterlogged
+encased_east_open,west,false
+encased_east_closed,up,false
+encased_west_open,east,false
+encased_west_closed,up,false
+gauge_x,west,false
+gauge_z,up,false
+gauge_sneak,up,false
+axes_conflict,up,false

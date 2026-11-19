@@ -1,0 +1,4 @@
+case,in_use,crank_rpm,exhaustion,main_damage,off_damage
+empty,10,32.0,0.319999993,0,0
+main,10,32.0,0.000000000,0,0
+off,10,32.0,0.319999993,0,0

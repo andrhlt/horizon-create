@@ -805,7 +805,7 @@ def build_pack(source, content, archive, *, worldgen=True):
             continue
         if path.parent == Path("loot_table/blocks") and path.stem in (
             "metal_girder", "metal_girder_encased_shaft", "copycat_panel", "copycat_step", "copycat_base",
-            "gearbox", "elevator_contact",
+            "gearbox", "elevator_contact", "hand_crank", "creative_motor",
             "copper_valve_handle", *DYED_VALVE_HANDLES,
             "cart_assembler", "controller_rail", "content_observer", "stockpile_switch",
         ):

@@ -1257,6 +1257,16 @@ fn resolve_motor_speed(game: &mut Game<'_>, pos: [i32; 3], speed: f32) {
     let Some(entity) = mod_entity(game, pos) else {
         return;
     };
+    let previous_speed = float(&entity.nbt, "Speed").unwrap_or(0.0);
+    if previous_speed != 0.0
+        && speed != 0.0
+        && previous_speed.signum() != speed.signum()
+        && previous_speed.abs() >= speed.abs()
+        && motor_network_has_active_crank(game, pos, entity)
+    {
+        game.native_machine_destroy_block(pos, None, false);
+        return;
+    }
     if speed != 0.0 && opposing_controller_output(game, pos, entity, speed) {
         game.native_machine_destroy_block(pos, None, false);
         return;
@@ -1267,6 +1277,24 @@ fn resolve_motor_speed(game: &mut Game<'_>, pos: [i32; 3], speed: f32) {
         }
         entity.data[SEEN_MOTOR_SPEED] = speed.to_bits() as i32;
     });
+}
+
+fn motor_network_has_active_crank(game: &Game<'_>, pos: [i32; 3], entity: &ModBlockEntity) -> bool {
+    let mut active = false;
+    walk_network(game, pos, (pos, entity), true, |at, _| {
+        if at == pos {
+            return;
+        }
+        let Some(Kinetic::HandCrank(face)) = Kinetic::at(game, at) else {
+            return;
+        };
+        if mod_entity(game, at)
+            .is_some_and(|crank| create_hand_crank::generated(&crank.nbt, face) != 0.0)
+        {
+            active = true;
+        }
+    });
+    active
 }
 
 pub(super) fn motor_setting_changed(game: &mut Game<'_>, pos: [i32; 3]) {
@@ -1632,20 +1660,30 @@ fn disconnect_crank_network(game: &mut Game<'_>, pos: [i32; 3], entity: &mut Mod
         members.push(member);
     });
     publish_network(entity, &stopped);
-    // Java disconnects the last generator immediately, even for
-    // shafts that already had their block entity turn this tick.
-    if stopped.capacity == 0.0 {
-        for member in members.into_iter().filter(|member| *member != pos) {
-            let changed = game.native_with_mod_block_entity(member, |linked| {
-                let changed = reading(linked, 0) != 0.0 || reading(linked, 1) != 0.0;
-                if changed {
-                    publish_network(linked, &stopped);
-                }
-                changed
-            });
-            if changed == Some(true) {
-                game.native_block_entity_sync(member);
+    // Republish the connected shafts on the tick the crank releases them.
+    // A slower generator can take over during the same tick.
+    if stopped.capacity != 0.0 && entity.id != CRANK {
+        return;
+    }
+    for member in members.into_iter().filter(|member| *member != pos) {
+        let updated;
+        let state = if stopped.capacity == 0.0 {
+            &stopped
+        } else {
+            updated = walk_network(game, member, (pos, entity), true, |_, _| {});
+            &updated
+        };
+        let changed = game.native_with_mod_block_entity(member, |linked| {
+            let changed = reading(linked, 0) != state.speed()
+                || reading(linked, 1) != state.capacity
+                || reading(linked, 2) != state.stress;
+            if changed {
+                publish_network(linked, state);
             }
+            changed
+        });
+        if changed == Some(true) {
+            game.native_block_entity_sync(member);
         }
     }
 }

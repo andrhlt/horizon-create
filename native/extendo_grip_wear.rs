@@ -1,7 +1,7 @@
 use horizon_world::{nbt::Tag, player_inventory::EquipmentSlot};
 use super::{Game, Hand};
 
-const GRIP: &str = "create:extendo_grip";
+pub(super) const GRIP: &str = "create:extendo_grip";
 const AIR: &str = "create:banktank_air";
 
 pub(super) fn wear(game: &mut Game<'_>) {
