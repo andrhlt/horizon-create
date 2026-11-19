@@ -509,7 +509,11 @@ fn warp(game: &mut Game<'_>, block: ValueBlock, selection: Selection) {
         [left + x, top + y]
     };
     game.cursor = (x, y);
-    if let Some(window) = game.window.as_ref() {
+    // Hidden and agent-controlled clients keep their pointer inside the game.
+    // Updating the settings selection must not move the user's desktop cursor.
+    if !game.internal_grab()
+        && let Some(window) = game.window.as_ref()
+    {
         let _ = window.set_cursor_position(PhysicalPosition::new(
             f64::from(game.cursor.0 * scale),
             f64::from(game.cursor.1 * scale),
