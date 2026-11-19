@@ -1,0 +1,13 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_test": "TestMisc.mixedTransmissionBend",
+  "patch_sha256": "16fa9048c0a509a16b14843f2cfc88d0d2ab08a2fd6efc7ef2bc7ed179aff47f",
+  "trace_sha256": "c93839df2c06c8a542473373190d659f1df4785fcf44828457f00e9a0b231c3e",
+  "records": 60,
+  "gradle_elapsed_seconds": 21,
+  "layout": "A Creative Motor drives an X-axis Clutch or Gearshift. A Z-axis Gearbox connects it to a perpendicular Y-axis Gearshift or Clutch and a vertical output shaft. The four rigs cover both placements of each transmission and both redstone callback orders.",
+  "sampling": "Record both gate states and theoretical RPM at the first gate, Gearbox, second gate and output shaft. Both redstone inputs turn on at tick 3 and off at tick 6. Sample before the actions, immediately after each action, and on the following ticks."
+}

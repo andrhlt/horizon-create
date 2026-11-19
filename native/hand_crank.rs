@@ -9,7 +9,9 @@ use crate::containers::ModBlockEntity;
 use horizon_client::first_person::Hand;
 
 use super::create_fan::facing;
-use super::create_machines::{crank_input_rpm, float, int, reading, set_float};
+use super::create_machines::{
+    crank_input_rpm, float, int, reading, refresh_connected_network, set_float,
+};
 use super::native_block_entity_draw::BlockEntityDraw;
 use super::{Game, GameLevel};
 
@@ -125,6 +127,8 @@ pub(super) fn click(game: &mut Game<'_>, pos: [i32; 3]) -> bool {
         let negative_face = matches!(face, Direction::Down | Direction::West | Direction::North);
         if external.abs() > RPM && (external < 0.0) != (backwards ^ negative_face) {
             game.native_machine_destroy_block(pos, None, false);
+        } else {
+            refresh_connected_network(game, pos);
         }
     }
     if let Some(player) = game.player.as_mut() {
