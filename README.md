@@ -1172,3 +1172,6 @@ to regenerate the reference.
 
 Claim a family in [the Linear work queue](PARITY-WORK-QUEUE.md) and follow
 [the worker workflow](PARITY-WORKER.md).
+
+Gameplay tickets use [finite completion gates](COMPLETION-STANDARD.md); ticket
+completion and exhaustive Java parity are tracked separately.

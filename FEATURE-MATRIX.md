@@ -15,6 +15,10 @@ to Create Parity Lab is tracked separately.
 | Java comparison | Names the fields or scenarios compared with original Java Create. A registry check establishes exact ID availability. A gameplay fixture comparison establishes the sampled states, ticks or outputs. |
 | Full 1:1 | **Open** until every applicable gameplay path, variant, rendering and audio effect, multiplayer role, and save/reopen behavior in the row is verified. Read the preceding comparison column for completed exact scopes. |
 
+Gameplay ticket completion follows [the finite completion standard](COMPLETION-STANDARD.md).
+A merged gameplay ticket may be Done while its Full 1:1 column remains Open;
+the two measure different levels of evidence.
+
 ## Kinetic power and transmission
 
 | Feature | In game | Basic tested | Java comparison | Full 1:1 | Remaining work |
