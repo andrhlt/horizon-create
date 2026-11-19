@@ -1167,3 +1167,8 @@ its frequency to verify that the lamp follows the shared server state.
 the sheep in survival. The sheared state and presence of nearby white wool
 match all 13 measured Java ticks. Apply `tools/java-shearing-trace.patch`
 to regenerate the reference.
+
+## Parallel parity work
+
+Claim a family in [the Linear work queue](PARITY-WORK-QUEUE.md) and follow
+[the worker workflow](PARITY-WORKER.md).
