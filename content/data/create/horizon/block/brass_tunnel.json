@@ -1,0 +1,55 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {
+    "occludes": false
+  },
+  "state_properties": {
+    "axis": {
+      "type": "enum",
+      "values": [
+        "x",
+        "z"
+      ]
+    },
+    "shape": {
+      "type": "enum",
+      "values": [
+        "straight",
+        "closed",
+        "window",
+        "t_left",
+        "t_right",
+        "cross"
+      ]
+    }
+  },
+  "default_state": {
+    "axis": "x",
+    "shape": "straight"
+  },
+  "shapes": {
+    "default": [
+      [
+        0,
+        0.625,
+        0,
+        1,
+        1,
+        1
+      ]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [
+        0,
+        0.625,
+        0,
+        1,
+        1,
+        1
+      ]
+    ]
+  }
+}

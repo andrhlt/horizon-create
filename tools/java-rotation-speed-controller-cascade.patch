@@ -1,0 +1,117 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..75caf779d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.cascadedRotationSpeedControllers"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..d42374892 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,85 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 45)
++	public static void cascadedRotationSpeedControllers(CreateGameTestHelper helper) {
++		var controller = com.simibubi.create.AllBlocks.ROTATION_SPEED_CONTROLLER;
++		var cog = com.simibubi.create.AllBlocks.LARGE_COGWHEEL;
++		var shaft = com.simibubi.create.AllBlocks.SHAFT;
++		var fan = com.simibubi.create.AllBlocks.ENCASED_FAN;
++		var motor = com.simibubi.create.AllBlocks.CREATIVE_MOTOR;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var west = net.minecraft.core.Direction.WEST;
++		var south = net.minecraft.core.Direction.SOUTH;
++		var x = net.minecraft.core.Direction.Axis.X;
++		var z = net.minecraft.core.Direction.Axis.Z;
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(helper.getLevel());
++
++		var input = new BlockPos(11, 2, 2);
++		var first = input.east();
++		var firstCog = first.above();
++		var link = firstCog.south();
++		var second = link.south();
++		var secondCog = second.above();
++		var output = secondCog.east();
++		var far = secondCog.west();
++		helper.setBlock(first, controller.getDefaultState().setValue(horizontal, x));
++		helper.setBlock(second, controller.getDefaultState().setValue(horizontal, z));
++		helper.setBlock(firstCog, cog.getDefaultState().setValue(axis, z));
++		helper.setBlock(secondCog, cog.getDefaultState().setValue(axis, x));
++		helper.setBlock(link, shaft.getDefaultState().setValue(axis, z));
++		helper.setBlock(output, shaft.getDefaultState().setValue(axis, x));
++		helper.setBlock(output.east(), fan.getDefaultState().setValue(facing, east));
++		helper.setBlock(second.south(), fan.getDefaultState().setValue(facing, south));
++		helper.setBlock(first.east(), fan.getDefaultState().setValue(facing, east));
++		helper.setBlock(input, motor.getDefaultState().setValue(facing, east));
++		helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), input).generatedSpeed.setValue(24);
++		var firstEntity = helper.getBlockEntity(AllBlockEntityTypes.ROTATION_SPEED_CONTROLLER.get(), first);
++		var secondEntity = helper.getBlockEntity(AllBlockEntityTypes.ROTATION_SPEED_CONTROLLER.get(), second);
++		var firstCogEntity = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), firstCog);
++		var secondCogEntity = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), secondCog);
++		var linkEntity = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), link);
++		var outputEntity = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), output);
++
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var registry = helper.getLevel().registryAccess();
++			var firstNetwork = firstEntity.saveWithoutMetadata(registry).getCompound("Network");
++			var secondNetwork = secondEntity.saveWithoutMetadata(registry).getCompound("Network");
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_SPEED_CONTROLLER_CASCADE %d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f%n",
++				tick, firstEntity.targetSpeed.getValue(), secondEntity.targetSpeed.getValue(),
++				firstEntity.getSpeed(), firstCogEntity.getSpeed(), linkEntity.getSpeed(),
++				secondEntity.getSpeed(), secondCogEntity.getSpeed(), outputEntity.getSpeed(),
++				firstNetwork.getFloat("Stress"), firstNetwork.getFloat("Capacity"),
++				secondNetwork.getFloat("Stress"), secondNetwork.getFloat("Capacity"));
++			if (tick == 5 || tick == 12 || tick == 22 || tick == 30) {
++				var selected = tick == 5 || tick == 22 ? firstEntity : secondEntity;
++				int row = tick == 12 ? 0 : 1;
++				int value = tick == 5 ? 48 : tick == 12 ? 32 : tick == 22 ? 64 : 12;
++				var packet = new com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsPacket(
++					selected.getBlockPos(), row, value, null, null, west, false, selected.targetSpeed.netId()) {
++						public void apply(net.minecraft.server.level.ServerPlayer player,
++							com.simibubi.create.foundation.blockEntity.SmartBlockEntity block) {
++							applySettings(player, block);
++						}
++				};
++				packet.apply(player, selected);
++			}
++			if (tick == 16)
++				helper.setBlock(input, Blocks.AIR);
++			if (tick == 18) {
++				helper.setBlock(far, motor.getDefaultState().setValue(facing, east));
++				helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), far).generatedSpeed.setValue(40);
++			}
++			if (tick == 36)
++				helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), far).generatedSpeed.setValue(20);
++			if (tick < 40)
++				helper.fail("Waiting for final cascaded-controller observation");
++		});
++	}
+ }

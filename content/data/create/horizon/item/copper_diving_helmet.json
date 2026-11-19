@@ -1,0 +1,27 @@
+{
+  "template": "minecraft:copper_helmet",
+  "max_stack_size": 1,
+  "components": {
+    "minecraft:equippable": {
+      "slot": "head",
+      "asset_id": "create:copper_diving",
+      "equip_sound": "create:copper_armor_equip"
+    },
+    "minecraft:attribute_modifiers": [
+      {
+        "type": "minecraft:armor",
+        "id": "minecraft:armor.head",
+        "amount": 1,
+        "operation": "add_value",
+        "slot": "head"
+      }
+    ],
+    "minecraft:enchantable": {
+      "value": 7
+    },
+    "minecraft:repairable": {
+      "items": "minecraft:copper_ingot"
+    },
+    "minecraft:max_damage": 77
+  }
+}

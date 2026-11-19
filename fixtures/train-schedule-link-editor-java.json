@@ -1,0 +1,92 @@
+{
+  "default": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "Frequency": [
+                  {},
+                  {}
+                ],
+                "Inverted": 0
+              },
+              "Id": "create:redstone_link"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "inverted": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "Frequency": [
+                  {
+                    "count": 1,
+                    "id": "minecraft:paper"
+                  },
+                  {
+                    "count": 1,
+                    "id": "minecraft:redstone"
+                  }
+                ],
+                "Inverted": 1
+              },
+              "Id": "create:redstone_link"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "cleared": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "Frequency": [
+                  {},
+                  {
+                    "count": 1,
+                    "id": "minecraft:redstone"
+                  }
+                ],
+                "Inverted": 0
+              },
+              "Id": "create:redstone_link"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  }
+}

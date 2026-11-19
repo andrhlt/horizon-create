@@ -1,0 +1,9 @@
+input,type,recipe,duration,experience,output,count
+zinc_ore,minecraft:smelting,create:smelting/zinc_ingot_from_ore,200,1.00,create:zinc_ingot,1
+zinc_ore,minecraft:blasting,create:blasting/zinc_ingot_from_ore,100,1.00,create:zinc_ingot,1
+deepslate_zinc_ore,minecraft:smelting,create:smelting/zinc_ingot_from_ore,200,1.00,create:zinc_ingot,1
+deepslate_zinc_ore,minecraft:blasting,create:blasting/zinc_ingot_from_ore,100,1.00,create:zinc_ingot,1
+raw_zinc,minecraft:smelting,create:smelting/zinc_ingot_from_raw_ore,200,0.70,create:zinc_ingot,1
+raw_zinc,minecraft:blasting,create:blasting/zinc_ingot_from_raw_ore,100,0.70,create:zinc_ingot,1
+crushed_raw_zinc,minecraft:smelting,create:smelting/zinc_ingot_from_crushed,200,0.10,create:zinc_ingot,1
+crushed_raw_zinc,minecraft:blasting,create:blasting/zinc_ingot_from_crushed,100,0.10,create:zinc_ingot,1

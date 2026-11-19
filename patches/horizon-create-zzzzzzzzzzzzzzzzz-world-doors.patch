@@ -1,0 +1,14 @@
+--- a/crates/horizon-client/src/game/use_hand.rs
++++ b/crates/horizon-client/src/game/use_hand.rs
+@@ -160,6 +160,11 @@
+                 // Read before the use runs: a sign's click commands execute in
+                 // `process_level_events` and may change or remove the sign, but
+                 // vanilla keeps the click consumed (`executedClickCommand`).
++                if super::create_elevator_doors::use_world_door(self, hit.pos) {
++                    self.trigger_default_block_use(hit.pos);
++                    self.swing_arm();
++                    return Ok(true);
++                }
+                 let sign_consumes = self.sign_consumes_click(hit.pos);
+                 let (result, branch) = self.with_level(|b, level, ticks| {
+                     b.use_item_on_branch(

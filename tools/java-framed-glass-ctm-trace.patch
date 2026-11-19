@@ -1,0 +1,96 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.framedGlassConnectedTextures"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,79 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 32)
++    public static void framedGlassConnectedTextures(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var at = helper.absolutePos(new BlockPos(1, 2, 1)).above(8);
++        var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++        var air = Blocks.AIR.defaultBlockState();
++        var framedShift = com.simibubi.create.AllSpriteShifts.FRAMED_GLASS;
++        int[] canonical = {0, 4, 68, 64, 20, 80, 21, 84, 87, 93, 245, 215, 16, 28, 124, 112, 5, 65, 69, 81, 213, 117, 125, 95, 17, 31, 255, 241, 29, 116, 23, 92, 247, 223, 119, 221, 1, 7, 199, 193, 71, 209, 197, 113, 253, 127, 85};
++        helper.runAtTickTime(4, () -> {
++            for (String mode : new String[] {"framed_glass", "horizontal_framed_glass", "vertical_framed_glass"}) {
++                var shift = switch (mode) {
++                    case "horizontal_framed_glass" -> com.simibubi.create.AllSpriteShifts.HORIZONTAL_FRAMED_GLASS;
++                    case "vertical_framed_glass" -> com.simibubi.create.AllSpriteShifts.VERTICAL_FRAMED_GLASS;
++                    default -> framedShift;
++                };
++                for (boolean skinny : new boolean[] {false, true}) {
++                    var tested = registry.get(com.simibubi.create.Create.asResource(mode + (skinny ? "_pane" : "")));
++                    com.simibubi.create.foundation.block.connected.ConnectedTextureBehaviour behavior = skinny
++                        ? new com.simibubi.create.foundation.block.connected.GlassPaneCTBehaviour(shift)
++                        : mode.equals("framed_glass")
++                            ? new com.simibubi.create.foundation.block.connected.SimpleCTBehaviour(shift)
++                            : new com.simibubi.create.foundation.block.connected.HorizontalCTBehaviour(shift,
++                                mode.equals("horizontal_framed_glass") ? framedShift : null);
++                    for (var face : net.minecraft.core.Direction.values()) {
++                        if (skinny && face.getAxis().isVertical())
++                            continue;
++                        var right = face.getAxis().isVertical() ? net.minecraft.core.Direction.EAST : face.getCounterClockWise();
++                        var up = face == net.minecraft.core.Direction.UP ? net.minecraft.core.Direction.NORTH
++                            : face == net.minecraft.core.Direction.DOWN ? net.minecraft.core.Direction.SOUTH : net.minecraft.core.Direction.UP;
++                        var center = tested.defaultBlockState();
++                        var neighbor = center;
++                        if (skinny) {
++                            if (face.getAxis() == net.minecraft.core.Direction.Axis.X)
++                                center = center.setValue(net.minecraft.world.level.block.CrossCollisionBlock.NORTH, true)
++                                    .setValue(net.minecraft.world.level.block.CrossCollisionBlock.SOUTH, true);
++                            else
++                                center = center.setValue(net.minecraft.world.level.block.CrossCollisionBlock.EAST, true)
++                                    .setValue(net.minecraft.world.level.block.CrossCollisionBlock.WEST, true);
++                            neighbor = neighbor.setValue(net.minecraft.world.level.block.CrossCollisionBlock.WATERLOGGED, true);
++                        }
++                        for (int x = -1; x <= 1; x++)
++                            for (int y = -1; y <= 1; y++)
++                                for (int z = -1; z <= 1; z++)
++                                    if (x != 0 || y != 0 || z != 0)
++                                        world.setBlock(at.offset(x, y, z), air, 2);
++                        world.setBlock(at, center, 2);
++                        var data = behavior.getDataType(world, at, center, face);
++                        int[] masks = data == null ? new int[] {0, 255}
++                            : data == framedShift.getType()
++                                ? ((face == net.minecraft.core.Direction.NORTH || face == net.minecraft.core.Direction.SOUTH)
++                                    ? canonical : new int[] {0, 1, 7, 16, 64, 255})
++                                : mode.equals("horizontal_framed_glass")
++                                    ? new int[] {0, 4, 64, 68} : new int[] {0, 1, 16, 17};
++                        int[] sides = {0, 1, 1, 1, 0, -1, -1, -1};
++                        int[] levels = {1, 1, 0, -1, -1, -1, 0, 1};
++                        for (int mask : masks) {
++                            for (int i = 0; i < 8; i++)
++                                world.setBlock(at.relative(up, levels[i]).relative(right, sides[i]),
++                                    ((mask >> i) & 1) != 0 ? neighbor : air, 2);
++                            if (data == null) {
++                                System.out.printf("CREATE_FRAMED_GLASS_CTM %s,%s,%s,%d,-1%n", mode, skinny,
++                                    face.getName(), mask);
++                            } else {
++                                var context = behavior.buildContext(world, at, center, face, data.getContextRequirement());
++                                System.out.printf("CREATE_FRAMED_GLASS_CTM %s,%s,%s,%d,%d%n", mode, skinny,
++                                    face.getName(), mask, data.getTextureIndex(context));
++                            }
++                        }
++                    }
++                }
++            }
++            helper.succeed();
++        });
++    }
+ }

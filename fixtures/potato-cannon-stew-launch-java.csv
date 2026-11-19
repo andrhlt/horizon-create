@@ -1,0 +1,3 @@
+case,result,ammo,damage,x,y,z,vx,vy,vz,item
+stew,SUCCESS,0,1,-0.750000000,1.469999999,1.500000000,0.079900189,0.000000000,1.598003766,minecraft:suspicious_stew
+invulnerable,SUCCESS,0,1,-0.750000000,1.469999999,1.500000000,0.079900189,0.000000000,1.598003766,minecraft:suspicious_stew

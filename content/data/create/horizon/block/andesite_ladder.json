@@ -1,0 +1,7 @@
+{
+  "template": "minecraft:ladder",
+  "properties": {
+    "map_color": 11,
+    "sounds": "minecraft:copper_block"
+  }
+}

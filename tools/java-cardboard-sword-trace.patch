@@ -1,0 +1,152 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..052da10 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.cardboardSword"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..199d03d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,133 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 115)
++	public static void cardboardSword(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 24, 2));
++		class Attacker extends net.neoforged.neoforge.common.util.FakePlayer {
++			Attacker() {
++				super(world, new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "SwordFixture"));
++			}
++
++			void arm(ItemStack stack, boolean charged) {
++				var main = net.minecraft.world.entity.EquipmentSlot.MAINHAND;
++				getMainHandItem().forEachModifier(main, (attribute, modifier) -> getAttribute(attribute).removeModifier(modifier));
++				setItemSlot(main, stack);
++				stack.forEachModifier(main, (attribute, modifier) -> getAttribute(attribute).addOrUpdateTransientModifier(modifier));
++				attackStrengthTicker = charged ? 25 : 0;
++			}
++		}
++		var attacker = new Attacker();
++		attacker.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var knockback = world.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT)
++			.getHolderOrThrow(net.minecraft.world.item.enchantment.Enchantments.KNOCKBACK);
++		record Swing(String name, EntityType<? extends net.minecraft.world.entity.Mob> kind,
++			boolean sprint, boolean enchant, boolean sword, boolean charged, float yaw) {}
++		var inputs = java.util.List.of(
++			new Swing("pig", EntityType.PIG, false, false, true, true, 0),
++			new Swing("zombie", EntityType.ZOMBIE, false, false, true, true, 90),
++			new Swing("sprint", EntityType.PIG, true, false, true, true, 0),
++			new Swing("sprint_uncharged", EntityType.PIG, true, false, true, false, 0),
++			new Swing("enchant", EntityType.PIG, false, true, true, true, 0),
++			new Swing("enchant_sprint", EntityType.PIG, true, true, true, true, 0),
++			new Swing("spider", EntityType.SPIDER, false, false, true, true, 0),
++			new Swing("spider_wood", EntityType.SPIDER, false, false, false, true, 0)
++		);
++		var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
++		var forcedChunks = new java.util.ArrayList<net.minecraft.world.level.ChunkPos>();
++		helper.runAtTickTime(1, () -> {
++			for (int x = (origin.getX() - 5) >> 4; x <= (origin.getX() + 5) >> 4; x++)
++				for (int z = (origin.getZ() - 5) >> 4; z <= (origin.getZ() + 16) >> 4; z++) {
++					if (world.setChunkForced(x, z, true))
++						forcedChunks.add(new net.minecraft.world.level.ChunkPos(x, z));
++				}
++			for (int dx = -5; dx <= 5; dx++)
++				for (int dz = -5; dz <= 16; dz++) {
++					world.setBlockAndUpdate(origin.offset(dx, -1, dz), Blocks.STONE.defaultBlockState());
++					for (int dy = 0; dy < 4; dy++)
++						world.setBlockAndUpdate(origin.offset(dx, dy, dz), Blocks.AIR.defaultBlockState());
++				}
++		});
++		for (int i = 0; i < inputs.size(); i++) {
++			var input = inputs.get(i);
++			int start = 4 + 13 * i;
++			var target = input.kind().create(world);
++			target.setPos(origin.getX() + 0.5, origin.getY(), origin.getZ() + 0.5);
++			target.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED).setBaseValue(0);
++			var range = target.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE);
++			if (range != null)
++				range.setBaseValue(0);
++			target.setPersistenceRequired();
++			if (target instanceof net.minecraft.world.entity.monster.Zombie)
++				target.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.CARVED_PUMPKIN));
++			helper.runAtTickTime(start - 1, () -> world.addFreshEntity(target));
++			java.util.function.IntConsumer capture = sample -> {
++				var slow = target.getEffect(net.minecraft.world.effect.MobEffects.MOVEMENT_SLOWDOWN);
++				var velocity = target.getDeltaMovement();
++				System.out.printf(java.util.Locale.ROOT,
++					"SWORD_TARGET,%s,%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%d,%d%n",
++					input.name(), sample, target.getHealth(),
++					target.getX() - origin.getX() - 0.5, target.getY() - origin.getY(), target.getZ() - origin.getZ() - 0.5,
++					velocity.x, velocity.y, velocity.z, slow == null ? 0 : slow.getDuration(),
++					slow == null ? -1 : slow.getAmplifier());
++			};
++
++			helper.runAtTickTime(start, () -> {
++				attacker.setPos(origin.getX() + 0.5 + (input.yaw() == 90 ? 2 : 0),
++					origin.getY(), origin.getZ() + 0.5 - (input.kind() == EntityType.SPIDER ? 1.7 : input.yaw() == 0 ? 2 : 0));
++				attacker.setYRot(input.yaw());
++				attacker.setOnGround(true);
++				target.setOnGround(true);
++				attacker.setSprinting(input.sprint());
++				attacker.setDeltaMovement(0.2, 0.05, 0.1);
++				var stack = input.sword() ? com.simibubi.create.AllItems.CARDBOARD_SWORD.asStack() : new ItemStack(Items.WOODEN_SWORD);
++				if (input.enchant())
++					stack.enchant(knockback, 2);
++				attacker.arm(stack, input.charged());
++				var sounds = new java.util.ArrayList<String>();
++				java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listener = sound -> {
++					if (sound.getLevel() != world || sound.getSound() == null || sound.isCanceled())
++						return;
++					var id = sound.getSound().value().getLocation();
++					if (id.getNamespace().equals("create"))
++						sounds.add(id + "|" + sound.getSource().name() + "|" + sound.getNewVolume() + "|" + sound.getNewPitch());
++				};
++				float before = target.getHealth();
++				float strength = attacker.getAttackStrengthScale(0.5f);
++				double damage = attacker.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE);
++				double speed = attacker.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_SPEED);
++				bus.addListener(net.neoforged.bus.api.EventPriority.LOWEST, listener);
++				try {
++					attacker.attack(target);
++				} finally {
++					bus.unregister(listener);
++				}
++				var velocity = attacker.getDeltaMovement();
++				System.out.printf(java.util.Locale.ROOT, "SWORD_SWING,%s,%.6f,%.6f,%.6f,%.6f,%d,%b,%.6f,%.6f,%.6f,%s%n",
++					input.name(), before, strength, damage, speed, stack.getDamageValue(), attacker.isSprinting(),
++					velocity.x, velocity.y, velocity.z, String.join(";", sounds));
++				capture.accept(0);
++				// The strike is complete. Keep the spider outside its random retaliation leap range.
++				if (input.kind() == EntityType.SPIDER)
++					attacker.setPos(origin.getX() + 0.5, origin.getY(), origin.getZ() + 0.5 - 6);
++			});
++			boolean last = i == inputs.size() - 1;
++			for (int tick = 1; tick <= 10; tick++) {
++				int sample = tick;
++				helper.runAtTickTime(start + tick, () -> {
++					capture.accept(sample);
++					if (sample == 10) {
++						target.discard();
++						if (last) {
++							for (var chunk : forcedChunks)
++								world.setChunkForced(chunk.x, chunk.z, false);
++							helper.succeed();
++						}
++					}
++				});
++			}
++		}
++	}
+ }

@@ -1,0 +1,9 @@
+scenario,result,hotbar_0,hotbar_1,main_0,main_1,paper_in_container,stick_in_container,open
+hand,SUCCESS,0,7,3,4,9,0,true
+sneak,SUCCESS,9,7,0,0,3,4,true
+missing,FAIL,9,7,3,4,0,0,false
+full,SUCCESS,9,7,3,4,0,1728,false
+partial,SUCCESS,5,7,3,4,64,1664,true
+filter_reject,SUCCESS,9,7,3,4,0,0,false
+filter_accept,SUCCESS,0,7,3,4,9,0,true
+empty_hand,SUCCESS,0,7,3,4,0,0,false

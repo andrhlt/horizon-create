@@ -1,0 +1,33 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaMovingFunnelSetup.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaMovingFunnelSetup.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaMovingFunnelSetup.java
+@@ -0,0 +1,28 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.kinetics.belt.item.BeltConnectorItem;
++import net.minecraft.core.BlockPos;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.event.tick.ServerTickEvent;
++
++@EventBusSubscriber
++public class JavaMovingFunnelSetup {
++    private static final BlockPos START = new BlockPos(2, 104, -11);
++    private static final BlockPos END = new BlockPos(6, 104, -11);
++    private static boolean connected;
++
++    @SubscribeEvent
++    public static void connectBelt(ServerTickEvent.Post event) {
++        if (!Boolean.getBoolean("parity.funnel.moving_setup") || connected)
++            return;
++        var level = event.getServer().overworld();
++        if (!level.hasChunkAt(START) || !AllBlocks.SHAFT.has(level.getBlockState(START))
++                || !AllBlocks.SHAFT.has(level.getBlockState(END)))
++            return;
++        BeltConnectorItem.createBelts(level, START, END);
++        connected = true;
++        System.out.println("CREATE_JAVA_FUNNEL_BELT_CONNECTED");
++    }
++}

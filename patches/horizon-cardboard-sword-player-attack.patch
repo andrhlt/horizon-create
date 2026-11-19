@@ -1,0 +1,30 @@
+--- a/crates/horizon-client/src/game/lan_actions.rs
++++ b/crates/horizon-client/src/game/lan_actions.rs
+@@ -3400,6 +3400,15 @@
+             .map(|(&fence, _)| fence)
+     }
+ 
++    fn create_player_attack_handled(
++        &mut self,
++        _host: &mut LanHost,
++        _conn: u32,
++        _victim: super::lan_pvp::Victim,
++        _handled: &mut bool,
++    ) {
++    }
++
+     fn guest_attack(&mut self, host: &mut LanHost, conn: u32, id: i32) {
+         let Some(gi) = host.hub.guests.iter().position(|g| g.conn == conn) else {
+             return;
+@@ -3440,6 +3449,11 @@
+             return;
+         }
+         if let Some(victim) = Self::pvp_victim(host, conn, id) {
++            let mut handled = false;
++            self.create_player_attack_handled(host, conn, victim, &mut handled);
++            if handled {
++                return;
++            }
+             if let Some(Some(strike)) = self.as_guest(host, conn, |g| g.pvp_strike())
+                 && self.pvp_land(host, victim, &strike)
+             {

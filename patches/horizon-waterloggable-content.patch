@@ -1,0 +1,35 @@
+diff --git a/crates/horizon-mods/src/content.rs b/crates/horizon-mods/src/content.rs
+--- a/crates/horizon-mods/src/content.rs
++++ b/crates/horizon-mods/src/content.rs
+@@ -75,6 +75,9 @@
+ #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+ #[serde(deny_unknown_fields)]
+ pub struct BlockProperties {
++    /// The block implements the standard bucket and fluid rules for its waterlogged state.
++    #[serde(default)]
++    pub waterloggable: bool,
+     /// Destroy time in seconds of hand mining (-1: unbreakable).
+     pub hardness: Option<f32>,
+     pub explosion_resistance: Option<f32>,
+diff --git a/crates/horizon-client/src/mod_content.rs b/crates/horizon-client/src/mod_content.rs
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -1498,6 +1498,18 @@
+                         }
+                         if !b.decl.item && b.wall_of.is_none() {
+                             v.set("item", J::Str("minecraft:air".into()));
++                        }
++                        if b.decl.properties.waterloggable {
++                            let mut interfaces = match v.get("interfaces") {
++                                Some(J::Arr(interfaces)) => interfaces.clone(),
++                                _ => Vec::new(),
++                            };
++                            if !interfaces.iter().any(|interface| {
++                                matches!(interface, J::Str(name) if name == "SimpleWaterloggedBlock")
++                            }) {
++                                interfaces.push(J::Str("SimpleWaterloggedBlock".into()));
++                            }
++                            v.set("interfaces", J::Arr(interfaces));
+                         }
+                         // `SignBlock.getWoodType`: the wood's name is what
+                         // the editor reads of it.

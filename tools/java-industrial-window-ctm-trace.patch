@@ -1,0 +1,87 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.industrialWindowConnectedTextures"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,70 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 32)
++    public static void industrialWindowConnectedTextures(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var at = helper.absolutePos(new BlockPos(1, 2, 1)).above(8);
++        var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++        var air = Blocks.AIR.defaultBlockState();
++        var rect = com.simibubi.create.foundation.block.connected.AllCTTypes.RECTANGLE;
++        var solid = new com.simibubi.create.foundation.block.connected.HorizontalCTBehaviour(null);
++        var pane = new com.simibubi.create.foundation.block.connected.GlassPaneCTBehaviour(null);
++        helper.runAtTickTime(4, () -> {
++            for (boolean skinny : new boolean[] {false, true}) {
++                String suffix = skinny ? "_window_pane" : "_window";
++                var tested = registry.get(com.simibubi.create.Create.asResource("industrial_iron" + suffix));
++                var different = registry.get(com.simibubi.create.Create.asResource("ornate_iron" + suffix));
++                var behavior = skinny ? pane : solid;
++                for (var face : net.minecraft.core.Direction.Plane.HORIZONTAL) {
++                    var right = face.getClockWise();
++                    var center = tested.defaultBlockState();
++                    var neighbor = center;
++                    if (skinny) {
++                        if (face.getAxis() == net.minecraft.core.Direction.Axis.X)
++                            center = center.setValue(net.minecraft.world.level.block.CrossCollisionBlock.NORTH, true)
++                                .setValue(net.minecraft.world.level.block.CrossCollisionBlock.SOUTH, true);
++                        else
++                            center = center.setValue(net.minecraft.world.level.block.CrossCollisionBlock.EAST, true)
++                                .setValue(net.minecraft.world.level.block.CrossCollisionBlock.WEST, true);
++                        neighbor = neighbor.setValue(net.minecraft.world.level.block.CrossCollisionBlock.WATERLOGGED, true);
++                    }
++                    world.setBlock(at, center, 2);
++                    for (int testCase = 0; testCase <= 20; testCase++) {
++                        for (int dy = -1; dy <= 1; dy++)
++                            for (int h = -1; h <= 1; h++)
++                                for (int d = 0; d <= 1; d++)
++                                    if (dy != 0 || h != 0 || d != 0)
++                                        world.setBlock(at.above(dy).relative(right, h).relative(face, d), air, 2);
++                        int mask = testCase <= 15 ? testCase
++                            : testCase == 16 ? 15 : testCase == 19 ? 8 : 1;
++                        if ((mask & 1) != 0)
++                            world.setBlock(at.above(), testCase == 20 ? different.defaultBlockState() : neighbor, 2);
++                        if ((mask & 2) != 0)
++                            world.setBlock(at.below(), neighbor, 2);
++                        if ((mask & 4) != 0)
++                            world.setBlock(at.relative(right.getOpposite()), neighbor, 2);
++                        if ((mask & 8) != 0)
++                            world.setBlock(at.relative(right), neighbor, 2);
++                        if (testCase == 16)
++                            for (int dy : new int[] {-1, 1})
++                                for (int h : new int[] {-1, 1})
++                                    world.setBlock(at.above(dy).relative(right, h), neighbor, 2);
++                        if (testCase == 17)
++                            world.setBlock(at.above().relative(face), neighbor, 2);
++                        if (testCase == 18)
++                            world.setBlock(at.above().relative(face), Blocks.STONE.defaultBlockState(), 2);
++                        if (testCase == 19)
++                            world.setBlock(at.relative(right).relative(face), neighbor, 2);
++                        var context = behavior.buildContext(world, at, center, face, rect.getContextRequirement());
++                        System.out.printf("CREATE_INDUSTRIAL_CTM %s,%s,%d,%d,%s,%s,%s,%s%n", skinny,
++                            face.getName(), testCase, rect.getTextureIndex(context), context.up,
++                            context.down, context.left, context.right);
++                    }
++                }
++            }
++            helper.succeed();
++        });
++    }
+ }

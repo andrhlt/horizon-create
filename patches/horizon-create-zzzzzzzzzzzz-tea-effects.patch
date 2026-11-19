@@ -1,0 +1,69 @@
+--- a/crates/horizon-client/src/game/lan_actions.rs
++++ b/crates/horizon-client/src/game/lan_actions.rs
+@@ -4298,6 +4298,7 @@
+             let digging = play.digging;
+             let using = play.using.is_some();
+             let delayed = play.destroy_delay > 0 || play.use_delay > 0 || play.attack_ticks < 100;
++            let mut tea_use = false;
+             if digging.is_some() || using || delayed {
+                 if pre_pending {
+                     pre_pending = false;
+@@ -4309,7 +4310,7 @@
+                 } else {
+                     Vec::new()
+                 };
+-                self.as_guest(host, conn, |g| {
++                tea_use = self.as_guest(host, conn, |g| {
+                     let outer = std::mem::replace(&mut g.stab_players, players);
+                     g.attack_ticks = g.attack_ticks.saturating_add(1);
+                     if let Some((pos, face)) = digging {
+@@ -4326,11 +4327,16 @@
+                     let _ = g.tick_mining();
+                     g.forced_hit = None;
+                     g.right = g.using.is_some();
+-                    g.tick_using();
++                    let tea_use = g.using.and_then(|(slot, _)| g.stack_in(slot))
++                        .is_some_and(|stack| stack.item.as_ref() == "create:builders_tea");
++                    if !tea_use {
++                        g.tick_using();
++                    }
+                     g.stab_players = outer;
+                     if g.use_delay > 0 {
+                         g.use_delay -= 1;
+                     }
+-                });
++                    tea_use
++                }).unwrap_or(false);
+                 self.land_player_stabs(host);
+                 // ServerPlayerGameMode.handleBlockBreakAction: creative and
+@@ -4372,7 +4378,7 @@
+                 play.attack_item = held.cloned();
+             }
+             self.guest_delayed_destroy(host, conn);
+-            self.guest_server_tick(host, conn);
++            self.guest_server_tick(host, conn, tea_use);
+             // Player.tick's statistics and ServerPlayer.tick's triggers, then
+             // PlayerAdvancements.flushDirty.
+             let sleeping = host.hub.guests[gi].sleeping;
+@@ -5073,7 +5079,7 @@
+     /// hazards (drowning, lava, fire blocks, suffocation, the void), and
+     /// regeneration and the food tick (ServerPlayer.doTick). Their hurt
+     /// sounds are heard at the guest.
+-    fn guest_server_tick(&mut self, host: &mut LanHost, conn: u32) {
++    fn guest_server_tick(&mut self, host: &mut LanHost, conn: u32, tea_use: bool) {
+         self.guest_replay(host, conn);
+         self.guest_vehicle_tick(host, conn);
+         // The last move's fall stands in for the server's delta movement.
+@@ -5275,6 +5281,12 @@
+             // LivingEntity.baseTick: outside the world border, then tickEffects.
+             game.border_damage();
+             game.tick_mob_effects();
++            if tea_use {
++                // Java finishes the drink after LivingEntity.baseTick ages
++                // existing effects. A newly applied Haste must keep tick 3600.
++                game.right = game.using.is_some();
++                game.tick_using();
++            }
+             // Soul Speed's effects (LivingEntity.baseTick's location_changed
+             // and tick effects); its particle goes to the players around.
+             soul = game.tick_soul_speed();

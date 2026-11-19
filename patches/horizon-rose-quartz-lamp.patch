@@ -1,0 +1,96 @@
+--- a/crates/horizon-world/src/level/mod.rs
++++ b/crates/horizon-world/src/level/mod.rs
+@@ -476,6 +476,16 @@
+         _moved: bool,
+     ) {
+     }
++    /// Handle a registered block's synchronous neighbour response with the level's ticks.
++    fn handle_native_neighbor_change(
++        &mut self, _ticks: &mut Ticks, _pos: BlockPos, _state: BlockStateId,
++    ) -> bool {
++        false
++    }
++    /// Whether a block relays nearby direct power, and samples power when placed.
++    fn native_signal_options(&self, _state: BlockStateId) -> (bool, bool) {
++        (true, false)
++    }
+     /// Bukkit's `BlockRedstoneEvent`: the button, lever or pressure plate at `pos` is about
+     /// to change its signal from `old` to `new` (0 to 15). The level may change `new`; the
+     /// component then takes that signal (one equal to `old` keeps it as it is). The
+--- a/crates/horizon-world/src/level/hooks.rs
++++ b/crates/horizon-world/src/level/hooks.rs
+@@ -30,6 +30,9 @@
+     ) {
+         self.level
+             .observe_neighbor_changed(pos, state, changed, moved);
++        if self.level.handle_native_neighbor_change(self.ticks, pos, state) {
++            return;
++        }
+         let b = self.b;
+         let block = b.block(state);
+         let chain = &b.data(state).chain;
+--- a/crates/horizon-world/src/level/redstone.rs
++++ b/crates/horizon-world/src/level/redstone.rs
+@@ -163,7 +163,7 @@
+     pub fn signal(&self, pos: BlockPos, direction: Direction) -> i32 {
+         let state = self.state(pos);
+         let signal = self.state_signal(state, pos, direction);
+-        if self.is_redstone_conductor(state, pos) {
++        if self.is_redstone_conductor(state, pos) && self.level.native_signal_options(state).0 {
+             signal.max(self.direct_signal_to(pos))
+         } else {
+             signal
+--- a/crates/horizon-world/src/level/place.rs
++++ b/crates/horizon-world/src/level/place.rs
+@@ -313,7 +313,12 @@
+             Some(None) => return None,
+             _ => {}
+         }
+-        self.placement_at(block, 0, ctx)
++        let state = self.placement_at(block, 0, ctx)?;
++        if self.level.native_signal_options(state).1 {
++            let powered = self.has_neighbor_signal(ctx.pos);
++            return Some(self.b.table.set_bool(state, self.b.props.powered, powered));
++        }
++        Some(state)
+     }
+ 
+     fn placement_at(
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -1102,6 +1102,18 @@
+         if self.native_authoritative {
+             self.native_neighbor_changed(self.dimension, pos, state, changed, moved);
+         }
++    }
++    fn handle_native_neighbor_change(&mut self, ticks: &mut Ticks, pos: BlockPos, state: BlockStateId) -> bool {
++        let mut handled = false;
++        if self.native_authoritative {
++            self.native_handle_neighbor_change(ticks, pos, state, &mut handled);
++        }
++        handled
++    }
++    fn native_signal_options(&self, state: BlockStateId) -> (bool, bool) {
++        let mut options = (true, false);
++        self.native_override_signal_options(state, &mut options);
++        options
+     }
+     fn redstone_change(&self, pos: BlockPos, old: i32, new: &mut i32) {
+         if self.native_authoritative {
+--- a/crates/horizon-client/src/game/native_hooks.rs
++++ b/crates/horizon-client/src/game/native_hooks.rs
+@@ -1308,6 +1308,14 @@
+         );
+     }
+ 
++    #[allow(unused_variables)]
++    pub(super) fn native_handle_neighbor_change(
++        &mut self, ticks: &mut Ticks, pos: BlockPos, state: BlockStateId, handled: &mut bool,
++    ) {}
++
++    #[allow(unused_variables)]
++    pub(super) fn native_override_signal_options(&self, state: BlockStateId, options: &mut (bool, bool)) {}
++
+     /// On an authoritative server, a fluid flows or fire spreads from `from`
+     /// into `to` (`kind` is `fluid` or `fire`): `FlowingFluid.spreadTo`, and
+     /// `FireBlock.tick` setting fire to `to` or burning it (`checkBurnOut`).

@@ -1,0 +1,2 @@
+case,selected_stone,result,hit_face,changed_dx,changed_dy,changed_dz,before,after,item_count
+cuboid_attached_fill,true,SUCCESS,south,0,0,1,minecraft:air,minecraft:stone,1

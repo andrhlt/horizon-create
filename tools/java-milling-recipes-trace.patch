@@ -1,0 +1,95 @@
+diff --git a/src/main/java/com/simibubi/create/content/kinetics/millstone/MillstoneBlockEntity.java b/src/main/java/com/simibubi/create/content/kinetics/millstone/MillstoneBlockEntity.java
+index cc8a5aa..99a3568 100644
+--- a/src/main/java/com/simibubi/create/content/kinetics/millstone/MillstoneBlockEntity.java
++++ b/src/main/java/com/simibubi/create/content/kinetics/millstone/MillstoneBlockEntity.java
+@@ -44,6 +44,7 @@ public class MillstoneBlockEntity extends KineticBlockEntity implements Clearabl
+ 	public ItemStackHandler outputInv;
+ 	public IItemHandler capability;
+ 	public int timer;
++	public net.minecraft.util.RandomSource wheatFixtureRandom;
+ 	private MillingRecipe lastRecipe;
+ 
+ 	public MillstoneBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
+@@ -160,7 +161,7 @@ public class MillstoneBlockEntity extends KineticBlockEntity implements Clearabl
+ 		ItemStack craftingRemainingItem = stackInSlot.getCraftingRemainingItem();
+ 		stackInSlot.shrink(1);
+ 		inputInv.setStackInSlot(0, stackInSlot);
+-		lastRecipe.rollResults(level.random)
++		lastRecipe.rollResults(wheatFixtureRandom == null ? level.random : wheatFixtureRandom)
+ 			.forEach(stack -> ItemHandlerHelper.insertItemStacked(outputInv, stack, false));
+ 		if (!craftingRemainingItem.isEmpty()) {
+ 			ItemHandlerHelper.insertItemStacked(outputInv, craftingRemainingItem, false);
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..80a0931 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestProcessing.traceMilling"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d..f5d9fd3 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,55 @@ public class TestProcessing {
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void traceMillingClay(CreateGameTestHelper helper) {
++		traceMillingRecipe(helper, "clay", Items.CLAY, Items.CLAY_BALL, Items.AIR, 4);
++	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void traceMillingWool(CreateGameTestHelper helper) {
++		traceMillingRecipe(helper, "wool", Items.MAGENTA_WOOL, Items.STRING, Items.AIR, 1);
++	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void traceMillingBone(CreateGameTestHelper helper) {
++		traceMillingRecipe(helper, "bone", Items.BONE, Items.BONE_MEAL, Items.WHITE_DYE, 3);
++	}
++
++	private static void traceMillingRecipe(CreateGameTestHelper helper, String name,
++		net.minecraft.world.item.Item input, net.minecraft.world.item.Item output,
++		net.minecraft.world.item.Item bonus, int minimum) {
++		var mill = (com.simibubi.create.content.kinetics.millstone.MillstoneBlockEntity)
++			helper.getBlockEntity(new BlockPos(2, 3, 1));
++		mill.wheatFixtureRandom = net.minecraft.util.RandomSource.create(2L);
++		var barrel = new BlockPos(2, 7, 1);
++		var storage = helper.itemStorageAt(barrel);
++		for (int slot = 0; slot < storage.getSlots(); slot++)
++			storage.extractItem(slot, 64, false);
++		storage.insertItem(0, new ItemStack(input, 1), false);
++		helper.pullLever(new BlockPos(1, 7, 1));
++		var hopper = new BlockPos(2, 2, 1);
++		var chest = new BlockPos(1, 2, 1);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var hopperItems = helper.getItemContent(hopper);
++			var chestItems = helper.getItemContent(chest);
++			long milled = 0;
++			long milledBonus = 0;
++			for (int slot = 0; slot < mill.outputInv.getSlots(); slot++) {
++				var stack = mill.outputInv.getStackInSlot(slot);
++				if (stack.is(output))
++					milled += stack.getCount();
++				if (stack.is(bonus))
++					milledBonus += stack.getCount();
++			}
++			System.out.printf("CREATE_MILLING %s %d %d %d %d %d %d %d %d %d %d%n", name, tick,
++				helper.getItemContent(barrel).getLong(input), mill.inputInv.getStackInSlot(0).getCount(),
++				mill.timer, milled, milledBonus, hopperItems.getLong(output), hopperItems.getLong(bonus),
++				chestItems.getLong(output), chestItems.getLong(bonus));
++			helper.assertTrue(tick >= 105, "Waiting for all outputs to reach the chest");
++			helper.assertTrue(chestItems.getLong(output) >= minimum, "Missing milled output");
++		});
++	}
++
+ }

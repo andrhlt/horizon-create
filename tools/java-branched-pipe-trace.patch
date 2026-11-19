@@ -1,0 +1,55 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..c453b56 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.threePipeCombine") || test.testName().equals("TestFluids.threePipeSplit"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+index 4102b83..d0472a6 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -127,6 +127,7 @@ public class TestFluids {
+ 		BlockPos pumpPos = new BlockPos(2, 2, 2);
+ 		helper.flipBlock(pumpPos);
+ 		helper.succeedWhen(() -> {
++			traceBranchedPipe(helper, "combine", pumpPos, tank1Pos, tank2Pos, tank3Pos, new BlockPos(1, 2, 2));
+ 			helper.assertSecondsPassed(13);
+ 			// make sure fully drained
+ 			helper.assertTanksEmpty(tank1Pos, tank2Pos, tank3Pos);
+@@ -151,6 +152,7 @@ public class TestFluids {
+ 		helper.flipBlock(pumpPos);
+ 
+ 		helper.succeedWhen(() -> {
++			traceBranchedPipe(helper, "split", pumpPos, tank1Pos, tank2Pos, tank3Pos, outputTankPos);
+ 			helper.assertSecondsPassed(7);
+ 			FluidStack contents = helper.getTankContents(outputTankPos);
+ 			if (!contents.isEmpty()) {
+@@ -163,6 +165,20 @@ public class TestFluids {
+ 		});
+ 	}
+ 
++	private static void traceBranchedPipe(CreateGameTestHelper helper, String mode, BlockPos pumpPos, BlockPos a, BlockPos b, BlockPos c, BlockPos other) {
++		var access = helper.getLevel().registryAccess();
++		var pump = helper.getBlockEntity(pumpPos).saveWithoutMetadata(access);
++		long tick = helper.getTick();
++		System.out.printf(java.util.Locale.ROOT, "CREATE_BRANCH %s %d %.7f %d %d %d %d%n", mode, tick,
++			pump.getFloat("Speed"), helper.getTankContents(other).getAmount(),
++			helper.getTankContents(a).getAmount(), helper.getTankContents(b).getAmount(), helper.getTankContents(c).getAmount());
++		if (tick <= 24) {
++			var junction = helper.getBlockEntity(new BlockPos(3, 2, 2)).saveWithoutMetadata(access);
++			var pipe = helper.getBlockEntity(new BlockPos(4, 2, 2)).saveWithoutMetadata(access);
++			System.out.printf("CREATE_BRANCH_DETAILS %s %d %s %s %s%n", mode, tick, pump, junction, pipe);
++		}
++	}
++
+ 	@GameTest(template = "large_waterwheel", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
+ 	public static void largeWaterwheel(CreateGameTestHelper helper) {
+ 		BlockPos wheel = new BlockPos(4, 3, 2);

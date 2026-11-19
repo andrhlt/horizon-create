@@ -1,0 +1,145 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..b27590652 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.curvedSignalChain"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..b04f60441 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,126 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 190)
++	public static void curvedSignalChain(CreateGameTestHelper helper) {
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var level = helper.getLevel();
++		var track = com.simibubi.create.AllBlocks.TRACK.get();
++		var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
++		var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
++		var origin = new BlockPos(8, 180, 72);
++		for (int x = -2; x <= 2; x++)
++			for (int z = -4; z <= 1; z++)
++				level.setChunkForced((origin.getX() >> 4) + x, (origin.getZ() >> 4) + z, true);
++		for (int x = -3; x <= 24; x++) {
++			level.setBlockAndUpdate(origin.offset(x,-1,0), Blocks.SMOOTH_STONE.defaultBlockState());
++			level.setBlockAndUpdate(origin.east(x), rail);
++			level.setBlockAndUpdate(origin.east(x).above(), Blocks.AIR.defaultBlockState());
++		}
++		var bendStart = origin.west(3);
++		var bendEnd = origin.offset(-13, 0, -10);
++		for (int z = -10; z >= -45; z--) {
++			var at = origin.offset(-13,0,z);
++			level.setBlockAndUpdate(at.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++			if (z < -10)
++				level.setBlockAndUpdate(at, track.defaultBlockState().setValue(shape,
++					com.simibubi.create.content.trains.track.TrackShape.ZO));
++		}
++		var layout = new ItemStack(track, 64); player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, layout);
++		player.setYRot(90);
++		player.setXRot(20);
++		com.simibubi.create.content.trains.track.TrackBlockItem.select(level, bendStart, player.getLookAngle(), layout);
++		player.setYRot(180);
++		com.simibubi.create.content.trains.track.TrackPlacement.tryConnect(level, player, bendEnd,
++			track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.ZO),
++			layout, false, false);
++		helper.assertTrue(player.getMainHandItem().getCount() < 64, "Java track placement did not lay the 90-degree bend");
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        var station = com.simibubi.create.AllBlocks.TRACK_STATION;
++        var stationItem = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) station.asItem();
++        var stationPos = origin.south(2);
++        level.setBlockAndUpdate(stationPos, Blocks.AIR.defaultBlockState());
++        level.setBlockAndUpdate(stationPos.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++        helper.runAfterDelay(7, () -> {
++            player.setItemInHand(hand, new ItemStack(stationItem));
++            player.setYRot(90);
++            player.setXRot(20);
++            clickTrackForAssembly(stationItem, player, origin);
++            clickTrackForAssembly(stationItem, player, stationPos.below());
++            helper.assertTrue(station.has(level.getBlockState(stationPos)), "Expected nearby Track Station");
++        });
++        var signal = com.simibubi.create.AllBlocks.TRACK_SIGNAL;
++        var signalItem = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) signal.asItem();
++        var signalPlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++        var approaches = java.util.List.of(origin.west(2), origin.west(2),
++            origin.offset(-13, 0, -15), origin.offset(-13, 0, -15));
++        var signalPositions = java.util.List.of(approaches.get(0).north(3), approaches.get(1).south(3),
++            approaches.get(2).east(3), approaches.get(3).west(3));
++        var wrench = com.simibubi.create.AllItems.WRENCH.get();
++        var type = com.simibubi.create.content.trains.signal.SignalBlock.TYPE;
++        for (int t = 1; t <= 105; ++t) {
++            int tick = t;
++            helper.runAtTickTime(tick + 9, () -> {
++                if (tick == 1) {
++                    float[] heading = {90, -90, 0, 180};
++                    for (int i = 0; i < signalPositions.size(); i++) {
++                        var position = signalPositions.get(i);
++                        level.setBlockAndUpdate(position, Blocks.AIR.defaultBlockState());
++                        level.setBlockAndUpdate(position.above(), Blocks.AIR.defaultBlockState());
++                        var support = position.below();
++                        level.setBlockAndUpdate(support, Blocks.SMOOTH_STONE.defaultBlockState());
++                        signalPlayer.setItemInHand(hand, new ItemStack(signalItem));
++                        signalPlayer.setYRot(heading[i]);
++                        signalPlayer.setXRot(20);
++                        var target = approaches.get(i);
++                        signalPlayer.setPos(target.getX() + .5, target.getY() + 1, target.getZ() + .5);
++                        clickTrackForAssembly(signalItem, signalPlayer, target);
++                        signalPlayer.setPos(support.getX() + .5, support.getY() + 1, support.getZ() + .5);
++                        clickTrackForAssembly(signalItem, signalPlayer, support);
++                        helper.assertTrue(signal.has(level.getBlockState(position)), "Signal placement failed at " + position);
++                        // Pin edge-point map order for repeatable upstream-first updates.
++                        var placed = (com.simibubi.create.content.trains.signal.SignalBlockEntity)
++                            level.getBlockEntity(position);
++                        var tag = placed.saveWithoutMetadata(level.registryAccess());
++                        tag.putUUID("Id", new java.util.UUID(0, new int[] {1, 2, 7, 8}[i]));
++                        placed.edgePoint.read(tag, level.registryAccess(), false);
++                    }
++                }
++                if (tick == 8 || tick == 84) {
++                    var pos = signalPositions.getFirst();
++                    var face = net.minecraft.core.Direction.UP;
++                    var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(face, .5), face, pos, false);
++                    signalPlayer.setPos(pos.getX() + .5, pos.getY() + .2, pos.getZ() + 1.5);
++                    signalPlayer.setItemInHand(hand, new ItemStack(wrench));
++                    wrench.useOn(new net.minecraft.world.item.context.UseOnContext(signalPlayer, hand, hit));
++                }
++                if (tick == 20 || tick == 73)
++                    level.setBlockAndUpdate(signalPositions.get(3).above(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++                if (tick == 40 || tick == 95)
++                    level.setBlockAndUpdate(signalPositions.get(3).above(), Blocks.AIR.defaultBlockState());
++                if (tick == 53)
++                    level.setBlockAndUpdate(signalPositions.get(2).above(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++                if (tick == 64)
++                    level.setBlockAndUpdate(signalPositions.get(2).above(), Blocks.AIR.defaultBlockState());
++                var out = new StringBuilder("CREATE_CURVED_SIGNAL_CHAIN ").append(tick);
++                for (var pos : signalPositions) {
++                    var placed = (com.simibubi.create.content.trains.signal.SignalBlockEntity) level.getBlockEntity(pos);
++                    out.append(';').append(placed.getState().name())
++                        .append(';').append(level.getBlockState(pos).getValue(type).getSerializedName());
++                }
++                System.out.println(out);
++                if (tick == 105)
++                    helper.succeed();
++            });
++        }
++    }
++
++	private static void clickTrackForAssembly(com.simibubi.create.content.trains.track.TrackTargetingBlockItem item,
++			net.minecraft.world.entity.player.Player player, BlockPos pos) {
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(pos).add(0,.5,0), net.minecraft.core.Direction.UP, pos, false);
++		item.useOn(new net.minecraft.world.item.context.UseOnContext(player,
++			net.minecraft.world.InteractionHand.MAIN_HAND, hit));
++	}
+ }

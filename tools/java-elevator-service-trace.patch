@@ -1,0 +1,176 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-            .filter(test -> test.testName().equals("TestContraptions.elevatorPassengers"))
++            .filter(test -> test.testName().equals("TestContraptions.elevatorService"))
+             .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -2,8 +2,11 @@
+ 
+ import static com.simibubi.create.content.contraptions.actors.contraptionControls.ContraptionControlsMovement.tickFloorSelection;
+ 
++import java.util.ArrayList;
+ import java.util.List;
+ import java.util.Locale;
++import java.util.Set;
++import java.util.function.Consumer;
+ import java.util.UUID;
+ import java.util.concurrent.atomic.AtomicInteger;
+ 
+@@ -18,9 +21,12 @@
+ import com.simibubi.create.content.contraptions.elevator.ElevatorContactBlockEntity;
+ import com.simibubi.create.content.contraptions.elevator.ElevatorContactEditPacket;
+ import com.simibubi.create.content.contraptions.elevator.ElevatorContraption;
++import com.simibubi.create.content.contraptions.glue.SuperGlueEntity;
+ import com.simibubi.create.content.contraptions.elevator.ElevatorPulleyBlockEntity;
+ import com.simibubi.create.content.contraptions.elevator.ElevatorTargetFloorPacket;
+ import com.simibubi.create.content.contraptions.sync.ContraptionInteractionPacket;
++import com.simibubi.create.content.decoration.slidingDoor.DoorControlBehaviour;
++import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
+ import com.simibubi.create.content.decoration.slidingDoor.DoorControl;
+ import com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftBlock;
+ import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
+@@ -47,12 +53,19 @@
+ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.item.Items;
+ import net.minecraft.world.level.GameType;
++import net.minecraft.world.level.block.Block;
++import net.minecraft.world.level.block.DoorBlock;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
++import net.minecraft.world.phys.AABB;
+ import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.CropBlock;
+ import net.minecraft.world.level.block.LeverBlock;
+ import net.minecraft.world.level.block.RedstoneLampBlock;
+ import net.minecraft.world.phys.Vec3;
+ 
++import net.neoforged.neoforge.common.NeoForge;
++import net.neoforged.neoforge.event.PlayLevelSoundEvent;
+ import net.neoforged.neoforge.fluids.FluidStack;
+ 
+ @GameTestGroup(path = "contraptions")
+@@ -347,8 +360,115 @@
+ 			return ",,,";
+ 		return String.format(Locale.ROOT, "%b,%.9f,%.9f,%.9f", passenger.isPassenger(),
+ 			passenger.getX() - origin.getX(), passenger.getY() - origin.getY(), passenger.getZ() - origin.getZ());
++	}
++
++	@GameTest(template = "elevator", timeoutTicks = 110)
++	public static void elevatorService(CreateGameTestHelper helper) {
++		BlockPos pulley = new BlockPos(5, 12, 3);
++		BlockPos bottom = new BlockPos(2, 2, 2);
++		BlockPos top = new BlockPos(2, 11, 2);
++		BlockPos controls = new BlockPos(3, 3, 2);
++		BlockPos cabinDoor = new BlockPos(3, 3, 3);
++		BlockPos lowerDoor = new BlockPos(3, 3, 4);
++		BlockPos upperDoor = new BlockPos(3, 12, 4);
++		BlockPos origin = helper.absolutePos(new BlockPos(0, 1, 0));
++		helper.setBlock(new BlockPos(4, 3, 2), Blocks.AIR);
++		placeElevatorDoor(helper, cabinDoor, AllBlocks.TRAIN_DOOR.get());
++		helper.setBlock(lowerDoor.below(), Blocks.IRON_BLOCK);
++		helper.setBlock(upperDoor.below(), Blocks.IRON_BLOCK);
++		placeElevatorDoor(helper, lowerDoor, Blocks.IRON_DOOR);
++		placeElevatorDoor(helper, upperDoor, Blocks.IRON_DOOR);
++		helper.getLevel().addFreshEntity(new SuperGlueEntity(helper.getLevel(),
++			new AABB(Vec3.atLowerCornerOf(helper.absolutePos(cabinDoor.below())),
++				Vec3.atLowerCornerOf(helper.absolutePos(cabinDoor.above().offset(1, 1, 1))))));
++		ServerPlayer host = createElevatorPlayer(helper, "ParityHost");
++		ServerPlayer guest = createElevatorPlayer(helper, "ParityGuest");
++		List<String> soundEvents = new ArrayList<>();
++		Consumer<PlayLevelSoundEvent.AtPosition> listen = event -> {
++			if (event.getLevel() != helper.getLevel() || event.getSound() == null)
++				return;
++			var sound = event.getSound().value().getLocation();
++			if (Set.of("block.iron_door.open", "block.iron_door.close", "controller_click",
++				"contraption_assemble", "contraption_assemble_compounded_1", "contraption_disassemble").contains(sound.getPath()))
++				soundEvents.add(sound.toString());
++		};
++		NeoForge.EVENT_BUS.addListener(listen);
++
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var main = helper.getBlockEntity(AllBlockEntityTypes.ELEVATOR_PULLEY.get(), pulley);
++			var cabin = main.getAttachedContraption();
++			var elevator = cabin == null ? null : (ElevatorContraption) cabin.getContraption();
++			var target = elevator == null ? null : elevator.getCurrentTargetY(helper.getLevel());
++			BlockPos localDoor = elevator == null ? null : helper.absolutePos(cabinDoor).subtract(elevator.anchor);
++			var moving = elevator == null ? null : elevator.getBlocks().get(localDoor);
++			var movingUpper = elevator == null ? null : elevator.getBlocks().get(localDoor.above());
++			System.out.printf(Locale.ROOT, "ELEVATOR_SERVICE %d,%s,%s,%b,%b,%s,%s,%s,%s,%s,%s,%s,%s,%s%n",
++				tick, cabin == null ? "" : String.format(Locale.ROOT, "%.9f", cabin.getY() - origin.getY()),
++				target == null ? "" : Integer.toString(target - origin.getY()),
++				helper.getBlockState(bottom.above()).getValue(RedstoneLampBlock.LIT),
++				helper.getBlockState(top.above()).getValue(RedstoneLampBlock.LIT),
++				elevatorDoorMode(helper, bottom), elevatorDoorMode(helper, top),
++				moving == null ? "" : elevatorOpen(moving.state()),
++				movingUpper == null ? "" : elevatorOpen(movingUpper.state()),
++				elevatorOpen(helper.getBlockState(lowerDoor)), elevatorOpen(helper.getBlockState(lowerDoor.above())),
++				elevatorOpen(helper.getBlockState(upperDoor)), elevatorOpen(helper.getBlockState(upperDoor.above())),
++				String.join("|", soundEvents));
++			soundEvents.clear();
++
++			switch ((int) tick) {
++				case 15 -> main.clicked();
++				case 18 -> {
++					helper.assertTrue(cabin != null, "Assembly: " + main.getLastAssemblyException());
++					placeElevatorPlayer(helper, host, 0.5, 3.0, 2.5);
++					new ElevatorContactEditPacket(helper.absolutePos(bottom), "G", "Ground", DoorControl.SOUTH).handle(host);
++					placeElevatorPlayer(helper, guest, 0.5, 12.0, 2.5);
++					new ElevatorContactEditPacket(helper.absolutePos(top), "U", "Upper", DoorControl.NONE).handle(guest);
++				}
++				case 25 -> {
++					helper.assertTrue(cabin != null, "Assembly: " + main.getLastAssemblyException());
++					placeElevatorPlayer(helper, guest, 4.5, 3.0, 2.5);
++					new ElevatorTargetFloorPacket(cabin, helper.absolutePos(top).getY()).handle(guest);
++					new ContraptionInteractionPacket(cabin, InteractionHand.MAIN_HAND,
++						helper.absolutePos(controls).subtract(elevator.anchor), Direction.EAST).handle(guest);
++				}
++				case 88 -> {
++					helper.assertTrue(!moving.state().getValue(DoorBlock.OPEN)
++						&& !helper.getBlockState(upperDoor).getValue(DoorBlock.OPEN), "Upper floor is set to keep doors shut");
++					placeElevatorPlayer(helper, guest, 0.5, 12.0, 2.5);
++					new ElevatorContactEditPacket(helper.absolutePos(top), "U", "Upper", DoorControl.SOUTH).handle(guest);
++				}
++				case 100 -> {
++					helper.assertTrue(moving.state().getValue(DoorBlock.OPEN) && movingUpper.state().getValue(DoorBlock.OPEN)
++						&& helper.getBlockState(upperDoor).getValue(DoorBlock.OPEN), "Changing upper mode must open matching doors");
++					NeoForge.EVENT_BUS.unregister(listen);
++					helper.getLevel().removePlayerImmediately(host, Entity.RemovalReason.DISCARDED);
++					helper.getLevel().removePlayerImmediately(guest, Entity.RemovalReason.DISCARDED);
++					return;
++				}
++			}
++			helper.fail("Waiting for the elevator service trace");
++		});
+ 	}
+ 
++	private static void placeElevatorDoor(CreateGameTestHelper helper, BlockPos pos, Block door) {
++		var state = door.defaultBlockState().setValue(DoorBlock.FACING, Direction.SOUTH);
++		helper.getLevel().setBlock(helper.absolutePos(pos), state, Block.UPDATE_CLIENTS);
++		helper.getLevel().setBlock(helper.absolutePos(pos.above()),
++			state.setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER), Block.UPDATE_CLIENTS);
++	}
++
++	private static String elevatorDoorMode(CreateGameTestHelper helper, BlockPos at) {
++		if (!(helper.getLevel().getBlockEntity(helper.absolutePos(at)) instanceof ElevatorContactBlockEntity contact))
++			return "";
++		var controls = BlockEntityBehaviour.get(contact, DoorControlBehaviour.TYPE);
++		return controls == null ? "" : controls.mode.name();
++	}
++
++	private static String elevatorOpen(BlockState state) {
++		return state.hasProperty(DoorBlock.OPEN) ? Boolean.toString(state.getValue(DoorBlock.OPEN)) : "";
++	}
++
+ 	@GameTest(template = "roller_filling")
+ 	public static void rollerFilling(CreateGameTestHelper helper) {
+ 		BlockPos lever = new BlockPos(7, 6, 1);

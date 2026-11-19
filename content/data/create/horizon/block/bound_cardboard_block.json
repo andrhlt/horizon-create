@@ -1,0 +1,28 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {
+    "map_color": 26,
+    "hardness": 0.2,
+    "explosion_resistance": 0.2,
+    "requires_tool": false,
+    "sounds": "minecraft:chiseled_bookshelf"
+  },
+  "state_properties": {
+    "axis": {
+      "type": "enum",
+      "values": [
+        "x",
+        "z"
+      ]
+    }
+  },
+  "default_state": {
+    "axis": "x"
+  },
+  "components": {
+    "minecraft:cooking_fuel": {
+      "burn_time": 4000
+    }
+  }
+}

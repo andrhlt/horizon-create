@@ -1,0 +1,52 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaBearingPortRenderProbe.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaBearingPortRenderProbe.java
+@@ -21,6 +21,7 @@
+ @EventBusSubscriber(value = Dist.CLIENT)
+ public class JavaBearingPortRenderProbe {
+ 	private static final BlockPos PORT = new BlockPos(7, 122, -10);
++	private static final boolean FLUID = Boolean.getBoolean("parity.bearingMovingFluid");
+ 	private static boolean opened;
+ 	private static boolean teleported;
+ 	private static int ticks;
+@@ -54,7 +55,8 @@
+ 		var mc = Minecraft.getInstance();
+ 		if (!opened && mc.getOverlay() == null && mc.screen instanceof TitleScreen) {
+ 			opened = true;
+-			mc.createWorldOpenFlows().openWorld("BearingPortActorReference", mc::stop);
++			mc.createWorldOpenFlows().openWorld(
++				FLUID ? "BearingPortFluidActorReference" : "BearingPortActorReference", mc::stop);
+ 		}
+ 		if (mc.screen instanceof BackupConfirmScreen backup)
+ 			backup.children().stream().filter(Button.class::isInstance).map(Button.class::cast)
+@@ -70,9 +72,14 @@
+ 				var src = server.createCommandSourceStack().withPermission(4);
+ 				server.getCommands().performPrefixedCommand(src, "gamemode spectator " + who);
+ 				server.getCommands().performPrefixedCommand(src, "tp " + who + " 6.3 123.6 -13 -7 35");
+-				server.getCommands().performPrefixedCommand(src, "place template create:gametest/contraptions/mounted_item_extract 3 120 -12");
+-				server.getCommands().performPrefixedCommand(src, "setblock 7 120 -10 minecraft:redstone_block");
+-				server.getCommands().performPrefixedCommand(src, "setblock 7 121 -10 minecraft:hopper[facing=north,enabled=false]");
++				String structure = FLUID ? "mounted_fluid_drain" : "mounted_item_extract";
++				server.getCommands().performPrefixedCommand(src, "place template create:gametest/contraptions/" + structure + " 3 120 -12");
++				if (FLUID) {
++					server.getCommands().performPrefixedCommand(src, "setblock 6 121 -11 minecraft:air");
++				} else {
++					server.getCommands().performPrefixedCommand(src, "setblock 7 120 -10 minecraft:redstone_block");
++					server.getCommands().performPrefixedCommand(src, "setblock 7 121 -10 minecraft:hopper[facing=north,enabled=false]");
++				}
+ 			});
+ 			mc.options.hideGui = true;
+ 		}
+--- a/build.gradle
++++ b/build.gradle
+@@ -71,7 +71,10 @@
+             if (project.hasProperty("parityBearingPortClient")) {
+                 gameDirectory = project.file("run/bearing-port-client")
+                 systemProperty("parity.bearingPortClient", "true")
+-                programArguments.addAll("--quickPlaySingleplayer", "BearingPortActorReference", "--width", "960", "--height", "540")
++                def fluid = project.findProperty("parityBearingPortClient") == "fluid"
++                systemProperty("parity.bearingMovingFluid", fluid.toString())
++                programArguments.addAll("--quickPlaySingleplayer",
++                    fluid ? "BearingPortFluidActorReference" : "BearingPortActorReference", "--width", "960", "--height", "540")
+             }
+         }
+ 

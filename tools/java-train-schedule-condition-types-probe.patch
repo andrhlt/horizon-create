@@ -1,0 +1,147 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleConditionTypesProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleConditionTypesProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleConditionTypesProbe.java
+@@ -0,0 +1,142 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.trains.schedule.ScheduleScreen;
++import com.simibubi.create.content.trains.schedule.condition.StationPoweredCondition;
++import com.simibubi.create.content.trains.schedule.condition.TimeOfDayCondition;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.Screenshot;
++import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaScheduleConditionTypesProbe {
++    private static boolean supplied;
++    private static int phase;
++    private static int elapsed;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.scheduleConditionTypes"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.getOverlay() != null)
++            return;
++        if (!supplied) {
++            var server = mc.getSingleplayerServer();
++            var playerId = mc.player.getUUID();
++            server.execute(() -> server.getPlayerList().getPlayer(playerId)
++                .setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, AllItems.SCHEDULE.asStack()));
++            supplied = true;
++        }
++        if (!AllItems.SCHEDULE.isIn(mc.player.getMainHandItem()) || ++elapsed < 8)
++            return;
++        if (mc.screen == null) {
++            if (phase == 0)
++                use(mc);
++            else if (phase == 8) {
++                captureItem(mc, "TIME");
++                use(mc);
++            } else if (phase == 13) {
++                captureItem(mc, "POWER");
++                use(mc);
++            } else
++                return;
++        } else if (mc.screen instanceof ScheduleScreen screen) {
++            switch (phase) {
++                case 1 -> click(screen, 52, 31);
++                case 2 -> {
++                    click(screen, 111, 94);
++                    for (char c : "Waiting Station".toCharArray())
++                        screen.charTyped(c, 0);
++                    click(screen, 233, 94);
++                }
++                case 3 -> {
++                    click(screen, 65, 60);
++                    scroll(screen, 130, 72, -1);
++                }
++                case 4 -> {
++                    require(screen, TimeOfDayCondition.class);
++                    for (int i=0; i < 2; i++)
++                        scroll(screen, 85, 94, 1);
++                    for (int i=0; i < 20; i++)
++                        scroll(screen, 101, 94, 1);
++                    scroll(screen, 157, 94, -1);
++                }
++                case 5 -> {
++                    photograph(mc, "schedule-time-of-day-editor");
++                    click(screen, 233, 94);
++                }
++                case 6, 11 -> click(screen, 222, 204);
++                case 9 -> {
++                    click(screen, 65, 60);
++                    var saved = (TimeOfDayCondition) require(screen, TimeOfDayCondition.class);
++                    System.out.println("CREATE_CONDITION_REOPEN_TIME " + saved.getData());
++                    for (int i=0; i < 7; i++)
++                        scroll(screen, 130, 72, -1);
++                }
++                case 10 -> {
++                    require(screen, StationPoweredCondition.class);
++                    photograph(mc, "schedule-station-powered-editor");
++                    click(screen, 233, 94);
++                }
++                case 14 -> {
++                    click(screen, 65, 60);
++                    var saved = (StationPoweredCondition) require(screen, StationPoweredCondition.class);
++                    System.out.println("CREATE_CONDITION_REOPEN_POWER " + saved.getData());
++                    System.out.println("CREATE_CONDITION_DONE");
++                    phase++;
++                    mc.stop();
++                    return;
++                }
++                default -> { return; }
++            }
++        } else
++            return;
++        phase = switch (phase) { case 6 -> 8; case 11 -> 13; default -> phase + 1; };
++        elapsed = 0;
++    }
++
++    private static void captureItem(Minecraft mc, String name) {
++        System.out.println("CREATE_CONDITION_" + name + " " +
++            mc.player.getMainHandItem().get(AllDataComponents.TRAIN_SCHEDULE));
++    }
++
++    private static Object require(ScheduleScreen screen, Class<?> kind) throws ReflectiveOperationException {
++        var field = ScheduleScreen.class.getDeclaredField("editingCondition");
++        field.setAccessible(true);
++        var value = field.get(screen);
++        if (!kind.isInstance(value))
++            throw new AssertionError("Expected condition " + kind.getSimpleName() + ", found " + value);
++        return value;
++    }
++
++    private static void use(Minecraft mc) throws ReflectiveOperationException {
++        var method = Minecraft.class.getDeclaredMethod("startUseItem");
++        method.setAccessible(true);
++        method.invoke(mc);
++    }
++
++    private static void click(ScheduleScreen screen, int dx, int dy) throws ReflectiveOperationException {
++        screen.mouseClicked(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, 0);
++    }
++
++    private static void scroll(ScheduleScreen screen, int dx, int dy, double delta) throws ReflectiveOperationException {
++        screen.mouseScrolled(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, 0, delta);
++    }
++
++    private static int origin(ScheduleScreen screen, String fieldName) throws ReflectiveOperationException {
++        var field = AbstractContainerScreen.class.getDeclaredField(fieldName);
++        field.setAccessible(true);
++        return (int) field.get(screen);
++    }
++
++    private static void photograph(Minecraft mc, String name) {
++        Screenshot.grab(mc.gameDirectory, name + ".png", mc.getMainRenderTarget(),
++            message -> System.out.println(message.getString()));
++    }
++}

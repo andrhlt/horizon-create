@@ -1,0 +1,27 @@
+{
+  "template": "minecraft:copper_boots",
+  "max_stack_size": 1,
+  "components": {
+    "minecraft:equippable": {
+      "slot": "feet",
+      "asset_id": "create:copper_diving",
+      "equip_sound": "create:copper_armor_equip"
+    },
+    "minecraft:attribute_modifiers": [
+      {
+        "type": "minecraft:armor",
+        "id": "minecraft:armor.feet",
+        "amount": 2,
+        "operation": "add_value",
+        "slot": "feet"
+      }
+    ],
+    "minecraft:enchantable": {
+      "value": 7
+    },
+    "minecraft:repairable": {
+      "items": "minecraft:copper_ingot"
+    },
+    "minecraft:max_damage": 91
+  }
+}

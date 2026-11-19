@@ -1,0 +1,6 @@
+tool,harvest,drops
+minecraft:air,false,
+minecraft:wooden_pickaxe,true,create:experience_block*1
+minecraft:stone_pickaxe,true,create:experience_block*1
+minecraft:iron_pickaxe,true,create:experience_block*1
+minecraft:iron_axe,false,

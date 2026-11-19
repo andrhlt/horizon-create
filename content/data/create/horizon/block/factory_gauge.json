@@ -1,0 +1,175 @@
+{
+  "template": "minecraft:gold_block",
+  "item": true,
+  "properties": {
+    "map_color": 47,
+    "hardness": 3.0,
+    "explosion_resistance": 6.0,
+    "requires_tool": true,
+    "sounds": "minecraft:copper_block",
+    "waterloggable": true,
+    "occludes": false
+  },
+  "state_properties": {
+    "face": {
+      "type": "enum",
+      "values": [
+        "floor",
+        "wall",
+        "ceiling"
+      ]
+    },
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "south",
+        "east",
+        "west"
+      ]
+    },
+    "powered": {
+      "type": "boolean"
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "face": "floor",
+    "facing": "north",
+    "powered": "false",
+    "waterlogged": "false"
+  },
+  "shapes": {
+    "properties": [
+      "face",
+      "facing"
+    ],
+    "values": {
+      "floor,north": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.125,
+          1
+        ]
+      ],
+      "ceiling,north": [
+        [
+          0,
+          0.875,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "floor,south": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.125,
+          1
+        ]
+      ],
+      "ceiling,south": [
+        [
+          0,
+          0.875,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "floor,east": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.125,
+          1
+        ]
+      ],
+      "ceiling,east": [
+        [
+          0,
+          0.875,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "floor,west": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.125,
+          1
+        ]
+      ],
+      "ceiling,west": [
+        [
+          0,
+          0.875,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "wall,north": [
+        [
+          0,
+          0,
+          0.875,
+          1,
+          1,
+          1
+        ]
+      ],
+      "wall,south": [
+        [
+          0,
+          0,
+          0,
+          1,
+          1,
+          0.125
+        ]
+      ],
+      "wall,east": [
+        [
+          0,
+          0,
+          0,
+          0.125,
+          1,
+          1
+        ]
+      ],
+      "wall,west": [
+        [
+          0.875,
+          0,
+          0,
+          1,
+          1,
+          1
+        ]
+      ]
+    }
+  },
+  "collision_shapes": {
+    "default": []
+  }
+}

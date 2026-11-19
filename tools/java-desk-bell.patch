@@ -1,0 +1,119 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..8718a0e73 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.deskBellPulse"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..9bda87a7b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,87 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 90)
++	public static void deskBellPulse(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(2, 20, 2));
++		var bell = com.simibubi.create.AllBlocks.DESK_BELL.get();
++		var props = com.simibubi.create.content.redstone.deskBell.DeskBellBlock.POWERED;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var wirePower = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWER;
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var dust = net.minecraft.world.level.block.Blocks.REDSTONE_WIRE.defaultBlockState();
++		for (var floor : java.util.List.of(at, at.east(), at.west(), at.south()))
++			level.setBlockAndUpdate(floor.below(), stone);
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		for (var face : net.minecraft.core.Direction.values()) {
++			var support = at.relative(face.getOpposite());
++			level.setBlockAndUpdate(support, stone);
++			var hit = new net.minecraft.world.phys.BlockHitResult(support.getCenter().relative(face, .5), face, support, false);
++			var ctx = new net.minecraft.world.item.context.BlockPlaceContext(player, net.minecraft.world.InteractionHand.MAIN_HAND,
++				bell.asItem().getDefaultInstance(), hit);
++			var state = bell.getStateForPlacement(ctx);
++			var shape = state.getShape(level, at).bounds();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_BELL_PLACE %s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f%n",
++				face.getName(), state.getValue(facing).getName(),
++				shape.minX, shape.minY, shape.minZ, shape.maxX, shape.maxY, shape.maxZ);
++			level.setBlockAndUpdate(at, net.minecraft.world.level.block.Blocks.WATER.defaultBlockState());
++			var wet = bell.getStateForPlacement(ctx);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_BELL_WET %s,%s,%b,%b%n", face.getName(),
++				wet.getValue(facing).getName(), wet.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED),
++				bell.getFluidState(wet).isSource());
++			level.removeBlock(at, false);
++			if (face != net.minecraft.core.Direction.UP)
++				level.removeBlock(support, false);
++		}
++		var state = bell.defaultBlockState();
++		System.out.printf(java.util.Locale.ROOT, "CREATE_BELL_MATERIAL %.1f,%.1f,%d,%b,%s%n",
++			state.getDestroySpeed(level, at), bell.getExplosionResistance(), state.getMapColor(level, at).id,
++			state.requiresCorrectToolForDrops(),
++			net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.getKey(state.getSoundType().getPlaceSound()));
++		level.setBlockAndUpdate(at, state);
++		level.setBlockAndUpdate(at.east(), dust);
++		var event = com.simibubi.create.AllSoundEvents.DESK_BELL_USE.getMainEvent();
++		System.out.printf("CREATE_BELL_EVENT %s%n", net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.getKey(event));
++		for (int tick = 0; tick < 55; tick++) {
++			int sample = tick;
++			helper.runAtTickTime(tick + 1, () -> {
++				var current = level.getBlockState(at);
++				if (sample == 3 || sample == 12 || sample == 40) {
++					var top = net.minecraft.core.Direction.UP;
++					var hit = new net.minecraft.world.phys.BlockHitResult(at.getCenter().relative(top, .5), top, at, false);
++					java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listener = sound -> {
++						if (sound.getLevel() != level || sound.getSound() == null || sound.isCanceled()
++							|| sound.getSound().value() != event)
++							return;
++						var origin = sound.getPosition();
++						System.out.printf(java.util.Locale.ROOT, "CREATE_BELL_SOUND %d,%s,%d,%.1f,%.1f,%.1f,%.8f,%.8f%n",
++							sample, event.getLocation(), sound.getSource().ordinal(), origin.x - at.getX(),
++							origin.y - at.getY(), origin.z - at.getZ(), sound.getNewVolume(), sound.getNewPitch());
++					};
++					var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
++					bus.addListener(net.neoforged.bus.api.EventPriority.LOWEST, listener);
++					try {
++						current.useWithoutItem(level, player, hit);
++					} finally {
++						bus.unregister(listener);
++					}
++					current = level.getBlockState(at);
++				}
++				if (sample == 44) {
++					level.removeBlock(at, false);
++					current = level.getBlockState(at);
++				}
++				int weak = current.getSignal(level, at, net.minecraft.core.Direction.EAST);
++				int strong = current.getDirectSignal(level, at, net.minecraft.core.Direction.UP);
++				int side = current.getDirectSignal(level, at, net.minecraft.core.Direction.EAST);
++				System.out.printf(java.util.Locale.ROOT, "CREATE_BELL_PULSE %d,%b,%d,%d,%d,%d%n", sample,
++					current.hasProperty(props) && current.getValue(props), weak, strong, side,
++					level.getBlockState(at.east()).getValue(wirePower));
++				if (sample == 54)
++					helper.succeed();
++			});
++		}
++	}
+ }

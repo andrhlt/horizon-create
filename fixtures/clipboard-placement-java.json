@@ -1,0 +1,134 @@
+[
+  {
+    "side": "up",
+    "state": {
+      "face": "floor",
+      "facing": "north",
+      "waterlogged": "false",
+      "written": "false"
+    },
+    "shape": [
+      0.18750000000000006,
+      0.0,
+      0.062499999999999944,
+      0.8125,
+      0.0625,
+      0.9375
+    ],
+    "spent": true,
+    "removed": true,
+    "before": "{count:1,id:\"create:clipboard\"}",
+    "block_item": "{count:1,id:\"create:clipboard\"}",
+    "recovered": "{count:1,id:\"create:clipboard\"}"
+  },
+  {
+    "side": "down",
+    "state": {
+      "face": "ceiling",
+      "facing": "north",
+      "waterlogged": "false",
+      "written": "true"
+    },
+    "shape": [
+      0.18750000000000006,
+      0.9375,
+      0.062499999999999944,
+      0.8125,
+      1.0,
+      0.9375
+    ],
+    "spent": true,
+    "removed": true,
+    "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "block_item": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "recovered": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+  },
+  {
+    "side": "north",
+    "state": {
+      "face": "wall",
+      "facing": "north",
+      "waterlogged": "false",
+      "written": "true"
+    },
+    "shape": [
+      0.18749999999999994,
+      0.0625,
+      0.9375,
+      0.8125,
+      0.9375,
+      1.0
+    ],
+    "spent": true,
+    "removed": true,
+    "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "block_item": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "recovered": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+  },
+  {
+    "side": "south",
+    "state": {
+      "face": "wall",
+      "facing": "south",
+      "waterlogged": "false",
+      "written": "true"
+    },
+    "shape": [
+      0.1875,
+      0.0625,
+      0.0,
+      0.8125,
+      0.9375,
+      0.0625
+    ],
+    "spent": true,
+    "removed": true,
+    "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "block_item": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "recovered": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+  },
+  {
+    "side": "east",
+    "state": {
+      "face": "wall",
+      "facing": "east",
+      "waterlogged": "false",
+      "written": "true"
+    },
+    "shape": [
+      0.0,
+      0.0625,
+      0.18749999999999994,
+      0.06250000000000006,
+      0.9375,
+      0.8125
+    ],
+    "spent": true,
+    "removed": true,
+    "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "block_item": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "recovered": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+  },
+  {
+    "side": "west",
+    "state": {
+      "face": "wall",
+      "facing": "west",
+      "waterlogged": "false",
+      "written": "true"
+    },
+    "shape": [
+      0.9375,
+      0.0625,
+      0.1875,
+      1.0,
+      0.9375,
+      0.8125
+    ],
+    "spent": true,
+    "removed": true,
+    "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "block_item": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "recovered": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+  }
+]

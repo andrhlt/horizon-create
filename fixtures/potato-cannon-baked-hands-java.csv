@@ -1,0 +1,3 @@
+case,result,main_count,inventory_count,damage,cooling,x,y,z,vx,vy,vz,item
+main_cannon,SUCCESS,1,2,1,true,-0.750000000,1.469999999,1.500000000,0.124844044,0.000000000,2.496880847,minecraft:baked_potato
+off_cannon,SUCCESS,2,0,1,true,0.750000000,1.469999999,1.500000000,-0.124844044,0.000000000,2.496880847,minecraft:baked_potato

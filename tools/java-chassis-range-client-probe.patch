@@ -1,0 +1,109 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaChassisRangeClientProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaChassisRangeClientProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaChassisRangeClientProbe.java
+@@ -0,0 +1,104 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllItems;
++import com.simibubi.create.CreateClient;
++import com.simibubi.create.content.contraptions.chassis.ChassisBlockEntity;
++import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBoard;
++import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsScreen;
++import net.minecraft.client.Minecraft;
++import net.minecraft.core.BlockPos;
++import net.minecraft.world.phys.BlockHitResult;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import org.lwjgl.glfw.GLFW;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaChassisRangeClientProbe {
++	private static int phase;
++	private static int entered;
++	private static int elapsed;
++	private static final BlockPos CHASSIS = new BlockPos(8, 96, 40);
++
++	private static void start(Minecraft mc) throws ReflectiveOperationException {
++		var method = Minecraft.class.getDeclaredMethod("startUseItem");
++		method.setAccessible(true);
++		mc.options.keyUse.setDown(true);
++		method.invoke(mc);
++		entered = phase;
++		elapsed = 0;
++	}
++
++	@SubscribeEvent
++	public static void tick(ClientTickEvent.Post ignored) throws ReflectiveOperationException {
++		if (!Boolean.getBoolean("parity.chassisRange"))
++			return;
++		var mc = Minecraft.getInstance();
++		if (mc.player == null || mc.level == null
++			|| !(mc.level.getBlockEntity(CHASSIS) instanceof ChassisBlockEntity chassis))
++			return;
++		var input = CreateClient.VALUE_SETTINGS_HANDLER;
++		if (phase == 0) {
++			if (!(mc.hitResult instanceof BlockHitResult hit) || !hit.getBlockPos().equals(CHASSIS))
++				return;
++			phase = 1;
++			start(mc);
++			System.out.printf("CREATE_CHASSIS_UI %d,%d,%d,%s,%d%n", phase, elapsed, input.interactHeldTicks,
++				mc.screen instanceof ValueSettingsScreen, chassis.getRange());
++			return;
++		}
++		if (phase >= 5)
++			return;
++		if (phase == 2 && entered != 2) {
++			if (!AllItems.WRENCH.isIn(mc.player.getMainHandItem()))
++				return;
++			start(mc);
++			System.out.printf("CREATE_CHASSIS_UI %d,%d,%d,%s,%d%n", phase, elapsed, input.interactHeldTicks,
++				mc.screen instanceof ValueSettingsScreen, chassis.getRange());
++			return;
++		}
++		if (phase >= 3 && entered != phase) {
++			if (elapsed++ < 8)
++				return;
++			start(mc);
++			System.out.printf("CREATE_CHASSIS_UI %d,%d,%d,%s,%d%n", phase, elapsed, input.interactHeldTicks,
++				mc.screen instanceof ValueSettingsScreen, chassis.getRange());
++			return;
++		}
++		elapsed++;
++		System.out.printf("CREATE_CHASSIS_UI %d,%d,%d,%s,%d%n", phase, elapsed, input.interactHeldTicks,
++			mc.screen instanceof ValueSettingsScreen, chassis.getRange());
++		if (phase == 1 && elapsed == 8) {
++			mc.options.keyUse.setDown(false);
++			System.out.println("CREATE_CHASSIS_UI_UNARMED_DONE");
++			phase = 2;
++			return;
++		}
++		if (phase == 2 && elapsed == 2)
++			mc.options.keyUse.setDown(false);
++		if (phase == 2 && elapsed == 8) {
++			elapsed = 0;
++			phase = 3;
++		}
++		if (phase >= 3 && mc.screen instanceof ValueSettingsScreen menu) {
++			var field = ValueSettingsScreen.class.getDeclaredField("board");
++			field.setAccessible(true);
++			var board = (ValueSettingsBoard) field.get(menu);
++			var left = menu.getCoordinateOfValue(0, 0);
++			var right = menu.getCoordinateOfValue(0, board.maxValue());
++			int x = (int) (phase == 3 ? left.x - 100 : right.x + 100);
++			int y = (int) left.y;
++			var chosen = menu.getClosestCoordinate(x, y);
++			System.out.printf("CREATE_CHASSIS_BOARD %s,%s,%d,%d,%d,%d,%d%n",
++				board.title().getString(), board.rows().getFirst().getString(), board.maxValue(),
++				board.milestoneInterval(), elapsed, chosen.value(), chassis.getRange());
++			menu.mouseReleased(x, y, GLFW.GLFW_MOUSE_BUTTON_RIGHT);
++			mc.options.keyUse.setDown(false);
++			elapsed = 0;
++			phase++;
++			if (phase == 5)
++				System.out.println("CREATE_CHASSIS_UI_DONE");
++		}
++	}
++}

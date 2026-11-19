@@ -1,0 +1,17 @@
+color,block,hardness,resistance,map_color,wool,craft_recipe,craft_count,source,recolor_recipe,recolor_count,result,after,waterlogged,dye_count,boarded
+white,create:white_seat,2.00,2.00,8,minecraft:white_wool,create:crafting/kinetics/white_seat,1,create:black_seat,create:crafting/kinetics/white_seat_from_other_seat,1,SUCCESS,create:white_seat,true,1,true
+orange,create:orange_seat,2.00,2.00,15,minecraft:orange_wool,create:crafting/kinetics/orange_seat,1,create:white_seat,create:crafting/kinetics/orange_seat_from_other_seat,1,SUCCESS,create:orange_seat,true,1,true
+magenta,create:magenta_seat,2.00,2.00,16,minecraft:magenta_wool,create:crafting/kinetics/magenta_seat,1,create:white_seat,create:crafting/kinetics/magenta_seat_from_other_seat,1,SUCCESS,create:magenta_seat,true,1,true
+light_blue,create:light_blue_seat,2.00,2.00,17,minecraft:light_blue_wool,create:crafting/kinetics/light_blue_seat,1,create:white_seat,create:crafting/kinetics/light_blue_seat_from_other_seat,1,SUCCESS,create:light_blue_seat,true,1,true
+yellow,create:yellow_seat,2.00,2.00,18,minecraft:yellow_wool,create:crafting/kinetics/yellow_seat,1,create:white_seat,create:crafting/kinetics/yellow_seat_from_other_seat,1,SUCCESS,create:yellow_seat,true,1,true
+lime,create:lime_seat,2.00,2.00,19,minecraft:lime_wool,create:crafting/kinetics/lime_seat,1,create:white_seat,create:crafting/kinetics/lime_seat_from_other_seat,1,SUCCESS,create:lime_seat,true,1,true
+pink,create:pink_seat,2.00,2.00,20,minecraft:pink_wool,create:crafting/kinetics/pink_seat,1,create:white_seat,create:crafting/kinetics/pink_seat_from_other_seat,1,SUCCESS,create:pink_seat,true,1,true
+gray,create:gray_seat,2.00,2.00,21,minecraft:gray_wool,create:crafting/kinetics/gray_seat,1,create:white_seat,create:crafting/kinetics/gray_seat_from_other_seat,1,SUCCESS,create:gray_seat,true,1,true
+light_gray,create:light_gray_seat,2.00,2.00,22,minecraft:light_gray_wool,create:crafting/kinetics/light_gray_seat,1,create:white_seat,create:crafting/kinetics/light_gray_seat_from_other_seat,1,SUCCESS,create:light_gray_seat,true,1,true
+cyan,create:cyan_seat,2.00,2.00,23,minecraft:cyan_wool,create:crafting/kinetics/cyan_seat,1,create:white_seat,create:crafting/kinetics/cyan_seat_from_other_seat,1,SUCCESS,create:cyan_seat,true,1,true
+purple,create:purple_seat,2.00,2.00,24,minecraft:purple_wool,create:crafting/kinetics/purple_seat,1,create:white_seat,create:crafting/kinetics/purple_seat_from_other_seat,1,SUCCESS,create:purple_seat,true,1,true
+blue,create:blue_seat,2.00,2.00,25,minecraft:blue_wool,create:crafting/kinetics/blue_seat,1,create:white_seat,create:crafting/kinetics/blue_seat_from_other_seat,1,SUCCESS,create:blue_seat,true,1,true
+brown,create:brown_seat,2.00,2.00,26,minecraft:brown_wool,create:crafting/kinetics/brown_seat,1,create:white_seat,create:crafting/kinetics/brown_seat_from_other_seat,1,SUCCESS,create:brown_seat,true,1,true
+green,create:green_seat,2.00,2.00,27,minecraft:green_wool,create:crafting/kinetics/green_seat,1,create:white_seat,create:crafting/kinetics/green_seat_from_other_seat,1,SUCCESS,create:green_seat,true,1,true
+red,create:red_seat,2.00,2.00,28,minecraft:red_wool,create:crafting/kinetics/red_seat,1,create:white_seat,create:crafting/kinetics/red_seat_from_other_seat,1,SUCCESS,create:red_seat,true,1,true
+black,create:black_seat,2.00,2.00,29,minecraft:black_wool,create:crafting/kinetics/black_seat,1,create:white_seat,create:crafting/kinetics/black_seat_from_other_seat,1,SUCCESS,create:black_seat,true,1,true

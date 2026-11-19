@@ -1,0 +1,111 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..06e2172 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.attributeFilterKinds"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..ee6ad15 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,92 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void attributeFilterKinds(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var registries = level.registryAccess();
++		var stone = new ItemStack(Items.STONE);
++		var apple = new ItemStack(Items.APPLE);
++		var sword = new ItemStack(Items.DIAMOND_SWORD);
++		var damaged = sword.copy();
++		damaged.setDamageValue(1500);
++		var slightlyDamaged = sword.copy();
++		slightlyDamaged.setDamageValue(200);
++		var renamed = stone.copy();
++		renamed.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal("Ore"));
++		var structuredName = stone.copy();
++		structuredName.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal("{\"text\":\"Ore\"}"));
++		for (String literal : new String[] {"Ore", "Ore Cart", "  Ore  ", "123", "true", "null", "Ore-4", "Ore/4", "Ore.4", "Ore_Cart", "'Ore Cart'"}) {
++			var named = stone.copy();
++			named.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal(literal));
++			var choices = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.getAllAttributes(named, level);
++			var result = choices.stream().filter(a -> com.simibubi.create.api.registry.CreateBuiltInRegistries.ITEM_ATTRIBUTE_TYPE.getKey(a.getType()).getPath().equals("has_name"))
++				.map(a -> com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.saveStatic(a, registries).getCompound("attribute").getString("value")).findFirst().orElse("");
++			System.out.printf("ATTRIBUTE_NAME_LITERAL,%s,%s%n",
++				java.util.HexFormat.of().formatHex(literal.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++				java.util.HexFormat.of().formatHex(result.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
++		}
++		var enchanted = sword.copy();
++		var enchantedMax = sword.copy();
++		var sharpness = registries.lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT).getOrThrow(net.minecraft.world.item.enchantment.Enchantments.SHARPNESS);
++		enchanted.enchant(sharpness, 1);
++		enchantedMax.enchant(sharpness, 5);
++
++		var emptyShulker = new ItemStack(Items.SHULKER_BOX);
++		var partialShulker = emptyShulker.copy();
++		var fullShulker = emptyShulker.copy();
++		partialShulker.set(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.fromItems(java.util.List.of(stone)));
++		fullShulker.set(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.fromItems(
++			java.util.stream.IntStream.range(0, 27).mapToObj(i -> new ItemStack(Items.STONE, 64)).toList()));
++
++		var book = new ItemStack(Items.WRITTEN_BOOK);
++		var copiedBook = new ItemStack(Items.WRITTEN_BOOK);
++		book.set(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT, new net.minecraft.world.item.component.WrittenBookContent(
++			net.minecraft.server.network.Filterable.passThrough("Cargo"), "River", 0, java.util.List.of(), false));
++		copiedBook.set(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT, new net.minecraft.world.item.component.WrittenBookContent(
++			net.minecraft.server.network.Filterable.passThrough("Cargo"), "River", 1, java.util.List.of(), false));
++		var water = new ItemStack(Items.WATER_BUCKET);
++		var lava = new ItemStack(Items.LAVA_BUCKET);
++		var cog = com.simibubi.create.AllBlocks.COGWHEEL.asStack();
++
++		record Group(String kind, ItemStack reference, ItemStack[] samples) {}
++		var groups = java.util.List.of(
++			new Group("placeable", stone, new ItemStack[]{stone, apple, water, cog}),
++			new Group("enchanted", enchanted, new ItemStack[]{enchanted, enchantedMax, sword}),
++			new Group("max_enchanted", enchantedMax, new ItemStack[]{enchanted, enchantedMax, sword}),
++			new Group("renamed", renamed, new ItemStack[]{renamed, stone, structuredName}),
++			new Group("has_name", structuredName, new ItemStack[]{structuredName, renamed, stone}),
++			new Group("badly_damaged", damaged, new ItemStack[]{damaged, slightlyDamaged, sword}),
++			new Group("not_stackable", sword, new ItemStack[]{damaged, sword, apple, water}),
++			new Group("added_by", cog, new ItemStack[]{cog, stone, water}),
++			new Group("added_by", stone, new ItemStack[]{cog, stone, water}),
++			new Group("has_fluid", water, new ItemStack[]{water, lava, stone}),
++			new Group("shulker_fill_level", emptyShulker, new ItemStack[]{emptyShulker, partialShulker, fullShulker, stone}),
++			new Group("shulker_fill_level", partialShulker, new ItemStack[]{emptyShulker, partialShulker, fullShulker, stone}),
++			new Group("shulker_fill_level", fullShulker, new ItemStack[]{emptyShulker, partialShulker, fullShulker, stone}),
++			new Group("book_author", book, new ItemStack[]{book, copiedBook, stone}),
++			new Group("book_copy", book, new ItemStack[]{book, copiedBook, stone}),
++			new Group("book_copy", copiedBook, new ItemStack[]{book, copiedBook, stone})
++		);
++		int index = 0;
++		for (var group : groups) {
++			var attribute = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.getAllAttributes(group.reference(), level).stream()
++				.filter(a -> com.simibubi.create.api.registry.CreateBuiltInRegistries.ITEM_ATTRIBUTE_TYPE.getKey(a.getType()).getPath().equals(group.kind()))
++				.findFirst().orElseThrow(() -> new IllegalStateException(group.kind()));
++			var data = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.saveStatic(attribute, registries);
++			var filter = com.simibubi.create.AllItems.ATTRIBUTE_FILTER.asStack();
++			filter.set(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES,
++				java.util.List.of(new com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.ItemAttributeEntry(attribute, false)));
++			var matcher = com.simibubi.create.content.logistics.filter.FilterItemStack.of(filter);
++			for (var sample : group.samples()) {
++				var saved = sample.save(registries).toString();
++				System.out.printf("ATTRIBUTE_KIND,%d,%s,%s,%s,%b%n", index++, group.kind(),
++					java.util.HexFormat.of().formatHex(data.getCompound("attribute").toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++					java.util.HexFormat.of().formatHex(saved.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++					matcher.test(level, sample, false));
++			}
++		}
++		helper.succeed();
++	}
+ }

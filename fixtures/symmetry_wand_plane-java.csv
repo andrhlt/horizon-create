@@ -1,0 +1,6 @@
+case,result,enabled,mirror_type,orientation_index,anchor_from_first_clicked,mirror_block,inventory_stone,reflected_stair_facing,embedded_enable,wand_count,simulate
+initial,,false,empty,0,,,,,true,1,absent
+xy,SUCCESS,true,plane,0,0:1:0,,,,true,1,absent
+xy_apply,,true,plane,0,0:1:0,minecraft:stone,3,,true,1,false
+disabled,SUCCESS,false,plane,0,0:1:0,minecraft:air,3,,true,1,false
+yz,SUCCESS,true,plane,1,5:0:0,minecraft:stone,2,west,true,1,false

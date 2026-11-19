@@ -1,0 +1,70 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -29,6 +29,67 @@
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 80)
++	public static void metalScaffolding(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var up = net.minecraft.core.Direction.UP;
++		var south = net.minecraft.core.Direction.SOUTH;
++		var scaffolds = java.util.List.of(com.simibubi.create.AllBlocks.ANDESITE_SCAFFOLD.get(),
++			com.simibubi.create.AllBlocks.BRASS_SCAFFOLD.get(), com.simibubi.create.AllBlocks.COPPER_SCAFFOLD.get());
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var water = net.minecraft.world.level.block.Blocks.WATER.defaultBlockState();
++		var bottom = net.minecraft.world.level.block.ScaffoldingBlock.BOTTOM;
++		var distance = net.minecraft.world.level.block.ScaffoldingBlock.DISTANCE;
++		var wet = net.minecraft.world.level.block.ScaffoldingBlock.WATERLOGGED;
++		record Sample(String phase, BlockPos at) {}
++		var samples = new java.util.ArrayList<Sample>();
++		java.util.function.BiConsumer<Sample, Integer> print = (entry, tick) -> {
++			var state = world.getBlockState(entry.at());
++			var block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock());
++			System.out.printf("CREATE_METAL_SCAFFOLDING %d,%s,%s,%s,%s,%s%n", tick, entry.phase(), block,
++				state.hasProperty(distance) ? state.getValue(distance) : "-",
++				state.hasProperty(bottom) ? state.getValue(bottom) : "-",
++				state.hasProperty(wet) ? state.getValue(wet) : "-");
++		};
++		for (int index = 0; index < scaffolds.size(); index++) {
++			var block = scaffolds.get(index);
++			var floor = helper.absolutePos(new BlockPos(2 + 3 * index, 14, 2));
++			world.setBlockAndUpdate(floor, stone);
++			world.setBlockAndUpdate(floor.above(), index == 2 ? water : air);
++			world.setBlockAndUpdate(floor.above(2), air);
++			player.setPos(floor.getX() + .5, floor.getY() + 1, floor.getZ() + 3.5);
++			player.setYRot(180);
++			var held = new ItemStack(block.asItem(), 2);
++			player.setItemInHand(hand, held);
++			for (var face : java.util.List.of(up, south)) {
++				var hitPos = face == up ? floor : floor.above();
++				var hit = new net.minecraft.world.phys.BlockHitResult(hitPos.getCenter().relative(face, .5), face, hitPos, false);
++				held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			}
++			helper.assertTrue(held.isEmpty(), "Two scaffold placements must consume two items");
++			samples.add(new Sample(index + "_base", floor.above()));
++			samples.add(new Sample(index + "_upper", floor.above(2)));
++			var unsupported = floor.above(4);
++			world.setBlockAndUpdate(unsupported, block.defaultBlockState());
++			samples.add(new Sample(index + "_free", unsupported));
++			world.removeBlock(floor, false);
++		}
++		for (int tick : java.util.List.of(0, 1, 4)) {
++			Runnable step = () -> {
++				samples.forEach(entry -> print.accept(entry, tick));
++				if (tick == 4)
++					helper.succeed();
++			};
++			if (tick == 0)
++				step.run();
++			else
++				helper.runAfterDelay(tick, step);
++		}
++	}
+ 	@GameTest(template = "schematicannon", timeoutTicks = FIFTEEN_SECONDS)
+ 	public static void schematicannon(CreateGameTestHelper helper) {
+ 		// load the structure

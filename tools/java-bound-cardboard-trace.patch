@@ -1,0 +1,85 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..5a49591 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.boundCardboard"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..50642c1 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,66 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 16)
++	public static void boundCardboard(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_AXIS;
++		var bound = com.simibubi.create.AllBlocks.BOUND_CARDBOARD_BLOCK.get();
++		var plain = com.simibubi.create.AllBlocks.CARDBOARD_BLOCK.get();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var silk = world.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT)
++			.getOrThrow(net.minecraft.world.item.enchantment.Enchantments.SILK_TOUCH);
++		helper.runAtTickTime(4, () -> {
++			world.setBlockAndUpdate(at.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++			for (var block : java.util.List.of(plain, bound)) {
++				for (int yaw : new int[] {180, 90}) {
++					world.setBlockAndUpdate(at, Blocks.AIR.defaultBlockState());
++					player.setYRot(yaw);
++					player.setItemInHand(hand, new net.minecraft.world.item.ItemStack(block));
++					var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(at.below()),
++						net.minecraft.core.Direction.UP, at.below(), false);
++					player.getItemInHand(hand).useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++					var state = world.getBlockState(at);
++					if (!state.is(block)) throw new IllegalStateException("No Cardboard placed: " + state);
++					System.out.printf("CREATE_CARDBOARD_PLACE %s,%d,%s,%d%n",
++						net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block), yaw, state.getValue(axis), player.getItemInHand(hand).getCount());
++				}
++				var state = world.getBlockState(at);
++				var fuel = new net.minecraft.world.item.ItemStack(block)
++					.getBurnTime(net.minecraft.world.item.crafting.RecipeType.SMELTING);
++				var east = net.minecraft.core.Direction.EAST;
++				System.out.printf("CREATE_CARDBOARD_RULES %s,%d,%d,%d%n",
++					net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block), fuel,
++					block.getFireSpreadSpeed(state, world, at, east), block.getFlammability(state, world, at, east));
++				for (String toolType : new String[] {"hand", "axe", "silk"}) {
++					var tool = switch (toolType) {
++					case "hand" -> net.minecraft.world.item.ItemStack.EMPTY;
++					case "axe" -> new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_AXE);
++					default -> new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND_AXE);
++					};
++					if (toolType.equals("silk")) tool.enchant(silk, 1);
++					var drops = net.minecraft.world.level.block.Block.getDrops(state, world, at, null, player, tool);
++					var items = drops.stream().map(stack -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem())
++						+ "*" + stack.getCount()).sorted().toList();
++					System.out.printf("CREATE_CARDBOARD_DROPS %s,%s,%s%n",
++						net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block), toolType, String.join(";", items));
++				}
++				var neighbor = at.east();
++				world.setBlockAndUpdate(neighbor, Blocks.AIR.defaultBlockState());
++				player.setItemInHand(hand, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.FLINT_AND_STEEL));
++				var fireHit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(at),
++					east, at, false);
++				player.getItemInHand(hand).useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, fireHit));
++				System.out.printf("CREATE_CARDBOARD_FIRE %s,%s,%d%n",
++					net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block),
++					net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(world.getBlockState(neighbor).getBlock()),
++					player.getItemInHand(hand).getDamageValue());
++			}
++			helper.succeed();
++		});
++	}
++
+ }

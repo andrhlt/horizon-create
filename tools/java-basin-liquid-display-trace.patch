@@ -1,0 +1,78 @@
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.basinLiquidDisplay"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -145,4 +145,52 @@
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
+ 
++
++	@GameTest(template = "wheat_milling", timeoutTicks = 60)
++	public static void basinLiquidDisplay(CreateGameTestHelper helper) {
++		var pos = new BlockPos(2, 9, 1);
++		helper.setBlock(pos, AllBlocks.BASIN.getDefaultState());
++		var basin = (com.simibubi.create.content.processing.basin.BasinBlockEntity) helper.getBlockEntity(pos);
++		basin.markVirtual();
++		var input = basin.getTanks().getFirst();
++		var output = basin.getTanks().getSecond();
++		var action = net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE;
++		var water = net.minecraft.world.level.material.Fluids.WATER;
++		var lava = net.minecraft.world.level.material.Fluids.LAVA;
++		var honey = com.simibubi.create.AllFluids.HONEY.get().getSource();
++		var chocolate = com.simibubi.create.AllFluids.CHOCOLATE.get().getSource();
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (float partial : new float[] {0, .5f, 1}) {
++				float total = basin.getTotalFluidUnits(partial);
++				float fill = Math.min(total / 2000f, 1f);
++				float surface = 2f / 16f + 12f / 16f * (1f - (1f - fill) * (1f - fill));
++				System.out.printf(java.util.Locale.ROOT, "CREATE_BASIN_LIQUID %d,%.1f,%.7f,%.7f", tick, partial, total, surface);
++				for (var tank : java.util.List.of(input, output)) {
++					for (var segment : tank.getTanks()) {
++						float units = segment.getTotalUnits(partial);
++						float width = !segment.getRenderedFluid().isEmpty() && units >= 1 && total >= 1 ? units / total * 12f / 16f : 0;
++						System.out.printf(java.util.Locale.ROOT, ",%.7f,%.7f", units, width);
++					}
++				}
++				System.out.println();
++			}
++			if (tick == 4) {
++				input.getCapability().fill(new net.neoforged.neoforge.fluids.FluidStack(water, 1000), action);
++				input.getCapability().fill(new net.neoforged.neoforge.fluids.FluidStack(lava, 500), action);
++				output.allowInsertion();
++				output.getCapability().fill(new net.neoforged.neoforge.fluids.FluidStack(honey, 250), action);
++				output.forbidInsertion();
++			}
++			if (tick == 20)
++				input.getPrimaryHandler().setFluid(net.neoforged.neoforge.fluids.FluidStack.EMPTY);
++			if (tick == 28) {
++				output.allowInsertion();
++				output.getCapability().fill(new net.neoforged.neoforge.fluids.FluidStack(chocolate, 250), action);
++				output.forbidInsertion();
++			}
++			helper.assertTrue(tick >= 48, "Waiting for the Basin surface transitions");
++		});
++	}
++
+ }

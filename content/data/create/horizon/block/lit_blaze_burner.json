@@ -1,0 +1,50 @@
+{
+  "template": "minecraft:stone",
+  "item": false,
+  "properties": {
+    "occludes": false
+  },
+  "state_properties": {
+    "flame_type": {
+      "type": "enum",
+      "values": [
+        "regular",
+        "soul"
+      ]
+    }
+  },
+  "default_state": {
+    "flame_type": "regular"
+  },
+  "state_light": {
+    "property": "flame_type",
+    "values": {
+      "regular": 12,
+      "soul": 9
+    }
+  },
+  "shapes": {
+    "default": [
+      [
+        0.0625,
+        0,
+        0.0625,
+        0.9375,
+        0.875,
+        0.9375
+      ]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [
+        0.0625,
+        0,
+        0.0625,
+        0.9375,
+        0.875,
+        0.9375
+      ]
+    ]
+  }
+}

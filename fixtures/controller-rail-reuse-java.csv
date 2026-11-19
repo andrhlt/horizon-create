@@ -1,0 +1,7 @@
+rig,action,rail_type,backwards,shape,held,controller_items,powered_items
+0,place,controller_rail,true,north_south,1,0,0
+0,powered,powered_rail,true,north_south,0,1,0
+0,controller,controller_rail,true,north_south,0,0,1
+1,place,controller_rail,false,east_west,1,0,0
+1,powered,powered_rail,false,east_west,0,1,0
+1,controller,controller_rail,false,east_west,0,0,1

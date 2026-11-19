@@ -1,0 +1,191 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleSuggestionsProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleSuggestionsProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleSuggestionsProbe.java
+@@ -0,0 +1,186 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.mojang.brigadier.suggestion.Suggestion;
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.trains.schedule.DestinationSuggestions;
++import com.simibubi.create.content.trains.schedule.ScheduleScreen;
++import com.simibubi.create.content.trains.station.StationBlockEntity;
++import com.simibubi.create.content.trains.track.TrackBlock;
++import com.simibubi.create.content.trains.track.TrackShape;
++import com.simibubi.create.content.trains.track.TrackTargetingBlockItem;
++import java.util.List;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.item.ItemStack;
++import net.minecraft.world.item.context.UseOnContext;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.phys.BlockHitResult;
++import net.minecraft.world.phys.Vec3;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaScheduleSuggestionsProbe {
++    private static final int[] OFFSETS = {3, 6, 10, 16};
++    private static final String[] NAMES = {"Harbor", "Harbor", "Harbor West", "East Yard"};
++    private static volatile BlockPos origin;
++    private static BlockPos rail(int index) {
++        return origin.east(OFFSETS[index]).south(index == 3 ? 12 : 0);
++    }
++
++    private static int setup;
++    private static int elapsed;
++    private static int phase;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.scheduleSuggestions"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.getOverlay() != null)
++            return;
++        var server = mc.getSingleplayerServer();
++        var id = mc.player.getUUID();
++        if (setup < 50) {
++            if (++setup == 1) {
++                server.execute(() -> {
++                    var player = server.getPlayerList().getPlayer(id);
++                    var level = player.serverLevel();
++                    origin = player.blockPosition().offset(0, 9, 5);
++                    var rail = AllBlocks.TRACK.get().defaultBlockState().setValue(TrackBlock.SHAPE, TrackShape.XO);
++                    for (int x = -3; x <= 19; x++) {
++                        var pos = origin.east(x);
++                        level.setBlockAndUpdate(pos.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++                        level.setBlockAndUpdate(pos, rail);
++                    }
++                    for (int x = 12; x <= 19; x++) {
++                        var pos = origin.east(x).south(12);
++                        level.setBlockAndUpdate(pos.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++                        level.setBlockAndUpdate(pos, rail);
++                    }
++                    for (int index = 0; index < OFFSETS.length; index++) {
++                        var there = rail(index).south(2);
++                        level.setBlockAndUpdate(there, Blocks.AIR.defaultBlockState());
++                        level.setBlockAndUpdate(there.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++                    }
++                });
++            } else if (setup == 15) {
++                server.execute(() -> {
++                    var player = server.getPlayerList().getPlayer(id);
++                    var item = (TrackTargetingBlockItem) AllBlocks.TRACK_STATION.asItem();
++                    player.setYRot(90);
++                    player.setXRot(20);
++                    for (int index = 0; index < OFFSETS.length; index++) {
++                        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(item));
++                        var rail = rail(index);
++                        for (var pos : List.of(rail, rail.south(2).below())) {
++                            var hit = new BlockHitResult(Vec3.atCenterOf(pos).add(0, .5, 0), Direction.UP, pos, false);
++                            item.useOn(new UseOnContext(player, InteractionHand.MAIN_HAND, hit));
++                        }
++                    }
++                });
++            } else if (setup == 40) {
++                server.execute(() -> {
++                    var player = server.getPlayerList().getPlayer(id);
++                    for (int i = 0; i < OFFSETS.length; i++) {
++                        var pos = rail(i).south(2);
++                        if (!(player.serverLevel().getBlockEntity(pos) instanceof StationBlockEntity station)
++                                || !station.updateName(NAMES[i]))
++                            throw new AssertionError("Failed to bind/name station " + pos);
++                    }
++                    player.setItemInHand(InteractionHand.MAIN_HAND, AllItems.SCHEDULE.asStack());
++                });
++            }
++            return;
++        }
++        if (!AllItems.SCHEDULE.isIn(mc.player.getMainHandItem()) || ++elapsed < 10)
++            return;
++
++        if (phase == 0 && mc.screen == null) {
++            var method = Minecraft.class.getDeclaredMethod("startUseItem");
++            method.setAccessible(true);
++            method.invoke(mc);
++        } else if (mc.screen instanceof ScheduleScreen screen) {
++            switch (phase) {
++                case 1 -> click(screen, 52, 31);
++                case 2 -> click(screen, 111, 94);
++                case 3 -> {
++                    check(screen, "BLANK", List.of("Harbor", "Harbor West", "East Yard"));
++                    screen.charTyped('h', 0);
++                }
++                case 4 -> {
++                    check(screen, "PREFIX", List.of("Harbor", "Harbor West"));
++                    screen.keyPressed(258, 0, 0);
++                }
++                case 5 -> click(screen, 233, 94);
++                case 6 -> click(screen, 222, 204);
++                case 8, 12 -> click(screen, 52, 106);
++                case 9, 13 -> click(screen, 111, 94);
++                case 10 -> {
++                    check(screen, "RESTRICTED", List.of("Harbor", "Harbor West"));
++                    click(screen, 19, 95);
++                    click(screen, 90, 37);
++                }
++                case 11 -> {
++                    click(screen, 111, 94);
++                    screen.keyPressed(269, 0, 0);
++                    for (int i = 0; i < 6; i++)
++                        screen.keyPressed(259, 0, 0);
++                    for (char c : "Missing".toCharArray())
++                        screen.charTyped(c, 0);
++                    click(screen, 233, 94);
++                }
++                case 14 -> {
++                    check(screen, "FALLBACK", List.of("Harbor", "Harbor West", "East Yard"));
++                    click(screen, 19, 95);
++                    click(screen, 222, 204);
++                }
++                default -> { return; }
++            }
++        } else if (phase == 7) {
++            var tag = mc.player.getMainHandItem().get(AllDataComponents.TRAIN_SCHEDULE);
++            System.out.println("CREATE_SUGGESTIONS_SELECTED " + tag);
++            var method = Minecraft.class.getDeclaredMethod("startUseItem");
++            method.setAccessible(true);
++            method.invoke(mc);
++        } else if (phase == 15) {
++            System.out.println("CREATE_SUGGESTIONS_DONE");
++            phase++;
++            mc.stop();
++            return;
++        } else
++            return;
++
++        phase++;
++        elapsed = 0;
++    }
++
++    private static void check(ScheduleScreen screen, String label, List<String> expected) throws ReflectiveOperationException {
++        var suggestions = ScheduleScreen.class.getDeclaredField("destinationSuggestions");
++        suggestions.setAccessible(true);
++        var widget = suggestions.get(screen);
++        var items = DestinationSuggestions.class.getDeclaredField("currentSuggestions");
++        items.setAccessible(true);
++        @SuppressWarnings("unchecked")
++        var list = (List<Suggestion>) items.get(widget);
++        var names = list.stream().map(Suggestion::getText).toList();
++        System.out.println("CREATE_SUGGESTIONS_" + label + " " + names);
++        if (!names.equals(expected))
++            throw new AssertionError("Expected " + expected + ", got " + names);
++    }
++
++    private static void click(ScheduleScreen screen, int dx, int dy) throws ReflectiveOperationException {
++        var left = AbstractContainerScreen.class.getDeclaredField("leftPos");
++        var top = AbstractContainerScreen.class.getDeclaredField("topPos");
++        left.setAccessible(true);
++        top.setAccessible(true);
++        screen.mouseClicked((int) left.get(screen) + dx, (int) top.get(screen) + dy, 0);
++    }
++}

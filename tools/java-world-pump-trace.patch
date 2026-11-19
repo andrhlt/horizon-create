@@ -1,0 +1,50 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..7e1c805 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.inWorldPumpingIn") || test.testName().equals("TestFluids.inWorldPumpingOut"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+index 4102b83..4a76d4c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -83,6 +83,7 @@ public class TestFluids {
+ 		BlockPos output = new BlockPos(2, 2, 2);
+ 		helper.pullLever(lever);
+ 		helper.succeedWhen(() -> {
++			traceWorldPump(helper, "out", basin, output);
+ 			helper.assertBlockPresent(Blocks.WATER, output);
+ 			helper.assertTankEmpty(basin);
+ 		});
+@@ -96,11 +97,23 @@ public class TestFluids {
+ 		FluidStack expectedResult = new FluidStack(Fluids.WATER, FluidType.BUCKET_VOLUME);
+ 		helper.pullLever(lever);
+ 		helper.succeedWhen(() -> {
++			traceWorldPump(helper, "in", basin, water);
+ 			helper.assertBlockPresent(Blocks.AIR, water);
+ 			helper.assertFluidPresent(expectedResult, basin);
+ 		});
+ 	}
+ 
++	private static void traceWorldPump(CreateGameTestHelper helper, String mode, BlockPos basin, BlockPos open) {
++		var access = helper.getLevel().registryAccess();
++		var pump = helper.getBlockEntity(new BlockPos(3, 2, 2)).saveWithoutMetadata(access);
++		var pipe = helper.getBlockEntity(new BlockPos(4, 2, 2)).saveWithoutMetadata(access);
++		var fluid = helper.getTankContents(basin);
++		String block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(helper.getBlockState(open).getBlock()).toString();
++		System.out.printf(java.util.Locale.ROOT, "CREATE_PUMP %s %d %.7f %s %d%n", mode, helper.getTick(),
++			pump.getFloat("Speed"), block, fluid.getAmount());
++		System.out.printf("CREATE_PUMP_DETAILS %s %d %s %s%n", mode, helper.getTick(), pump, pipe);
++	}
++
+ 	@GameTest(template = "steam_engine")
+ 	public static void steamEngine(CreateGameTestHelper helper) {
+ 		BlockPos lever = new BlockPos(4, 3, 3);

@@ -1,0 +1,65 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -312,6 +312,32 @@
+ 				var source = cargo.getAllItems().getStackInSlot(0);
+ 				System.out.printf(java.util.Locale.ROOT, "CREATE_SCHEDULED_HOPPER %d;%b;%d;%d%n",
+ 					t, transfer.canTransfer(), source.getCount(), hopper.getItem(0).getCount());
++				if (Boolean.getBoolean("parity.poweredHopperCargo")) {
++					var portPower = transferInterface.south();
++					int timer = transfer.saveWithoutMetadata(level.registryAccess()).getInt("Timer");
++					boolean enabled = level.getBlockState(hopperPos).getValue(net.minecraft.world.level.block.HopperBlock.ENABLED);
++					boolean powered = level.hasNeighborSignal(transferInterface);
++					System.out.printf("CREATE_POWERED_HOPPER %d;%b;%b;%d;%b;%d;%d;%d;%d;%d%n",
++						t, powered, enabled, timer, transfer.canTransfer(), source.getCount(),
++						hopper.getItem(0).getCount(), cargo.getAllItems().getStackInSlot(1).getCount(),
++						cargo.getAllItems().getStackInSlot(2).getCount(), cargo.getVersion());
++					if (t == 27) {
++						train.runtime.paused = true;
++						level.setBlockAndUpdate(portPower, Blocks.REDSTONE_BLOCK.defaultBlockState());
++						level.setBlockAndUpdate(lock, Blocks.AIR.defaultBlockState());
++					}
++					if (t == 31)
++						level.setBlockAndUpdate(portPower, Blocks.AIR.defaultBlockState());
++					if (t == 32)
++						level.setBlockAndUpdate(lock, Blocks.REDSTONE_BLOCK.defaultBlockState());
++					if (t == 45) {
++						helper.assertTrue(source.getCount() == (inserting ? 64 : 63)
++							&& hopper.getItem(0).getCount() == (inserting ? 0 : 1),
++							"The enabled Hopper exchanges a single paper after the fixed port unlocks");
++						helper.succeed();
++					}
++					return;
++				}
+ 				if (t == 27) {
+ 					helper.assertTrue(transfer.canTransfer() && source.getCount() == (inserting ? 63 : 64)
+ 						&& hopper.getItem(0).getCount() == (inserting ? 1 : 0),
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,11 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		var tests = CreateTestFunction.getTestsFrom(testHolders);
++		if (!Boolean.getBoolean("parity.poweredHopperCargo"))
++			return tests;
++		var name = Boolean.getBoolean("parity.poweredHopperPush")
++			? "TestMisc.scheduledHopperCargoInsert" : "TestMisc.scheduledHopperCargo";
++		return tests.stream().filter(test -> test.testName().equals(name)).toList();
+ 	}
+ }
+--- a/build.gradle
++++ b/build.gradle
+@@ -91,6 +91,12 @@
+ 
+         gameTestServer {
+             type = "gameTestServer"
++            if (project.hasProperty("parityPoweredHopperCargo")) {
++                def pushing = project.findProperty("parityPoweredHopperCargo") == "push"
++                gameDirectory = project.file(pushing ? "run/powered-hopper-push-test-server" : "run/powered-hopper-pull-test-server")
++                systemProperty("parity.poweredHopperCargo", "true")
++                systemProperty("parity.poweredHopperPush", pushing.toString())
++            }
+         }
+     }
+ }

@@ -1,0 +1,100 @@
+{
+  "template": "minecraft:stone",
+  "item": false,
+  "properties": {
+    "occludes": false
+  },
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "up",
+        "down",
+        "north",
+        "south",
+        "east",
+        "west"
+      ]
+    }
+  },
+  "default_state": {
+    "facing": "up"
+  },
+  "shapes": {
+    "properties": [
+      "facing"
+    ],
+    "values": {
+      "up": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.1875,
+          1
+        ]
+      ],
+      "down": [
+        [
+          0,
+          0.8125,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "north": [
+        [
+          0,
+          0,
+          0.8125,
+          1,
+          1,
+          1
+        ]
+      ],
+      "south": [
+        [
+          0,
+          0,
+          0,
+          1,
+          1,
+          0.1875
+        ]
+      ],
+      "east": [
+        [
+          0,
+          0,
+          0,
+          0.1875,
+          1,
+          1
+        ]
+      ],
+      "west": [
+        [
+          0.8125,
+          0,
+          0,
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    "default": [
+      [
+        0,
+        0,
+        0,
+        1,
+        0.1875,
+        1
+      ]
+    ]
+  }
+}

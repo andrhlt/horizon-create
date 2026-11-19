@@ -1,0 +1,56 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..2d04283 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.couplingProbe"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..b59245a 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,37 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++ @GameTest(template = "threshold_switch_pulley", timeoutTicks = 220)
++ public static void couplingProbe(CreateGameTestHelper h) {
++  var w=h.getLevel();
++  for(int x=0;x<=2;x++)for(int z=0;z<=2;z++)w.setChunkForced(x,z,true);
++  w.getEntitiesOfClass(net.minecraft.world.entity.vehicle.AbstractMinecart.class,new net.minecraft.world.phys.AABB(0,160,0,45,180,45)).forEach(e->e.discard());
++  var sh=net.minecraft.world.level.block.state.properties.BlockStateProperties.RAIL_SHAPE;
++  for(int x=4;x<=20;x++){w.setBlock(new BlockPos(x,169,24),Blocks.STONE.defaultBlockState(),2);w.setBlock(new BlockPos(x,170,24),Blocks.RAIL.defaultBlockState().setValue(sh,net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST),2);}
++  var carts=new net.minecraft.world.entity.vehicle.Minecart[3];
++  for(int i=0;i<3;i++){carts[i]=new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART,w);carts[i].setUUID(new java.util.UUID(0,701+i));carts[i].setPos(8.5+3*i,170.0625,24.5);w.addFreshEntity(carts[i]);}
++  var player=h.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,com.simibubi.create.AllItems.MINECART_COUPLING.asStack(3));
++  h.runAtTickTime(60,()->{
++   for(int i=0;i<3;i++){carts[i].setPos(8.5+3*i,170.0625,24.5);carts[i].setDeltaMovement(0,0,0);}
++   h.assertTrue(com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player,w,carts[0].getId(),carts[1].getId()),"first link failed");
++   h.assertTrue(com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player,w,carts[1].getId(),carts[2].getId()),"second link failed");
++   var c0=carts[0].getData(com.simibubi.create.AllAttachmentTypes.MINECART_CONTROLLER);var c1=carts[1].getData(com.simibubi.create.AllAttachmentTypes.MINECART_CONTROLLER);var c2=carts[2].getData(com.simibubi.create.AllAttachmentTypes.MINECART_CONTROLLER);
++   h.assertTrue(c0.isLeadingCoupling() && c1.isFullyCoupled() && c2.isConnectedToCoupling(),"chain missing");
++   System.out.printf("WRENCH_SAVE before=%s,%s,%s,%s items=%d%n",c0.isLeadingCoupling(),c1.isConnectedToCoupling(),c1.isLeadingCoupling(),c2.isConnectedToCoupling(),player.getInventory().countItem(com.simibubi.create.AllItems.MINECART_COUPLING.get()));
++   player.getInventory().setItem(1,player.getMainHandItem().copy());player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,com.simibubi.create.AllItems.WRENCH.asStack());
++   var ev=new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.EntityInteract(player,net.minecraft.world.InteractionHand.MAIN_HAND,carts[1]);
++   com.simibubi.create.content.contraptions.minecart.MinecartCouplingItem.handleInteractionWithMinecart(ev);
++   h.assertTrue(ev.isCanceled(),"wrench did not handle cart");
++   h.assertTrue(!c0.isLeadingCoupling() && !c1.isFullyCoupled() && !c1.isLeadingCoupling() && !c1.isConnectedToCoupling() && !c2.isConnectedToCoupling(),"wrench left links");
++   int count=player.getInventory().countItem(com.simibubi.create.AllItems.MINECART_COUPLING.get());h.assertTrue(count==3,"incorrect refund");
++   System.out.printf("WRENCH_SAVE removed=%s,%s,%s,%s items=%d canceled=%s%n",c0.isLeadingCoupling(),c1.isConnectedToCoupling(),c1.isLeadingCoupling(),c2.isConnectedToCoupling(),count,ev.isCanceled());
++   for(int i=0;i<3;i++){
++    var tag=carts[i].saveWithoutId(new net.minecraft.nbt.CompoundTag());var restored=new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART,w);restored.load(tag);
++    var rc=restored.getData(com.simibubi.create.AllAttachmentTypes.MINECART_CONTROLLER);
++    h.assertTrue(!rc.isLeadingCoupling() && !rc.isConnectedToCoupling(),"links resurrected after NBT reload");
++    System.out.printf("WRENCH_SAVE nbt_reload index=%d leading=%s connected=%s uuid=%s%n",i,rc.isLeadingCoupling(),rc.isConnectedToCoupling(),restored.getUUID());
++   }
++   h.succeed();
++  });
++ }
+ }

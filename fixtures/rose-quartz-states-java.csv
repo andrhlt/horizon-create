@@ -1,0 +1,10 @@
+block,face,axis,hardness,resistance,map_color,requires_tool
+create:rose_quartz_block,east,x,1.5,1.5,42,true
+create:rose_quartz_block,up,y,1.5,1.5,42,true
+create:rose_quartz_block,south,z,1.5,1.5,42,true
+create:rose_quartz_tiles,east,_,3.0,6.0,42,true
+create:rose_quartz_tiles,up,_,3.0,6.0,42,true
+create:rose_quartz_tiles,south,_,3.0,6.0,42,true
+create:small_rose_quartz_tiles,east,_,3.0,6.0,42,true
+create:small_rose_quartz_tiles,up,_,3.0,6.0,42,true
+create:small_rose_quartz_tiles,south,_,3.0,6.0,42,true

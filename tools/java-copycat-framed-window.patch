@@ -1,0 +1,138 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaCopycatFramedWindowProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaCopycatFramedWindowProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaCopycatFramedWindowProbe.java
+@@ -0,0 +1,133 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.decoration.copycat.CopycatModel;
++import com.simibubi.create.content.decoration.copycat.CopycatPanelBlock;
++import com.simibubi.create.foundation.model.BakedQuadHelper;
++
++import java.util.List;
++import java.util.Map;
++
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.renderer.block.model.BakedQuad;
++import net.minecraft.client.renderer.texture.TextureAtlasSprite;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.resources.ResourceLocation;
++import net.minecraft.util.RandomSource;
++import net.minecraft.world.inventory.InventoryMenu;
++import net.minecraft.world.level.BlockAndTintGetter;
++import net.minecraft.world.level.ColorResolver;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.entity.BlockEntity;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.level.lighting.LevelLightEngine;
++import net.minecraft.world.level.material.FluidState;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import net.neoforged.neoforge.client.model.data.ModelData;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaCopycatFramedWindowProbe {
++    private static boolean done;
++
++    private record Scene(Map<BlockPos, BlockState> blocks, Map<BlockPos, ModelData> data)
++        implements BlockAndTintGetter {
++        public BlockState getBlockState(BlockPos pos) {
++            return blocks.getOrDefault(pos, Blocks.AIR.defaultBlockState());
++        }
++        public ModelData getModelData(BlockPos pos) { return data.getOrDefault(pos, ModelData.EMPTY); }
++        public BlockEntity getBlockEntity(BlockPos pos) { return null; }
++        public FluidState getFluidState(BlockPos pos) { return getBlockState(pos).getFluidState(); }
++        public int getHeight() { return 384; }
++        public int getMinBuildHeight() { return -64; }
++        public float getShade(Direction side, boolean shaded) { return 1; }
++        public LevelLightEngine getLightEngine() { return null; }
++        public int getBlockTint(BlockPos pos, ColorResolver resolver) { return -1; }
++    }
++
++    private record Neighbour(String name, BlockState state, BlockState material) {
++        ModelData data() {
++            return material == null ? ModelData.EMPTY
++                : ModelData.builder().with(CopycatModel.MATERIAL_PROPERTY, material).build();
++        }
++    }
++
++    private static BlockState block(String id) {
++        return BuiltInRegistries.BLOCK.get(ResourceLocation.parse(id)).defaultBlockState();
++    }
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) {
++        if (!Boolean.getBoolean("parity.copycatFramedWindow") || done)
++            return;
++        var minecraft = Minecraft.getInstance();
++        if (minecraft.screen == null || minecraft.getOverlay() != null)
++            return;
++        done = true;
++        try {
++            probe(minecraft);
++        } finally {
++            minecraft.stop();
++        }
++    }
++
++    private record Palette(String name, int grid) {}
++
++    private static void probe(Minecraft minecraft) {
++        var pos = new BlockPos(8, 111, -10);
++        for (var palette : List.of(
++            new Palette("framed_glass", 8), new Palette("horizontal_framed_glass", 2),
++            new Palette("vertical_framed_glass", 2), new Palette("industrial_iron_window", 4)
++        )) {
++            var material = block("create:" + palette.name());
++            var sprite = minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS)
++                .apply(ResourceLocation.parse("create:block/palettes/" + palette.name() + "_connected"));
++            for (var face : List.of(Direction.NORTH, Direction.SOUTH)) {
++                var panel = AllBlocks.COPYCAT_PANEL.getDefaultState()
++                    .setValue(CopycatPanelBlock.FACING, face.getOpposite());
++                var own = new Neighbour("panel", panel, material);
++                var model = minecraft.getBlockRenderer().getBlockModel(panel);
++                for (var neighbour : List.of(
++                    new Neighbour("air", Blocks.AIR.defaultBlockState(), null),
++                    new Neighbour("glass", material, null),
++                    new Neighbour("painted-panel", panel, material)
++                )) {
++                    var sides = neighbour.name().equals("air") ? List.of(Direction.UP)
++                        : List.of(Direction.UP, Direction.DOWN, Direction.WEST, Direction.EAST);
++                    for (var toward : sides) {
++                        var otherPos = pos.relative(toward);
++                        var scene = new Scene(Map.of(pos, panel, otherPos, neighbour.state()),
++                            Map.of(pos, own.data(), otherPos, neighbour.data()));
++                        var data = model.getModelData(scene, pos, panel, own.data());
++                        var quads = model.getQuads(panel, face, RandomSource.create(panel.getSeed(pos)), data, null);
++                        if (quads.size() != 1)
++                            throw new IllegalStateException("Expected one painted Panel quad");
++                        int index = tile(sprite, quads.getFirst(), palette.grid());
++                        if (index < 0 || index >= palette.grid() * palette.grid())
++                            throw new IllegalStateException("Quad did not use the connected sprite for " + palette.name());
++                        System.out.printf("CREATE_COPYCAT_FRAMED_WINDOW %s,%s,%s,%s,%d%n",
++                            palette.name(), neighbour.name(), toward.getName(), face.getName(), index);
++                    }
++                }
++            }
++        }
++        System.out.println("CREATE_COPYCAT_FRAMED_WINDOW_DONE");
++    }
++
++    private static int tile(TextureAtlasSprite sprite, BakedQuad quad, int grid) {
++        float u = 0;
++        float v = 0;
++        for (int i = 0; i < 4; i++) {
++            u += BakedQuadHelper.getU(quad.getVertices(), i) / 4;
++            v += BakedQuadHelper.getV(quad.getVertices(), i) / 4;
++        }
++        int x = (int) Math.floor((u - sprite.getU0()) / (sprite.getU1() - sprite.getU0()) * grid);
++        int y = (int) Math.floor((v - sprite.getV0()) / (sprite.getV1() - sprite.getV0()) * grid);
++        return x + grid * y;
++    }
++}
++

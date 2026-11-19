@@ -1,0 +1,72 @@
+{
+  "initial": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Id": "create:delay",
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              }
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "time": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "Hour": 10,
+                "Minute": 20,
+                "Rotation": 6
+              },
+              "Id": "create:time_of_day"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "power": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {},
+              "Id": "create:powered"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  }
+}

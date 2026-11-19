@@ -1,0 +1,178 @@
+--- a/crates/horizon-client/src/motion.rs
++++ b/crates/horizon-client/src/motion.rs
+@@ -370,6 +370,7 @@
+     pub sprint_input: crate::sprint::SprintState,
+     pub shift_key_down: bool,
+     pub local_crouching: bool,
++    pub(crate) has_cardboard_armor: bool,
+     pub pose: crate::pose::Pose,
+     pub dimensions: crate::pose::Dimensions,
+     /// The `minecraft:scale` the dimensions were last built with
+--- a/crates/horizon-client/src/motion/body.rs
++++ b/crates/horizon-client/src/motion/body.rs
+@@ -66,6 +66,7 @@
+             sprint_input: crate::sprint::SprintState::default(),
+             shift_key_down: false,
+             local_crouching: false,
++            has_cardboard_armor: false,
+             pose: crate::pose::Pose::Standing,
+             dimensions: crate::pose::Pose::Standing.dimensions(1.0),
+             scale: 1.0,
+--- a/crates/horizon-client/src/pose.rs
++++ b/crates/horizon-client/src/pose.rs
+@@ -101,12 +101,45 @@
+             }
+         }
+     }
++    pub fn sync_cardboard_armor(&mut self, armor: &[Option<crate::items::ItemStack>; 4]) -> Result<()> {
++        let full_set = armor.iter().all(|slot| {
++            slot.as_ref().is_some_and(|stack| {
++                stack.count > 0 && matches!(
++                    stack.item.as_ref(),
++                    "create:cardboard_helmet" | "create:cardboard_chestplate" |
++                    "create:cardboard_leggings" | "create:cardboard_boots"
++                )
++            })
++        });
++        if self.has_cardboard_armor != full_set {
++            self.has_cardboard_armor = full_set;
++            self.refresh_dimensions()?;
++        }
++        Ok(())
++    }
++    pub fn cardboard_disguised(&self) -> bool {
++        self.pose == Pose::Crouching && self.can_disguise_as_cardboard()
++    }
++    fn can_disguise_as_cardboard(&self) -> bool {
++        self.has_cardboard_armor && !self.flying
++    }
++    fn body_dimensions(&self, pose: Pose, scale: f32) -> Dimensions {
++        if pose == Pose::Crouching && self.can_disguise_as_cardboard() {
++            return Dimensions {
++                width: 0.6 * scale,
++                height: 0.8 * scale,
++                eye_height: 0.6 * scale,
++            };
++        }
++        pose.dimensions(scale)
++    }
+     pub fn dimensions_for_pose(&mut self, pose: Pose) -> Result<Dimensions> {
+-        Ok(pose.dimensions(self.attribute("minecraft:scale")? as f32))
++        let scale = self.attribute("minecraft:scale")? as f32;
++        Ok(self.body_dimensions(pose, scale))
+     }
+     pub fn refresh_dimensions(&mut self) -> Result<()> {
+         self.scale = self.attribute("minecraft:scale")? as f32;
+-        self.dimensions = self.pose.dimensions(self.scale);
++        self.dimensions = self.body_dimensions(self.pose, self.scale);
+         Ok(())
+     }
+     pub fn set_pose(&mut self, pose: Pose) -> Result<()> {
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -3648,6 +3648,7 @@
+         let Some(player) = self.player.as_mut() else {
+             return;
+         };
++        let _ = player.sync_cardboard_armor(&self.armor);
+         player.nudge = nudge;
+         player.mobility_restricted = blind;
+         player.yaw = self.yaw;
+--- a/crates/horizon-client/src/game/lan_actions.rs
++++ b/crates/horizon-client/src/game/lan_actions.rs
+@@ -5038,6 +5038,7 @@
+             let Some(player) = game.player.as_mut() else {
+                 return (Vec::new(), None);
+             };
++            let _ = player.sync_cardboard_armor(&game.armor);
+             player.fluids.boat = boat;
+             let mut w = MotionWorld {
+                 entities: &[],
+--- a/crates/horizon-client/src/mobs.rs
++++ b/crates/horizon-client/src/mobs.rs
+@@ -2770,6 +2770,7 @@
+     pub alive: bool,
+     pub creative: bool,
+     pub sneaking: bool,
++    pub cardboard_disguised: bool,
+     /// `Entity.isSwimming`.
+     pub swimming: bool,
+     pub look: [f64; 3],
+@@ -2850,6 +2851,9 @@
+         targeting: Option<&str>,
+         items: Option<&crate::items::Items>,
+     ) -> f64 {
++        if self.cardboard_disguised {
++            return 0.0;
++        }
+         let mut visibility = 1.0;
+         if self.sneaking {
+             visibility *= 0.8;
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -435,6 +435,7 @@
+             // EntitySelector.NO_CREATIVE_OR_SPECTATOR.
+             creative: self.creative || self.spectator(),
+             sneaking: self.keys.held(Action::Sneak),
++            cardboard_disguised: p.cardboard_disguised(),
+             swimming: p.swimming,
+             look: view_vector(self.yaw, self.pitch),
+             main_hand: self.held().map(|s| s.item.clone()),
+--- a/crates/horizon-client/src/game/lan_mobs.rs
++++ b/crates/horizon-client/src/game/lan_mobs.rs
+@@ -565,6 +565,7 @@
+             alive: true,
+             creative,
+             sneaking: false,
++            cardboard_disguised: false,
+             swimming: false,
+             look: [0.0; 3],
+             main_hand: None,
+--- a/crates/horizon-client/src/mobs/world.rs
++++ b/crates/horizon-client/src/mobs/world.rs
+@@ -948,6 +948,7 @@
+         alive: true,
+         creative: false,
+         sneaking: false,
++        cardboard_disguised: false,
+         swimming: false,
+         look: [0.0; 3],
+         main_hand: None,
+--- a/crates/horizon-client/src/mobs/cube.rs
++++ b/crates/horizon-client/src/mobs/cube.rs
+@@ -540,6 +540,7 @@
+                 alive: true,
+                 creative: false,
+                 sneaking: false,
++                cardboard_disguised: false,
+                 swimming: false,
+                 look: [0.0, 0.0, 1.0],
+                 main_hand: None,
+--- a/crates/horizon-client/src/game/agent.rs
++++ b/crates/horizon-client/src/game/agent.rs
+@@ -537,6 +537,11 @@
+                 "position": [p.position.x, p.position.y, p.position.z],
+                 "block_pos": [p.position.x.floor() as i32, p.position.y.floor() as i32, p.position.z.floor() as i32],
+                 "eye": self.eye_position(),
++                "pose": p.pose.name(),
++                "body_width": p.dimensions.width,
++                "body_height": p.dimensions.height,
++                "visibility": self.player_view().map(|view| view.visibility_percent(None, None)),
++                "cardboard_disguised": p.cardboard_disguised(),
+                 "yaw": self.yaw,
+                 "pitch": self.pitch,
+                 "velocity": [p.velocity.x, p.velocity.y, p.velocity.z],
+--- a/crates/horizon-client/src/game/lan.rs
++++ b/crates/horizon-client/src/game/lan.rs
+@@ -1341,6 +1341,11 @@
+                     "using": h.play.get(&g.conn).and_then(|p| p.using())
+                         .map(|(slot, ticks)| json!({ "slot": slot, "ticks": ticks })),
+                     "sneaking": g.sneaking,
++                    "pose": g.pose().name(),
++                    "body_width": g.dimensions().width,
++                    "body_height": g.dimensions().height,
++                    "eye_height": g.eye_height(),
++                    "cardboard_disguised": g.motion.as_ref().is_some_and(|m| m.cardboard_disguised()),
+                     // The server's Elytra glide (shared flag 7).
+                     "fall_flying": g.fall_flying,
+                     "sleeping": g.bed,

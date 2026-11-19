@@ -1,0 +1,7 @@
+face,facing,waterlogged,source
+down,down,true,true
+up,up,true,true
+north,north,true,true
+south,south,true,true
+west,west,true,true
+east,east,true,true

@@ -1,0 +1,91 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {
+    "waterloggable": true,
+    "occludes": false
+  },
+  "state_properties": {
+    "shape": {
+      "type": "enum",
+      "values": [
+        "north_south",
+        "east_west"
+      ]
+    },
+    "rail_type": {
+      "type": "enum",
+      "values": [
+        "regular",
+        "powered_rail",
+        "detector_rail",
+        "activator_rail",
+        "controller_rail"
+      ]
+    },
+    "backwards": {
+      "type": "boolean"
+    },
+    "powered": {
+      "type": "boolean"
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "shape": "north_south",
+    "rail_type": "regular",
+    "backwards": "false",
+    "powered": "false",
+    "waterlogged": "false"
+  },
+  "shapes": {
+    "property": "shape",
+    "values": {
+      "east_west": [
+        [
+          0,
+          0.75,
+          0,
+          1,
+          1,
+          1
+        ],
+        [
+          0.0625,
+          0,
+          -0.125,
+          0.9375,
+          0.875,
+          1.125
+        ]
+      ],
+      "north_south": [
+        [
+          0,
+          0.75,
+          0,
+          1,
+          1,
+          1
+        ],
+        [
+          -0.125,
+          0,
+          0.0625,
+          1.125,
+          0.875,
+          0.9375
+        ]
+      ]
+    }
+  },
+  "collision_shapes": {
+    "property": "shape",
+    "values": {
+      "north_south": [],
+      "east_west": []
+    }
+  }
+}

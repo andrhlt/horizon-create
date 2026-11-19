@@ -1,0 +1,13 @@
+facing,face,active,x,y,z
+south,down,false,0.50000,0.21875,0.43750
+south,up,true,0.50000,0.78125,0.43750
+south,north,false,0.50000,0.50000,0.15625
+south,south,false,0.50000,0.50000,0.71875
+south,west,true,0.21875,0.50000,0.43750
+south,east,true,0.78125,0.50000,0.43750
+up,down,false,0.50000,0.15625,0.50000
+up,up,false,0.50000,0.71875,0.50000
+up,north,true,0.50000,0.43750,0.21875
+up,south,true,0.50000,0.43750,0.78125
+up,west,true,0.21875,0.43750,0.50000
+up,east,true,0.78125,0.43750,0.50000

@@ -1,0 +1,77 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..3fe7135 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.worldshaperChanceFill"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..638e815 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,58 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void worldshaperChanceFill(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var patterns = new com.simibubi.create.content.equipment.zapper.PlacementPatterns[] {
++			com.simibubi.create.content.equipment.zapper.PlacementPatterns.Chance25,
++			com.simibubi.create.content.equipment.zapper.PlacementPatterns.Chance50,
++			com.simibubi.create.content.equipment.zapper.PlacementPatterns.Chance75,
++		};
++		helper.runAtTickTime(4, () -> {
++			for (int scenario = 0; scenario < 3; scenario++) {
++				var target = new BlockPos(-12, 112, -9);
++                level.setChunkForced(target.getX() >> 4, target.getZ() >> 4, true);
++				for (BlockPos delta : BlockPos.betweenClosed(-7, -4, -7, 7, 7, 7))
++					level.setBlock(target.offset(delta), Blocks.AIR.defaultBlockState(), 2);
++				var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++				var stack = com.simibubi.create.AllItems.WORLDSHAPER.asStack();
++				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack);
++				boolean north = false;
++				player.setPos(target.getX() + .5, target.getY(), target.getZ() + (north ? -2.5 : 2.5));
++				player.setYRot(north ? 0 : 180);
++				player.setXRot(25);
++				level.setBlock(target, Blocks.GOLD_BLOCK.defaultBlockState(), 2);
++				boolean selected = com.simibubi.create.content.equipment.zapper.ZapperInteractionHandler.trySelect(stack, player);
++				level.setBlock(target, Blocks.STONE.defaultBlockState(), 2);
++				com.simibubi.create.content.equipment.zapper.terrainzapper.WorldshaperItem.configureSettings(stack,
++					patterns[scenario % 3],
++					com.simibubi.create.content.equipment.zapper.terrainzapper.TerrainBrushes.Cuboid,
++					2, 3, 4, com.simibubi.create.content.equipment.zapper.terrainzapper.TerrainTools.Fill, com.simibubi.create.content.equipment.zapper.terrainzapper.PlacementOptions.Attached);
++				var eye = player.position().add(0, player.getEyeHeight(), 0);
++				var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, eye.add(player.getLookAngle().scale(128)),
++					net.minecraft.world.level.ClipContext.Block.OUTLINE, net.minecraft.world.level.ClipContext.Fluid.NONE, player));
++				var itemData = (net.minecraft.nbt.CompoundTag) stack.saveOptional(level.registryAccess());
++				System.out.printf("CREATE_WORLDSHAPER_PATTERN_COMPONENTS %s %s%n", com.simibubi.create.content.equipment.zapper.terrainzapper.PlacementOptions.Attached, itemData.getCompound("components"));
++				long seed = 123456789L;
++				level.random.setSeed(seed);
++				var result = com.simibubi.create.AllItems.WORLDSHAPER.get().use(level, player, net.minecraft.world.InteractionHand.MAIN_HAND);
++				long nextLong = level.random.nextLong();
++				if (!selected || !hit.getBlockPos().equals(target) || hit.getDirection() != net.minecraft.core.Direction.SOUTH
++					|| result.getResult() != net.minecraft.world.InteractionResult.SUCCESS)
++					throw new IllegalStateException("Unexpected Worldshaper target or result: " + hit + " " + result.getResult());
++				var changed = new java.util.ArrayList<String>();
++				for (int x = -7; x <= 7; x++)
++					for (int y = -4; y <= 7; y++)
++						for (int z = -7; z <= 7; z++)
++							if (level.getBlockState(target.offset(x, y, z)).is(Blocks.GOLD_BLOCK))
++								changed.add(x + ":" + y + ":" + z);
++				System.out.printf("CREATE_WORLDSHAPER_CHANCE,%s,%d:%d:%d,%s,2,3,4,%s,%s,%d,%s,%d,%d,%d,%s%n",
++					patterns[scenario % 3], target.getX(), target.getY(), target.getZ(), hit.getDirection(), selected, result.getResult(), changed.size(),
++					level.getBlockState(target).is(Blocks.STONE), stack.getCount(), seed, nextLong, String.join("|", changed));
++			}
++			helper.succeed();
++		});
++	}
+ }

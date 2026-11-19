@@ -1,0 +1,4 @@
+block,ingredient,recipe,count
+create:andesite_scaffolding,create:andesite_alloy,create:andesite_scaffolding_from_andesite_alloy_stonecutting,2
+create:brass_scaffolding,create:brass_ingot,create:brass_scaffolding_from_ingots_brass_stonecutting,2
+create:copper_scaffolding,minecraft:copper_ingot,create:copper_scaffolding_from_ingots_copper_stonecutting,2

@@ -1,0 +1,77 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..7f2cd64a2 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.roseQuartzPalettes"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..2ae034cf8 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,45 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 15)
++	public static void roseQuartzPalettes(CreateGameTestHelper helper) {
++		var list = java.util.List.of(com.simibubi.create.AllBlocks.ROSE_QUARTZ_BLOCK,
++			com.simibubi.create.AllBlocks.ROSE_QUARTZ_TILES, com.simibubi.create.AllBlocks.SMALL_ROSE_QUARTZ_TILES);
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(2, 12, 2));
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var faces = new net.minecraft.core.Direction[] { net.minecraft.core.Direction.EAST,
++			net.minecraft.core.Direction.UP, net.minecraft.core.Direction.SOUTH };
++		for (var entry : list) {
++			var id = registry.getKey(entry.get());
++			for (var face : faces) {
++				var support = at.relative(face.getOpposite());
++				level.setBlockAndUpdate(support, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++				var hit = new net.minecraft.world.phys.BlockHitResult(support.getCenter().relative(face, .5), face, support, false);
++				var placement = new net.minecraft.world.item.context.BlockPlaceContext(player,
++					net.minecraft.world.InteractionHand.MAIN_HAND, entry.asStack(), hit);
++				var state = entry.get().getStateForPlacement(placement);
++				var axis = net.minecraft.world.level.block.RotatedPillarBlock.AXIS;
++				System.out.printf(java.util.Locale.ROOT, "CREATE_ROSE_STATE %s,%s,%s,%.1f,%.1f,%d,%b%n",
++					id, face.getName(), state.hasProperty(axis) ? state.getValue(axis).getName() : "_",
++					state.getDestroySpeed(level, at), entry.get().getExplosionResistance(),
++					state.getMapColor(level, at).id, state.requiresCorrectToolForDrops());
++			}
++			var ingredient = entry == com.simibubi.create.AllBlocks.ROSE_QUARTZ_BLOCK
++				? com.simibubi.create.AllItems.ROSE_QUARTZ.asStack()
++				: com.simibubi.create.AllItems.POLISHED_ROSE_QUARTZ.asStack();
++			var input = new net.minecraft.world.item.crafting.SingleRecipeInput(ingredient);
++			var recipe = level.getRecipeManager().getRecipesFor(
++				net.minecraft.world.item.crafting.RecipeType.STONECUTTING, input, level).stream()
++				.filter(candidate -> candidate.id().getPath().startsWith(id.getPath() + "_from_"))
++				.findFirst().orElseThrow();
++			var result = recipe.value().assemble(input, level.registryAccess());
++			System.out.printf(java.util.Locale.ROOT, "CREATE_ROSE_CUT %s,%s,%s,%d%n",
++				id, items.getKey(ingredient.getItem()), recipe.id(), result.getCount());
++		}
++		helper.succeed();
++	}
+ }

@@ -1,0 +1,133 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleGroupEditorProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleGroupEditorProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleGroupEditorProbe.java
+@@ -0,0 +1,128 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.trains.schedule.Schedule;
++import com.simibubi.create.content.trains.schedule.ScheduleScreen;
++import com.simibubi.create.content.trains.schedule.condition.ScheduledDelay;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.Screenshot;
++import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaScheduleGroupEditorProbe {
++    private static boolean supplied;
++    private static int phase;
++    private static int elapsed;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.scheduleGroupEditor"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.getOverlay() != null)
++            return;
++        if (!supplied) {
++            var server = mc.getSingleplayerServer();
++            var playerId = mc.player.getUUID();
++            server.execute(() -> server.getPlayerList().getPlayer(playerId)
++                .setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, AllItems.SCHEDULE.asStack()));
++            supplied = true;
++        }
++        if (!AllItems.SCHEDULE.isIn(mc.player.getMainHandItem()) || ++elapsed < 8)
++            return;
++        if (mc.screen == null) {
++            if (phase == 0)
++                use(mc);
++            else if (phase == 8) {
++                captureItem(mc, "GROUPS");
++                use(mc);
++            } else if (phase == 11) {
++                captureItem(mc, "REMOVED_TERM");
++                use(mc);
++            } else if (phase == 14) {
++                captureItem(mc, "REMOVED_ALT");
++                System.out.println("CREATE_GROUP_EDITOR_DONE");
++                phase++;
++                mc.stop();
++                return;
++            } else
++                return;
++        } else if (mc.screen instanceof ScheduleScreen screen) {
++            switch (phase) {
++                case 1 -> click(screen, 52, 31, 0);
++                case 2 -> {
++                    click(screen, 111, 94, 0);
++                    for (char c : "Waiting Station".toCharArray())
++                        screen.charTyped(c, 0);
++                    click(screen, 233, 94, 0);
++                }
++                case 3 -> click(screen, 51 + columnWidth(screen) / 2, 76, 0);
++                case 4 -> editDelay(screen, 6);
++                case 5 -> click(screen, 51 + columnWidth(screen) + 13, 61, 0);
++                case 6 -> editDelay(screen, 8);
++                case 7 -> {
++                    Screenshot.grab(mc.gameDirectory, "schedule-and-or-editor.png", mc.getMainRenderTarget(),
++                        message -> System.out.println(message.getString()));
++                    click(screen, 222, 204, 0);
++                }
++                case 9 -> click(screen, 65, 79, 1);
++                case 10, 13 -> click(screen, 222, 204, 0);
++                case 12 -> click(screen, 51 + columnWidth(screen) + 20, 61, 1);
++                default -> { return; }
++            }
++        } else
++            return;
++        phase++;
++        elapsed = 0;
++    }
++
++    private static void editDelay(ScheduleScreen screen, int target) throws ReflectiveOperationException {
++        var editing = ScheduleScreen.class.getDeclaredField("editingCondition");
++        editing.setAccessible(true);
++        if (!(editing.get(screen) instanceof ScheduledDelay))
++            throw new AssertionError("Expected an editable Scheduled Delay");
++        for (int i = 5; i < target; i++)
++            scroll(screen, 90, 94, 1);
++        scroll(screen, 150, 94, 1);
++        click(screen, 233, 94, 0);
++    }
++
++    private static int columnWidth(ScheduleScreen screen) throws ReflectiveOperationException {
++        var doc = ScheduleScreen.class.getDeclaredField("schedule");
++        doc.setAccessible(true);
++        var schedule = (Schedule) doc.get(screen);
++        var width = ScheduleScreen.class.getDeclaredMethod("getConditionColumnWidth", java.util.List.class);
++        width.setAccessible(true);
++        return (int) width.invoke(screen, schedule.entries.getFirst().conditions.getFirst());
++    }
++
++    private static void captureItem(Minecraft mc, String name) {
++        System.out.println("CREATE_GROUP_EDITOR_" + name + " " +
++            mc.player.getMainHandItem().get(AllDataComponents.TRAIN_SCHEDULE));
++    }
++
++    private static void use(Minecraft mc) throws ReflectiveOperationException {
++        var method = Minecraft.class.getDeclaredMethod("startUseItem");
++        method.setAccessible(true);
++        method.invoke(mc);
++    }
++
++    private static void click(ScheduleScreen screen, int dx, int dy, int button) throws ReflectiveOperationException {
++        screen.mouseClicked(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, button);
++    }
++
++    private static void scroll(ScheduleScreen screen, int dx, int dy, double delta) throws ReflectiveOperationException {
++        screen.mouseScrolled(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, 0, delta);
++    }
++
++    private static int origin(ScheduleScreen screen, String fieldName) throws ReflectiveOperationException {
++        var field = AbstractContainerScreen.class.getDeclaredField(fieldName);
++        field.setAccessible(true);
++        return (int) field.get(screen);
++    }
++}

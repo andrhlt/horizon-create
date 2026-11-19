@@ -1,0 +1,162 @@
+{
+  "integration_only": true,
+  "include_components": true,
+  "actions": [
+    {
+      "op": "place",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        6,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 3
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:potion_contents": {
+            "potion": "minecraft:healing"
+          }
+        }
+      }
+    },
+    {
+      "op": "probe",
+      "label": "creative-0-0",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:potion_contents": {
+            "potion": "minecraft:strength"
+          }
+        }
+      }
+    },
+    {
+      "op": "probe",
+      "label": "creative-0-1",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:glass_bottle",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "creative-0-2",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        6,
+        0,
+        0
+      ],
+      "mode": "survival",
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:potion_contents": {
+            "potion": "minecraft:healing"
+          }
+        }
+      }
+    },
+    {
+      "op": "probe",
+      "label": "survival-6-0",
+      "positions": [
+        [
+          6,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        6,
+        0,
+        0
+      ],
+      "mode": "survival",
+      "item": {
+        "id": "minecraft:glass_bottle",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "survival-6-1",
+      "positions": [
+        [
+          6,
+          0,
+          0
+        ]
+      ]
+    }
+  ]
+}

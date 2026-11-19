@@ -1,0 +1,6 @@
+action,left_lower,left_upper,right_lower,right_upper
+before,false,false,true,true
+opened,true,true,true,true
+opened_next_tick,true,true,true,true
+closed,false,false,false,false
+closed_next_tick,false,false,false,false

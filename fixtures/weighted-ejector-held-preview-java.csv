@@ -1,0 +1,5 @@
+case,x,y,z,projected_x,projected_y,projected_z,dust_count,dust_color
+aligned,5,104,-11,5,104,-11,8,9ede73
+diagonal,5,104,-13,5,104,-11,8,ff7171
+tie,7,104,-13,,,,0,
+vertical,9,105,-11,,,,0,

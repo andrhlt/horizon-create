@@ -1,0 +1,131 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..e700fb0a3 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.copperValveHandleAngleSettings"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..46f759628 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,99 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++
++
++
++
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 39)
++	public static void copperValveHandleAngleSettings(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var east = net.minecraft.core.Direction.EAST;
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(helper.getLevel());
++		var angleRows = new int[] {1, 0, 1};
++		var angleValues = new int[] {95, 137, 0};
++		for (int index = 0; index < angleRows.length; index++) {
++			var pos = new BlockPos(12, 3, 2 + index * 5);
++			helper.setBlock(pos, com.simibubi.create.AllBlocks.COPPER_VALVE_HANDLE.getDefaultState().setValue(facing, east));
++			helper.setBlock(pos.west(), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis()));
++		}
++		var origin = helper.absolutePos(new BlockPos(12, 3, 2));
++		var base = com.simibubi.create.AllBlocks.COPPER_VALVE_HANDLE.getDefaultState();
++		var slot = new com.simibubi.create.content.kinetics.crank.ValveHandleBlockEntity.ValveHandleValueBox();
++		for (var face : net.minecraft.core.Direction.values()) {
++			var state = base.setValue(facing, face);
++			var center = slot.fromSide(face).getLocalOffset(helper.getLevel(), origin, state);
++			var plateCenter = new net.minecraft.world.phys.Vec3(0.5, 0.5, 0.5);
++			var corner = plateCenter.add(face.getAxis() == net.minecraft.core.Direction.Axis.X ? 0 : 0.35,
++				face.getAxis() == net.minecraft.core.Direction.Axis.X ? 0.35 : 0, 0);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_HANDLE_SLOT,%s,%.5f,%.5f,%.5f,%s,%s%n",
++				face, center.x, center.y, center.z,
++				slot.testHit(helper.getLevel(), origin, state, plateCenter),
++				slot.testHit(helper.getLevel(), origin, state, corner));
++			for (var shape : state.getShape(helper.getLevel(), origin).toAabbs())
++				System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_HANDLE_SHAPE,%s,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f%n",
++					face, shape.minX, shape.minY, shape.minZ, shape.maxX, shape.maxY, shape.maxZ);
++		}
++		var directions = net.minecraft.core.Direction.values();
++		for (int index = 0; index < directions.length + 3; index++) {
++			boolean wet = index == 6;
++			boolean preferShaft = index == 7 || index == 8;
++			var clickedFace = index < directions.length ? directions[index] : net.minecraft.core.Direction.UP;
++			var mount = helper.absolutePos(new BlockPos(18 + index * 3, 6, 11));
++			var clicked = mount.relative(clickedFace.getOpposite());
++			helper.getLevel().setBlockAndUpdate(clicked, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++			helper.getLevel().setBlockAndUpdate(mount, (wet ? net.minecraft.world.level.block.Blocks.WATER
++				: net.minecraft.world.level.block.Blocks.AIR).defaultBlockState());
++			if (preferShaft)
++				helper.getLevel().setBlockAndUpdate(mount.west(), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis()));
++			var hit = new net.minecraft.world.phys.BlockHitResult(clicked.getCenter().relative(clickedFace, 0.5), clickedFace, clicked, false);
++			var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++			var stack = new net.minecraft.world.item.ItemStack(com.simibubi.create.AllBlocks.COPPER_VALVE_HANDLE.asItem());
++			player.setShiftKeyDown(index == 8);
++			var context = new net.minecraft.world.item.context.BlockPlaceContext(player, hand, stack, hit);
++			var place = com.simibubi.create.AllBlocks.COPPER_VALVE_HANDLE.get().getStateForPlacement(context);
++			var fluid = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++			System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_HANDLE_PLACEMENT,%d,%s,%s,%s,%s%n",
++				index, clickedFace, place.getValue(facing), place.getValue(fluid), place.canSurvive(helper.getLevel(), mount));
++		}
++		player.setShiftKeyDown(false);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int index = 0; index < angleRows.length; index++) {
++				var pos = new BlockPos(12, 3, 2 + index * 5);
++				var at = helper.absolutePos(pos);
++				var handle = helper.getBlockEntity(AllBlockEntityTypes.VALVE_HANDLE.get(), pos);
++				var output = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), pos.west());
++				var nbt = handle.saveWithoutMetadata(helper.getLevel().registryAccess());
++				System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_HANDLE_ANGLE,%d,%d,%d,%d,%d,%d,%d,%d,%s,%.4f,%.4f%n",
++					tick, index, handle.angleInput.getValue(), nbt.getInt("InUse"), nbt.getInt("TotalUseTicks"),
++					nbt.getInt("StartAngle"), nbt.getInt("TargetAngle"), handle.cooldown, handle.showValue(),
++					handle.getSpeed(), output.getSpeed());
++				if (tick == 3) {
++					var hit = new net.minecraft.world.phys.BlockHitResult(at.getCenter().relative(east, 0.49), east, at, false);
++					var board = handle.angleInput.createBoard(player, hit);
++					var selection = new com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBehaviour.ValueSettings(
++						angleRows[index], angleValues[index]);
++					System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_HANDLE_BOARD,%d,%s,%d,%d,%s,%s,%s%n",
++						index, board.title().getString(), board.maxValue(), board.milestoneInterval(),
++						board.rows().get(0).getString(), board.rows().get(1).getString(),
++						board.formatter().format(selection).getString());
++					handle.angleInput.setValueSettings(player, selection, false);
++				}
++				if (tick == 5)
++					handle.activate(index == 2);
++				if (tick == 7)
++					handle.activate(false);
++			}
++			if (tick < 30)
++				helper.fail("Waiting for the complete valve angle trace");
++		});
++	}
+ }

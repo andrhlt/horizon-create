@@ -1,0 +1,61 @@
+{
+  "template": "minecraft:glass",
+  "item": true,
+  "properties": {
+    "map_color": 0,
+    "hardness": 0,
+    "explosion_resistance": 0,
+    "requires_tool": false,
+    "sounds": "minecraft:repeater"
+  },
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "south",
+        "east",
+        "west"
+      ]
+    },
+    "powered": {
+      "type": "boolean"
+    },
+    "powering": {
+      "type": "boolean"
+    },
+    "inverted": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "facing": "north",
+    "powered": "false",
+    "powering": "false",
+    "inverted": "false"
+  },
+  "shapes": {
+    "default": [
+      [
+        0,
+        0,
+        0,
+        1,
+        0.125,
+        1
+      ]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [
+        0,
+        0,
+        0,
+        1,
+        0.125,
+        1
+      ]
+    ]
+  }
+}

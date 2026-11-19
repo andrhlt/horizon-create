@@ -1,0 +1,226 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..60f8cd9 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.curvedTrain"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..52d87ab 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,207 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 190)
++	public static void curvedTrain(CreateGameTestHelper helper) {
++		boolean rightLeaf = "1".equals(System.getenv("CREATE_CURVED_PAIRED_RIGHT"));
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var level = helper.getLevel();
++		var track = com.simibubi.create.AllBlocks.TRACK.get();
++		var casing = com.simibubi.create.AllBlocks.RAILWAY_CASING.asItem();
++		var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
++		var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
++		var origin = new BlockPos(8, 180, 8);
++		for (int x = -2; x <= 2; x++)
++			for (int z = -4; z <= 1; z++)
++				level.setChunkForced((origin.getX() >> 4) + x, (origin.getZ() >> 4) + z, true);
++		for (int x = -3; x <= 24; x++) {
++			level.setBlockAndUpdate(origin.offset(x,-1,0), Blocks.SMOOTH_STONE.defaultBlockState());
++			level.setBlockAndUpdate(origin.east(x), rail);
++			level.setBlockAndUpdate(origin.east(x).above(), Blocks.AIR.defaultBlockState());
++		}
++		var bendStart = origin.west(3);
++		var bendEnd = origin.offset(-13, 0, -10);
++		for (int z = -10; z >= -45; z--) {
++			var at = origin.offset(-13,0,z);
++			level.setBlockAndUpdate(at.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++			if (z < -10)
++				level.setBlockAndUpdate(at, track.defaultBlockState().setValue(shape,
++					com.simibubi.create.content.trains.track.TrackShape.ZO));
++		}
++		var layout = new ItemStack(track, 64); player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, layout);
++		player.setYRot(90);
++		player.setXRot(20);
++		com.simibubi.create.content.trains.track.TrackBlockItem.select(level, bendStart, player.getLookAngle(), layout);
++		player.setYRot(180);
++		com.simibubi.create.content.trains.track.TrackPlacement.tryConnect(level, player, bendEnd,
++			track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.ZO),
++			layout, false, false);
++		helper.assertTrue(player.getMainHandItem().getCount() < 64, "Java track placement did not lay the 90-degree bend");
++		var destination = origin.south(2);
++		level.setBlockAndUpdate(destination, Blocks.AIR.defaultBlockState());
++		level.setBlockAndUpdate(destination.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++		var item = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) com.simibubi.create.AllBlocks.TRACK_STATION.asItem();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		helper.runAfterDelay(7, () -> {
++			player.setItemInHand(hand, new ItemStack(item));
++			player.setYRot(90);
++			player.setXRot(20);
++			clickTrackForAssembly(item, player, origin);
++			clickTrackForAssembly(item, player, destination.below());
++		});
++		helper.runAfterDelay(12, () -> {
++			var station = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(destination);
++			helper.assertTrue(station != null && station.enterAssemblyMode(null), "Station must enter assembly mode");
++			player.setItemInHand(hand, new ItemStack(casing, 3));
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east()), "Expected first bogey");
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east(4)), "Expected rear bogey");
++			for (int x = 1; x <= 4; x++)
++				level.setBlockAndUpdate(origin.east(x).above(2), Blocks.OAK_PLANKS.defaultBlockState());
++			var controls = com.simibubi.create.AllBlocks.TRAIN_CONTROLS.get().defaultBlockState()
++				.setValue(com.simibubi.create.content.contraptions.actors.trainControls.ControlsBlock.FACING,
++					net.minecraft.core.Direction.EAST);
++			level.setBlockAndUpdate(origin.east().above(3), controls);
++            var door = com.simibubi.create.AllBlocks.TRAIN_DOOR.get();
++            for (int x = 3; x <= 4; x++) {
++                var pos = origin.east(x).north().above(3);
++                level.setBlockAndUpdate(pos.below(), Blocks.OAK_PLANKS.defaultBlockState());
++                var state = door.defaultBlockState()
++                    .setValue(net.minecraft.world.level.block.DoorBlock.FACING, net.minecraft.core.Direction.NORTH)
++                    .setValue(net.minecraft.world.level.block.DoorBlock.HINGE, x == 3
++                        ? net.minecraft.world.level.block.state.properties.DoorHingeSide.LEFT
++                        : net.minecraft.world.level.block.state.properties.DoorHingeSide.RIGHT);
++                level.setBlockAndUpdate(pos, state);
++                level.setBlockAndUpdate(pos.above(), state.setValue(net.minecraft.world.level.block.DoorBlock.HALF,
++                    net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER));
++            }
++            var area = com.simibubi.create.content.contraptions.glue.SuperGlueEntity.span(
++                origin.east().above().north(), origin.east(4).above(4));
++			level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, area));
++			station.assemble(player.getUUID());
++		});
++        var animation = net.createmod.catnip.animation.LerpedFloat.linear().startWithValue(0);
++		for (int tick = 13; tick <= 172; tick++) {
++			int t = tick;
++			helper.runAfterDelay(t, () -> {
++				var railway = com.simibubi.create.Create.RAILWAYS;
++				var train = railway.trains.values().stream().filter(candidate -> candidate.owner.equals(player.getUUID()))
++					.findFirst().orElse(null);
++				helper.assertTrue(train != null, "Station failed assembly: " + level.getBlockEntity(destination).saveWithoutMetadata(level.registryAccess()));
++				var c = train.carriages.getFirst();
++				var wheels = java.util.List.of(c.leadingBogey().leading(), c.leadingBogey().trailing(),
++					c.trailingBogey().leading(), c.trailingBogey().trailing());
++				var output = new StringBuilder(String.format(java.util.Locale.ROOT,
++					"CREATE_CURVED_TRAIN %d %.9f", t, train.speed));
++				for (var wheel : wheels) {
++					var point = wheel.getPosition(train.graph).subtract(origin.getX(), origin.getY(), origin.getZ());
++					output.append(String.format(java.util.Locale.ROOT, " %.9f %.9f %.9f", point.x, point.y, point.z));
++				}
++				System.out.println(output.toString());
++				double sampledSpeed = train.speed;
++				if (t >= 18 && t < 172) {
++					var entity = c.anyAvailableEntity();
++					helper.assertTrue(entity != null, "Assembled carriage entity was not available");
++					var controls = new BlockPos(0, 2, 0);
++					var at = entity.toGlobalVector(net.minecraft.world.phys.Vec3.atCenterOf(controls), 0);
++					player.setPos(at.x, at.y, at.z + 1.5);
++					if (t == 18)
++						helper.assertTrue(entity.startControlling(controls, player), "Player could not take controls");
++					var keys = t < 92 ? java.util.List.of(0) : java.util.List.<Integer>of();
++					helper.assertTrue(entity.control(controls, keys, player), "Train control was refused at " + t);
++				}
++
++                if (t >= 76 && t <= 84) {
++                    var entity = c.anyAvailableEntity();
++                    var left = new BlockPos(2, 2, -1);
++                    boolean wasOpen = entity.getContraption().getBlocks().get(left).state()
++                        .getValue(net.minecraft.world.level.block.DoorBlock.OPEN);
++                    boolean wasSettled = animation.settled();
++                    animation.chase(wasOpen ? 1 : 0, .15f, net.createmod.catnip.animation.LerpedFloat.Chaser.LINEAR);
++                    if (t > 76)
++                        animation.tickChaser();
++                    float value = animation.getValue();
++                    float slide = value * value * 13 / 16f;
++                    float normal = net.minecraft.util.Mth.clamp(value * 10, 0, 1) / 32f;
++                    var leftOffset = entity.applyRotation(new net.minecraft.world.phys.Vec3(-slide, 0, -normal), 1);
++                    var rightOffset = entity.applyRotation(new net.minecraft.world.phys.Vec3(slide, 0, -normal), 1);
++                    if (t == 77 || t == 79) {
++                        var encoded = entity.getContraption().writeNBT(level.registryAccess(), false);
++                        var restored = com.simibubi.create.content.contraptions.Contraption.fromNBT(level, encoded, false);
++                        var bits = new StringBuilder();
++                        for (var pos : java.util.List.of(left, left.above(), left.east(), left.east().above())) {
++                            var state = restored.getBlocks().get(pos).state();
++                            helper.assertTrue(state == entity.getContraption().getBlocks().get(pos).state(),
++                                "Restored door state changed");
++                            bits.append(state.getValue(net.minecraft.world.level.block.DoorBlock.OPEN) ? '1' : '0');
++                        }
++                        try {
++                            var door = com.simibubi.create.AllBlocks.TRAIN_DOOR.get();
++                            var field = com.simibubi.create.content.decoration.slidingDoor.SlidingDoorBlockEntity
++                                .class.getDeclaredField("animation");
++                            field.setAccessible(true);
++                            var freshLeft = door.newBlockEntity(left, restored.getBlocks().get(left).state());
++                            var right = left.east();
++                            var freshRight = door.newBlockEntity(right, restored.getBlocks().get(right).state());
++                            var leftChaser = (net.createmod.catnip.animation.LerpedFloat) field.get(freshLeft);
++                            var rightChaser = (net.createmod.catnip.animation.LerpedFloat) field.get(freshRight);
++                            float l = leftChaser.getValue();
++                            float r = rightChaser.getValue();
++                            var restoredLeft = entity.applyRotation(new net.minecraft.world.phys.Vec3(
++                                -l * l * 13 / 16f, 0, -net.minecraft.util.Mth.clamp(l * 10, 0, 1) / 32f), 1);
++                            var restoredRight = entity.applyRotation(new net.minecraft.world.phys.Vec3(
++                                r * r * 13 / 16f, 0, -net.minecraft.util.Mth.clamp(r * 10, 0, 1) / 32f), 1);
++                            System.out.printf(java.util.Locale.ROOT,
++                                "CREATE_MOVING_PAIRED_RELOAD,%d,%s,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",
++                                t, bits, value, l, r, restoredLeft.x, restoredLeft.y, restoredLeft.z,
++                                restoredRight.x, restoredRight.y, restoredRight.z);
++                        } catch (ReflectiveOperationException exception) {
++                            throw new IllegalStateException(exception);
++                        }
++                    }
++                    boolean closeCue = !wasOpen && !wasSettled && animation.settled();
++                    System.out.printf(java.util.Locale.ROOT,
++                        "CREATE_CURVED_PAIRED_ANIMATION,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%b%n",
++                        t, sampledSpeed, value, leftOffset.x, leftOffset.y, leftOffset.z,
++                        rightOffset.x, rightOffset.y, rightOffset.z, closeCue);
++                }
++
++                if (t >= 76 && t <= 79) {
++                    var entity = c.anyAvailableEntity();
++                    var left = new BlockPos(2, 2, -1);
++                    var cells = java.util.List.of(left, left.above(), left.east(), left.east().above());
++                    var blocks = entity.getContraption().getBlocks();
++                    for (var cell : cells)
++                        helper.assertTrue(com.simibubi.create.AllBlocks.TRAIN_DOOR.has(blocks.get(cell).state()),
++                            "Missing paired leaf: " + cell);
++                    java.util.function.Consumer<String> sample = action -> {
++                        var bits = new StringBuilder();
++                        for (var cell : cells)
++                            bits.append(blocks.get(cell).state().getValue(net.minecraft.world.level.block.DoorBlock.OPEN) ? '1' : '0');
++                        System.out.printf(java.util.Locale.ROOT, "CREATE_CURVED_PAIRED_DOOR,%d,%s,%.9f,%s%n",
++                            t, action, sampledSpeed, bits);
++                    };
++                    if (t == 76)
++                        sample.accept("before");
++                    if (t == 76 || t == 78) {
++                        var behaviour = new com.simibubi.create.content.contraptions.behaviour.DoorMovingInteraction();
++                        helper.assertTrue(behaviour.handlePlayerInteraction(player, hand, rightLeaf ? left.east() : left, entity), "Door use failed");
++                        sample.accept(t == 76 ? "opened" : "closed");
++                    } else {
++                        sample.accept(t == 77 ? "opened_next_tick" : "closed_next_tick");
++                    }
++                }
++				if (t == 172)
++					helper.succeed();
++			});
++		}
++	}
++
++	private static void clickTrackForAssembly(com.simibubi.create.content.trains.track.TrackTargetingBlockItem item,
++			net.minecraft.world.entity.player.Player player, BlockPos pos) {
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(pos).add(0,.5,0), net.minecraft.core.Direction.UP, pos, false);
++		item.useOn(new net.minecraft.world.item.context.UseOnContext(player,
++			net.minecraft.world.InteractionHand.MAIN_HAND, hit));
++	}
+ }

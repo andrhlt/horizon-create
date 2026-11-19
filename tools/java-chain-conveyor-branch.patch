@@ -1,0 +1,93 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -151,6 +151,8 @@
+ 		var end = start.offset(edge);
+ 		var portPos = end.east(2).below(2);
+ 		var motorPos = start.below();
++		var sidePos = start.south(7);
++		var sidePortPos = sidePos.east(2).below(2);
+ 		int startTick = 8;
+ 		int last = reverse ? 66 : 79;
+ 		helper.runAtTickTime(2, () -> {
+@@ -158,8 +160,11 @@
+ 			world.setBlockAndUpdate(end, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
+ 			world.setBlockAndUpdate(motorPos, AllBlocks.CREATIVE_MOTOR.getDefaultState()
+ 				.setValue(CreativeMotorBlock.FACING, Direction.UP));
+-			if (!reverse)
++			if (!reverse) {
+ 				world.setBlockAndUpdate(portPos, AllBlocks.PACKAGE_FROGPORT.getDefaultState());
++				world.setBlockAndUpdate(sidePos, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
++				world.setBlockAndUpdate(sidePortPos, AllBlocks.PACKAGE_FROGPORT.getDefaultState());
++			}
+ 		});
+ 		helper.runAtTickTime(5, () -> {
+ 			var motor = (CreativeMotorBlockEntity) world.getBlockEntity(motorPos);
+@@ -172,11 +177,15 @@
+ 			var chain = new ItemStack(Items.CHAIN);
+ 			new ChainConveyorConnectionPacket(start, end, chain, true).handle(player);
+ 			chainConnectionLine(scenario, "insufficient", source, dest, player, edge);
+-			if (!source.connections.isEmpty() || !dest.connections.isEmpty() || player.getInventory().countItem(Items.CHAIN) != 1)
++			if (source.connections.contains(edge) || dest.connections.contains(edge.multiply(-1)) || player.getInventory().countItem(Items.CHAIN) != 1)
+ 				throw new IllegalStateException("Insufficient chains created a connection or changed inventory");
+ 			player.getInventory().setItem(0, new ItemStack(Items.CHAIN, 16));
+ 			new ChainConveyorConnectionPacket(start, end, chain, true).handle(player);
+ 			chainConnectionLine(scenario, "connected", source, dest, player, edge);
++			if (!reverse) {
++				player.getInventory().setItem(0, new ItemStack(Items.CHAIN, 16));
++				new ChainConveyorConnectionPacket(start, sidePos, chain, true).handle(player);
++			}
+ 			if (!source.connections.contains(edge) || !dest.connections.contains(edge.multiply(-1)))
+ 				throw new IllegalStateException("Connection packet did not link both conveyors");
+ 		});
+@@ -191,6 +200,14 @@
+ 					port.addressFilter = "Lab-In";
+ 					port.target.setup(port, world, portPos);
+ 					port.target.register(port, world, portPos);
++				}
++				var side = reverse ? null : (ChainConveyorBlockEntity) world.getBlockEntity(sidePos);
++				var sidePort = reverse ? null : (FrogportBlockEntity) world.getBlockEntity(sidePortPos);
++				if (tick == 0 && sidePort != null) {
++					sidePort.target = new ChainConveyorFrogportTarget(sidePos.subtract(sidePortPos), 150, (BlockPos) null, false);
++					sidePort.addressFilter = "Side";
++					sidePort.target.setup(sidePort, world, sidePortPos);
++					sidePort.target.register(sidePort, world, sidePortPos);
+ 				}
+ 				if (tick == 2) {
+ 					var box = chainPackage("Lab-In", Items.PAPER, 3);
+@@ -200,7 +217,7 @@
+ 							throw new IllegalStateException("Travel package ingress was rejected");
+ 					} else {
+ 						source.addLoopingPackage(new ChainConveyorPackage(40, box));
+-						source.addLoopingPackage(new ChainConveyorPackage(40, chainPackage("Other", Items.STRING, 2)));
++						source.addLoopingPackage(new ChainConveyorPackage(40, chainPackage("Side", Items.STRING, 2)));
+ 					}
+ 				}
+ 				if (reverse && tick == 11) {
+@@ -219,7 +236,7 @@
+ 					var player = chainPlayer(world, start, 8);
+ 					new ChainConveyorConnectionPacket(start, end, new ItemStack(Items.CHAIN), false).handle(player);
+ 					chainConnectionLine(scenario, "disconnected", source, dest, player, edge);
+-					if (!source.connections.isEmpty() || !dest.connections.isEmpty())
++					if (source.connections.contains(edge) || dest.connections.contains(edge.multiply(-1)))
+ 						throw new IllegalStateException("Disconnect packet left a unilateral edge");
+ 				}
+ 				String receipt = port == null ? "-" : chainReceipt(port);
+@@ -229,8 +246,17 @@
+ 					port == null ? 0 : port.animationProgress.getValue(), receipt);
+ 				chainPackages(world, scenario, tick, "A", source, start);
+ 				chainPackages(world, scenario, tick, "B", dest, start);
++				if (side != null && tick < 70) {
++					System.out.printf(Locale.ROOT, "CREATE_CHAIN_BRANCH %d,%s,%s,%.8f,%.8f,%s,%.8f,%s%n", tick,
++						chainOffset(source.routingTable.getExitFor(chainPackage("Lab-In", Items.PAPER, 3))),
++						chainOffset(source.routingTable.getExitFor(chainPackage("Side", Items.STRING, 2))),
++						side.getSpeed(), port.animationProgress.getValue(), receipt,
++						sidePort.animationProgress.getValue(), chainReceipt(sidePort));
++					chainPackages(world, scenario, tick, "C", side, start);
++				}
+ 				if (tick == last) {
+-					if (!reverse && !receipt.equals("inventory:Lab-In:paper:3"))
++					if (!reverse && (!receipt.equals("inventory:Lab-In:paper:3")
++						|| !chainReceipt(sidePort).equals("inventory:Side:string:2")))
+ 						throw new IllegalStateException("Matching box failed to arrive at receiving Frogport: " + receipt);
+ 					helper.succeed();
+ 				}

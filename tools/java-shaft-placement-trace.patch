@@ -1,0 +1,105 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..b7957947f 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.shaftPlacement"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..c67aac463 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,73 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing")
++	public static void shaftPlacement(CreateGameTestHelper helper) {
++		var shaft = com.simibubi.create.AllBlocks.SHAFT;
++		var small = com.simibubi.create.AllBlocks.COGWHEEL;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var wet = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var x = net.minecraft.core.Direction.Axis.X;
++		var z = net.minecraft.core.Direction.Axis.Z;
++		var west = net.minecraft.core.Direction.WEST;
++		var up = net.minecraft.core.Direction.UP;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++
++		for (int index = 0; index < 10; index++) {
++			var origin = new BlockPos(12 + (index % 5) * 18, 3, 2 + (index / 5) * 10);
++			BlockPos expected;
++			BlockPos clicked;
++			var face = up;
++			player.setYRot(index == 5 ? 90 : 0);
++			player.setYHeadRot(index == 5 ? 90 : 0);
++			player.setXRot(index == 1 || index == 4 ? 70 : 0);
++			player.setShiftKeyDown(index == 3);
++			var held = new ItemStack(index == 8 ? small.asItem() : shaft.asItem(), 2);
++			player.setItemInHand(hand, held);
++
++			if (index < 6) {
++				expected = origin;
++				face = index == 0 || index == 1 || index == 5 ? west : up;
++				clicked = origin.relative(face.getOpposite());
++				helper.setBlock(clicked, Blocks.STONE);
++				if (index == 2 || index == 3 || index == 4)
++					helper.setBlock(origin.west(), shaft.getDefaultState().setValue(axis, x));
++				if (index == 4)
++					helper.setBlock(origin.north(), shaft.getDefaultState().setValue(axis, z));
++				if (index == 5)
++					helper.setBlock(origin, Blocks.WATER);
++			} else {
++				clicked = origin;
++				int poles = index == 6 ? 2 : index == 9 ? 12 : 1;
++				for (int distance = 0; distance <= poles; distance++) {
++					var member = clicked.east(distance);
++					helper.setBlock(member, shaft.getDefaultState().setValue(axis, x));
++				}
++				if (index == 7)
++					helper.setBlock(clicked.east(2), Blocks.STONE);
++				expected = index == 7 || index == 9 ? clicked.west() : clicked.east(poles + 1);
++			}
++
++			var at = helper.absolutePos(clicked);
++			player.setPos(at.getX() - 2, at.getY(), at.getZ());
++			var hitAt = index >= 6
++				? net.minecraft.world.phys.Vec3.atLowerCornerWithOffset(at, 0.85, 0.685, 0.5)
++				: at.getCenter().relative(face, 0.5);
++			var hit = new net.minecraft.world.phys.BlockHitResult(hitAt, face, at, false);
++			var use = level.getBlockState(at).useItemOn(held, level, player, hand, hit);
++			if (!use.consumesAction())
++				held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			var state = helper.getBlockState(expected);
++			var name = small.has(state) ? "small" : shaft.has(state) ? "shaft" : "none";
++			var placed = !name.equals("none");
++			System.out.printf("CREATE_SHAFT_PLACEMENT,%d,%s,%s,%s,%d%n", index, name,
++				placed ? state.getValue(axis).getName() : "none",
++				placed && state.getValue(wet), held.getCount());
++		}
++		player.setShiftKeyDown(false);
++		helper.succeed();
++	}
+ }

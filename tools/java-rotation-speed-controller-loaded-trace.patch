@@ -1,0 +1,131 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..1a056b977 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.loadedRotationSpeedController"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..beb948c96 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -3,6 +3,11 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
+ import com.simibubi.create.AllBlockEntityTypes;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++import net.minecraft.world.level.GameType;
++import net.minecraft.core.Direction;
++import com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock;
++import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllDataComponents;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+@@ -115,4 +120,87 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 58)
++	public static void loadedRotationSpeedController(CreateGameTestHelper helper) {
++		var drivenFromAbove = new BlockPos(12, 2, 2);
++		var drivenFromShaft = new BlockPos(20, 2, 2);
++		var cogAbove = drivenFromAbove.above();
++		var cogOutput = drivenFromShaft.above();
++		var shaftOutput = drivenFromAbove.south();
++		var topOutput = cogOutput.east();
++		var shaftThrough = drivenFromShaft.south();
++		var gearMotor = cogAbove.west();
++		var shaftMotor = drivenFromShaft.north();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(helper.getLevel());
++		for (var pos : java.util.List.of(drivenFromAbove, drivenFromShaft))
++			helper.setBlock(pos, AllBlocks.ROTATION_SPEED_CONTROLLER.getDefaultState()
++				.setValue(BlockStateProperties.HORIZONTAL_AXIS, Direction.Axis.Z));
++		for (var pos : java.util.List.of(cogAbove, cogOutput))
++			helper.setBlock(pos, AllBlocks.LARGE_COGWHEEL.getDefaultState()
++				.setValue(BlockStateProperties.AXIS, Direction.Axis.X));
++		for (var pos : java.util.List.of(shaftOutput, shaftThrough))
++			helper.setBlock(pos, AllBlocks.SHAFT.getDefaultState()
++				.setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
++		helper.setBlock(topOutput, AllBlocks.SHAFT.getDefaultState()
++			.setValue(BlockStateProperties.AXIS, Direction.Axis.X));
++		helper.setBlock(gearMotor, AllBlocks.CREATIVE_MOTOR.getDefaultState()
++			.setValue(BlockStateProperties.FACING, Direction.EAST));
++		helper.setBlock(shaftMotor, AllBlocks.CREATIVE_MOTOR.getDefaultState()
++			.setValue(BlockStateProperties.FACING, Direction.SOUTH));
++		for (var pos : java.util.List.of(shaftOutput.south(), shaftThrough.south()))
++			helper.setBlock(pos, AllBlocks.ENCASED_FAN.getDefaultState()
++				.setValue(BlockStateProperties.FACING, Direction.SOUTH));
++		for (var pos : java.util.List.of(cogAbove.east(), topOutput.east()))
++			helper.setBlock(pos, AllBlocks.ENCASED_FAN.getDefaultState()
++				.setValue(BlockStateProperties.FACING, Direction.EAST));
++		var motor = helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), gearMotor);
++		motor.generatedSpeed.setValue(24);
++		helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), shaftMotor).generatedSpeed.setValue(24);
++		var fromAbove = helper.getBlockEntity(AllBlockEntityTypes.ROTATION_SPEED_CONTROLLER.get(), drivenFromAbove);
++		var fromShaft = helper.getBlockEntity(AllBlockEntityTypes.ROTATION_SPEED_CONTROLLER.get(), drivenFromShaft);
++		var actualUpperInput = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), cogAbove);
++		var actualUpperOutput = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), cogOutput);
++		var endFromAbove = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), shaftOutput);
++		var endFromShaft = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), topOutput);
++		var endShaftThrough = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), shaftThrough);
++		var board = fromAbove.targetSpeed.createBoard(player, null);
++		System.out.printf(java.util.Locale.ROOT, "CREATE_SPEED_CONTROLLER_BOARD %s,%d,%d,%d%n",
++			board.title().getString(), board.maxValue(), board.milestoneInterval(), board.rows().size());
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var registry = helper.getLevel().registryAccess();
++			var aboveNetwork = fromAbove.saveWithoutMetadata(registry).getCompound("Network");
++			var shaftNetwork = fromShaft.saveWithoutMetadata(registry).getCompound("Network");
++
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_SPEED_CONTROLLER_LOADED %d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f%n", tick,
++				fromAbove.targetSpeed.getValue(), fromShaft.targetSpeed.getValue(),
++				actualUpperInput.getSpeed(), fromAbove.getSpeed(), endFromAbove.getSpeed(),
++				fromShaft.getSpeed(), actualUpperOutput.getSpeed(), endFromShaft.getSpeed(),
++				endShaftThrough.getSpeed(), aboveNetwork.getFloat("Stress"), aboveNetwork.getFloat("Capacity"),
++				shaftNetwork.getFloat("Stress"), shaftNetwork.getFloat("Capacity"));
++			if (tick == 4 || tick == 12 || tick == 21 || tick == 28 || tick == 45) {
++				int row = tick == 12 ? 0 : 1;
++				int value = tick == 4 ? 64 : tick == 12 ? 32 : tick == 21 ? 0 : tick == 28 ? 700 : 12;
++				for (var controller : java.util.List.of(fromAbove, fromShaft)) {
++					var packet = new com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsPacket(
++						controller.getBlockPos(), row, value, null, null, Direction.WEST, false,
++						controller.targetSpeed.netId()) {
++						public void apply(net.minecraft.server.level.ServerPlayer player,
++							com.simibubi.create.foundation.blockEntity.SmartBlockEntity block) {
++							applySettings(player, block);
++						}
++					};
++					packet.apply(player, controller);
++				}
++			}
++			if (tick == 36)
++				motor.generatedSpeed.setValue(40);
++			if (tick < 51)
++				helper.fail("Waiting for final speed controller observation");
++		});
++	}
+ }

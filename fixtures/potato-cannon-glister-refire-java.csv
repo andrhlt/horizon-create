@@ -1,0 +1,11 @@
+case,tick,cooling,attempt,main_count,inventory_count,damage,cooling_after
+glister,0,true,false,1,2,1,true
+glister,1,true,false,1,2,1,true
+glister,2,true,false,1,2,1,true
+glister,3,true,false,1,2,1,true
+glister,4,true,false,1,2,1,true
+glister,5,true,false,1,2,1,true
+glister,6,true,false,1,2,1,true
+glister,7,true,true,1,2,1,true
+glister,8,false,true,1,1,2,true
+glister,9,true,false,1,1,2,true

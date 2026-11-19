@@ -1,0 +1,70 @@
+--- a/crates/horizon-client/src/crafting.rs
++++ b/crates/horizon-client/src/crafting.rs
+@@ -443,6 +443,8 @@
+         material: Ingredient,
+         result: Template,
+     },
++    /// Create's item-copying recipe for a programmed Train Schedule.
++    CreateScheduleCopy,
+     /// `BookCloningRecipe`.
+     BookCloning {
+         source: Ingredient,
+@@ -827,6 +829,7 @@
+                     })
+                 })
+             }
++            Self::CreateScheduleCopy => Self::schedule_copy_source(&stacks).is_some(),
+             Self::BookCloning {
+                 source,
+                 material,
+@@ -991,7 +994,25 @@
+             && durable(first)
+             && durable(second))
+         .then_some((*first, *second))
++    }
++    fn schedule_copy_source<'a>(stacks: &[&'a ItemStack]) -> Option<&'a ItemStack> {
++        if stacks.len() < 2 {
++            return None;
++        }
++        let mut source = None;
++        for &stack in stacks {
++            if stack.item.as_ref() != "create:schedule" {
++                return None;
++            }
++            if stack.data().is_some_and(|data| data.other("create:train_schedule").is_some())
++                && source.replace(stack).is_some()
++            {
++                return None;
++            }
++        }
++        source
+     }
++
+     /// `Recipe.assemble`; None is the empty stack.
+     fn assemble(&self, ctx: &Context, input: &Input) -> Option<ItemStack> {
+         use crate::banner;
+@@ -1091,6 +1112,16 @@
+                 out.data_mut().potion = source.data().and_then(|d| d.potion.clone());
+                 out
+             }
++            Self::CreateScheduleCopy => {
++                let mut result = Self::schedule_copy_source(&stacks)?.clone();
++                result.count = stacks.len() as u32;
++                let data = result.data_mut();
++                data.enchantments.clear();
++                data.stored_enchantments.clear();
++                data.set_other("minecraft:enchantments", None);
++                data.set_other("minecraft:stored_enchantments", None);
++                result
++            }
+             Self::BookCloning {
+                 source,
+                 material,
+@@ -1664,6 +1695,7 @@
+                         result: result()?,
+                     })
+                 })()),
++                "create:item_copying" => special(Some(Special::CreateScheduleCopy)),
+                 "minecraft:crafting_special_bookcloning" => special((|| {
+                     let (min, max) = bounds(v.get("allowed_generations"), (0, 1), (0, 2));
+                     Some(Special::BookCloning {

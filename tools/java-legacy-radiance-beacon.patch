@@ -1,0 +1,159 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..218b9dd 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().startsWith("TestMisc.legacyMaterial")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..be67952 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,142 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 160)
++	public static void legacyMaterialBeacon(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var test = helper.absolutePos(new BlockPos(1, 16, 1));
++		var origin = new BlockPos((test.getX() & -16) + 2, test.getY(), (test.getZ() & -16) + 5);
++		var active = origin;
++		var blocked = origin.east(6);
++		for (var beacon : java.util.List.of(active, blocked)) {
++			for (int x = -1; x <= 1; ++x)
++				for (int z = -1; z <= 1; ++z)
++					level.setBlockAndUpdate(beacon.offset(x, -1, z), net.minecraft.world.level.block.Blocks.IRON_BLOCK.defaultBlockState());
++			level.setBlockAndUpdate(beacon, net.minecraft.world.level.block.Blocks.BEACON.defaultBlockState());
++		}
++		level.setBlockAndUpdate(blocked.above(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++		var beacons = java.util.List.of(active, blocked, origin.east(12));
++		var labels = java.util.List.of("beam", "blocked", "no_beacon");
++		var drops = new java.util.ArrayList<net.minecraft.world.entity.item.ItemEntity>();
++		java.util.function.IntConsumer sample = relative -> {
++				for (int index = 0; index < drops.size(); index++) {
++					var entity = drops.get(index);
++					var stack = entity.getItem();
++					if (entity.tickCount != relative)
++						throw new AssertionError("Unexpected item tick " + entity.tickCount + " at " + relative);
++					var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
++					System.out.printf(java.util.Locale.ROOT,
++						"CREATE_RADIANCE_BEACON,%s,%d,%s,%d,%.12f,%.12f,%b,%b,%b%n",
++						labels.get(index), relative, id, stack.getCount(), entity.getY() - origin.getY() - 3.5,
++						entity.getDeltaMovement().y, entity.isNoGravity(), entity.isSilent(),
++						entity.getPersistentData().contains("JustCreated"));
++				}
++				if (relative == 1 || relative == 2) {
++					var source = drops.getFirst();
++					var data = source.saveWithoutId(new net.minecraft.nbt.CompoundTag());
++					var restored = new net.minecraft.world.entity.item.ItemEntity(EntityType.ITEM, level);
++					restored.load(data);
++					var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(restored.getItem().getItem());
++					System.out.printf(java.util.Locale.ROOT, "CREATE_RADIANCE_RELOAD,%d,%s,%d,%.12f,%.12f,%b,%b,%b%n",
++						relative, id, restored.getItem().getCount(), restored.getY() - origin.getY() - 3.5,
++						restored.getDeltaMovement().y, restored.isNoGravity(), restored.isSilent(),
++						restored.getPersistentData().contains("JustCreated"));
++				}
++				if (relative == 8) {
++					helper.assertTrue(drops.getFirst().getItem().is(com.simibubi.create.AllItems.REFINED_RADIANCE.get()), "expected conversion in beam");
++					for (int index : new int[]{1, 2})
++						helper.assertTrue(drops.get(index).getItem().is(com.simibubi.create.AllItems.CHROMATIC_COMPOUND.get()), "unexpected conversion outside beam");
++				}
++		};
++		helper.runAtTickTime(90, () -> {
++			for (var beacon : beacons) {
++				var entity = new net.minecraft.world.entity.item.ItemEntity(level, beacon.getX() + .5, origin.getY() + 3.5,
++					beacon.getZ() + .5, com.simibubi.create.AllItems.CHROMATIC_COMPOUND.asStack(3), 0, 0, 0);
++				entity.setPickUpDelay(32767);
++				level.addFreshEntity(entity);
++				drops.add(entity);
++			}
++			sample.accept(0);
++		});
++		for (int tick = 91; tick <= 98; tick++) {
++			int relative = tick - 90;
++			helper.runAtTickTime(tick, () -> sample.accept(relative));
++		}
++		var startCharge = origin.offset(3, 8, 7);
++		var component = com.simibubi.create.AllDataComponents.CHROMATIC_COMPOUND_COLLECTING_LIGHT;
++		for (int t = 0; t <= 6; t++) {
++			int relative = t;
++			helper.runAtTickTime(104 + t, () -> {
++				for (int charge : new int[]{9, 10}) {
++					var at = startCharge.east((charge - 9) * 5);
++					double y = at.getY() + .5;
++					if (relative == 0) {
++						var stack = com.simibubi.create.AllItems.CHROMATIC_COMPOUND.asStack();
++						stack.set(component, charge);
++						var entity = new net.minecraft.world.entity.item.ItemEntity(level, at.getX() + .5,
++							y, at.getZ() + .5, stack, 0, 0, 0);
++						level.addFreshEntity(entity);
++					}
++					var box = new net.minecraft.world.phys.AABB(at).inflate(.4, 3.0, .4);
++					var nearby = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, box);
++					if (nearby.size() != 1)
++						throw new AssertionError("Expected one item at charge " + charge + " tick " + relative);
++					var entity = nearby.getFirst();
++					var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(entity.getItem().getItem());
++					System.out.printf(java.util.Locale.ROOT,
++						"CREATE_RADIANCE_CHARGE,%d,%d,%s,%d,%.12f,%.12f,%b,%b,%b,%d,%d%n",
++						charge, relative, id, entity.getItem().getCount(), entity.getY() - y, entity.getDeltaMovement().y,
++						entity.isNoGravity(), entity.isSilent(), entity.getPersistentData().contains("JustCreated"),
++						entity.getItem().getOrDefault(component, 0), entity.getAge());
++				}
++				if (relative == 6)
++					helper.succeed();
++			});
++		}
++	}
++
++
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void legacyMaterialLightCollection(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var test = helper.absolutePos(new BlockPos(1, 16, 1));
++		var origin = new BlockPos((test.getX() & -16) + 3, test.getY(), (test.getZ() & -16) + 5);
++		var item = com.simibubi.create.AllItems.CHROMATIC_COMPOUND.get();
++		var component = com.simibubi.create.AllDataComponents.CHROMATIC_COMPOUND_COLLECTING_LIGHT;
++		for (int i = 0; i < 3; i++) {
++			var drop = origin.south(i * 4);
++			var at = net.minecraft.world.phys.Vec3.atCenterOf(drop);
++			var seed = new net.minecraft.world.level.levelgen.LegacyRandomSource(4100);
++			helper.assertTrue(seed.nextFloat() <= .5f, "expected selected light lookup");
++			var target = BlockPos.containing(net.createmod.catnip.math.VecHelper.offsetRandomly(at, seed, 3));
++			System.out.printf("CREATE_RADIANCE_TARGET,%d,%d,%d%n",
++				target.getX() - drop.getX(), target.getY() - drop.getY(), target.getZ() - drop.getZ());
++			helper.assertTrue(target.getX() >= drop.getX() + 2, "need clearance for a blocker");
++			var luminous = i != 2;
++			level.setBlockAndUpdate(target, (luminous ? Blocks.GLOWSTONE : Blocks.STONE).defaultBlockState());
++			if (i == 1)
++				level.setBlockAndUpdate(drop.east(), Blocks.STONE.defaultBlockState());
++			var source = new net.minecraft.world.entity.item.ItemEntity(level, at.x, at.y, at.z, new ItemStack(item, 2), 0, 0, 0);
++			source.setPickUpDelay(32767);
++			level.addFreshEntity(source);
++			level.random.setSeed(4100);
++			item.onEntityItemUpdate(source.getItem(), source);
++			var area = new net.minecraft.world.phys.AABB(drop).inflate(.25);
++			int plain = 0, charged = 0, charge = 0;
++			for (var nearby : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, area)) {
++				int light = nearby.getItem().getOrDefault(component, 0);
++				if (light == 0)
++					plain += nearby.getItem().getCount();
++				else {
++					charged += nearby.getItem().getCount();
++					charge = light;
++				}
++			}
++			var block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(target).getBlock());
++			System.out.printf("CREATE_RADIANCE_COLLECTION,%d,%s,%d,%d,%d%n", i, block, plain, charged, charge);
++			helper.assertTrue((i == 0 && charged == 1 && charge == 1 && plain == 1 && level.isEmptyBlock(target))
++				|| (i != 0 && charged == 0 && plain == 2 && !level.isEmptyBlock(target)), "wrong light collection branch");
++		}
++		helper.succeed();
++	}
+ }

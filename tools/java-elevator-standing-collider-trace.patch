@@ -1,0 +1,60 @@
+--- a/src/main/java/com/simibubi/create/content/contraptions/ContraptionCollider.java
++++ b/src/main/java/com/simibubi/create/content/contraptions/ContraptionCollider.java
+@@ -134,6 +134,11 @@
+ 
+ 			// Transform entity position and motion to local space
+ 			Vec3 entityPosition = entity.position();
++			boolean trace = Boolean.getBoolean("parity.elevator.standing") && playerType == PlayerType.CLIENT
++				&& contraption instanceof com.simibubi.create.content.contraptions.elevator.ElevatorContraption;
++			double beforeY = entity.getY();
++			double beforeVelocity = entity.getDeltaMovement().y;
++
+ 			AABB entityBounds = entity.getBoundingBox();
+ 			Vec3 motion = entity.getDeltaMovement();
+ 			float yawOffset = rotation.getYawOffset();
+@@ -277,8 +282,12 @@
+ 				entityMotion = entity.getDeltaMovement();
+ 			}
+ 
+-			if (!hardCollision && !surfaceCollision)
++			if (!hardCollision && !surfaceCollision) {
++				if (trace)
++					traceStanding(world, entity, contraptionEntity, contraptionMotion, beforeY, beforeVelocity,
++						totalResponse.y, motionResponse.y, collisionResult.temporalResponse, hardCollision, surfaceCollision);
+ 				continue;
++			}
+ 
+ 			Vec3 allowedMovement = collide(totalResponse, entity);
+ 			entity.setPos(entityPosition.x + allowedMovement.x, entityPosition.y + allowedMovement.y,
+@@ -311,6 +320,9 @@
+ 			}
+ 
+ 			entity.setDeltaMovement(entityMotion);
++			if (trace)
++				traceStanding(world, entity, contraptionEntity, contraptionMotion, beforeY, beforeVelocity,
++					totalResponse.y, motionResponse.y, collisionResult.temporalResponse, hardCollision, surfaceCollision);
+ 
+ 			if (playerType != PlayerType.CLIENT)
+ 				continue;
+@@ -330,6 +342,21 @@
+ 
+ 	}
+ 
++	// Read-only diagnostics for the live two-client parity fixture.
++	private static void traceStanding(Level world, Entity entity, AbstractContraptionEntity cabin, Vec3 motion,
++		double beforeY, double beforeVelocity, double response, double motionResponse, double temporal,
++		boolean hard, boolean surface) {
++		System.out.printf(java.util.Locale.ROOT,
++			"STANDING_MOTION %d,%s,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%b,%b,%b%n",
++			world.getGameTime(), ((Player) entity).getGameProfile().getName(),
++			cabin.getY() - 96, cabin.getPrevPositionVec().y - 96, motion.y,
++			cabin.getDeltaMovement().y, beforeY - 96, beforeVelocity,
++			response, motionResponse, temporal, entity.getY() - 96,
++			hard, surface, entity.onGround());
++		System.out.printf(java.util.Locale.ROOT, "STANDING_VELOCITY %d,%.15f%n", world.getGameTime(),
++			entity.getDeltaMovement().y);
++	}
++
+ 	private static int packetCooldown = 0;
+ 
+ 	@OnlyIn(Dist.CLIENT)

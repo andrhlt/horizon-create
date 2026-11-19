@@ -1,0 +1,25 @@
+--- a/crates/horizon-client/src/mobs/ai.rs
++++ b/crates/horizon-client/src/mobs/ai.rs
+@@ -1843,12 +1843,18 @@
+         {
+             m.ai.target = Some(who);
+         }
+-        // doPush calls the other living entity's push; sleeping vetoes both impulses.
+-        let sleeping = match who {
++        // doPush calls the other living entity's push. A sleeping receiver or a
++        // Package receiving a push from a higher ordinary mob vetoes both impulses.
++        let receiver_veto = match who {
+             Who::Player => w.player.as_ref().is_some_and(|p| p.sleeping),
+-            Who::Mob(id) => w.seen(id).is_some_and(|o| o.sleeping),
++            Who::Mob(id) => w.seen(id).is_some_and(|other| {
++                other.sleeping
++                    || (other.create_package
++                        && m.kind.id != "create:package"
++                        && bounds.min_position().y > other.bounds.min_position().y)
++            }),
+         };
+-        if sleeping {
++        if receiver_veto {
+             continue;
+         }
+         // Entity.push: passengers of the same vehicle (a rider and its mount

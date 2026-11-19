@@ -1,0 +1,13 @@
+diff --git a/crates/horizon-world/src/level/place.rs b/crates/horizon-world/src/level/place.rs
+--- a/crates/horizon-world/src/level/place.rs
++++ b/crates/horizon-world/src/level/place.rs
+@@ -166,7 +166,8 @@
+         }
+         directions
+     }
+-    fn nearest_looking_direction(&self) -> Direction {
++    /// The closest direction to the player's aim, as vanilla resolves it.
++    pub fn nearest_looking_direction(&self) -> Direction {
+         ordered_by_nearest(self.yaw, self.pitch)[0]
+     }
+     fn nearest_looking_vertical(&self) -> Direction {

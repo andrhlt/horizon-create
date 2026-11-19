@@ -1,0 +1,9 @@
+scenario,tick
+straight_loop,20
+straight_loop,21
+straight_loop,22
+straight_loop,23
+rising_span,3
+rising_span,4
+rising_span,5
+rising_span,6

@@ -1,0 +1,97 @@
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+index 657f93b..45a2e93 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+@@ -95,6 +95,7 @@ public class CrossPlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+index 4e7785d..3b3571a 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+@@ -91,6 +91,7 @@ public class PlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+index ee1f50c..a2cbd61 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+@@ -118,6 +118,7 @@ public abstract class SymmetryMirror {
+ 	@OnlyIn(Dist.CLIENT)
+ 	public abstract PartialModel getModel();
+ 
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {}
+ 
+ 	protected Vec3 getDiff(BlockPos position) {
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..f313387 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.creativeCrateRefund")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..08293f2 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,44 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void creativeCrateRefund(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		helper.runAtTickTime(4, () -> {
++			for (int scenario = 0; scenario < 4; scenario++) {
++				level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
++				level.setBlock(pos, com.simibubi.create.AllBlocks.CREATIVE_CRATE.getDefaultState(), 3);
++				var crate = (com.simibubi.create.content.logistics.crate.CreativeCrateBlockEntity) level.getBlockEntity(pos);
++				var filter = crate.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE);
++				var player = helper.makeMockPlayer(scenario == 0 ? net.minecraft.world.level.GameType.SURVIVAL : net.minecraft.world.level.GameType.CREATIVE);
++				var held = com.simibubi.create.AllItems.FILTER.asStack();
++				var tag = new net.minecraft.nbt.CompoundTag(); tag.putInt("marker", 17);
++				held.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(tag));
++				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, held);
++				var top = new net.minecraft.world.phys.Vec3(pos.getX()+.5, pos.getY()+.875, pos.getZ()+.5);
++				var hit = new net.minecraft.world.phys.BlockHitResult(top, net.minecraft.core.Direction.UP, pos, false);
++				filter.onShortInteract(player, net.minecraft.world.InteractionHand.MAIN_HAND, net.minecraft.core.Direction.UP, hit);
++				int handAfterSet = player.getMainHandItem().getCount();
++				int configuredCount = filter.getFilter().getCount();
++				System.out.println("CREATE_CRATE_FILTER_NBT " + filter.getFilter().saveOptional(level.registryAccess()));
++				if (scenario == 1) player.getInventory().setItem(1, player.getMainHandItem().copy());
++				if (scenario == 3) player.getInventory().setItem(1, filter.getFilter().copy());
++				System.out.println("CREATE_CRATE_COMPARISON " + scenario + " " + player.getInventory().getItem(1) + " " + filter.getFilter() + " " + ItemStack.isSameItemSameComponents(player.getInventory().getItem(1), filter.getFilter()));
++				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_INGOT, 7));
++				filter.onShortInteract(player, net.minecraft.world.InteractionHand.MAIN_HAND, net.minecraft.core.Direction.UP, hit);
++				int returned = 0; boolean retained = false;
++				for (var stack : player.getInventory().items) if (stack.is(com.simibubi.create.AllItems.FILTER.get())) {
++					returned += stack.getCount();
++					var data = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA);
++					retained |= data != null && data.copyTag().getInt("marker") == 17;
++				}
++				System.out.printf("CREATE_CRATE_REFUND,%s,%d,%d,%d,%s,%d,%s%n", new String[]{"survival","creative_has_copy","creative_no_copy","creative_exact_copy"}[scenario], handAfterSet, configuredCount, returned, retained, player.getMainHandItem().getCount(), net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(filter.getFilter().getItem()));
++				if (configuredCount != 1 || returned != (scenario == 1 ? 2 : 1) || !retained || player.getMainHandItem().getCount() != 7 || !filter.getFilter().is(Items.IRON_INGOT) || handAfterSet != (scenario == 0 ? 0 : 1))
++					throw new IllegalStateException("Unexpected Creative Crate refund");
++			}
++			helper.succeed();
++		});
++	}
++
+ }

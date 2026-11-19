@@ -1,0 +1,73 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.trackStraightConnection"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,58 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "track_crafting")
++	public static void trackStraightConnection(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var origin = helper.absolutePos(new BlockPos(1,8,1));
++		var track = AllBlocks.TRACK.get();
++		var property = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		int[][] cases = {{1,0,5,0,0},{0,1,5,1,0},{1,1,4,0,0},{1,0,6,0,1},
++			{1,0,6,0,2},{1,0,5,0,3},{-1,1,4,0,0}};
++		for (int scenario = 0; scenario < cases.length; scenario++) {
++			var spec = cases[scenario];
++			int dx = spec[0], dz = spec[1], length = spec[2], existing = spec[3], block = spec[4];
++			var start = origin.offset(0, scenario*2, 0);
++			var end = start.offset(dx*length, 0, dz*length);
++			var shape = dx == 0 ? "zo" : dz == 0 ? "xo" : dx == dz ? "pd" : "nd";
++			var direction = java.util.Arrays.stream(com.simibubi.create.content.trains.track.TrackShape.values())
++				.filter(s -> s.getSerializedName().equals(shape)).findFirst().orElseThrow();
++			var rail = track.defaultBlockState().setValue(property, direction);
++			for (int i = 0; i <= length; i++) {
++				var pos = start.offset(dx*i,0,dz*i);
++				level.setBlockAndUpdate(pos.below(), stone);
++				level.setBlockAndUpdate(pos, air);
++			}
++			level.setBlockAndUpdate(start, rail);
++			if (existing != 0)
++				level.setBlockAndUpdate(end, rail);
++			var middle = start.offset(dx*(length/2),0,dz*(length/2));
++			if (block == 1)
++				level.setBlockAndUpdate(middle, stone);
++			if (block == 2)
++				level.setBlockAndUpdate(middle, track.defaultBlockState());
++			float yaw = dx == 0 ? 0 : dz == 0 ? -90 : dx > 0 ? -45 : 45;
++			player.setYRot(yaw);
++			player.setXRot(20);
++			int supplied = block == 3 ? 2 : 16;
++			var stack = new ItemStack(track, supplied);
++			player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack);
++			com.simibubi.create.content.trains.track.TrackBlockItem.select(level, start, player.getLookAngle(), stack);
++			var info = com.simibubi.create.content.trains.track.TrackPlacement.tryConnect(level, player, end, rail, stack, false, false);
++			var report = new java.util.ArrayList<String>();
++			for (int i=0;i<=length;i++) {
++				var state = level.getBlockState(start.offset(dx*i,0,dz*i));
++				report.add(state.getBlock() == track ? state.getValue(property).getSerializedName() :
++					state.getBlock() == net.minecraft.world.level.block.Blocks.STONE ? "stone" : "-");
++			}
++			System.out.printf(java.util.Locale.ROOT, "CREATE_TRACK_LINE %d %d %d %d %d %d %.1f %d %d %s%n",
++				scenario, dx, dz, length, existing, block, yaw, supplied,
++				player.getMainHandItem().getCount(), String.join(";", report));
++		}
++		helper.succeed();
++	}
+ }

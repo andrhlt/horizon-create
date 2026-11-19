@@ -1,0 +1,29 @@
+{
+  "template": "minecraft:copper_chestplate",
+  "max_stack_size": 1,
+  "components": {
+    "minecraft:equippable": {
+      "slot": "chest",
+      "asset_id": "create:copper_diving",
+      "equip_sound": "create:copper_armor_equip"
+    },
+    "minecraft:attribute_modifiers": [
+      {
+        "type": "minecraft:armor",
+        "id": "minecraft:armor.chest",
+        "amount": 3,
+        "operation": "add_value",
+        "slot": "chest"
+      }
+    ],
+    "minecraft:enchantable": {
+      "value": 7
+    },
+    "minecraft:repairable": {
+      "items": "minecraft:copper_ingot"
+    },
+    "!minecraft:max_damage": {},
+    "!minecraft:damage": {}
+  },
+  "place_block": "create:copper_backtank"
+}

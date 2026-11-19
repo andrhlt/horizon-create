@@ -1,0 +1,118 @@
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/ChainRestartProbe.java
+@@ -0,0 +1,115 @@
++package com.simibubi.create.infrastructure.gametest;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorBlockEntity;
++import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorPackage;
++import com.simibubi.create.content.kinetics.motor.CreativeMotorBlock;
++import com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity;
++import com.simibubi.create.content.logistics.box.PackageStyles;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.nbt.Tag;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.world.item.ItemStack;
++import net.minecraft.world.level.block.Blocks;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.event.tick.ServerTickEvent;
++
++import java.util.Locale;
++
++@EventBusSubscriber
++public class ChainRestartProbe {
++    private static final BlockPos A = new BlockPos(8, 102, -10);
++    private static final BlockPos READY = A.below(4);
++    private static long beginning = -1;
++    private static long previous = -1;
++    private static boolean finished;
++
++    @SubscribeEvent
++    public static void tick(ServerTickEvent.Post event) {
++        String phase = System.getProperty("create.chain.restart");
++        if (phase == null || finished)
++            return;
++        ServerLevel level = event.getServer().overworld();
++        if (!level.hasChunkAt(A) || !level.getBlockState(READY).is(Blocks.GOLD_BLOCK))
++            return;
++
++        boolean rising = Boolean.getBoolean("create.chain.rising");
++        BlockPos edge = rising ? new BlockPos(6, 2, 3) : new BlockPos(7, 0, 0);
++        BlockPos b = A.offset(edge);
++        long clock = level.getGameTime();
++        if (clock == previous)
++            return;
++        previous = clock;
++        if (beginning < 0)
++            beginning = clock;
++        long tick = clock - beginning;
++
++        if (phase.equals("save")) {
++            if (tick == 0) {
++                level.setBlockAndUpdate(A, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
++                level.setBlockAndUpdate(b, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
++                level.setBlockAndUpdate(A.below(), AllBlocks.CREATIVE_MOTOR.getDefaultState()
++                    .setValue(CreativeMotorBlock.FACING, Direction.UP));
++            }
++            if (tick == 3)
++                motor(level).generatedSpeed.setValue(128);
++            if (tick == 6) {
++                wheel(level, A).addConnectionTo(b);
++                wheel(level, b).addConnectionTo(A);
++            }
++            if (tick == 13) {
++                if (rising)
++                    motor(level).generatedSpeed.setValue(-128);
++                wheel(level, A).addTravellingPackage(new ChainConveyorPackage(rising ? 3.200000048f : 2.133333445f,
++                    new ItemStack(PackageStyles.ALL_BOXES.getFirst())), edge);
++                trace(level, b, -1);
++                event.getServer().tickRateManager().setFrozen(true);
++                System.out.printf("CREATE_CHAIN_RESTART_SAVED %d%n", clock);
++                finished = true;
++            }
++        } else {
++            if (!(level.getBlockEntity(A) instanceof ChainConveyorBlockEntity)
++                || !(level.getBlockEntity(b) instanceof ChainConveyorBlockEntity)) {
++                beginning = -1;
++                return;
++            }
++            trace(level, b, tick);
++            if (tick == 14)
++                finished = true;
++        }
++    }
++
++    private static CreativeMotorBlockEntity motor(ServerLevel level) {
++        return (CreativeMotorBlockEntity) level.getBlockEntity(A.below());
++    }
++
++    private static ChainConveyorBlockEntity wheel(ServerLevel level, BlockPos at) {
++        return (ChainConveyorBlockEntity) level.getBlockEntity(at);
++    }
++
++    private static void trace(ServerLevel level, BlockPos b, long tick) {
++        var source = wheel(level, A);
++        var target = wheel(level, b);
++        System.out.printf(Locale.ROOT, "CREATE_CHAIN_RESTART_TICK %d,%d,%.8f,%.8f,%b,%b%n",
++            tick, level.getGameTime(), source.getSpeed(), target.getSpeed(), source.reversed, target.reversed);
++        for (var where : new BlockPos[] { A, b }) {
++            var entity = wheel(level, where);
++            String owner = where.equals(A) ? "A" : "B";
++            var nbt = entity.saveWithoutMetadata(level.registryAccess());
++            for (var tag : nbt.getList("LoopingPackages", Tag.TAG_COMPOUND))
++                emit(tick, owner, "loop", (net.minecraft.nbt.CompoundTag) tag);
++            for (var tag : nbt.getList("TravellingPackages", Tag.TAG_COMPOUND)) {
++                var span = (net.minecraft.nbt.CompoundTag) tag;
++                for (var box : span.getList("Packages", Tag.TAG_COMPOUND))
++                    emit(tick, owner, "span", (net.minecraft.nbt.CompoundTag) box);
++            }
++        }
++    }
++
++    private static void emit(long tick, String owner, String path, net.minecraft.nbt.CompoundTag box) {
++        System.out.printf(Locale.ROOT, "CREATE_CHAIN_RESTART_PACKAGE %d,%s,%s,%.9f%n",
++            tick, owner, path, box.getFloat("Position"));
++    }
++}

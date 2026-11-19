@@ -1,0 +1,24 @@
+--- a/crates/horizon-client/src/game/text_displays.rs
++++ b/crates/horizon-client/src/game/text_displays.rs
+@@ -301,6 +301,21 @@
+                 if let Some(state) = display.block {
+                     // BlockModelResolver.update: model seed 42.
+                     self.block_model_vertices(state, 42, matrix, light, true, out);
++                    // Create's contraption proxies carry a non-visible marker in
++                    // the glow override. Ordinary BlockDisplays keep vanilla's
++                    // static-only rendering behavior.
++                    if d.glow_color == 0x43535452 && &*self.res.facts().get(state).name == "create:sticker" {
++                        let mut draw = super::native_block_entity_draw::BlockEntityDraw::posed(
++                            partial as f32, self.world.game_time, light,
++                            [position.x.floor() as i32, position.y.floor() as i32, position.z.floor() as i32],
++                            matrix, horizon_client::block_entity_render::diffuse_lights(false), Vec::new(),
++                        );
++                        let entity = crate::containers::ModBlockEntity::new(crate::containers::ModBlockEntityFields {
++                            id: "create:sticker".into(), ..Default::default()
++                        });
++                        self.native_block_entity_submit([position.x.floor() as i32, position.y.floor() as i32, position.z.floor() as i32], "create:sticker", state, &entity, &mut draw);
++                        out.extend(draw.into_vertices());
++                    }
+                     // CompositeBlockModel.update: the special model of a chest,
+                     // head, banner and the like comes on top of the block model.
+                     if self

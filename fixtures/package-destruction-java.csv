@@ -1,0 +1,12 @@
+source,accepted,removed,health,fire_ticks,items,pigs,sounds
+generic,false,true,5.000000,-1,minecraft:pig_spawn_egg|1;minecraft:stone|3,1,create:package_pop|4|0.75|1.0;create:package_pop_compounded_1|4|0.25|1.15
+melee,false,true,5.000000,-1,minecraft:pig_spawn_egg|1;minecraft:stone|3,1,create:package_pop|4|0.75|1.0;create:package_pop_compounded_1|4|0.25|1.15
+fall,false,false,5.000000,-1,,0,
+kill,false,true,5.000000,-1,,0,
+void,false,true,5.000000,-1,,0,
+explosion,false,true,5.000000,-1,minecraft:pig_spawn_egg|1;minecraft:stone|3,1,create:package_pop|4|0.75|1.0;create:package_pop_compounded_1|4|0.25|1.15
+blast,false,true,5.000000,-1,minecraft:pig_spawn_egg|1;minecraft:stone|3,1,create:package_pop|4|0.75|1.0;create:package_pop_compounded_1|4|0.25|1.15
+fire_once,false,false,5.000000,100,,0,
+fire_twice,false,false,4.850000,100,,0,
+water,false,true,5.000000,-1,minecraft:pig_spawn_egg|1;minecraft:stone|3,1,create:package_pop|4|0.75|1.0;create:package_pop_compounded_1|4|0.25|1.15
+waterlogged,false,true,5.000000,-1,minecraft:pig_spawn_egg|1;minecraft:stone|3,1,create:package_pop|4|0.75|1.0;create:package_pop_compounded_1|4|0.25|1.15

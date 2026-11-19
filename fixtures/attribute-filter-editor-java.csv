@@ -1,0 +1,6 @@
+open,0,1,1,5,3,null,0,true,false,false
+reference,1,1,1,5,3,null,0,true,false,false
+save,1,1,1,5,3,WHITELIST_CONJ,2,true,false,false
+reopen,0,1,1,5,3,WHITELIST_CONJ,2,true,false,false
+deny,0,1,1,5,3,BLACKLIST,2,true,false,false
+reset,0,1,1,5,3,null,0,true,false,false

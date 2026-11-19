@@ -1,0 +1,17 @@
+color,block,facing,waterlogged,map_color,hardness,resistance,max_stack,can_contain
+white,create:white_toolbox,north,false,8,2.00,2.00,64,false
+orange,create:orange_toolbox,north,false,15,2.00,2.00,64,false
+magenta,create:magenta_toolbox,north,false,16,2.00,2.00,64,false
+light_blue,create:light_blue_toolbox,north,false,17,2.00,2.00,64,false
+yellow,create:yellow_toolbox,north,false,18,2.00,2.00,64,false
+lime,create:lime_toolbox,north,false,19,2.00,2.00,64,false
+pink,create:pink_toolbox,north,false,20,2.00,2.00,64,false
+gray,create:gray_toolbox,north,false,21,2.00,2.00,64,false
+light_gray,create:light_gray_toolbox,north,false,22,2.00,2.00,64,false
+cyan,create:cyan_toolbox,north,false,23,2.00,2.00,64,false
+purple,create:purple_toolbox,north,false,24,2.00,2.00,64,false
+blue,create:blue_toolbox,north,false,25,2.00,2.00,64,false
+brown,create:brown_toolbox,north,false,26,2.00,2.00,64,false
+green,create:green_toolbox,north,false,27,2.00,2.00,64,false
+red,create:red_toolbox,north,false,28,2.00,2.00,64,false
+black,create:black_toolbox,north,false,29,2.00,2.00,64,false

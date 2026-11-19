@@ -1,0 +1,194 @@
+--- a/build.gradle
++++ b/build.gradle
+@@ -68,6 +68,13 @@
+ 
+         client {
+             client()
++            if (project.hasProperty("parityPortAward")) {
++                gameDirectory = project.file("run/portable-award-client")
++                def fluid = project.findProperty("parityPortAward") == "fluid"
++                systemProperty("parity.portAward", "true")
++                systemProperty("parity.portAwardFluid", fluid.toString())
++                programArguments.addAll("--quickPlaySingleplayer", fluid ? "PortableFluidAwardReference" : "PortableAwardReference", "--width", "1100", "--height", "620")
++            }
+         }
+ 
+         server {
+@@ -96,6 +103,10 @@
+                 gameDirectory = project.file(pushing ? "run/powered-hopper-push-test-server" : "run/powered-hopper-pull-test-server")
+                 systemProperty("parity.poweredHopperCargo", "true")
+                 systemProperty("parity.poweredHopperPush", pushing.toString())
++                if (project.hasProperty("parityPortAward")) {
++                    gameDirectory = project.file("run/portable-award-test-server")
++                    systemProperty("parity.portAward", "true")
++                }
+             }
+         }
+     }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -323,6 +323,10 @@
+ 						cargo.getAllItems().getStackInSlot(2).getCount(), cargo.getVersion());
+ 					if (t == 27) {
+ 						train.runtime.paused = true;
++						if (Boolean.getBoolean("parity.portAward")) {
++							helper.succeed();
++							return;
++						}
+ 						level.setBlockAndUpdate(portPower, Blocks.REDSTONE_BLOCK.defaultBlockState());
+ 						level.setBlockAndUpdate(lock, Blocks.AIR.defaultBlockState());
+ 					}
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaPortableAwardClientProbe.java
+@@ -0,0 +1,151 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllBlocks;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.gui.screens.BackupConfirmScreen;
++import net.minecraft.client.gui.screens.TitleScreen;
++import net.minecraft.client.gui.components.Button;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.resources.ResourceLocation;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.server.level.ServerPlayer;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.item.context.UseOnContext;
++import net.minecraft.world.level.GameType;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.entity.HopperBlockEntity;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++import net.minecraft.world.phys.BlockHitResult;
++import net.minecraft.world.phys.Vec3;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import net.neoforged.neoforge.event.tick.ServerTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaPortableAwardClientProbe {
++    private static final BlockPos PORT = new BlockPos(12, 115, -6);
++    private static final BlockPos HOPPER = PORT.below();
++    private static final BlockPos LOCK = HOPPER.east();
++    private static final BlockPos MOTOR = PORT.above();
++    private static final BlockPos SINK = PORT.east(3);
++    private static final boolean FLUID = Boolean.getBoolean("parity.portAwardFluid");
++    private static final ResourceLocation AWARD = ResourceLocation.fromNamespaceAndPath("create", "portable_storage_interface");
++    private static boolean opened;
++    private static int elapsed;
++    private static long unlockedAt = Long.MIN_VALUE;
++    private static String placer;
++    private static boolean stopped;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) {
++        if (!Boolean.getBoolean("parity.portAward"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.getOverlay() == null && mc.screen instanceof TitleScreen && !opened) {
++            opened = true;
++            mc.createWorldOpenFlows().openWorld(FLUID ? "PortableFluidAwardReference" : "PortableAwardReference", mc::stop);
++        }
++        if (mc.screen instanceof BackupConfirmScreen backup)
++            backup.children().stream().filter(child -> child instanceof Button).map(child -> (Button) child)
++                .filter(button -> button.getMessage().getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents key
++                    && key.getKey().equals("selectWorld.backupJoinSkipButton")).findFirst().ifPresent(Button::onPress);
++        var server = mc.getSingleplayerServer();
++        if (mc.player == null || mc.level == null || server == null || mc.getOverlay() != null)
++            return;
++        if (elapsed++ == 0) {
++            var name = mc.player.getGameProfile().getName();
++            server.execute(() -> {
++                var source = server.createCommandSourceStack().withPermission(4);
++                server.getCommands().performPrefixedCommand(source, "tp " + name + " 12.5 115.7 -4.5 180 0");
++            });
++        }
++        if (elapsed == 30 || elapsed == 45 || elapsed == 46 || (!FLUID && (elapsed == 54 || elapsed == 60)) || (FLUID && elapsed == 112)) {
++            var name = mc.player.getGameProfile().getName();
++            int sample = elapsed;
++            server.execute(() -> observe(server, name, sample));
++        }
++        if (elapsed == (FLUID ? 130 : 75))
++            mc.stop();
++    }
++
++    private static void observe(MinecraftServer server, String name, int sample) {
++        ServerLevel level = server.overworld();
++        ServerPlayer player = server.getPlayerList().getPlayerByName(name);
++        if (player == null)
++            throw new IllegalStateException("The real placement player did not join");
++        if (sample == 30 || sample == (FLUID ? 112 : 60)) {
++            player.setGameMode(GameType.SURVIVAL);
++            level.setBlockAndUpdate(PORT, Blocks.AIR.defaultBlockState());
++            player.setYRot(180);
++            player.setXRot(0);
++            player.setShiftKeyDown(true);
++            if (FLUID) {
++                level.setBlockAndUpdate(PORT.south(), Blocks.AIR.defaultBlockState());
++                level.setBlockAndUpdate(HOPPER, Blocks.SMOOTH_STONE.defaultBlockState());
++            }
++            var stack = (FLUID ? AllBlocks.PORTABLE_FLUID_INTERFACE : AllBlocks.PORTABLE_STORAGE_INTERFACE).asStack();
++            player.setItemInHand(InteractionHand.MAIN_HAND, stack);
++            var hit = new BlockHitResult(Vec3.atCenterOf(HOPPER).add(0, .5, 0), Direction.UP, HOPPER, false);
++            var placed = stack.useOn(new UseOnContext(player, InteractionHand.MAIN_HAND, hit));
++            System.out.printf("CREATE_PORT_AWARD_PLACEMENT %d;%s;%d%n",
++                sample, placed, player.getItemInHand(InteractionHand.MAIN_HAND).getCount());
++            player.setShiftKeyDown(false);
++        }
++        if (sample == 46) {
++            placer = name;
++            unlockedAt = level.getGameTime();
++            if (FLUID)
++                level.setBlockAndUpdate(MOTOR, AllBlocks.CREATIVE_MOTOR.get().defaultBlockState()
++                    .setValue(com.simibubi.create.content.kinetics.motor.CreativeMotorBlock.FACING, Direction.EAST));
++            else
++                level.setBlockAndUpdate(LOCK, Blocks.AIR.defaultBlockState());
++            traceTick(server, 0);
++        }
++        if (sample == 54)
++            level.setBlockAndUpdate(LOCK, Blocks.REDSTONE_BLOCK.defaultBlockState());
++        var entity = level.getBlockEntity(PORT);
++        var tag = entity == null ? new net.minecraft.nbt.CompoundTag() : entity.saveWithoutMetadata(level.registryAccess());
++        boolean owner = tag.hasUUID("Owner") && player.getUUID().equals(tag.getUUID("Owner"));
++        var advancement = server.getAdvancements().get(AWARD);
++        boolean granted = advancement != null && player.getAdvancements().getOrStartProgress(advancement).isDone();
++        var state = level.getBlockState(PORT);
++        var face = state.hasProperty(BlockStateProperties.FACING) ? state.getValue(BlockStateProperties.FACING).toString() : "-";
++        System.out.printf("CREATE_PORT_AWARD %d;%s;%b;%b;%b;%d%n",
++            sample, face, owner, tag.hasUUID("Owner"), granted, amount(level));
++    }
++
++    @SubscribeEvent
++    public static void serverTick(ServerTickEvent.Post event) {
++        if (unlockedAt == Long.MIN_VALUE)
++            return;
++        var server = event.getServer();
++        long elapsed = server.overworld().getGameTime() - unlockedAt;
++        if (0 < elapsed && elapsed <= (FLUID ? 58 : 7))
++            traceTick(server, elapsed);
++        if (FLUID && !stopped && amount(server.overworld()) > 0) {
++            server.overworld().setBlockAndUpdate(MOTOR, Blocks.AIR.defaultBlockState());
++            stopped = true;
++        }
++    }
++
++    private static void traceTick(MinecraftServer server, long elapsed) {
++        var level = server.overworld();
++        var player = server.getPlayerList().getPlayerByName(placer);
++        var carriedOwner = level.getBlockEntity(PORT).saveWithoutMetadata(level.registryAccess()).hasUUID("Owner");
++        var award = server.getAdvancements().get(AWARD);
++        System.out.printf("CREATE_PORT_AWARD_TICK %d;%b;%b;%d%n", elapsed, carriedOwner,
++            player.getAdvancements().getOrStartProgress(award).isDone(), amount(level));
++    }
++
++    private static int amount(ServerLevel level) {
++        if (FLUID)
++            return ((com.simibubi.create.content.fluids.tank.FluidTankBlockEntity) level.getBlockEntity(SINK))
++                .getTankInventory().getFluidInTank(0).getAmount();
++        return ((HopperBlockEntity) level.getBlockEntity(HOPPER)).getItem(0).getCount();
++    }
++
++}

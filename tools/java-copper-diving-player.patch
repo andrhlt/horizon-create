@@ -1,0 +1,117 @@
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+index 657f93b..45a2e93 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+@@ -95,6 +95,7 @@ public class CrossPlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+index 4e7785d..3b3571a 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+@@ -91,6 +91,7 @@ public class PlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+index ee1f50c..a2cbd61 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+@@ -118,6 +118,7 @@ public abstract class SymmetryMirror {
+ 	@OnlyIn(Dist.CLIENT)
+ 	public abstract PartialModel getModel();
+ 
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {}
+ 
+ 	protected Vec3 getDiff(BlockPos position) {
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..d5ac11d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().startsWith("TestMisc.copperDiving")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..7cfd7cd 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,64 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 100)
++	public static void copperDivingPlayer(CreateGameTestHelper helper) {
++		compareCopperDivingPlayer(helper, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 100)
++	public static void copperDivingWaterBreathing(CreateGameTestHelper helper) {
++		compareCopperDivingPlayer(helper, true);
++	}
++
++	private static void compareCopperDivingPlayer(CreateGameTestHelper helper, boolean potion) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		var players = new net.minecraft.world.entity.player.Player[1];
++		java.util.function.IntConsumer record = frame -> {
++			var player = players[0];
++			int tank = player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST)
++				.getOrDefault(com.simibubi.create.AllDataComponents.BACKTANK_AIR, 0);
++			System.out.printf("CREATE_COPPER_PLAYER,%s,%d,%d,%d,%d,%s%n",
++				potion ? "potion" : "ordinary", frame, level.getGameTime() % 20, player.getAirSupply(), tank,
++				player.isEyeInFluid(net.minecraft.tags.FluidTags.WATER));
++			int startPhase = (int) Math.floorMod(level.getGameTime() - frame, 20);
++			int expectedCharge = potion ? 200 : 200 - (startPhase + frame) / 20;
++			if (frame == 48 && (tank != expectedCharge || !player.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)
++				|| player.getAirSupply() != 300))
++				throw new IllegalStateException("Unexpected Copper Backtank player breathing");
++		};
++		helper.runAtTickTime(4, () -> {
++			for (int x = -1; x <= 1; x++)
++				for (int z = -1; z <= 1; z++)
++					for (int y = -1; y <= 3; y++)
++						level.setBlock(pos.offset(x, y, z),
++							x == 0 && z == 0 && y >= 0 ? Blocks.WATER.defaultBlockState() : Blocks.STONE.defaultBlockState(), 3);
++			var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++			player.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, 0, 0);
++			player.setNoGravity(true);
++			player.setAirSupply(300);
++			if (potion)
++				player.addEffect(new net.minecraft.world.effect.MobEffectInstance(
++					net.minecraft.world.effect.MobEffects.WATER_BREATHING, 160));
++			player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, com.simibubi.create.AllItems.COPPER_DIVING_HELMET.asStack());
++			var tank = com.simibubi.create.AllItems.COPPER_BACKTANK.asStack();
++			tank.set(com.simibubi.create.AllDataComponents.BACKTANK_AIR, 200);
++			player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, tank);
++			players[0] = player;
++			record.accept(0);
++		});
++		for (int tick = 1; tick <= 48; tick++) {
++			final int frame = tick;
++			helper.runAtTickTime(4 + tick, () -> {
++				players[0].tick();
++				record.accept(frame);
++			});
++		}
++		helper.runAtTickTime(53, helper::succeed);
++	}
++
+ }

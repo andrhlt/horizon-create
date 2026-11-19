@@ -1,0 +1,84 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,68 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	private static net.minecraft.server.level.ServerPlayer pressFixturePlayer(CreateGameTestHelper helper, String name) {
++		var server = helper.getLevel().getServer();
++		var profile = new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), name);
++		var cookie = net.minecraft.server.network.CommonListenerCookie.createInitial(profile, false);
++		var player = new net.minecraft.server.level.ServerPlayer(server, helper.getLevel(),
++			cookie.gameProfile(), cookie.clientInformation());
++		var connection = new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
++		new io.netty.channel.embedded.EmbeddedChannel(connection);
++		new net.minecraft.server.network.ServerGamePacketListenerImpl(server, connection, player, cookie) {
++			@Override
++			public void send(net.minecraft.network.protocol.Packet<?> packet,
++				net.minecraft.network.PacketSendListener callback) {}
++		};
++		helper.getLevel().addNewPlayer(player);
++		player.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
++		player.getAbilities().flying = true;
++		player.onUpdateAbilities();
++		return player;
++	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void mixerOperatorPlacement(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = pressFixturePlayer(helper, "MixerPlacement");
++		player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
++		player.setShiftKeyDown(true);
++		var support = helper.absolutePos(new BlockPos(3, 10, 1));
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var up = net.minecraft.core.Direction.UP;
++		var belt = AllBlocks.BELT.getDefaultState();
++		var slope = com.simibubi.create.content.kinetics.belt.BeltBlock.SLOPE;
++		var horizontal = com.simibubi.create.content.kinetics.belt.BeltSlope.HORIZONTAL;
++		var raised = com.simibubi.create.content.kinetics.belt.BeltSlope.UPWARD;
++		record Case(String name, net.minecraft.world.level.block.state.BlockState surface) {}
++		var cases = java.util.List.of(
++			new Case("stone", stone), new Case("over_basin", AllBlocks.BASIN.getDefaultState()),
++			new Case("over_depot", AllBlocks.DEPOT.getDefaultState()),
++			new Case("over_ejector", AllBlocks.WEIGHTED_EJECTOR.getDefaultState()),
++			new Case("over_flat_belt", belt.setValue(slope, horizontal)),
++			new Case("over_up_belt", belt.setValue(slope, raised)),
++			new Case("blocked_basin", AllBlocks.BASIN.getDefaultState())
++		);
++		player.moveTo(support.getX() + 2.5, support.getY() + 1, support.getZ() + .5, 90, 0);
++		for (var probe : cases) {
++			boolean blocked = probe.name().equals("blocked_basin");
++			level.setBlockAndUpdate(support.above(), air);
++			level.setBlockAndUpdate(support.above(2), blocked ? stone : air);
++			level.setBlockAndUpdate(support, probe.surface());
++			var stack = AllBlocks.MECHANICAL_MIXER.asStack();
++			player.setItemInHand(hand, stack);
++			var hit = new net.minecraft.world.phys.BlockHitResult(
++				support.getCenter().relative(up, .5), up, support, false);
++			stack.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			int height = AllBlocks.MECHANICAL_MIXER.has(level.getBlockState(support.above())) ? 1
++				: AllBlocks.MECHANICAL_MIXER.has(level.getBlockState(support.above(2))) ? 2 : 0;
++			System.out.printf(java.util.Locale.ROOT, "CREATE_MIXER_PLACEMENT %s,%d,%d%n",
++				probe.name(), stack.getCount(), height);
++			helper.assertTrue(blocked == (height == 0), "Unexpected Mixer placement.");
++		}
++		helper.succeed();
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.mixerOperatorPlacement")).toList();
+ 	}
+ }

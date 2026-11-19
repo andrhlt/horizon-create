@@ -1,0 +1,191 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..7c82d855c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,9 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.ordinaryTransmission")
++				|| test.testName().equals("TestMisc.clutchCompetingSources"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..66cfea307 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,158 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++
++
++
++
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 30)
++	public static void ordinaryTransmission(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var powered = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++		var east = net.minecraft.core.Direction.EAST;
++		var north = net.minecraft.core.Direction.NORTH;
++		var up = net.minecraft.core.Direction.UP;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var blocks = java.util.List.of(com.simibubi.create.AllBlocks.CLUTCH.get(), com.simibubi.create.AllBlocks.GEARSHIFT.get());
++		var rigs = java.util.List.of(new BlockPos(12, 3, 9), new BlockPos(12, 3, 12));
++		for (int kind = 0; kind < blocks.size(); kind++) {
++			var block = blocks.get(kind);
++			var place = helper.absolutePos(new BlockPos(12, 3, 3 + kind * 3));
++			player.setItemInHand(hand, new ItemStack(block.asItem()));
++			for (int placement = 0; placement < 7; placement++) {
++				var side = placement == 5 ? up : placement == 6 ? east : north;
++				var support = place.relative(side.getOpposite());
++				var hit = new net.minecraft.world.phys.BlockHitResult(support.getCenter().relative(side, 0.5), side, support, false);
++				level.setBlockAndUpdate(place.relative(north.getOpposite()), Blocks.AIR.defaultBlockState());
++				float yaw = placement == 6 ? 90 : 0;
++				float pitch = placement == 5 ? 80 : 0;
++				player.setYRot(yaw);
++				player.setXRot(pitch);
++				player.setYHeadRot(yaw);
++				player.setYBodyRot(yaw);
++				player.yRotO = yaw;
++				player.xRotO = pitch;
++				player.setShiftKeyDown(placement == 2 || placement == 6);
++				level.setBlockAndUpdate(place.east(), placement >= 1 && placement <= 3
++					? com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis())
++					: Blocks.AIR.defaultBlockState());
++				level.setBlockAndUpdate(place.west(), placement == 4 ? Blocks.REDSTONE_BLOCK.defaultBlockState() : Blocks.AIR.defaultBlockState());
++				level.setBlockAndUpdate(place.below(), placement == 3
++					? com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, up.getAxis())
++					: Blocks.AIR.defaultBlockState());
++				level.setBlockAndUpdate(support, Blocks.STONE.defaultBlockState());
++				var context = new net.minecraft.world.item.context.BlockPlaceContext(player, hand, player.getItemInHand(hand), hit);
++				var result = block.getStateForPlacement(context);
++				System.out.printf("CREATE_PLAIN_TRANSMISSION_PLACE,%d,%d,%s,%s%n", kind, placement, result.getValue(axis), result.getValue(powered));
++			}
++			var wrenchAt = helper.absolutePos(new BlockPos(17, 3, 3 + kind * 3));
++			player.setShiftKeyDown(false);
++			player.setItemInHand(hand, new ItemStack(com.simibubi.create.AllItems.WRENCH.get()));
++			for (var before : net.minecraft.core.Direction.Axis.values()) {
++				for (var face : net.minecraft.core.Direction.values()) {
++					var state = block.defaultBlockState().setValue(axis, before);
++					level.setBlockAndUpdate(wrenchAt, state);
++					var wrenchHit = new net.minecraft.world.phys.BlockHitResult(wrenchAt.getCenter().relative(face, 0.5), face, wrenchAt, false);
++					var context = new net.minecraft.world.item.context.UseOnContext(player, hand, wrenchHit);
++					var action = block.onWrenched(state, context);
++					System.out.printf("CREATE_PLAIN_TRANSMISSION_WRENCH,%d,%s,%s,%s,%s%n", kind, before, face,
++						level.getBlockState(wrenchAt).getValue(axis), action.consumesAction());
++				}
++			}
++			player.setShiftKeyDown(true);
++			int count = player.getInventory().countItem(block.asItem());
++			var pickupHit = new net.minecraft.world.phys.BlockHitResult(wrenchAt.getCenter().relative(up, 0.5), up, wrenchAt, false);
++			var pickup = new net.minecraft.world.item.context.UseOnContext(player, hand, pickupHit);
++			var result = block.onSneakWrenched(level.getBlockState(wrenchAt), pickup);
++			System.out.printf("CREATE_PLAIN_TRANSMISSION_PICKUP,%d,%s,%s,%d%n", kind, result.consumesAction(),
++				level.getBlockState(wrenchAt).isAir(), player.getInventory().countItem(block.asItem()) - count);
++			player.setShiftKeyDown(false);
++			var rig = rigs.get(kind);
++			helper.setBlock(rig.west(), com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east));
++			helper.setBlock(rig, block.defaultBlockState().setValue(axis, east.getAxis()));
++			helper.setBlock(rig.east(), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis()));
++			helper.setBlock(rig.above(), Blocks.LEVER.defaultBlockState().setValue(
++				net.minecraft.world.level.block.state.properties.BlockStateProperties.ATTACH_FACE,
++				net.minecraft.world.level.block.state.properties.AttachFace.FLOOR));
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int kind = 0; kind < rigs.size(); kind++) {
++				var rig = rigs.get(kind);
++				if (tick == 0)
++					helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), rig.west()).generatedSpeed.setValue(32);
++				for (int phase = 0; phase < 2; phase++) {
++					if (phase == 1) {
++						if (tick == 5 || tick == 9 || tick == 13 || tick == 17) helper.pullLever(rig.above());
++						else continue;
++					}
++					var gear = (com.simibubi.create.content.kinetics.transmission.SplitShaftBlockEntity) level.getBlockEntity(helper.absolutePos(rig));
++					var shaft = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), rig.east());
++					System.out.printf(java.util.Locale.ROOT, "CREATE_PLAIN_TRANSMISSION_TICK,%d,%d,%d,%s,%.4f,%.4f%n", kind, tick, phase,
++						gear.getBlockState().getValue(powered), gear.getSpeed(), shaft.getSpeed());
++					var pos = helper.absolutePos(rig);
++					float phaseAngle = (pos.getY() + pos.getZ()) % 2 == 0 ? 22.5f : 0f;
++					long gameTime = level.getGameTime();
++					float input = gear.getSpeed() * gear.getRotationSpeedModifier(east.getOpposite());
++					float output = gear.getSpeed() * gear.getRotationSpeedModifier(east);
++					System.out.printf(java.util.Locale.ROOT, "CREATE_SPLIT_SHAFT_VISUAL,%d,%d,%d,%d,%.1f,%.4f,%.4f,%.6f,%.6f%n",
++						kind, tick, phase, gameTime, phaseAngle, input, output,
++						((gameTime + .5f) * input * 3f / 10f) % 360 + phaseAngle,
++						((gameTime + .5f) * output * 3f / 10f) % 360 + phaseAngle);
++				}
++			}
++			if (tick < 22) helper.fail("Waiting for both encased transmissions");
++		});
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 24)
++	public static void clutchCompetingSources(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var powered = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++		var east = net.minecraft.core.Direction.EAST;
++		var clutch = new BlockPos(12, 3, 9);
++		var left = clutch.west();
++		var right = clutch.east();
++		var power = clutch.above();
++		var level = helper.getLevel();
++		helper.setBlock(left, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east));
++		helper.setBlock(clutch, com.simibubi.create.AllBlocks.CLUTCH.getDefaultState().setValue(axis, east.getAxis()));
++		helper.setBlock(right, com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis()));
++		helper.setBlock(power, Blocks.LEVER.defaultBlockState().setValue(
++			net.minecraft.world.level.block.state.properties.BlockStateProperties.ATTACH_FACE,
++			net.minecraft.world.level.block.state.properties.AttachFace.FLOOR));
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			if (tick == 0)
++				helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), left).generatedSpeed.setValue(32);
++			if (tick == 4)
++				helper.pullLever(power);
++			if (tick == 6) {
++				helper.setBlock(right, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east.getOpposite()));
++				helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), right).generatedSpeed.setValue(64);
++			}
++			if (tick == 10)
++				helper.setBlock(left, Blocks.AIR.defaultBlockState());
++			if (tick == 14)
++				helper.pullLever(power);
++			var gear = helper.getBlockEntity(AllBlockEntityTypes.CLUTCH.get(), clutch);
++			var rightEntity = (com.simibubi.create.content.kinetics.base.KineticBlockEntity) level.getBlockEntity(helper.absolutePos(right));
++			var saved = gear.saveWithoutMetadata(level.registryAccess());
++			var leftEntity = level.getBlockEntity(helper.absolutePos(left));
++			float leftSpeed = leftEntity instanceof com.simibubi.create.content.kinetics.base.KineticBlockEntity kinetic ? kinetic.getSpeed() : 0;
++			System.out.printf(java.util.Locale.ROOT, "CREATE_CLUTCH_COMPETING,%d,%s,%.4f,%.4f,%.4f,%s%n", tick,
++				gear.getBlockState().getValue(powered), leftSpeed, gear.getSpeed(), rightEntity.getSpeed(), saved.contains("Source"));
++			if (tick < 18) helper.fail("Waiting for both ordinary clutch sources");
++		});
++	}
+ }

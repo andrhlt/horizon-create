@@ -1,0 +1,96 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..d0739ef 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.nixieColorParity"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..e9e027c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,77 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 16)
++	public static void nixieColorParity(CreateGameTestHelper helper) {
++		var props = com.simibubi.create.AllBlocks.ORANGE_NIXIE_TUBE.get().defaultBlockState()
++			.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING,
++				net.minecraft.core.Direction.EAST)
++			.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED, true);
++		for (var dye : net.minecraft.world.item.DyeColor.values()) {
++			var target = com.simibubi.create.content.redstone.nixieTube.NixieTubeBlock.withColor(props, dye);
++			var colors = com.simibubi.create.foundation.utility.DyeHelper.getDyeColors(dye);
++			var equal = com.simibubi.create.content.redstone.nixieTube.NixieTubeBlock.areNixieBlocksEqual(props, target);
++			if (!equal) throw new IllegalStateException("Color changed tube geometry: " + dye);
++			System.out.printf("CREATE_NIXIE_COLOR %s,%s,%06x,%06x,%s%n", dye.getSerializedName(),
++				net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(target.getBlock()),
++				colors.getFirst() & 0xffffff, colors.getSecond() & 0xffffff, equal);
++		}
++		var faceProp = com.simibubi.create.content.redstone.nixieTube.DoubleFaceAttachedBlock.FACE;
++		var facingProp = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		for (var face : faceProp.getPossibleValues()) {
++			for (var side : facingProp.getPossibleValues()) {
++				var shapeState = props.setValue(faceProp, face).setValue(facingProp, side);
++				for (var box : shapeState.getShape(helper.getLevel(), helper.absolutePos(new BlockPos(0, 2, 0))).toAabbs())
++					System.out.printf("CREATE_NIXIE_SHAPE %s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f%n",
++						face.getSerializedName(), side.getSerializedName(),
++						box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ);
++			}
++		}
++		var world = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var north = net.minecraft.core.Direction.NORTH;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var hitSide = net.minecraft.core.Direction.UP;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var at = helper.absolutePos(new BlockPos(1, 2, 1)).above(12);
++		var other = at.east();
++		var stop = other.east();
++		helper.runAtTickTime(4, () -> {
++			for (var pos : java.util.List.of(at, other, stop))
++				world.setBlockAndUpdate(pos.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++			for (var dye : net.minecraft.world.item.DyeColor.values()) {
++				world.setBlockAndUpdate(at, props);
++				world.setBlockAndUpdate(other, com.simibubi.create.content.redstone.nixieTube.NixieTubeBlock.withColor(props,
++					net.minecraft.world.item.DyeColor.BLUE));
++				world.setBlockAndUpdate(stop, props.setValue(facing, north));
++				var entity = (com.simibubi.create.content.redstone.nixieTube.NixieTubeBlockEntity) world.getBlockEntity(other);
++				entity.displayCustomText("\"PARITY\"", 1);
++				var stack = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.DyeItem.byColor(dye), 3);
++				player.setItemInHand(hand, stack);
++				var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(at), hitSide, at, false);
++				var action = world.getBlockState(at).useItemOn(stack, world, player, hand, hit);
++				var table = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++				var result = world.getBlockEntity(other);
++				var nbt = result.saveWithoutMetadata(world.registryAccess());
++				System.out.printf("CREATE_NIXIE_DYE %s,%s,%s,%s,%d,%s,%d,%s%n",
++					dye.getSerializedName(), table.getKey(world.getBlockState(at).getBlock()),
++					table.getKey(world.getBlockState(other).getBlock()), table.getKey(world.getBlockState(stop).getBlock()),
++					stack.getCount(), action, nbt.getInt("CustomTextIndex"), result == entity);
++			}
++		});
++		for (int i = 0; i <= 3; i++) {
++			int tick = i;
++			helper.runAtTickTime(5 + tick, () -> {
++				if (tick == 0) world.setBlockAndUpdate(at.west(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++				if (tick == 2) world.setBlockAndUpdate(at.west(), Blocks.AIR.defaultBlockState());
++				var powered = (com.simibubi.create.content.redstone.nixieTube.NixieTubeBlockEntity) world.getBlockEntity(at);
++				var withText = (com.simibubi.create.content.redstone.nixieTube.NixieTubeBlockEntity) world.getBlockEntity(other);
++				System.out.printf("CREATE_NIXIE_POWER %d,%d,%s%n", tick, powered.getRedstoneStrength(),
++					withText.getFullText().getString());
++				if (tick == 3) helper.succeed();
++			});
++		}
++	}
++
+ }

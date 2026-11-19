@@ -1,0 +1,78 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -394,6 +394,75 @@
+ 		helper.succeed();
+ 	}
+ 
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void chainConveyorClipboardCopy(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var board = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		var source = board.east(3);
++		var target = source.east(3);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var existing = new com.simibubi.create.content.equipment.clipboard.ClipboardEntry(
++			false, net.minecraft.network.chat.Component.literal("Sort brass"));
++		var duplicate = new com.simibubi.create.content.equipment.clipboard.ClipboardEntry(
++			true, net.minecraft.network.chat.Component.literal("Sort brass"));
++		var address = new com.simibubi.create.content.equipment.clipboard.ClipboardEntry(
++			true, net.minecraft.network.chat.Component.literal("#Warehouse"))
++			.displayItem(new ItemStack(Items.IRON_INGOT), 7);
++		var pages = com.simibubi.create.content.equipment.clipboard.ClipboardContent.EMPTY
++			.setType(com.simibubi.create.content.equipment.clipboard.ClipboardOverrides.ClipboardType.WRITTEN);
++		var held = AllBlocks.CLIPBOARD.asStack();
++		held.set(AllDataComponents.CLIPBOARD_CONTENT,
++			pages.setPages(java.util.List.of(java.util.List.of(existing))).setReadOnly(true));
++		player.setItemInHand(hand, held);
++		level.setBlockAndUpdate(board.below(), Blocks.STONE.defaultBlockState());
++		level.setBlockAndUpdate(board, AllBlocks.CLIPBOARD.getDefaultState());
++		var cbe = (com.simibubi.create.content.equipment.clipboard.ClipboardBlockEntity) level.getBlockEntity(board);
++		var components = new net.minecraft.core.component.PatchedDataComponentMap(cbe.components());
++		components.set(AllDataComponents.CLIPBOARD_CONTENT,
++			pages.setPages(java.util.List.of(java.util.List.of(duplicate, address))));
++		cbe.setComponents(components);
++		cbe.updateWrittenState();
++		String before = held.save(level.registryAccess()).toString();
++		var hit = new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(board), Direction.UP, board, false);
++		var copyBoard = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock(player, hand, board, hit);
++		com.simibubi.create.content.equipment.clipboard.ClipboardValueSettingsHandler.rightClickToCopy(copyBoard);
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_COPY board_right|%b|%s|%s%n",
++			copyBoard.isCanceled(), before, held.save(level.registryAccess()));
++		var leftBoard = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(player, board, Direction.UP,
++			net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
++		before = held.save(level.registryAccess()).toString();
++		com.simibubi.create.content.equipment.clipboard.ClipboardValueSettingsHandler.leftClickToPaste(leftBoard);
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_COPY board_left_duplicate|%b|%s|%s%n",
++			leftBoard.isCanceled(), before, held.save(level.registryAccess()));
++
++		var inverted = com.simibubi.create.content.redstone.diodes.BrassDiodeBlock.INVERTED;
++		var scroll = com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE;
++		level.setBlockAndUpdate(source.below(), Blocks.STONE.defaultBlockState());
++		level.setBlockAndUpdate(target.below(), Blocks.STONE.defaultBlockState());
++		level.setBlockAndUpdate(source, AllBlocks.PULSE_EXTENDER.getDefaultState().setValue(inverted, true));
++		level.setBlockAndUpdate(target, AllBlocks.PULSE_REPEATER.getDefaultState().setValue(inverted, false));
++		((com.simibubi.create.foundation.blockEntity.SmartBlockEntity) level.getBlockEntity(source))
++			.getBehaviour(scroll).setValue(71);
++		var targetTimer = ((com.simibubi.create.foundation.blockEntity.SmartBlockEntity) level.getBlockEntity(target))
++			.getBehaviour(scroll);
++		targetTimer.setValue(9);
++		var copyHit = new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(source), Direction.UP, source, false);
++		var copyDiode = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock(player, hand, source, copyHit);
++		before = held.save(level.registryAccess()).toString();
++		com.simibubi.create.content.equipment.clipboard.ClipboardValueSettingsHandler.rightClickToCopy(copyDiode);
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_COPY diode_right|%b|%s|%s%n",
++			copyDiode.isCanceled(), before, held.save(level.registryAccess()));
++		var paste = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(player, target, Direction.UP,
++			net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_DIODE before|%d|%b%n",
++			targetTimer.getValue(), level.getBlockState(target).getValue(inverted));
++		com.simibubi.create.content.equipment.clipboard.ClipboardValueSettingsHandler.leftClickToPaste(paste);
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_DIODE after|%d|%b|%b%n",
++			targetTimer.getValue(), level.getBlockState(target).getValue(inverted), paste.isCanceled());
++		helper.succeed();
++	}
++
+ 	private static void runChainConveyor(CreateGameTestHelper helper, String scenario, BlockPos edge, boolean reverse) {
+ 		var world = helper.getLevel();
+ 		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);

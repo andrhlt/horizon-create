@@ -1,0 +1,125 @@
+{
+  "include_components": true,
+  "actions": [
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 3
+    },
+    {
+      "op": "configure",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "minecraft:water",
+      "amount": 1000
+    },
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 4
+    },
+    {
+      "op": "probe",
+      "label": "expanded",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "remove",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "removed",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 4
+    },
+    {
+      "op": "probe",
+      "label": "after",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    }
+  ]
+}

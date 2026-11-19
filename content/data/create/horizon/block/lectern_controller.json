@@ -1,0 +1,5 @@
+{
+  "template": "minecraft:lectern",
+  "item": false,
+  "default_state": {"facing": "north", "has_book": "true", "powered": "false"}
+}

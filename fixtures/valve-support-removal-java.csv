@@ -1,0 +1,4 @@
+tick,case,after_front_changed,after_support_removed,water_amount,drops
+23,0,create:copper_valve_handle,minecraft:air,0,1
+23,1,create:copper_valve_handle,minecraft:water,8,1
+23,2,create:white_valve_handle,minecraft:water,8,1

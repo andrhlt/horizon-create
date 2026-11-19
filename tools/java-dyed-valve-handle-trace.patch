@@ -1,0 +1,142 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..58ee0dc45 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.dyedValveHandleTrace"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..9fe9f0009 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,110 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++
++
++
++
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 97)
++	public static void dyedValveHandleTrace(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var waterlogged = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var east = net.minecraft.core.Direction.EAST;
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(helper.getLevel());
++		var colors = net.minecraft.world.item.DyeColor.values();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var pos = new BlockPos(12, 3, 2);
++		var at = helper.absolutePos(pos);
++		var shaft = pos.west();
++		var level = helper.getLevel();
++		var copper = com.simibubi.create.AllBlocks.COPPER_VALVE_HANDLE;
++		helper.setBlock(pos, copper.getDefaultState().setValue(facing, east).setValue(waterlogged, true));
++		helper.setBlock(shaft, com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis()));
++		var single = pos.south(5);
++		var stoneSupported = pos.south(10);
++		var untouched = pos.south(15);
++		for (var extra : new BlockPos[]{single, stoneSupported, untouched}) {
++			helper.setBlock(extra, copper.getDefaultState().setValue(facing, east).setValue(waterlogged, true));
++			helper.setBlock(extra.west(), extra.equals(stoneSupported) ? Blocks.STONE.defaultBlockState() :
++				com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis()));
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var state = level.getBlockState(at);
++			var handle = helper.getBlockEntity(AllBlockEntityTypes.VALVE_HANDLE.get(), pos);
++			var shaftEntity = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), shaft);
++			if (tick == 1)
++				handle.angleInput.setValue(-137);
++			if (tick == 2)
++				handle.activate(false);
++			if (tick >= 2 && tick <= 18) {
++				System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_HANDLE_VISUAL,%d,%s,%.6f,%.6f,%.6f,%d%n",
++					tick, handle.getBlockState().getValue(facing), handle.getIndependentAngle(0), handle.getIndependentAngle(0.5f),
++					handle.getIndependentAngle(1), handle.saveWithoutMetadata(level.registryAccess()).getInt("InUse"));
++			}
++			if (tick >= 2) {
++				var current = handle.saveWithoutMetadata(level.registryAccess());
++				System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_HANDLE_DYE_STATE,%d,%d,%.4f,%.4f,%.4f,%d%n",
++					tick, current.getInt("InUse"), handle.getSpeed(), shaftEntity.getSpeed(), handle.getGeneratedSpeed(), handle.cooldown);
++			}
++			if (tick >= 3 && tick < 3 + colors.length) {
++				var dye = colors[(int) tick - 3];
++				var held = new ItemStack(net.minecraft.world.item.DyeItem.byColor(dye), 3);
++				player.setItemInHand(hand, held);
++				((com.simibubi.create.content.kinetics.crank.ValveHandleBlock) state.getBlock()).clicked(level, at, state, player, hand);
++				var result = level.getBlockState(at);
++				var entity = helper.getBlockEntity(AllBlockEntityTypes.VALVE_HANDLE.get(), pos);
++				var nbt = entity.saveWithoutMetadata(level.registryAccess());
++				System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_HANDLE_DYE,%d,%s,%s,%s,%s,%d,%s,%d,%d,%d,%.4f,%.4f,%.4f%n",
++					tick, dye.getName(), net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(result.getBlock()), result.getValue(facing),
++					result.getValue(waterlogged), held.getCount(), entity == handle, entity.angleInput.getValue(), nbt.getInt("InUse"),
++					nbt.getInt("TargetAngle"), entity.getSpeed(), shaftEntity.getSpeed(), entity.calculateAddedStressCapacity());
++				player.setItemInHand(hand, ItemStack.EMPTY);
++			}
++			if (tick == 25) {
++				var dye = colors[colors.length - 1];
++				var held = new ItemStack(net.minecraft.world.item.DyeItem.byColor(dye), 3);
++				player.setItemInHand(hand, held);
++				var result = ((com.simibubi.create.content.kinetics.crank.ValveHandleBlock) state.getBlock()).clicked(level, at, state, player, hand);
++				var nbt = handle.saveWithoutMetadata(level.registryAccess());
++				System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_HANDLE_REPEAT,%s,%d,%d,%d,%.4f%n",
++					result, held.getCount(), nbt.getInt("InUse"), handle.angleInput.getValue(), handle.getSpeed());
++				player.setItemInHand(hand, ItemStack.EMPTY);
++			}
++			for (var extra : new BlockPos[]{single, stoneSupported, untouched}) {
++				var current = helper.getBlockEntity(AllBlockEntityTypes.VALVE_HANDLE.get(), extra);
++				var target = (com.simibubi.create.content.kinetics.base.KineticBlockEntity) level.getBlockEntity(helper.absolutePos(extra.west()));
++				if (tick == 1)
++					current.angleInput.setValue(-137);
++				if (tick == 2)
++					current.activate(false);
++				if (tick == 5 && !extra.equals(untouched)) {
++					player.setItemInHand(hand, new ItemStack(net.minecraft.world.item.DyeItem.byColor(colors[0]), 3));
++					var old = current.getBlockState();
++					((com.simibubi.create.content.kinetics.crank.ValveHandleBlock) old.getBlock()).clicked(level, current.getBlockPos(), old, player, hand);
++					player.setItemInHand(hand, ItemStack.EMPTY);
++				}
++				if (tick >= 2) {
++					var saved = current.saveWithoutMetadata(level.registryAccess());
++					var power = saved.getCompound("Network");
++					System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_HANDLE_LINK,%d,%d,%d,%.4f,%.4f,%.4f,%s,%s,%.4f,%.4f%n",
++						tick, extra.getZ(), saved.getInt("InUse"), current.getSpeed(), target == null ? 0 : target.getSpeed(),
++						current.getGeneratedSpeed(), current.source == null ? "-" : current.source.offset(-current.getBlockPos().getX(),
++							-current.getBlockPos().getY(), -current.getBlockPos().getZ()).toShortString().replace(",", ":"),
++						target == null || target.source == null ? "-" : target.source.offset(-target.getBlockPos().getX(),
++							-target.getBlockPos().getY(), -target.getBlockPos().getZ()).toShortString().replace(",", ":"),
++						power.getFloat("Capacity"), power.getFloat("Stress"));
++				}
++			}
++			if (tick < 86)
++				helper.fail("Waiting for the complete valve dye trace");
++		});
++	}
+ }

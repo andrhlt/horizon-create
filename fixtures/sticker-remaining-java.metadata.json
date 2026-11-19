@@ -1,0 +1,42 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "patch_sha256": "9a14159f0d90e8d34b561d079bf807b821257f177ba934069eee1b24cbbd6676",
+  "records": 999,
+  "counts": {
+    "physics": 384,
+    "fall": 120,
+    "face": 480,
+    "trajectory": 15
+  },
+  "trajectory_setup": {
+    "initial_relative_position": [
+      0.5,
+      1,
+      0.5
+    ],
+    "initial_motion": [
+      0.2,
+      0,
+      0.1
+    ],
+    "pig_ai": "enabled, goals and target goals cleared",
+    "scenarios": {
+      "0": "up Sticker, retracted",
+      "1": "north Sticker, retracted",
+      "2": "stone"
+    },
+    "ticks": 5,
+    "rig_chunk_offsets": [
+      2,
+      6,
+      10
+    ],
+    "comparison": "Decode double bits; positions contain large-world coordinate rounding, use explicit position tolerance in integration comparison."
+  },
+  "seconds": 21.282825375001266,
+  "scope": "Actual StickerBlock callbacks (bounce, stepOn, fallOn) and BlockMovementChecks/SuperGlue face queries; direct callbacks plus three five-tick AI-enabled pig trajectories with cleared goal selectors, no client/LAN comparison",
+  "face_setup": {
+    "stone_below": true,
+    "actual_block_asserted": true
+  }
+}

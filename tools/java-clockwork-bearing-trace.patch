@@ -1,0 +1,98 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..cbd1eb2ad 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.clockworkBearing"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..1e43c4534 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,79 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "shearing", timeoutTicks = 60)
++    public static void clockworkBearing(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++        var clock = com.simibubi.create.AllBlocks.CLOCKWORK_BEARING;
++        var properties = clock.getDefaultState();
++        var sample = helper.absolutePos(new BlockPos(4, 14, 4));
++        System.out.printf(java.util.Locale.ROOT, "CREATE_CLOCKWORK_MATERIAL %s;%d;%.2f;%.2f;%s;%s%n",
++            properties.getValue(facing).getName(), properties.getMapColor(level, sample).id,
++            properties.getDestroySpeed(level, sample), properties.getBlock().getExplosionResistance(),
++            properties.canOcclude(), properties.getShape(level, sample).bounds());
++        var motor = com.simibubi.create.AllBlocks.CREATIVE_MOTOR;
++        var directions = java.util.List.of(net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.WEST);
++        var origins = java.util.List.of(helper.absolutePos(new BlockPos(5, 14, 4)),
++            helper.absolutePos(new BlockPos(8, 14, 11)));
++        for (int i = 0; i < origins.size(); i++) {
++            var pos = origins.get(i);
++            var side = directions.get(i);
++            level.setChunkForced(pos.getX() >> 4, pos.getZ() >> 4, true);
++            level.setBlockAndUpdate(pos, clock.getDefaultState().setValue(facing, side));
++            for (int arm = 1; arm <= 2; arm++) {
++                var at = pos.relative(side, arm);
++                var material = arm == 1 ? Blocks.OAK_PLANKS : Blocks.STONE;
++                level.setBlockAndUpdate(at, material.defaultBlockState());
++                level.setBlockAndUpdate(at.above(), material.defaultBlockState());
++                var corner = net.minecraft.world.phys.Vec3.atLowerCornerOf(at);
++                var box = new net.minecraft.world.phys.AABB(corner, corner.add(1, 2, 1));
++                level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, box));
++            }
++        }
++        for (int j = 0; j <= 22; j++) {
++            int tick = j;
++            helper.runAtTickTime(tick + 3, () -> {
++                level.setDayTime(tick < 14 ? 2580 : 18335);
++                for (int i = 0; i < origins.size(); i++) {
++                    var side = directions.get(i);
++                    var pos = origins.get(i);
++                    var sourcePos = pos.relative(side.getOpposite());
++                    var bearing = (com.simibubi.create.content.contraptions.bearing.ClockworkBearingBlockEntity)
++                        level.getBlockEntity(pos);
++                    if (tick == 1)
++                        level.setBlockAndUpdate(sourcePos, motor.getDefaultState().setValue(facing, side));
++                    if (tick == 8 || tick == 14)
++                        bearing.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE)
++                            .setValue(tick == 8 ? 1 : 2);
++                    if (tick == 18)
++                        level.setBlockAndUpdate(sourcePos, Blocks.AIR.defaultBlockState());
++                    var saved = bearing.saveWithoutMetadata(level.registryAccess());
++                    var network = saved.getCompound("Network");
++                    var area = new net.minecraft.world.phys.AABB(pos).inflate(3);
++                    var contraptions = level.getEntitiesOfClass(
++                        com.simibubi.create.content.contraptions.ControlledContraptionEntity.class, area,
++                        entity -> bearing.isAttachedTo(entity));
++                    var hands = contraptions.stream().map(
++                        entity -> (com.simibubi.create.content.contraptions.bearing.ClockworkContraption) entity.getContraption())
++                        .sorted(java.util.Comparator.comparing(hand -> hand.handType.name()))
++                        .map(hand -> hand.handType + ":" + hand.offset + ":" + hand.getBlocks().size())
++                        .collect(java.util.stream.Collectors.joining("|"));
++                    var present = 0;
++                    for (int arm = 1; arm <= 2; arm++) {
++                        var at = pos.relative(side, arm);
++                        if (!level.getBlockState(at).isAir()) present++;
++                        if (!level.getBlockState(at.above()).isAir()) present++;
++                    }
++                    System.out.printf(java.util.Locale.ROOT, "CREATE_CLOCKWORK %d;%s;%d;%s;%.8f;%.8f;%.8f;%.1f;%.1f;%d;%s%n",
++                        tick, side.getName(), level.getDayTime(), saved.getBoolean("Running"), bearing.getSpeed(),
++                        saved.getFloat("HourAngle"), saved.getFloat("MinuteAngle"), network.getFloat("Stress"),
++                        network.getFloat("Capacity"), present, hands);
++                }
++                if (tick == 22)
++                    helper.succeed();
++            });
++        }
++    }
+ }

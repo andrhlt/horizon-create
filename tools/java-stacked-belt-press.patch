@@ -1,0 +1,117 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,101 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stackedBeltPressing(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var south = net.minecraft.core.Direction.SOUTH;
++		var shaft = AllBlocks.SHAFT.getDefaultState().setValue(axis, net.minecraft.core.Direction.Axis.Z);
++		var motorState = AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, south);
++
++		BlockPos first = new BlockPos(2, 9, 1);
++		BlockPos end = new BlockPos(5, 9, 1);
++		BlockPos pressPos = first.east().above(2);
++		BlockPos beltMotor = first.north();
++		BlockPos pressMotor = pressPos.north();
++		BlockPos depotPos = end.east();
++
++		level.setBlockAndUpdate(helper.absolutePos(first), shaft);
++		level.setBlockAndUpdate(helper.absolutePos(end), shaft);
++		com.simibubi.create.content.kinetics.belt.item.BeltConnectorItem.createBelts(
++			level, helper.absolutePos(first), helper.absolutePos(end));
++		level.setBlockAndUpdate(helper.absolutePos(beltMotor), motorState);
++		level.setBlockAndUpdate(helper.absolutePos(pressMotor), motorState);
++		level.setBlockAndUpdate(helper.absolutePos(pressPos),
++			AllBlocks.MECHANICAL_PRESS.getDefaultState().setValue(horizontal, south));
++		level.setBlockAndUpdate(helper.absolutePos(depotPos), AllBlocks.DEPOT.getDefaultState());
++
++		((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(beltMotor))
++			.generatedSpeed.setValue(-48);
++		((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(pressMotor))
++			.generatedSpeed.setValue(128);
++		var press = (com.simibubi.create.content.kinetics.press.MechanicalPressBlockEntity) helper.getBlockEntity(pressPos);
++		var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) helper.getBlockEntity(depotPos);
++		var sounds = new java.util.ArrayList<String>();
++		var depotSounds = new java.util.ArrayList<String>();
++		var delivered = new java.util.concurrent.atomic.AtomicInteger();
++		java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listen = event -> {
++			if (event.getLevel() != level || event.getSound() == null)
++				return;
++			var name = event.getSound().value().getLocation();
++			if (name.toString().equals("create:depot_slide")) {
++				depotSounds.add(String.format(java.util.Locale.ROOT, "%s,%s,%.6f,%.6f",
++					name, event.getSource().getName(), event.getNewVolume(), event.getNewPitch()));
++				return;
++			}
++			if (!name.getPath().startsWith("mechanical_press_activation"))
++				return;
++			sounds.add(String.format(java.util.Locale.ROOT, "%s/%.6f/%.6f",
++				name, event.getNewVolume(), event.getNewPitch()));
++		};
++		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(listen);
++
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick() - 5;
++			for (String sound : depotSounds)
++				System.out.printf(java.util.Locale.ROOT, "CREATE_BELT_DEPOT_SLIDE %d,%s%n", tick, sound);
++			depotSounds.clear();
++			helper.assertTrue(tick >= 0, "Waiting for belt initialization");
++			var belt = (com.simibubi.create.content.kinetics.belt.BeltBlockEntity) helper.getBlockEntity(first);
++			if (tick == 0) {
++				var stack = new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++					new ItemStack(Items.IRON_INGOT, 3));
++				stack.beltPosition = stack.prevBeltPosition = .4375f;
++				stack.angle = 180;
++				stack.sideOffset = stack.prevSideOffset = 0;
++				belt.getInventory().addItem(stack);
++			}
++			var tags = belt.getInventory().write(level.registryAccess()).getList("Items", 10);
++			var cargo = new java.util.ArrayList<String>();
++			for (int i = 0; i < tags.size(); i++) {
++				var tag = tags.getCompound(i);
++				var item = tag.getCompound("Item");
++				cargo.add(String.format(java.util.Locale.ROOT, "%s/%d/%.7f/%d",
++					item.getString("id"), item.getInt("count"), tag.getFloat("Pos"),
++					tag.getBoolean("Locked") ? 1 : 0));
++			}
++			var held = depot.getHeldItem();
++			if (held.is(AllItems.IRON_SHEET.get())) {
++				delivered.addAndGet(held.getCount());
++				depot.getBehaviour(com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE).removeHeldItem();
++			}
++			var pressBehavior = press.getPressingBehaviour();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_STACKED_BELT_PRESS %d,%d,%d,%d,%d,%d,%d,%.6f,%d,%s,%s%n",
++				tick, (int) belt.getSpeed(), (int) press.getSpeed(), pressBehavior.running ? 1 : 0,
++				pressBehavior.finished ? 1 : 0, pressBehavior.mode.ordinal(), pressBehavior.runningTicks,
++				pressBehavior.getRenderedHeadOffset(.5f) * pressBehavior.mode.headOffset,
++				delivered.get(),
++				cargo.isEmpty() ? "-" : String.join(";", cargo),
++				sounds.isEmpty() ? "-" : String.join(";", sounds));
++			sounds.clear();
++			helper.assertTrue(tick >= 100, "Waiting for three pressing cycles");
++			helper.assertTrue(delivered.get() == 3,
++				"All three stamped sheets must collect on the depot");
++			net.neoforged.neoforge.common.NeoForge.EVENT_BUS.unregister(listen);
++		});
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.stackedBeltPressing")).toList();
+ 	}
+ }

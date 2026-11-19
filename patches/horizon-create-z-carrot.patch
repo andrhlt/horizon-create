@@ -1,0 +1,148 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -1740,16 +1740,14 @@
+             ProjectileKind::Potion(stack, _) => Some((**stack).clone()),
+             ProjectileKind::ExperienceBottle => Some(crate::items::ItemStack::new(
+                 "minecraft:experience_bottle",
+-                1,
+-            )),
+-            ProjectileKind::Thrown(t) => Some(crate::items::ItemStack::new(
+-                if t.id == "create:potato_projectile" {
+-                    "minecraft:potato"
+-                } else {
+-                    t.item
+-                },
+                 1,
+             )),
++            ProjectileKind::Thrown(t) if t.id == "create:potato_projectile" => Some(
++                self.item
++                    .clone()
++                    .unwrap_or_else(|| crate::items::ItemStack::new("minecraft:potato", 1)),
++            ),
++            ProjectileKind::Thrown(t) => Some(crate::items::ItemStack::new(t.item, 1)),
+             _ => None,
+         }
+     }
+--- a/crates/horizon-client/src/entity_nbt.rs
++++ b/crates/horizon-client/src/entity_nbt.rs
+@@ -3313,6 +3313,14 @@
+     }
+     // the loaded item stays (blue egg, potion effects) at `setItem`'s count 1.
+     if let Tag::Compound(m) = &mut tag {
++        if matches!(&p.kind, ProjectileKind::Thrown(t) if t.id == "create:potato_projectile") {
++            let stack = p
++                .item
++                .clone()
++                .unwrap_or_else(|| crate::items::ItemStack::new("minecraft:potato", 1));
++            m.insert("Item".into(), item_to_nbt(&stack));
++            return Some(tag);
++        }
+         let st = match &p.kind {
+             ProjectileKind::Potion(s, _) => (**s).clone(),
+             _ => crate::items::ItemStack::new(item, 1),
+@@ -3337,6 +3345,9 @@
+     let owner = owner_uuid(tag);
+     let from_player = player.is_some() && owner == player;
+     let mut p = Projectile::new(kind, position(tag)?, from_player.then_some(Who::Player));
++    if matches!(&p.kind, ProjectileKind::Thrown(t) if t.id == "create:potato_projectile") {
++        p.item = tag.get("Item").and_then(item_from_nbt);
++    }
+     p.velocity = motion(tag);
+     [p.yaw, p.pitch] = rotation(tag);
+     p.left_owner = flag(tag, "LeftOwner");
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5583,6 +5583,11 @@
+             }
+             // a mod's copy of Snowball: its damage to anything it hits.
+             (ProjectileKind::Thrown(t), hit) => {
++                let carrot = t.id == "create:potato_projectile"
++                    && p.item
++                        .as_ref()
++                        .is_some_and(|item| item.item.as_ref() == "minecraft:carrot");
++                let damage = if carrot { 4.0 } else { t.damage };
+                 match hit {
+                     Hit::Entity {
+                         who: Who::Mob(id), ..
+@@ -5592,14 +5597,23 @@
+                             .mobs
+                             .iter_mut()
+                             .find(|m| m.id == id)
+-                            .is_some_and(|m| m.damage_projectile(t.damage, source, aim, push));
++                            .is_some_and(|m| m.damage_projectile(damage, source, aim, push));
+                         if hurt {
+                             // Create's potato adds its projectile knockback after
+                             // LivingEntity.hurt has applied the ordinary impulse.
+                             if t.id == "create:potato_projectile"
+                                 && let Some(m) = self.mobs.iter_mut().find(|m| m.id == id)
+                             {
+-                                m.knockback(1.5 * 0.6, -push[0], -push[1], &source);
++                                m.knockback(
++                                    if carrot {
++                                        0.3_f32 as f64 * 0.6
++                                    } else {
++                                        1.5 * 0.6
++                                    },
++                                    -push[0],
++                                    -push[1],
++                                    &source,
++                                );
+                             }
+                             self.player_hurt_mob(p, id);
+                         }
+@@ -5614,20 +5628,20 @@
+                                 position: [p.position.x, p.position.y, p.position.z],
+                                 ..Default::default()
+                             };
+-                            self.player_hit(&victim, "minecraft:thrown", Some(direct), t.damage);
++                            self.player_hit(&victim, "minecraft:thrown", Some(direct), damage);
+                         }
+                     }
+                     // Player.hurtServer takes no 0 damage.
+                     Hit::Entity {
+                         who: Who::Player, ..
+-                    } if t.damage > 0.0 => {
++                    } if damage > 0.0 => {
+                         let from = [p.previous.x, p.previous.y, p.previous.z];
+-                        self.mob_hits_player(t.damage, from, "minecraft:thrown");
++                        self.mob_hits_player(damage, from, "minecraft:thrown");
+                     }
+                     _ => {}
+                 }
+                 self.thrown_break_event(p.id, atp);
+-                self.item_burst(atp, t.item);
++                self.item_burst(atp, if carrot { "minecraft:carrot" } else { t.item });
+             }
+             (ProjectileKind::Egg, hit) => {
+                 if let Hit::Entity {
+--- a/crates/horizon-client/src/game/lan_entities.rs
++++ b/crates/horizon-client/src/game/lan_entities.rs
+@@ -804,6 +804,9 @@
+                         Value::Item(hub.stack(&Some((**stack).clone()))),
+                     ));
+                 }
++                K::Thrown(t) if t.id == "create:potato_projectile" && p.item.is_some() => {
++                    e.meta.push((8, serializer::ITEM_STACK, Value::Item(hub.stack(&p.item))));
++                }
+                 // Fireball.DATA_ITEM_STACK: the item it is drawn as, which a
+                 // guest has no other way of learning. A plain fire charge is
+                 // the client's default and is not sent.
+--- a/crates/horizon-client/src/game/remote_projectiles.rs
++++ b/crates/horizon-client/src/game/remote_projectiles.rs
+@@ -149,9 +149,14 @@
+ pub(super) fn remote_projectile_item(projectiles: &mut [Projectile], id: u32, stack: ItemStack) {
+     if let Some(p) = projectiles
+         .iter_mut()
+-        .find(|p| p.id == id && p.kind.is_item_fireball())
++        .find(|p| p.id == id && (p.kind.is_item_fireball()
++            || matches!(&p.kind, ProjectileKind::Thrown(t) if t.id == "create:potato_projectile")))
+     {
+-        p.set_item(stack);
++        if matches!(&p.kind, ProjectileKind::Thrown(t) if t.id == "create:potato_projectile") {
++            p.item = Some(stack);
++        } else {
++            p.set_item(stack);
++        }
+     }
+ }
+ 

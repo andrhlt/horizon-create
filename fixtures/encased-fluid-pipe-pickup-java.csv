@@ -1,0 +1,6 @@
+case,result,id,pipes_received,casing_count
+straight,SUCCESS,minecraft:air,1,5
+elbow,SUCCESS,minecraft:air,1,5
+junction,SUCCESS,minecraft:air,1,5
+wet,SUCCESS,minecraft:air,1,5
+glass,SUCCESS,minecraft:air,1,5

@@ -1,0 +1,10 @@
+{
+  "template": "minecraft:stone",
+  "item": false,
+  "state_properties": {
+    "axis": {"type": "enum", "values": ["x", "z"]}
+  },
+  "default_state": {"axis": "x"},
+  "shapes": {"property": "axis", "values": {"x": [], "z": []}},
+  "collision_shapes": {"property": "axis", "values": {"x": [], "z": []}}
+}

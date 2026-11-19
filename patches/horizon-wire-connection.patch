@@ -1,0 +1,53 @@
+--- a/crates/horizon-world/src/level/mod.rs
++++ b/crates/horizon-world/src/level/mod.rs
+@@ -764,6 +764,10 @@
+     }
+     /// `BlockState.hasAnalogOutputSignal` once the library answered `vanilla`:
+     /// whether comparators read the block. The default keeps it.
++    /// A content block's redstone-wire connection override.
++    fn native_wire_connects(&self, _state: BlockStateId, _direction: Option<Direction>) -> Option<bool> {
++        None
++    }
+     fn adjust_has_analog_output(&self, _state: BlockStateId, vanilla: bool) -> bool {
+         vanilla
+     }
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -1292,6 +1292,11 @@
+             self.native_block_signal(self.dimension, pos, state, face, direct, &mut signal);
+         }
+         signal.clamp(0, 15)
++    }
++    fn native_wire_connects(&self, state: BlockStateId, direction: Option<Direction>) -> Option<bool> {
++        let mut answer = None;
++        self.native_override_wire_connection(state, direction, &mut answer);
++        answer
+     }
+     fn adjust_has_analog_output(&self, state: BlockStateId, vanilla: bool) -> bool {
+         let mut output = vanilla;
+--- a/crates/horizon-client/src/game/native_hooks.rs
++++ b/crates/horizon-client/src/game/native_hooks.rs
+@@ -1536,6 +1536,11 @@
+         );
+     }
+ 
++    #[allow(unused_variables)]
++    pub(super) fn native_override_wire_connection(
++        &self, state: BlockStateId, direction: Option<Direction>, answer: &mut Option<bool>,
++    ) {}
++
+     /// `BlockState.isSignalSource`: set `source` for a block of yours that
+     /// gives a signal, so redstone wire beside it connects to it. Authoritative
+     /// servers only. API 38.
+--- a/crates/horizon-world/src/level/redstone.rs
++++ b/crates/horizon-world/src/level/redstone.rs
+@@ -214,6 +214,9 @@
+     // ---- redstone wire ----
+ 
+     fn should_wire_connect_to(&self, state: BlockStateId, direction: Option<Direction>) -> bool {
++        if let Some(connects) = self.level.native_wire_connects(state, direction) {
++            return connects;
++        }
+         let b = self.b;
+         match b.data(state).class {
+             Class::RedstoneWire => true,

@@ -1,0 +1,91 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,75 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void funnelKiss(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var actor = kissPlayer(helper, "KissActor");
++		var observer = kissPlayer(helper, "KissObserver");
++		var advancement = level.getServer().getAdvancements().get(
++			com.simibubi.create.Create.asResource("belt_funnel_kiss"));
++		helper.assertTrue(advancement != null, "The original hidden Funnel advancement must exist");
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var west = net.minecraft.core.Direction.WEST;
++		var east = net.minecraft.core.Direction.EAST;
++		var north = net.minecraft.core.Direction.NORTH;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var shape = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.SHAPE;
++		var extended = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape.EXTENDED;
++		var retracted = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape.RETRACTED;
++		for (int c = 0; c < 4; c++) {
++			var target = new BlockPos(5, 105, -11 + c * 3);
++			var other = target.west();
++			var chunk = new net.minecraft.world.level.ChunkPos(target);
++			level.setChunkForced(chunk.x, chunk.z, true);
++			level.getChunk(chunk.x, chunk.z);
++			var belt = AllBlocks.BELT.getDefaultState().setValue(facing, east);
++			level.setBlockAndUpdate(target.below(), belt);
++			level.setBlockAndUpdate(other.below(), belt);
++			var initial = AllBlocks.BRASS_BELT_FUNNEL.getDefaultState().setValue(facing, west).setValue(shape, retracted);
++			level.setBlockAndUpdate(target, initial);
++			if (c != 0) {
++				var opposite = initial.setValue(facing, c == 1 ? west : east).setValue(shape, c == 2 ? retracted : extended);
++				level.setBlockAndUpdate(other, opposite);
++			}
++			var wrench = AllItems.WRENCH.asStack();
++			actor.setItemInHand(hand, wrench);
++			actor.moveTo(target.getX() + .5, target.getY() - 1, target.getZ() - 1.5, 0, 0);
++			var hit = new net.minecraft.world.phys.BlockHitResult(target.getCenter().relative(north, .35), north, target, false);
++			var before = actor.getAdvancements().getOrStartProgress(advancement).isDone();
++			wrench.useOn(new net.minecraft.world.item.context.UseOnContext(actor, hand, hit));
++			var after = actor.getAdvancements().getOrStartProgress(advancement).isDone();
++			var observerDone = observer.getAdvancements().getOrStartProgress(advancement).isDone();
++			var mode = level.getBlockState(target).getValue(shape);
++			System.out.printf("CREATE_FUNNEL_KISS %d,%s,%s,%s,%s,%d%n", c, mode.getSerializedName(), before, after, observerDone, wrench.getCount());
++			helper.assertTrue(mode == extended && !before && after == (c == 3) && !observerDone && wrench.getCount() == 1,
++				"Only the player extending opposite an extended Funnel should earn the hidden advancement");
++		}
++		for (int c = 0; c < 4; c++) {
++			var chunk = new net.minecraft.world.level.ChunkPos(new BlockPos(5, 105, -11 + c * 3));
++			level.setChunkForced(chunk.x, chunk.z, false);
++		}
++		helper.succeed();
++	}
++
++	private static net.minecraft.server.level.ServerPlayer kissPlayer(CreateGameTestHelper helper, String name) {
++		var server = helper.getLevel().getServer();
++		var profile = new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), name);
++		var cookie = net.minecraft.server.network.CommonListenerCookie.createInitial(profile, false);
++		var player = new net.minecraft.server.level.ServerPlayer(server, helper.getLevel(),
++			cookie.gameProfile(), cookie.clientInformation());
++		var connection = new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
++		new io.netty.channel.embedded.EmbeddedChannel(connection);
++		new net.minecraft.server.network.ServerGamePacketListenerImpl(server, connection, player, cookie) {
++			@Override
++			public void send(net.minecraft.network.protocol.Packet<?> packet,
++				net.minecraft.network.PacketSendListener callback) {}
++		};
++		helper.getLevel().addNewPlayer(player);
++		player.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
++		player.getAbilities().flying = true;
++		player.onUpdateAbilities();
++		return player;
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.funnelKiss")).toList();
+ 	}
+ }

@@ -1,0 +1,10 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {"occludes": false},
+  "state_properties": {
+    "blaze": {"type": "enum", "values": ["none", "smouldering", "fading", "kindled", "seething"]},
+    "facing": {"type": "enum", "values": ["north", "east", "south", "west"]}
+  },
+  "default_state": {"blaze": "smouldering", "facing": "north"}
+}

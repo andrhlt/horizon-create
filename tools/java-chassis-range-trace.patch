@@ -1,0 +1,111 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..b1d4a93b2 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.chassisRange"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..95f24a0fb 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -29,6 +29,92 @@ import net.minecraft.world.level.block.RedstoneLampBlock;
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 65)
++	public static void chassisRange(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var anchor = new BlockPos(8, 201, 42);
++		var driver = anchor.below();
++		var motor = driver.below();
++		var up = net.minecraft.core.Direction.UP;
++		var east = net.minecraft.core.Direction.EAST;
++		var axis = net.minecraft.world.level.block.RotatedPillarBlock.AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var primary = com.simibubi.create.AllBlocks.LINEAR_CHASSIS.get();
++		var secondary = com.simibubi.create.AllBlocks.SECONDARY_LINEAR_CHASSIS.get();
++		var radial = com.simibubi.create.AllBlocks.RADIAL_CHASSIS.get();
++		var valueType = com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE;
++		level.setChunkForced(0, 2, true);
++		level.setChunkForced(1, 2, true);
++
++		for (int i = 0; i < 4; i++) {
++			int scenario = i;
++			boolean isRadial = i % 2 == 1;
++			boolean bulk = i >= 2;
++			var chassis = isRadial ? radial : primary;
++			var plain = chassis.defaultBlockState().setValue(axis, isRadial ? up.getAxis() : east.getAxis());
++			var sticky = plain.setValue(chassis.getGlueableSide(plain, east), true);
++			var peer = isRadial ? anchor.above() : anchor.south();
++			var unrelated = isRadial ? anchor.north() : peer.south();
++			var build = new java.util.LinkedHashMap<BlockPos, net.minecraft.world.level.block.state.BlockState>();
++			build.put(anchor, sticky);
++			build.put(peer, sticky);
++			build.put(unrelated, (isRadial ? plain : secondary.defaultBlockState().setValue(axis, east.getAxis())));
++			for (int length = 1; length <= 17; length++) {
++				build.put(anchor.east(length), Blocks.STONE.defaultBlockState());
++				build.put(peer.east(length), Blocks.BRICKS.defaultBlockState());
++			}
++			if (isRadial) {
++				build.put(anchor.east(1).south(), Blocks.OAK_PLANKS.defaultBlockState());
++				build.put(anchor.east(1).south(2), Blocks.SMOOTH_STONE.defaultBlockState());
++			}
++			helper.runAfterDelay(4 + i * 11, () -> {
++				build.forEach(level::setBlockAndUpdate);
++				level.setBlockAndUpdate(driver, com.simibubi.create.AllBlocks.MECHANICAL_BEARING.getDefaultState().setValue(facing, up));
++				level.setBlockAndUpdate(motor, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, up));
++				var source = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motor);
++				source.generatedSpeed.setValue(0);
++			});
++			helper.runAfterDelay(7 + 11 * i, () -> {
++				var root = (com.simibubi.create.content.contraptions.chassis.ChassisBlockEntity) level.getBlockEntity(anchor);
++				var friend = (com.simibubi.create.content.contraptions.chassis.ChassisBlockEntity) level.getBlockEntity(peer);
++				var outside = (com.simibubi.create.content.contraptions.chassis.ChassisBlockEntity) level.getBlockEntity(unrelated);
++				var range = root.getBehaviour(valueType);
++				int initial = root.getRange();
++				range.setValueSettings(player, new com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBehaviour.ValueSettings(0, -200), false);
++				int low = root.getRange();
++				range.setValueSettings(player, new com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBehaviour.ValueSettings(0, 200), false);
++				int high = root.getRange();
++				int column = scenario == 0 ? 1 : scenario == 1 ? 2 : 15;
++				range.setValueSettings(player, new com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBehaviour.ValueSettings(0, column), bulk);
++				System.out.printf("CREATE_CHASSIS_RANGE %d,0,%d,%d,%d,%d,%d,%d,-%n",
++					scenario, initial, low, high, root.getRange(), friend.getRange(), outside.getRange());
++				var source = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motor);
++				source.generatedSpeed.setValue(16);
++			});
++			helper.runAfterDelay(8 + 11 * i, () -> {
++				var controller = (com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity) level.getBlockEntity(driver);
++				if (controller.getMovedContraption() == null)
++					throw new IllegalStateException("Motor did not capture its chassis");
++				var blocks = controller.getMovedContraption().getContraption().getBlocks();
++				var ordered = blocks.keySet().stream().map(pos -> pos.getX() + ":" + pos.getY() + ":" + pos.getZ()).sorted().toList();
++				System.out.printf("CREATE_CHASSIS_RANGE %d,1,-,-,-,-,-,-,%s%n", scenario, String.join("|", ordered));
++				var source = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motor);
++				source.generatedSpeed.setValue(0);
++			});
++			helper.runAfterDelay(9 + 11 * i, () -> {
++				var root = (com.simibubi.create.content.contraptions.chassis.ChassisBlockEntity) level.getBlockEntity(anchor);
++				var friend = (com.simibubi.create.content.contraptions.chassis.ChassisBlockEntity) level.getBlockEntity(peer);
++				var outside = (com.simibubi.create.content.contraptions.chassis.ChassisBlockEntity) level.getBlockEntity(unrelated);
++				System.out.printf("CREATE_CHASSIS_RANGE %d,2,-,-,-,%d,%d,%d,-%n", scenario, root.getRange(), friend.getRange(), outside.getRange());
++				build.keySet().forEach(pos -> level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState()));
++				level.setBlockAndUpdate(driver, Blocks.AIR.defaultBlockState());
++				level.setBlockAndUpdate(motor, Blocks.AIR.defaultBlockState());
++			});
++		}
++		helper.runAfterDelay(49, helper::succeed);
++	}
++
+ 	@GameTest(template = "schematicannon", timeoutTicks = FIFTEEN_SECONDS)
+ 	public static void schematicannon(CreateGameTestHelper helper) {
+ 		// load the structure

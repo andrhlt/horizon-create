@@ -1,0 +1,7 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {"occludes": false},
+  "state_properties": {"ceiling": {"type": "boolean"}},
+  "default_state": {"ceiling": "false"}
+}

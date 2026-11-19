@@ -1,0 +1,54 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..70557aa 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.postboxOfflineBuffer")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..c082f93 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,37 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void postboxOfflineBuffer(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		var white = com.simibubi.create.AllBlocks.PACKAGE_POSTBOXES.get(net.minecraft.world.item.DyeColor.WHITE).get();
++		level.setBlockAndUpdate(at, white.defaultBlockState());
++		var box = (com.simibubi.create.content.logistics.packagePort.postbox.PostboxBlockEntity) level.getBlockEntity(at);
++		var station = new com.simibubi.create.content.trains.station.GlobalStation();
++		var port = new com.simibubi.create.content.trains.station.GlobalPackagePort();
++		station.connectedPorts.put(at, port);
++		box.trackedGlobalStation = new java.lang.ref.WeakReference<>(station);
++		var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.parse("create:cardboard_package_12x12")).getDefaultInstance();
++		item.set(com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS, "Parcel Depot");
++		box.inventory.setStackInSlot(17, item);
++		var stored = port.offlineBuffer.getStackInSlot(17);
++		helper.assertTrue(net.minecraft.world.item.ItemStack.isSameItemSameComponents(item, stored), "Buffer did not mirror the inserted package");
++		var buffer = port.offlineBuffer.serializeNBT(level.registryAccess());
++		System.out.println("CREATE_POSTBOX_BUFFER inserted " + buffer);
++		box.inventory.setStackInSlot(17, net.minecraft.world.item.ItemStack.EMPTY);
++		helper.assertTrue(port.offlineBuffer.getStackInSlot(17).isEmpty(), "Buffer did not mirror removal");
++		System.out.println("CREATE_POSTBOX_BUFFER cleared " + port.offlineBuffer.serializeNBT(level.registryAccess()));
++		var remote = item.copy();
++		remote.set(com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS, "Remote Depot");
++		port.offlineBuffer.setStackInSlot(17, remote);
++		port.offlineBuffer.setStackInSlot(3, item.copy());
++		port.primed = true;
++		port.restoreOfflineBuffer(box.inventory);
++		helper.assertTrue(!port.primed && net.minecraft.world.item.ItemStack.isSameItemSameComponents(remote, box.inventory.getStackInSlot(17))
++			&& net.minecraft.world.item.ItemStack.isSameItemSameComponents(item, box.inventory.getStackInSlot(3)), "Primed buffer must restore every slot");
++		System.out.println("CREATE_POSTBOX_BUFFER restored " + port.offlineBuffer.serializeNBT(level.registryAccess()) + " primed=" + port.primed);
++		helper.succeed();
++	}
++
+ }

@@ -1,0 +1,48 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -192,6 +192,8 @@
+ 		});
+ 		var signalRail = origin.west(8);
+         var signalPos = signalRail.south(3);
++        var chainRail = origin.west(4);
++        var chainPos = chainRail.south(3);
+         helper.runAfterDelay(16, () -> {
+             var signal = com.simibubi.create.AllBlocks.TRACK_SIGNAL;
+             var signalItem = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) signal.asItem();
+@@ -209,6 +211,27 @@
+             helper.assertTrue(signal.has(level.getBlockState(signalPos)), "Expected a westbound track signal");
+             level.setBlockAndUpdate(signalPos.above(), Blocks.REDSTONE_BLOCK.defaultBlockState());
+         });
++        helper.runAfterDelay(17, () -> {
++            var signal = com.simibubi.create.AllBlocks.TRACK_SIGNAL;
++            var signalItem = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) signal.asItem();
++            var support = chainPos.below();
++            level.setBlockAndUpdate(chainPos, Blocks.AIR.defaultBlockState());
++            level.setBlockAndUpdate(chainPos.above(), Blocks.AIR.defaultBlockState());
++            level.setBlockAndUpdate(support, Blocks.SMOOTH_STONE.defaultBlockState());
++            player.setItemInHand(hand, new ItemStack(signalItem));
++            player.setYRot(90);
++            player.setXRot(20);
++            player.setPos(chainRail.getX() + .5, chainRail.getY() + 1, chainRail.getZ() + .5);
++            clickTrackForAssembly(signalItem, player, chainRail);
++            player.setPos(support.getX() + .5, support.getY() + 1, support.getZ() + .5);
++            clickTrackForAssembly(signalItem, player, support);
++            helper.assertTrue(signal.has(level.getBlockState(chainPos)), "Expected the westbound cross signal");
++        });
++        helper.runAfterDelay(21, () -> {
++            var cross = (com.simibubi.create.content.trains.signal.SignalBlockEntity) level.getBlockEntity(chainPos);
++            helper.assertTrue(cross.getSignal() != null, "Cross signal did not bind to the graph");
++            cross.getSignal().cycleSignalType(chainPos);
++        });
+         helper.runAfterDelay(22, () -> {
+             var train = com.simibubi.create.Create.RAILWAYS.trains.values().stream()
+                 .filter(candidate -> candidate.owner.equals(player.getUUID())).findFirst().orElseThrow();
+@@ -275,6 +298,8 @@
+                 System.out.printf(java.util.Locale.ROOT, "CREATE_SCHEDULED_SIGNAL %d;%s;%s;%.9f%n", t,
+                     signal.getState(), train.navigation.waitingForSignal != null,
+                     train.navigation.waitingForSignal == null ? 0 : train.navigation.distanceToSignal);
++                var cross = (com.simibubi.create.content.trains.signal.SignalBlockEntity) level.getBlockEntity(chainPos);
++                System.out.printf("CREATE_SCHEDULED_CROSS %d;%s%n", t, cross.getState());
+                 if (t == 115)
+                     level.setBlockAndUpdate(signalPos.above(), Blocks.AIR.defaultBlockState());
+                 if (t == 205) {

@@ -1,0 +1,100 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders)
++			.stream().filter(test -> test.testName().equals("TestProcessing.depotPullingFunnel")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,84 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void depotPullingFunnel(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var stone = net.minecraft.world.level.block.Blocks.SMOOTH_STONE.defaultBlockState();
++		var redstone = net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState();
++		var barrelBlock = net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState();
++		var west = net.minecraft.core.Direction.WEST;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var power = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++		var shape = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.SHAPE;
++		var pulling = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape.PULLING;
++		var origins = java.util.List.of(new BlockPos(5, 104, -11), new BlockPos(5, 104, -5), new BlockPos(5, 104, 1));
++		var rigs = new java.util.ArrayList<DepotFunnelRig>();
++		for (int i = 0; i < origins.size(); i++) {
++			var at = origins.get(i);
++			var chunk = new net.minecraft.world.level.ChunkPos(at);
++			level.setChunkForced(chunk.x, chunk.z, true);
++			level.getChunk(chunk.x, chunk.z);
++			for (int x = -3; x <= 7; x++)
++				for (int z = -2; z <= 2; z++) {
++					level.setBlockAndUpdate(at.offset(x, -1, z), stone);
++					for (int y = 0; y < 7; y++)
++						level.removeBlock(at.offset(x, y, z), false);
++				}
++			level.setBlockAndUpdate(at, AllBlocks.DEPOT.getDefaultState());
++			level.setBlockAndUpdate(at.above().east(), barrelBlock);
++			level.setBlockAndUpdate(at.above(), AllBlocks.BRASS_BELT_FUNNEL.getDefaultState()
++				.setValue(horizontal, west).setValue(shape, pulling));
++			var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) level.getBlockEntity(at);
++			var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(at.above().east());
++			if (i == 1)
++				level.setBlockAndUpdate(at.above(2), redstone);
++			if (i == 2) {
++				barrel.setItem(0, new ItemStack(Items.IRON_INGOT, 63));
++				for (int slot = 1; slot < barrel.getContainerSize(); slot++)
++					barrel.setItem(slot, new ItemStack(Items.STONE, 64));
++			}
++			rigs.add(new DepotFunnelRig(at, depot, barrel));
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			helper.assertTrue(tick >= 1, "Waiting for first measured tick");
++			for (int i = 0; i < rigs.size(); i++) {
++				var rig = rigs.get(i);
++				var depot = rig.depot();
++				if (tick == 12) {
++					var input = depot.getBehaviour(com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE);
++					input.setCenteredHeldItem(new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++						new ItemStack(Items.IRON_INGOT, 3)));
++					depot.notifyUpdate();
++				}
++				if (tick == 18 && i == 1)
++					level.removeBlock(rig.pos().above(2), false);
++				if (tick == 20 && i == 2)
++					rig.barrel().clearContent();
++				int iron = 0;
++				for (int slot = 0; slot < rig.barrel().getContainerSize(); slot++) {
++					var stack = rig.barrel().getItem(slot);
++					if (stack.is(Items.IRON_INGOT))
++						iron += stack.getCount();
++				}
++				System.out.printf(java.util.Locale.ROOT, "CREATE_DEPOT_PULLING_FUNNEL %d,%d,%d,%d,%b%n",
++					i, tick, depot.getHeldItem().getCount(), iron, level.getBlockState(rig.pos().above()).getValue(power));
++			}
++			helper.assertTrue(tick >= 32, "Measuring Depot transfers and power changes");
++			helper.assertTrue(rigs.get(0).barrel().getItem(0).getCount() == 3, "Unblocked Depot transfers all iron");
++			helper.assertTrue(rigs.get(1).barrel().getItem(0).getCount() == 3, "Powered Depot begins when unpowered");
++			helper.assertTrue(rigs.get(2).barrel().getItem(0).getCount() == 2, "Depot transferred one before space opened");
++			for (var at : origins) {
++				var chunk = new net.minecraft.world.level.ChunkPos(at);
++				level.setChunkForced(chunk.x, chunk.z, false);
++			}
++		});
++	}
++
++	private record DepotFunnelRig(
++		BlockPos pos, com.simibubi.create.content.logistics.depot.DepotBlockEntity depot,
++		net.minecraft.world.level.block.entity.BarrelBlockEntity barrel
++	) {}
+ }

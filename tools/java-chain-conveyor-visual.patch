@@ -1,0 +1,47 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -32,6 +32,7 @@
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.sounds.SoundSource;
++import net.minecraft.util.Mth;
+ import net.minecraft.world.entity.EntityType;
+ import net.minecraft.world.entity.EquipmentSlot;
+ import net.minecraft.world.entity.animal.Sheep;
+@@ -177,6 +178,15 @@
+ 			player.getInventory().setItem(0, new ItemStack(Items.CHAIN, 16));
+ 			new ChainConveyorConnectionPacket(start, end, chain, true).handle(player);
+ 			chainConnectionLine(scenario, "connected", source, dest, player, edge);
++			for (var wheel : java.util.List.of(source, dest)) {
++				var delta = wheel == source ? edge : edge.multiply(-1);
++				var stats = wheel.connectionStats.get(delta);
++				var diff = stats.end().subtract(stats.start());
++				float yaw = (float) (Mth.RAD_TO_DEG * Mth.atan2(diff.x, diff.z));
++				float pitch = (float) (Mth.RAD_TO_DEG * Mth.atan2(diff.y, diff.multiply(1, 0, 1).length()));
++				System.out.printf(Locale.ROOT, "CREATE_CHAIN_VISUAL_SPAN %s,%s,%.9f,%.9f,%.9f%n",
++					scenario, wheel == source ? "A" : "B", yaw, pitch, stats.chainLength());
++			}
+ 			if (!source.connections.contains(edge) || !dest.connections.contains(edge.multiply(-1)))
+ 				throw new IllegalStateException("Connection packet did not link both conveyors");
+ 		});
+@@ -221,6 +231,20 @@
+ 					chainConnectionLine(scenario, "disconnected", source, dest, player, edge);
+ 					if (!source.connections.isEmpty() || !dest.connections.isEmpty())
+ 						throw new IllegalStateException("Disconnect packet left a unilateral edge");
++				}
++				if (port != null && port.isAnimationInProgress()) {
++					Vec3 diff = port.target.getExactTargetLocation(port, world, portPos)
++						.subtract(0, .75, 0).subtract(Vec3.atCenterOf(portPos));
++					float yaw = port.getYaw();
++					float pitch = (float) Mth.atan2(diff.y, diff.multiply(1, 0, 1).length() + 3 / 16f) * Mth.RAD_TO_DEG;
++					float headBase = Mth.clamp(pitch * 2, 60, 100);
++					float length = Math.max((float) diff.length(), 1);
++					float progress = port.animationProgress.getValue();
++					float head = headBase * (1 - (float) Math.min(1, Math.max(0, (Math.pow(progress * 1.5, 2) - .5) * 2)));
++					float tongue = length * (float) Math.pow(Math.max(0, 1 - progress * 1.25), 5);
++					float scale = (float) Math.max(.5, 1 - progress * 1.25);
++					System.out.printf(Locale.ROOT, "CREATE_CHAIN_VISUAL_PORT %s,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",
++						scenario, tick, yaw, pitch, headBase, length, progress, head, tongue, scale);
+ 				}
+ 				String receipt = port == null ? "-" : chainReceipt(port);
+ 				System.out.printf(Locale.ROOT, "CREATE_CHAIN_WORLD %s,%d,%.8f,%.8f,%b,%b,%b,%b,%s,%.8f,%s%n",

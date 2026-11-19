@@ -1,0 +1,71 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestItems.brassTunnel"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+@@ -155,6 +155,7 @@
+ 				new BlockPos(3, 2, 6), new ItemStack(Items.DIAMOND, 17)
+ 		);
+ 		BlockPos lever = new BlockPos(2, 3, 2);
++		traceBrassTunnel(helper, "filtering", List.of(new BlockPos(3,2,2), new BlockPos(4,2,3), new BlockPos(4,2,4), new BlockPos(4,2,5), new BlockPos(3,2,6)), List.of(new BlockPos(3,3,3), new BlockPos(3,3,4), new BlockPos(3,3,5)), List.of(new BlockPos(1,3,3)));
+ 		helper.pullLever(lever);
+ 		helper.succeedWhen(() -> outputs.forEach(helper::assertContainerContains));
+ 	}
+@@ -172,6 +173,7 @@
+ 				new BlockPos(5, 2, 3)
+ 		);
+ 		BlockPos lever = new BlockPos(2, 3, 2);
++		traceBrassTunnel(helper, "prefer_nearest", out, tunnels, List.of(new BlockPos(1,3,3)));
+ 		helper.pullLever(lever);
+ 		// tunnels reconnect and lose their modes
+ 		tunnels.forEach(tunnel -> helper.setTunnelMode(tunnel, SelectionMode.PREFER_NEAREST));
+@@ -209,6 +211,7 @@
+ 				new BlockPos(3, 3, 2),
+ 				new BlockPos(3, 3, 3)
+ 		);
++		traceBrassTunnel(helper, mode.name().toLowerCase(java.util.Locale.ROOT), outputs, tunnels, List.of(new BlockPos(1,3,3)));
+ 		helper.pullLever(lever);
+ 		tunnels.forEach(tunnel -> helper.setTunnelMode(tunnel, mode));
+ 		helper.succeedWhen(() -> {
+@@ -240,6 +243,7 @@
+ 				new BlockPos(7, 2, 2),
+ 				new BlockPos(7, 2, 3)
+ 		);
++		traceBrassTunnel(helper, "sync_input", outputs, tunnels, List.of(new BlockPos(2,3,1), new BlockPos(2,3,2), new BlockPos(2,3,3)));
+ 		helper.pullLever(lever);
+ 		tunnels.forEach(tunnel -> helper.setTunnelMode(tunnel, SelectionMode.SYNCHRONIZE));
+ 		helper.succeedWhen(() -> {
+@@ -437,4 +441,24 @@
+ 			}
+ 		});
+ 	}
++
++	private static void traceBrassTunnel(CreateGameTestHelper helper, String mode, List<BlockPos> outputs,
++		List<BlockPos> tunnels, List<BlockPos> sources) {
++		for (int t = 1; t <= 201; t++) {
++			int tick = t;
++			helper.runAfterDelay(tick, () -> {
++				var result = new java.util.ArrayList<String>();
++				for (var pos : sources)
++					result.add(Long.toString(helper.getTotalItems(pos)));
++				for (var pos : tunnels) {
++					var tunnel = (com.simibubi.create.content.logistics.tunnel.BrassTunnelBlockEntity)
++						helper.getLevel().getBlockEntity(helper.absolutePos(pos));
++					result.add(Integer.toString(tunnel.getStackToDistribute().getCount()));
++				}
++				for (var pos : outputs)
++					result.add(Long.toString(helper.getTotalItems(pos)));
++				System.out.printf("CREATE_BRASS_TUNNEL %s %d %s%n", mode, tick, String.join(" ", result));
++			});
++		}
++	}
+ }

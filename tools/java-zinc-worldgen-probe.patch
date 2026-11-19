@@ -1,0 +1,85 @@
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/ZincWorldgenProbe.java
+@@ -0,0 +1,82 @@
++package com.simibubi.create.infrastructure.gametest;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.infrastructure.config.AllConfigs;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.world.level.block.Blocks;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.event.tick.ServerTickEvent;
++
++@EventBusSubscriber
++public final class ZincWorldgenProbe {
++    private static boolean done;
++
++    @SubscribeEvent
++    public static void tick(ServerTickEvent.Post event) {
++        if (!Boolean.getBoolean("parity.zinc.worldgen") || done)
++            return;
++        boolean nether = Boolean.getBoolean("parity.zinc.nether");
++        var level = nether
++            ? event.getServer().getLevel(net.minecraft.world.level.Level.NETHER)
++            : event.getServer().overworld();
++        if (level == null || level.getGameTime() < 2)
++            return;
++        int chunks = Integer.getInteger("parity.zinc.chunks", 2);
++        String forced = System.getProperty("parity.zinc.forced");
++        if (forced != null) {
++            if (!java.nio.file.Files.isRegularFile(java.nio.file.Path.of(forced)))
++                return;
++            int radius = Integer.getInteger("parity.zinc.halo", 0);
++            for (int x = -radius; x < chunks + radius; x++)
++                for (int z = -radius; z < chunks + radius; z++)
++                    if (level.getChunkSource().getChunkNow(x, z) == null)
++                        return;
++        }
++        done = true;
++        boolean disabled = AllConfigs.common().worldGen.disable.get();
++        System.out.printf("CREATE_ZINC_WORLD seed=%d disabled=%b%n", level.getSeed(), disabled);
++        var generator = level.getChunkSource().getGenerator();
++        var steps = net.minecraft.world.level.biome.FeatureSorter.buildFeaturesPerStep(
++            java.util.List.copyOf(generator.getBiomeSource().possibleBiomes()),
++            biome -> generator.getBiomeGenerationSettings(biome).features(), true);
++        int oreStep = net.minecraft.world.level.levelgen.GenerationStep.Decoration.UNDERGROUND_ORES.ordinal();
++        var placed = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.PLACED_FEATURE);
++        var order = steps.get(oreStep).features();
++        for (int index = 0; index < order.size(); index++) {
++            var id = placed.getKey(order.get(index));
++            System.out.printf("CREATE_ZINC_FEATURE_INDEX %d,%d,%s%n", oreStep, index, id);
++        }
++        var palette = Boolean.getBoolean("parity.zinc.striated") ? java.util.Set.of(
++            "create:asurine", "create:crimsite", "create:limestone", "create:ochrum",
++            "create:scoria", "create:scorchia", "create:veridium") : java.util.Set.<String>of();
++        var naturalOres = nether ? java.util.Set.of(Blocks.NETHER_GOLD_ORE, Blocks.NETHER_QUARTZ_ORE, Blocks.ANCIENT_DEBRIS)
++            : java.util.Set.of(AllBlocks.ZINC_ORE.get(), AllBlocks.DEEPSLATE_ZINC_ORE.get(), Blocks.GOLD_ORE, Blocks.DEEPSLATE_GOLD_ORE);
++        int low = nether ? 0 : -64, high = nether ? 127 : 80;
++        if (Boolean.getBoolean("parity.zinc.settled")) {
++            int radius = Integer.getInteger("parity.zinc.halo", 0);
++            for (int x = -radius; x < chunks + radius; x++)
++                for (int z = -radius; z < chunks + radius; z++)
++                    level.getChunk(x, z);
++        }
++        var position = new BlockPos.MutableBlockPos();
++        for (int cx = 0; cx < chunks; cx++) {
++            for (int cz = 0; cz < chunks; cz++) {
++                var chunk = level.getChunk(cx, cz);
++                for (int y = low; y <= high; y++) {
++                    for (int x = cx * 16; x < (cx + 1) * 16; x++) {
++                        for (int z = cz * 16; z < (cz + 1) * 16; z++) {
++                            var block = chunk.getBlockState(position.set(x, y, z)).getBlock();
++                            var id = BuiltInRegistries.BLOCK.getKey(block);
++                            if (naturalOres.contains(block) || palette.contains(id.toString()))
++                                System.out.printf("CREATE_ZINC_WORLD_BLOCK %d,%d,%d,%s%n",
++                                    x, y, z, id);
++                        }
++                    }
++                }
++            }
++        }
++        System.out.println("CREATE_ZINC_WORLD_DONE");
++    }
++}

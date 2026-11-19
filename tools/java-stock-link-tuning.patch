@@ -1,0 +1,76 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1000,4 +1000,62 @@
+ 		}
+ 	}
+ 
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stockLinkTuning(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var original = helper.absolutePos(new BlockPos(2, 14, 2));
++		var copy = original.east(3);
++		var link = com.simibubi.create.AllBlocks.STOCK_LINK;
++		var type = com.simibubi.create.AllBlockEntityTypes.PACKAGER_LINK.get();
++		var side = net.minecraft.core.Direction.UP;
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var useOn = (java.util.function.Function<BlockPos, net.minecraft.world.InteractionResult>) pos -> {
++			player.setPos(pos.getX() + .5, pos.getY(), pos.getZ() - 2.5);
++			var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(side, .5), side, pos, false);
++			return player.getItemInHand(hand).useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++		};
++		helper.runAtTickTime(2, () -> {
++			level.setBlockAndUpdate(original.below(), stone);
++			level.setBlockAndUpdate(copy.below(), stone);
++			player.setItemInHand(hand, link.asStack());
++			var result = useOn.apply(original.below());
++			var entity = level.getBlockEntity(original, type).orElseThrow();
++			System.out.printf("CREATE_STOCK_LINK_TUNING %d,new,%b,%b,%b%n", helper.getTick(),
++				result.consumesAction(), player.getItemInHand(hand).isEmpty(),
++				player.getUUID().equals(entity.placedBy));
++		});
++		helper.runAtTickTime(3, () -> {
++			player.setItemInHand(hand, link.asStack());
++			var result = useOn.apply(original);
++			var held = player.getItemInHand(hand);
++			var originalEntity = level.getBlockEntity(original, type).orElseThrow();
++			var frequency = com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem.networkFromStack(held);
++			System.out.printf("CREATE_STOCK_LINK_TUNING %d,tune,%b,%d,%b,%b%n", helper.getTick(),
++				result.consumesAction(), held.getCount(), originalEntity.behaviour.freqId.equals(frequency),
++				held.hasFoil());
++		});
++		helper.runAtTickTime(4, () -> {
++			var result = useOn.apply(copy.below());
++			var originalEntity = level.getBlockEntity(original, type).orElseThrow();
++			var placed = level.getBlockEntity(copy, type).orElseThrow();
++			System.out.printf("CREATE_STOCK_LINK_TUNING %d,place,%b,%b,%b,%b%n", helper.getTick(),
++				result.consumesAction(), player.getItemInHand(hand).isEmpty(),
++				originalEntity.behaviour.freqId.equals(placed.behaviour.freqId),
++				player.getUUID().equals(placed.placedBy));
++		});
++		helper.runAtTickTime(5, () -> {
++			player.setItemInHand(hand, link.asStack());
++			useOn.apply(original);
++			var held = player.getItemInHand(hand);
++			var result = held.use(level, player, hand);
++			var frequency = com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem.networkFromStack(held);
++			System.out.printf("CREATE_STOCK_LINK_TUNING %d,clear,%b,%d,%b,%b%n", helper.getTick(),
++				result.getResult().consumesAction(), held.getCount(), frequency == null, held.hasFoil());
++			helper.succeed();
++		});
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().startsWith("TestMisc.stockLinkPackager"))
++			.filter(test -> test.testName().startsWith("TestMisc.stockLinkTuning"))
+ 			.toList();
+ 	}
+ }

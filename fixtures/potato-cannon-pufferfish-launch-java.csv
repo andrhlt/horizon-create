@@ -1,0 +1,3 @@
+case,result,ammo,damage,x,y,z,vx,vy,vz,item
+pufferfish,SUCCESS,2,1,-0.750000000,1.469999999,1.500000000,0.109862761,0.000000000,2.197255193,minecraft:pufferfish
+invulnerable,SUCCESS,2,1,-0.750000000,1.469999999,1.500000000,0.109862761,0.000000000,2.197255193,minecraft:pufferfish

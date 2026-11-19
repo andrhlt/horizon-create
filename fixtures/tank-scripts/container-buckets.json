@@ -1,0 +1,308 @@
+{
+  "integration_only": true,
+  "include_components": true,
+  "actions": [
+    {
+      "op": "place",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "create:honey_bucket",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "0-insert",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:bucket",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "0-extract",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "0-next-tick",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        6,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        6,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "create:chocolate_bucket",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "1-insert",
+      "positions": [
+        [
+          6,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        6,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:bucket",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "1-extract",
+      "positions": [
+        [
+          6,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "1-next-tick",
+      "positions": [
+        [
+          6,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        12,
+        0,
+        0
+      ],
+      "block": "creative"
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        12,
+        0,
+        0
+      ],
+      "mode": "survival",
+      "item": {
+        "id": "create:honey_bucket",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "2-insert",
+      "positions": [
+        [
+          12,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        12,
+        0,
+        0
+      ],
+      "mode": "survival",
+      "item": {
+        "id": "minecraft:bucket",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "2-extract",
+      "positions": [
+        [
+          12,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "2-next-tick",
+      "positions": [
+        [
+          12,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        18,
+        0,
+        0
+      ],
+      "block": "creative"
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        18,
+        0,
+        0
+      ],
+      "mode": "survival",
+      "item": {
+        "id": "create:chocolate_bucket",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "3-insert",
+      "positions": [
+        [
+          18,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        18,
+        0,
+        0
+      ],
+      "mode": "survival",
+      "item": {
+        "id": "minecraft:bucket",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "3-extract",
+      "positions": [
+        [
+          18,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "3-next-tick",
+      "positions": [
+        [
+          18,
+          0,
+          0
+        ]
+      ]
+    }
+  ]
+}

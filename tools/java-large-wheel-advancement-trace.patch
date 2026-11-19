@@ -1,0 +1,28 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().equals("TestFluids.smallWaterwheel"))
++			.filter(test -> test.testName().equals("TestFluids.largeWaterwheel"))
+ 			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -197,11 +197,11 @@
+         var advancement = level.getServer().getAdvancements().get(com.simibubi.create.Create.asResource("water_wheel"));
+         var worldWheel = helper.absolutePos(wheel);
+         var placed = level.getBlockState(worldWheel);
+-        placed.getBlock().setPlacedBy(level, worldWheel, placed, owner, com.simibubi.create.AllBlocks.WATER_WHEEL.asStack());
++        placed.getBlock().setPlacedBy(level, worldWheel, placed, owner, com.simibubi.create.AllBlocks.LARGE_WATER_WHEEL.asStack());
+         helper.pullLever(openLever);
+ 		helper.succeedWhen(() -> {
+-			if (expectedRpm == 8) {
+-				var source = helper.getBlockEntity(AllBlockEntityTypes.WATER_WHEEL.get(), wheel);
++			if (expectedRpm == 4) {
++				var source = helper.getBlockEntity(AllBlockEntityTypes.LARGE_WATER_WHEEL.get(), wheel);
+                 var ownerDone = owner.getAdvancements().getOrStartProgress(advancement).isDone();
+                 var bystanderDone = bystander.getAdvancements().getOrStartProgress(advancement).isDone();
+                 System.out.printf(java.util.Locale.ROOT, "CREATE_WHEEL_ADVANCEMENT %d;%d;%s;%s%n",

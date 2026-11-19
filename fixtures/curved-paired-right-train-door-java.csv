@@ -1,0 +1,6 @@
+tick,action,speed,halves
+76,before,0.434999990,0000
+76,opened,0.434999990,1111
+77,opened_next_tick,0.442499990,1111
+78,closed,0.449999990,0000
+79,closed_next_tick,0.457499990,0000

@@ -1,0 +1,85 @@
+diff --git a/src/main/java/com/simibubi/create/content/kinetics/crusher/CrushingWheelControllerBlockEntity.java b/src/main/java/com/simibubi/create/content/kinetics/crusher/CrushingWheelControllerBlockEntity.java
+index 61427c4..44e732a 100644
+--- a/src/main/java/com/simibubi/create/content/kinetics/crusher/CrushingWheelControllerBlockEntity.java
++++ b/src/main/java/com/simibubi/create/content/kinetics/crusher/CrushingWheelControllerBlockEntity.java
+@@ -52,6 +52,7 @@ import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+ import net.neoforged.neoforge.items.wrapper.RecipeWrapper;
+ 
+ public class CrushingWheelControllerBlockEntity extends SmartBlockEntity implements Clearable {
++	public static net.minecraft.util.RandomSource rockFixtureRandom;
+ 	public Entity processingEntity;
+ 	private UUID entityUUID;
+ 	protected boolean searchForEntity;
+@@ -309,7 +310,7 @@ public class CrushingWheelControllerBlockEntity extends SmartBlockEntity impleme
+ 			inventory.clear();
+ 			for (int roll = 0; roll < rolls; roll++) {
+ 				List<ItemStack> rolledResults = recipe.get().value()
+-					.rollResults(level.random);
++					.rollResults(rockFixtureRandom == null ? level.random : rockFixtureRandom);
+ 				for (ItemStack stack : rolledResults) {
+ 					ItemHelper.addToList(stack, list);
+ 				}
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..ab08ca9 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.stoneCobbleSandCrushing"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d..5c65aa5 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -106,11 +106,44 @@ public class TestProcessing {
+ 
+ 	@GameTest(template = "stone_cobble_sand_crushing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
+ 	public static void stoneCobbleSandCrushing(CreateGameTestHelper helper) {
++		com.simibubi.create.content.kinetics.crusher.CrushingWheelControllerBlockEntity.rockFixtureRandom = net.minecraft.util.RandomSource.create(4096L);
+ 		BlockPos chest = new BlockPos(1, 6, 2);
+ 		BlockPos lever = new BlockPos(2, 3, 1);
+ 		helper.pullLever(lever);
+ 		ItemStack expected = new ItemStack(Items.SAND, 5);
+-		helper.succeedWhen(() -> helper.assertContainerContains(chest, expected));
++		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			long tick = helper.getTick();
++			for (int row = 0; row < 2; row++) {
++				int y = row * 3;
++				var belt = (com.simibubi.create.content.kinetics.belt.BeltBlockEntity) helper.getBlockEntity(new BlockPos(2, 2 + y, 2));
++				var transported = belt.getInventory().write(access).getList("Items", 10);
++				var crusher = helper.getBlockEntity(new BlockPos(4, 3 + y, 2)).saveWithoutMetadata(access);
++				var inv = crusher.getCompound("Inventory");
++				var slots = inv.getList("Items", 10);
++				System.out.printf(java.util.Locale.ROOT, "CREATE_CRUSH %d %d %.7f %.7f %d %d %d %d%n", tick, row,
++					crusher.getFloat("Speed"), inv.getFloat("ProcessingTime"), inv.getBoolean("AppliedRecipe") ? 1 : 0,
++					helper.getTotalItems(new BlockPos(1, 3 + y, 2)), transported.size(), slots.size());
++				for (int j = 0; j < transported.size(); j++) {
++					var moved = transported.getCompound(j);
++					var stack = moved.getCompound("Item");
++					System.out.printf(java.util.Locale.ROOT, "CREATE_CRUSH_BELT %d %d %s %d %.7f%n", tick, row,
++						stack.getString("id").isEmpty() ? "_" : stack.getString("id"), stack.getInt("count"), moved.getFloat("Pos"));
++				}
++				for (int j = 0; j < slots.size(); j++) {
++					var stack = slots.getCompound(j);
++					System.out.printf("CREATE_CRUSH_ITEM %d %d %d %s %d%n", tick, row,
++						stack.getInt("Slot"), stack.getString("id"), stack.getInt("count"));
++				}
++			}
++			for (int y = 3; y <= 6; y++) {
++				var chute = helper.getBlockEntity(new BlockPos(7, y, 2)).saveWithoutMetadata(access);
++				var stack = chute.getCompound("Item");
++				System.out.printf(java.util.Locale.ROOT, "CREATE_CRUSH_CHUTE %d %d %s %d %.7f%n", tick, y,
++					stack.getString("id").isEmpty() ? "_" : stack.getString("id"), stack.getInt("count"), chute.getFloat("ItemPosition"));
++			}
++			helper.assertContainerContains(chest, expected);
++		});
+ 	}
+ 
+ 	@GameTest(template = "track_crafting", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)

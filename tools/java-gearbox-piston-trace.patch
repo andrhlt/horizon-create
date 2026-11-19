@@ -1,0 +1,67 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..c00ee4715 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.gearboxPiston"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..bb06868e2 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,48 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 44)
++	public static void gearboxPiston(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var east = net.minecraft.core.Direction.EAST;
++		var blocks = new net.minecraft.world.level.block.state.BlockState[] {
++			com.simibubi.create.AllBlocks.GEARBOX.getDefaultState().setValue(axis, net.minecraft.core.Direction.Axis.Y),
++			com.simibubi.create.AllBlocks.GEARBOX.getDefaultState().setValue(axis, net.minecraft.core.Direction.Axis.Z),
++			Blocks.STONE.defaultBlockState(),
++			Blocks.WHITE_GLAZED_TERRACOTTA.defaultBlockState()
++		};
++		for (int i = 0; i < blocks.length; i++) {
++			var base = new BlockPos(12, 7, 4 * i + 4);
++			helper.setBlock(base, (i == 1 ? Blocks.PISTON : Blocks.STICKY_PISTON).defaultBlockState().setValue(facing, east));
++			helper.setBlock(base.east(), blocks[i]);
++			if (i < 2) {
++				var input = i == 0 ? net.minecraft.core.Direction.NORTH : net.minecraft.core.Direction.DOWN;
++				var motor = base.east(2).relative(input);
++				helper.setBlock(motor, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, input.getOpposite()));
++				helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), motor).generatedSpeed.setValue(32);
++				helper.setBlock(base.east(2).relative(input.getOpposite()), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, input.getAxis()));
++			}
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int i = 0; i < blocks.length; i++) {
++				var base = new BlockPos(12, 7, 4 * i + 4);
++				if (tick == 5)
++					helper.setBlock(base.below(), Blocks.REDSTONE_BLOCK);
++				if (tick == 15)
++					helper.setBlock(base.below(), Blocks.AIR);
++				var left = helper.getBlockState(base.east());
++				var right = helper.getBlockState(base.east(2));
++				var ids = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++				var extended = net.minecraft.world.level.block.state.properties.BlockStateProperties.EXTENDED;
++				var output = i == 0 ? base.east(2).south() : base.east(2).above();
++				float rpm = i < 2 ? helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), output).getSpeed() : 0;
++				String boxAxis = right.getBlock() == com.simibubi.create.AllBlocks.GEARBOX.get() ? right.getValue(axis).getName() : "-";
++				float boxRPM = boxAxis.equals("-") ? 0 : helper.getBlockEntity(AllBlockEntityTypes.GEARBOX.get(), base.east(2)).getSpeed();
++				System.out.printf("GEARBOX_PISTON,%d,%d,%s,%s,%s,%s,%d,%d%n", tick, i, helper.getBlockState(base).getOptionalValue(extended).map(Object::toString).orElse("moving"), ids.getKey(left.getBlock()), ids.getKey(right.getBlock()), boxAxis, (int) rpm, (int) boxRPM);
++			}
++			helper.assertTrue(tick == 25, "sampling piston ticks");
++		});
++	}
+ }

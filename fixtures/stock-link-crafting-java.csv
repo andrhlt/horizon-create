@@ -1,0 +1,2 @@
+recipe,width,height,slots,output,count,remainder
+crafting/logistics/stock_link,1,2,"create:transmitter,create:item_vault",create:stock_link,1,

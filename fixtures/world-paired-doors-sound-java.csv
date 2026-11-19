@@ -1,0 +1,16 @@
+material,tick,half,sound,volume,pitch
+andesite_door,3,2,minecraft:block.iron_door.open,1.0000000,0.9474443
+copper_door,3,2,minecraft:block.iron_door.open,1.0000000,0.9213345
+brass_door,3,2,minecraft:block.iron_door.open,1.0000000,0.9761511
+train_door,3,2,minecraft:block.iron_door.open,1.0000000,0.9220532
+framed_glass_door,3,2,minecraft:block.iron_door.open,1.0000000,0.9437243
+andesite_door,21,0,minecraft:block.iron_door.close,0.5000000,1.0000000
+andesite_door,21,2,minecraft:block.iron_door.close,0.5000000,1.0000000
+copper_door,21,0,minecraft:block.iron_door.close,0.5000000,1.0000000
+copper_door,21,2,minecraft:block.iron_door.close,0.5000000,1.0000000
+brass_door,21,0,minecraft:block.iron_door.close,0.5000000,1.0000000
+brass_door,21,2,minecraft:block.iron_door.close,0.5000000,1.0000000
+train_door,21,0,minecraft:block.iron_door.close,0.5000000,1.0000000
+train_door,21,2,minecraft:block.iron_door.close,0.5000000,1.0000000
+framed_glass_door,21,0,minecraft:block.iron_door.close,0.5000000,1.0000000
+framed_glass_door,21,2,minecraft:block.iron_door.close,0.5000000,1.0000000

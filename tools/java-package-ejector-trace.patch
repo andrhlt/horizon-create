@@ -1,0 +1,104 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageEjector"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,89 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 45)
++	public static void packageEjector(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(3, 4, 2));
++		var target = net.minecraft.world.phys.Vec3.atCenterOf(pos).add(0, 5 / 16f, 0);
++		var bounds = new net.minecraft.world.phys.AABB(pos).inflate(3);
++		for (String scenario : new String[]{"charged", "occupied", "retracting", "launch"}) {
++			for (int x = -2; x <= 2; x++)
++				for (int z = -2; z <= 2; z++) {
++					world.setBlockAndUpdate(pos.offset(x, -1, z), Blocks.OBSIDIAN.defaultBlockState());
++					for (int y = 0; y < 4; y++)
++						world.setBlockAndUpdate(pos.offset(x, y, z), Blocks.AIR.defaultBlockState());
++				}
++
++			var targetPos = pos.east(4);
++			world.setBlockAndUpdate(targetPos, com.simibubi.create.AllBlocks.DEPOT.getDefaultState());
++			var targetDepot = com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(world, targetPos,
++				com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE);
++			targetDepot.setCenteredHeldItem(new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++				new ItemStack(Items.IRON_INGOT, 64)));
++			world.setBlockAndUpdate(pos, com.simibubi.create.AllBlocks.WEIGHTED_EJECTOR.getDefaultState()
++				.setValue(com.simibubi.create.content.logistics.depot.EjectorBlock.HORIZONTAL_FACING, net.minecraft.core.Direction.EAST));
++			var ejector = (com.simibubi.create.content.logistics.depot.EjectorBlockEntity) world.getBlockEntity(pos);
++			var configured = ejector.saveWithoutMetadata(world.registryAccess());
++			configured.putString("State", scenario.equals("retracting") ? "RETRACTING" : "CHARGED");
++			configured.putInt("HorizontalDistance", 4);
++			configured.putInt("VerticalDistance", 0);
++			configured.putFloat("ForceAngle", scenario.equals("retracting") ? 1 : 0);
++			ejector.loadWithComponents(configured, world.registryAccess());
++			var depot = com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(world, pos,
++				com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE);
++			if (scenario.equals("occupied"))
++				depot.setCenteredHeldItem(new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++					new ItemStack(Items.IRON_INGOT, 64)));
++			var stack = new ItemStack(com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES.get(2));
++			var cargo = net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
++			cargo.set(6, new ItemStack(Items.CLAY_BALL, 3));
++			stack.set(com.simibubi.create.AllDataComponents.PACKAGE_CONTENTS,
++				net.minecraft.world.item.component.ItemContainerContents.fromItems(cargo));
++			stack.set(com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS, "Ejector fixture");
++			var box = com.simibubi.create.content.logistics.box.PackageEntity.fromItemStack(world,
++				target.add(0.22, 1.75, 0.17), stack);
++			box.setYRot(47);
++			box.setDeltaMovement(0, -0.12, 0);
++			world.addFreshEntity(box);
++			var plops = new java.util.ArrayList<String>();
++			java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listener = sound -> {
++				if (sound.getLevel() == world && sound.getSound() != null && !sound.isCanceled()
++					&& sound.getSound().value().getLocation().equals(com.simibubi.create.Create.asResource("depot_plop")))
++					plops.add(sound.getSource().ordinal() + "|" + sound.getNewVolume() + "|" + sound.getNewPitch());
++			};
++			var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
++			bus.addListener(net.neoforged.bus.api.EventPriority.LOWEST, listener);
++			for (int tick = 0; tick <= 24; tick++) {
++				if (tick > 0) {
++					if (!box.isRemoved())
++						world.tickNonPassenger(box);
++					if (scenario.equals("launch") && tick == 12)
++						ejector.activateDeferred();
++					ejector.tick();
++				}
++				var actual = box.position().subtract(target);
++				var motion = box.getDeltaMovement();
++				var held = depot.getHeldItemStack();
++				if (!held.isEmpty() && !scenario.equals("occupied") && !ItemStack.matches(stack, held))
++					throw new AssertionError("The Depot changed the Package's components");
++				var heldID = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(held.getItem());
++				var encoded = held.isEmpty() ? "" : java.util.HexFormat.of().formatHex(held.save(world.registryAccess())
++					.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
++				float depotPosition = world.getBlockEntity(pos).saveWithoutMetadata(world.registryAccess())
++					.getCompound("HeldItem").getFloat("Pos");
++				System.out.printf(java.util.Locale.ROOT,
++					"PACKAGE_EJECTOR,%s,%d,%b,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.6f,%s,%d,%s,%.6f,%s,%s%n",
++					scenario, tick, box.isRemoved(), actual.x, actual.y, actual.z, motion.x, motion.y, motion.z,
++					box.getYRot(), heldID, held.getCount(), encoded, depotPosition, String.join(";", plops), ejector.getState().name());
++				if (box.isRemoved())
++					break;
++			}
++			bus.unregister(listener);
++			box.discard();
++			world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, bounds).forEach(entity -> entity.discard());
++		}
++		helper.succeed();
++	}
+ }

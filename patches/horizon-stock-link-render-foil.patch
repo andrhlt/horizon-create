@@ -1,0 +1,17 @@
+--- a/crates/horizon-client/src/item_render.rs
++++ b/crates/horizon-client/src/item_render.rs
+@@ -1111,6 +1111,14 @@
+                 }
+             };
+         }
++    }
++    if matches!(stack.item.as_ref(), "create:stock_link" | "create:redstone_requester" | "create:stock_ticker") {
++        // Match the item's own foil rule in the model resolver. The saved
++        // stack keeps its typed data with no glint override component.
++        view.patch.insert(
++            "minecraft:enchantment_glint_override".into(),
++            Some(Value::Bool(stack.has_foil(false))),
++        );
+     }
+     view
+ }

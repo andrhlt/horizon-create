@@ -1,0 +1,139 @@
+--- a/crates/horizon-client/src/arrows.rs
++++ b/crates/horizon-client/src/arrows.rs
+@@ -679,6 +679,35 @@
+     p.arrow = Some(st);
+     keep
+ }
++/// Finish the remainder of this tick's segment after an accepted piercing hit.
++/// A second entity hit suspends the tick again so the game can apply its damage.
++pub fn continue_piercing_hit(
++    p: &mut Projectile,
++    scene: &ArrowScene,
++    targets: &[(Who, Aabb)],
++) -> (bool, Hit) {
++    let Some(mut st) = p.arrow.take() else {
++        return (false, Hit::None);
++    };
++    let from = p.position;
++    let end = p.previous.add_vector(p.velocity);
++    let mut ticker = Ticker {
++        p,
++        st: &mut st,
++        scene,
++        client: false,
++    };
++    ticker.hit_sound();
++    let hit = ticker.step_move_and_hit(from, end, targets, true);
++    if !matches!(hit, Hit::Entity { .. }) {
++        ticker.finish();
++    }
++    p.stuck = st.in_ground;
++    let keep = !st.removed;
++    p.arrow = Some(st);
++    (keep, hit)
++}
++
+ struct Ticker<'p, 's, 'a, 'r> {
+     p: &'p mut Projectile,
+     st: &'s mut ArrowState,
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -4997,6 +4997,31 @@
+             let rain = self.arrow_rain();
+             horizon_client::arrows::finish_entity_hit(&mut arrow, &self.arrow_scene(&rain), outcome)
+         };
++        self.keep_arrow_after_hit(arrow, keep);
++    }
++
++    fn continue_package_piercing_hit(&mut self, mut arrow: Projectile) -> Result<()> {
++        let (keep, hit) = {
++            let mut targets = self.projectile_targets();
++            targets.extend(self.lan_projectile_targets());
++            let rain = self.arrow_rain();
++            horizon_client::arrows::continue_piercing_hit(
++                &mut arrow,
++                &self.arrow_scene(&rain),
++                &targets,
++            )
++        };
++        if matches!(hit, Hit::Entity { .. }) {
++            return self.projectile_hit_inner(&arrow, hit, true);
++        }
++        if matches!(hit, Hit::Block { .. }) {
++            self.projectile_hit_inner(&arrow, hit, false)?;
++        }
++        self.keep_arrow_after_hit(arrow, keep);
++        Ok(())
++    }
++
++    fn keep_arrow_after_hit(&mut self, mut arrow: Projectile, keep: bool) {
+         let Some(a) = arrow.arrow.as_mut() else {
+             return;
+         };
+@@ -5069,14 +5094,24 @@
+         self.target_block_hit(&hook, pos, at, face);
+     }
+     pub(super) fn projectile_hit(&mut self, p: &Projectile, hit: Hit) -> Result<()> {
+-        let result = self.projectile_hit_inner(p, hit);
++        let result = self.projectile_hit_inner(p, hit, false);
+         // LivingEntity.actuallyHurt credits the shooter (a ServerPlayer) with the absorbed damage.
+         self.settle_dealt_absorbed(p.owner == Some(Who::Player));
+         result?;
+         // The hit's hurt teleports an enderman or a shulker now (`hurtServer`).
+         self.settle_hurt_teleports()
+     }
+-    fn projectile_hit_inner(&mut self, p: &Projectile, hit: Hit) -> Result<()> {
++    /// Lets a custom mob answer AbstractArrow's hit before vanilla living damage.
++    fn native_arrow_mob_damage(&mut self, _arrow: &Projectile, _mob: u32) -> Option<bool> {
++        None
++    }
++
++    fn projectile_hit_inner(
++        &mut self,
++        p: &Projectile,
++        hit: Hit,
++        continuing_package_hit: bool,
++    ) -> Result<()> {
+         let _attacker = self.knockback_scope_for(p.owner);
+         // Projectile.onHitBlock: BlockState.onProjectileHit, for every
+         // projectile (a wind charge out of the world's top has no face).
+@@ -5322,6 +5357,7 @@
+                     Who::Mob(id) => self.mobs.iter().find(|m| m.id == id).map(|m| m.fire_ticks),
+                     Who::Player => None,
+                 };
++                let mut package_hit = continuing_package_hit;
+                 let mut dodged = false;
+                 // AbstractArrow.onHitEntity: a burning arrow sets its target alight.
+                 if p.arrow.as_ref().is_some_and(|a| a.on_fire()) {
+@@ -5338,8 +5374,12 @@
+                         hurt
+                     }
+                     Who::Mob(id) => {
+-                        let hurt = self.mobs.iter_mut().find(|m| m.id == id).is_some_and(|m| {
+-                            m.damage_projectile(amount, source, aim, [p.velocity.x, p.velocity.z])
++                        let package_damage = self.native_arrow_mob_damage(p, id);
++                        package_hit |= package_damage.is_some();
++                        let hurt = package_damage.unwrap_or_else(|| {
++                            self.mobs.iter_mut().find(|m| m.id == id).is_some_and(|m| {
++                                m.damage_projectile(amount, source, aim, [p.velocity.x, p.velocity.z])
++                            })
+                         });
+                         dodged = !hurt
+                             && self.mobs.iter().find(|m| m.id == id).is_some_and(|m| {
+@@ -5466,6 +5506,16 @@
+                     };
+                     self.shot_post_attack(p, who, direct, "minecraft:arrow");
+                     self.arrow_post_hurt_effects(p, who);
++                }
++                if package_hit {
++                    if hurt && arrow.arrow.as_ref().is_some_and(|state| state.pierce > 0) {
++                        return self.continue_package_piercing_hit(arrow);
++                    }
++                    if !hurt && !dodged {
++                        // The original arrow advances from the start of the tick using
++                        // the rebound velocity before applying drag and gravity.
++                        arrow.position = arrow.previous.add_vector(arrow.velocity.scale(-0.1));
++                    }
+                 }
+                 match (hurt, who) {
+                     (true, _) => self.finish_arrow_hit(arrow, EntityHit::Hurt),

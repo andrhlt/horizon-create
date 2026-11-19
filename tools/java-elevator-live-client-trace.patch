@@ -1,0 +1,75 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaElevatorClientProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaElevatorClientProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaElevatorClientProbe.java
+@@ -0,0 +1,38 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import java.util.Locale;
++
++import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
++import com.simibubi.create.content.contraptions.actors.contraptionControls.ContraptionControlsBlockEntity;
++import com.simibubi.create.content.contraptions.elevator.ElevatorContraption;
++
++import net.minecraft.client.Minecraft;
++import net.minecraft.core.BlockPos;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaElevatorClientProbe {
++	@SubscribeEvent
++	public static void tick(ClientTickEvent.Post event) {
++		var minecraft = Minecraft.getInstance();
++		var level = minecraft.level;
++		var player = minecraft.player;
++		if (level == null || player == null)
++			return;
++		for (var entity : level.entitiesForRendering()) {
++			if (!(entity instanceof AbstractContraptionEntity cabin)
++				|| !(cabin.getContraption() instanceof ElevatorContraption elevator))
++				continue;
++			var control = elevator.getBlockEntityClientSide(new BlockPos(6, 98, -10).subtract(elevator.anchor));
++			if (!(control instanceof ContraptionControlsBlockEntity cbe))
++				continue;
++			System.out.printf(Locale.ROOT, "LIVE_ELEVATOR %d,%s,%.9f,%.9f,%.9f,%.9f,%b,%b,%b,%.6f,%.6f%n",
++				level.getGameTime(), player.getGameProfile().getName(), cabin.getY()-96, player.getX()-3,
++				player.getY()-96, player.getZ()+12, player.onGround(), player.isPassenger(), player.getAbilities().flying,
++				cbe.indicator.getValue(), cbe.indicator.getChaseTarget());
++		}
++	}
++}
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaElevatorServerProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaElevatorServerProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaElevatorServerProbe.java
+@@ -0,0 +1,27 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.content.contraptions.elevator.ElevatorPulleyBlockEntity;
++import net.minecraft.core.BlockPos;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.event.tick.ServerTickEvent;
++
++import java.nio.file.Files;
++import java.nio.file.Path;
++
++@EventBusSubscriber
++public class JavaElevatorServerProbe {
++	private static boolean assembled;
++	@SubscribeEvent
++	public static void tick(ServerTickEvent.Post event) {
++		var signal = System.getProperty("parity.elevator.assemble");
++		if (signal == null || assembled || !Files.exists(Path.of(signal)))
++			return;
++		var level = event.getServer().overworld();
++		if (level.getBlockEntity(new BlockPos(8, 107, -9)) instanceof ElevatorPulleyBlockEntity pulley) {
++			pulley.clicked();
++			assembled = true;
++			System.out.println("LIVE_ELEVATOR clicked");
++		}
++	}
++}

@@ -1,0 +1,100 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageDestruction"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,85 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void packageDestruction(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(2, 4, 2));
++		var at = net.minecraft.world.phys.Vec3.atBottomCenterOf(pos);
++		var bounds = new net.minecraft.world.phys.AABB(pos).inflate(3);
++		var boxes = com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES;
++		var contents = com.simibubi.create.AllDataComponents.PACKAGE_CONTENTS;
++		var sources = world.damageSources();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		player.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		player.setPos(at.x - 2, at.y, at.z);
++		player.getInventory().clearContent();
++		for (String action : new String[]{"generic", "melee", "fall", "kill", "void", "explosion", "blast", "fire_once",
++				"fire_twice", "water", "waterlogged"}) {
++			var cargo = net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
++			cargo.set(0, new ItemStack(Items.STONE, 3));
++			cargo.set(2, new ItemStack(Items.PIG_SPAWN_EGG, 2));
++			var box = new ItemStack(boxes.getFirst());
++			box.set(contents, net.minecraft.world.item.component.ItemContainerContents.fromItems(cargo));
++			var packageEntity = com.simibubi.create.content.logistics.box.PackageEntity.fromItemStack(world, at, box);
++			world.addFreshEntity(packageEntity);
++
++			var pops = new java.util.ArrayList<String>();
++			java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listener = sound -> {
++				if (sound.getLevel() != world || sound.getSound() == null || sound.isCanceled())
++					return;
++				var id = sound.getSound().value().getLocation();
++				if (id.getNamespace().equals("create") && id.getPath().startsWith("package_pop"))
++					pops.add(id + "|" + sound.getSource().ordinal() + "|" + sound.getNewVolume() + "|" + sound.getNewPitch());
++			};
++			var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
++			bus.addListener(net.neoforged.bus.api.EventPriority.LOWEST, listener);
++			boolean accepted = false;
++			try {
++				switch (action) {
++					case "generic" -> accepted = packageEntity.hurt(sources.generic(), 1);
++					case "melee" -> player.attack(packageEntity);
++					case "fall" -> accepted = packageEntity.hurt(sources.fall(), 1);
++					case "kill" -> accepted = packageEntity.hurt(sources.genericKill(), 1);
++					case "void" -> accepted = packageEntity.hurt(sources.fellOutOfWorld(), 1);
++					case "explosion" -> accepted = packageEntity.hurt(sources.explosion(null, null), 1);
++					case "blast" -> {
++						for (int x = -2; x <= 2; x++)
++							for (int y = -2; y <= 2; y++)
++								for (int z = -2; z <= 2; z++)
++									world.setBlockAndUpdate(pos.offset(x, y, z), Blocks.AIR.defaultBlockState());
++						world.explode(null, at.x + .75, at.y + .4, at.z, 1, net.minecraft.world.level.Level.ExplosionInteraction.TNT);
++					}
++					case "fire_once", "fire_twice" -> {
++						accepted = packageEntity.hurt(sources.inFire(), 1);
++						if (action.equals("fire_twice"))
++							accepted = packageEntity.hurt(sources.inFire(), 1);
++					}
++					case "water", "waterlogged" -> {
++						var state = action.equals("water")
++							? Blocks.WATER.defaultBlockState()
++							: Blocks.OAK_STAIRS.defaultBlockState().setValue(
++								net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED, true);
++						world.setBlockAndUpdate(pos, state);
++						world.tickNonPassenger(packageEntity);
++					}
++				}
++			} finally {
++				bus.unregister(listener);
++			}
++			var drops = world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, bounds);
++			var pigs = world.getEntitiesOfClass(net.minecraft.world.entity.animal.Pig.class, bounds);
++			String items = drops.stream().map(e -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(e.getItem().getItem())
++				+ "|" + e.getItem().getCount()).sorted().collect(java.util.stream.Collectors.joining(";"));
++			System.out.printf(java.util.Locale.ROOT, "PACKAGE_DESTRUCTION,%s,%b,%b,%.6f,%d,%s,%d,%s%n",
++				action, accepted, packageEntity.isRemoved(), packageEntity.getHealth(), packageEntity.getRemainingFireTicks(),
++				items, pigs.size(), String.join(";", pops));
++			packageEntity.discard();
++			drops.forEach(entity -> entity.discard());
++			pigs.forEach(entity -> entity.discard());
++			world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++		}
++		helper.succeed();
++	}
+ }

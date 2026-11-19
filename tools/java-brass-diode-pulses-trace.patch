@@ -1,0 +1,75 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..fe2642c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.brassDiodePulses"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..9374bf2 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,56 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 70)
++	public static void brassDiodePulses(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var east = net.minecraft.core.Direction.EAST;
++		var diode = net.minecraft.world.level.block.DiodeBlock.FACING;
++		var powered = net.minecraft.world.level.block.DiodeBlock.POWERED;
++		var powering = com.simibubi.create.content.redstone.diodes.BrassDiodeBlock.POWERING;
++		var inverted = com.simibubi.create.content.redstone.diodes.BrassDiodeBlock.INVERTED;
++		var names = java.util.List.of("extender_default", "extender_five", "repeater_default", "repeater_seven",
++			"timer_default", "timer_two_inverted");
++		var delays = new int[] {2, 5, 2, 7, 20, 2};
++		var blocks = java.util.List.of(com.simibubi.create.AllBlocks.PULSE_EXTENDER.get(),
++			com.simibubi.create.AllBlocks.PULSE_EXTENDER.get(), com.simibubi.create.AllBlocks.PULSE_REPEATER.get(),
++			com.simibubi.create.AllBlocks.PULSE_REPEATER.get(), com.simibubi.create.AllBlocks.PULSE_TIMER.get(),
++			com.simibubi.create.AllBlocks.PULSE_TIMER.get());
++		var origin = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		var positions = java.util.stream.IntStream.range(0, names.size())
++			.mapToObj(index -> origin.above(index * 4)).toList();
++		for (int i = 0; i <= 44; i++) {
++			final int tick = i;
++			helper.runAtTickTime(4 + tick, () -> {
++				if (tick == 0) {
++					for (int index = 0; index < names.size(); index++) {
++						var at = positions.get(index);
++						world.setBlockAndUpdate(at.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++						world.setBlockAndUpdate(at, blocks.get(index).defaultBlockState().setValue(diode, east)
++							.setValue(inverted, index == 5));
++						var be = world.getBlockEntity(at);
++						if (be == null) throw new IllegalStateException("No diode at " + at + ": " + world.getBlockState(at));
++						var nbt = be.saveWithoutMetadata(world.registryAccess());
++						nbt.putInt("ScrollValue", delays[index]);
++						be.loadWithComponents(nbt, world.registryAccess());
++					}
++				}
++				if (tick == 4 || tick == 13 || tick == 30)
++					for (var at : positions) world.setBlockAndUpdate(at.east(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++				if (tick == 9 || tick == 14 || tick == 36)
++					for (var at : positions) world.setBlockAndUpdate(at.east(), Blocks.AIR.defaultBlockState());
++				for (int index = 0; index < names.size(); index++) {
++					var at = positions.get(index);
++					var state = world.getBlockState(at);
++					var data = world.getBlockEntity(at).saveWithoutMetadata(world.registryAccess());
++					System.out.printf("CREATE_BRASS_DIODE %s,%d,%b,%b,%b,%d,%d,%d,%d%n",
++						names.get(index), tick, state.getValue(powered), state.getValue(powering), state.getValue(inverted),
++						data.getInt("State"), data.getInt("ScrollValue"), world.getSignal(at, east),
++						world.getSignal(at, net.minecraft.core.Direction.NORTH));
++				}
++				if (tick == 44) helper.succeed();
++			});
++		}
++	}
+ }

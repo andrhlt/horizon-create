@@ -1,0 +1,53 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..4c8eeff 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.rotatedFramedTrapdoorEdges")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..46873ea 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,36 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 100)
++	public static void rotatedFramedTrapdoorEdges(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(3, 3, 3));
++		var openProperty = net.minecraft.world.level.block.TrapDoorBlock.OPEN;
++		var facing = net.minecraft.world.level.block.TrapDoorBlock.FACING;
++		var half = net.minecraft.world.level.block.TrapDoorBlock.HALF;
++		float yaw = (float) Math.toRadians(37);
++		for (boolean open : new boolean[]{false, true}) {
++			var state = com.simibubi.create.AllBlocks.FRAMED_GLASS_TRAPDOOR.getDefaultState()
++				.setValue(openProperty, open).setValue(facing, net.minecraft.core.Direction.EAST)
++				.setValue(half, net.minecraft.world.level.block.state.properties.Half.TOP);
++			level.setBlockAndUpdate(pos, state);
++			var shape = state.getShape(level, pos);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_TRAPDOOR_SHAPE,%s,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f%n", open,
++				shape.min(net.minecraft.core.Direction.Axis.X), shape.min(net.minecraft.core.Direction.Axis.Y),
++				shape.min(net.minecraft.core.Direction.Axis.Z), shape.max(net.minecraft.core.Direction.Axis.X),
++				shape.max(net.minecraft.core.Direction.Axis.Y), shape.max(net.minecraft.core.Direction.Axis.Z));
++			for (double x : new double[]{-.08, .02, .50, .98, 1.08})
++				for (double z : new double[]{-.08, .02, .50, .98, 1.08}) {
++					var local = new net.minecraft.world.phys.Vec3(x - .5, 0, z - .5);
++					var rotated = local.yRot(yaw);
++					var recovered = rotated.yRot(-yaw).add(.5, 0, .5);
++					var from = recovered.add(0, 2, 0);
++					var to = recovered.add(0, -1, 0);
++					boolean hit = shape.clip(from, to, BlockPos.ZERO) != null;
++					System.out.printf(java.util.Locale.ROOT, "CREATE_ROTATED_FRAMED_EDGE,%s,%.2f,%.2f,%s%n", open, x, z, hit);
++				}
++		}
++		helper.succeed();
++	}
+ }

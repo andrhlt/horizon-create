@@ -1,0 +1,115 @@
+diff --git a/crates/horizon-client/src/game/native_hooks.rs b/crates/horizon-client/src/game/native_hooks.rs
+index 63ab8da..a6ddf90 100644
+--- a/crates/horizon-client/src/game/native_hooks.rs
++++ b/crates/horizon-client/src/game/native_hooks.rs
+@@ -1981,6 +1981,8 @@ pub(crate) struct NativeRecipeView {
+     /// Exact fluids in input slots by index; the corresponding item slot is empty.
+     pub(crate) fluid_inputs: Vec<(usize, NativeFluidStack)>,
+     pub(crate) results: Vec<NativeStack>,
++    /// Fluid outputs by slot index, separate from item alternatives.
++    pub(crate) fluid_outputs: Vec<(usize, NativeFluidStack)>,
+     /// A short line under the recipe (a cooking time), or "".
+     pub(crate) note: String,
+     /// The action button beside it: none, enabled, or shown greyed.
+diff --git a/crates/horizon-client/src/game/native_panel.rs b/crates/horizon-client/src/game/native_panel.rs
+index d3c707c..1279307 100644
+--- a/crates/horizon-client/src/game/native_panel.rs
++++ b/crates/horizon-client/src/game/native_panel.rs
+@@ -547,7 +547,12 @@ impl Game<'_> {
+         if self.carried.is_some() {
+             self.draw_carried(batch);
+         } else if let Some(fluid) = self.recipe_fluid_hovered(&layout) {
+-            let label = self.translate("block.minecraft.water", "Water");
++            let label = match fluid.fluid.as_str() {
++                "create:honey" => self.translate("fluid.create.honey", "Honey"),
++                "create:chocolate" => self.translate("fluid.create.chocolate", "Chocolate"),
++                "minecraft:lava" => self.translate("block.minecraft.lava", "Lava"),
++                _ => self.translate("block.minecraft.water", "Water"),
++            };
+             let lines = vec![
+                 (label, u32::MAX),
+                 (format!("{} mB", fluid.amount), u32::MAX),
+@@ -812,6 +817,7 @@ mod tests {
+             slots: vec![vec![stack("minecraft:oak_log")]; 12],
+             fluid_inputs: Vec::new(),
+             results: vec![stack("minecraft:oak_planks")],
++            fluid_outputs: Vec::new(),
+             note: String::new(),
+             action: Some(true),
+         }
+diff --git a/crates/horizon-client/src/game/native_panel_recipes.rs b/crates/horizon-client/src/game/native_panel_recipes.rs
+index add97a0..5c78981 100644
+--- a/crates/horizon-client/src/game/native_panel_recipes.rs
++++ b/crates/horizon-client/src/game/native_panel_recipes.rs
+@@ -133,6 +133,7 @@ pub(super) struct Shown {
+     /// stacks; a stack the game doesn't have is left out of the cycle.
+     slots: Vec<Vec<(BrowserStack, ItemStack)>>,
+     fluid_inputs: Vec<(usize, NativeFluidStack)>,
++    fluid_outputs: Vec<(usize, NativeFluidStack)>,
+     note: String,
+     action: Option<bool>,
+     has_fuel: bool,
+@@ -211,6 +212,7 @@ impl Pages {
+                     height: r.height as usize,
+                     slots,
+                     fluid_inputs: r.fluid_inputs.clone(),
++                    fluid_outputs: r.fluid_outputs.clone(),
+                     note: r.note.clone(),
+                     action: r.action,
+                     has_fuel: !fuels.is_empty(),
+@@ -429,7 +431,7 @@ impl Game<'_> {
+             .find_map(|(i, (x, y))| {
+                 let recipe = pages.recipes.get(i)?;
+                 let (places, _, _) = recipe.places(layout.width());
+-                recipe.fluid_inputs.iter().find_map(|(slot, fluid)| {
++                recipe.fluid_inputs.iter().chain(&recipe.fluid_outputs).find_map(|(slot, fluid)| {
+                     let &(sx, sy) = places.get(*slot)?;
+                     inside(self.cursor, [x + sx, y + sy, SLOT, SLOT]).then(|| fluid.clone())
+                 })
+@@ -599,21 +601,19 @@ impl Game<'_> {
+                 batch.text(atlas, &note, x, y + h + 2.0, rgba(224, 224, 224, 255), true);
+             }
+             for (k, &(sx, sy)) in at.iter().enumerate().filter(|(_, p)| p.0.is_finite()) {
+-                if let Some((_, fluid)) = r.fluid_inputs.iter().find(|(slot, _)| *slot == k) {
+-                    if fluid.fluid == "minecraft:water" && fluid.components.is_empty() {
+-                        batch.sprite_scaled(
+-                            atlas,
+-                            "block/water_still",
+-                            x + sx + 1.0,
+-                            y + sy + 1.0,
+-                            16.0,
+-                            16.0,
+-                            rgba(63, 118, 228, 255),
+-                        );
++                if let Some((_, fluid)) = r.fluid_inputs.iter().chain(&r.fluid_outputs).find(|(slot, _)| *slot == k) {
++                    let visual = match fluid.fluid.as_str() {
++                        "minecraft:water" => Some(("block/water_still", rgba(63, 118, 228, 255), "Water")),
++                        "create:honey" => Some(("create:fluid/honey_still", u32::MAX, "Honey")),
++                        "create:chocolate" => Some(("create:fluid/chocolate_still", u32::MAX, "Chocolate")),
++                        "minecraft:lava" => Some(("block/lava_still", u32::MAX, "Lava")),
++                        _ => None,
++                    };
++                    if let Some((sprite, tint, name)) = visual.filter(|_| fluid.components.is_empty()) {
++                        batch.sprite_scaled(atlas, sprite, x + sx + 1.0, y + sy + 1.0, 16.0, 16.0, tint);
+                         horizon_client::widgets::record_as(
+-                            &format!("Water {} mB", fluid.amount),
+-                            [x + sx + 1.0, y + sy + 1.0, 16.0, 16.0],
+-                            true,
++                            &format!("{name} {} mB", fluid.amount),
++                            [x + sx + 1.0, y + sy + 1.0, 16.0, 16.0], true,
+                             horizon_client::widgets::Kind::Button,
+                         );
+                     }
+diff --git a/crates/horizon-client/src/mod_api.rs b/crates/horizon-client/src/mod_api.rs
+index b5d73f9..098f98d 100644
+--- a/crates/horizon-client/src/mod_api.rs
++++ b/crates/horizon-client/src/mod_api.rs
+@@ -518,6 +518,8 @@ pub struct NativeCategoryRecipe {
+     /// Exact fluids in input slots by index; the corresponding item slot is empty.
+     pub fluid_inputs: Vec<(usize, NativeFluidStack)>,
+     pub outputs: Vec<NativeChanceOutput>,
++    /// Simultaneous fluid results, with their exact amount and components.
++    pub fluid_outputs: Vec<NativeFluidStack>,
+     /// Lines about the whole recipe.
+     pub notes: Vec<String>,
+ }

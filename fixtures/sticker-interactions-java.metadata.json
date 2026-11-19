@@ -1,0 +1,34 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "patch_sha256": "20c50780742acc22e5aef2d04a92be17904469af072f0f04935b60fdca359846",
+  "records": 42,
+  "seconds": 22.126948916999027,
+  "scope": "Actual Sticker.getRotatedBlockState for six initial directions times six targeted faces, extended/powered preserved; shouldCheckWeakPower in six directions. Dedicated Java GameTest without client/GPU.",
+  "defaults": {
+    "facing": "north",
+    "powered": false,
+    "extended": false,
+    "hardness": 1.5,
+    "explosion_resistance": 6.0,
+    "friction": 0.6,
+    "speed_factor": 1.0,
+    "jump_factor": 1.0,
+    "occludes": false,
+    "collision_full_cube": true,
+    "collision_boxes": [
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    ]
+  },
+  "defaults_evidence": {
+    "fixture": "fixtures/sticker-defaults-java.jsonl",
+    "metadata": "fixtures/sticker-defaults-java.metadata.json",
+    "patch_sha256": "e23c5a06baba34965200acc7e7bf7a4ba2da3d39faab6a87aeb1b94d7f86873c"
+  }
+}

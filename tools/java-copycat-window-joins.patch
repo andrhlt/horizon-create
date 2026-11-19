@@ -1,0 +1,155 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaCopycatWindowJoinProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaCopycatWindowJoinProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaCopycatWindowJoinProbe.java
+@@ -0,0 +1,150 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.decoration.copycat.CopycatModel;
++import com.simibubi.create.content.decoration.copycat.CopycatPanelBlock;
++import com.simibubi.create.content.decoration.copycat.CopycatStepBlock;
++import com.simibubi.create.foundation.model.BakedQuadHelper;
++
++import java.util.List;
++import java.util.Map;
++
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.renderer.block.model.BakedQuad;
++import net.minecraft.client.renderer.texture.TextureAtlasSprite;
++import net.minecraft.client.resources.model.BakedModel;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.resources.ResourceLocation;
++import net.minecraft.util.RandomSource;
++import net.minecraft.world.inventory.InventoryMenu;
++import net.minecraft.world.level.BlockAndTintGetter;
++import net.minecraft.world.level.ColorResolver;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.entity.BlockEntity;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.level.lighting.LevelLightEngine;
++import net.minecraft.world.level.material.FluidState;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import net.neoforged.neoforge.client.model.data.ModelData;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaCopycatWindowJoinProbe {
++    private static boolean done;
++
++    private record Scene(Map<BlockPos, BlockState> blocks, Map<BlockPos, ModelData> data)
++        implements BlockAndTintGetter {
++        public BlockState getBlockState(BlockPos pos) {
++            return blocks.getOrDefault(pos, Blocks.AIR.defaultBlockState());
++        }
++        public ModelData getModelData(BlockPos pos) { return data.getOrDefault(pos, ModelData.EMPTY); }
++        public BlockEntity getBlockEntity(BlockPos pos) { return null; }
++        public FluidState getFluidState(BlockPos pos) { return getBlockState(pos).getFluidState(); }
++        public int getHeight() { return 384; }
++        public int getMinBuildHeight() { return -64; }
++        public float getShade(Direction side, boolean shaded) { return 1; }
++        public LevelLightEngine getLightEngine() { return null; }
++        public int getBlockTint(BlockPos pos, ColorResolver resolver) { return -1; }
++    }
++
++    private record Neighbour(String name, BlockState state, BlockState material) {
++        ModelData data() {
++            return material == null ? ModelData.EMPTY
++                : ModelData.builder().with(CopycatModel.MATERIAL_PROPERTY, material).build();
++        }
++    }
++
++    private static BlockState block(String id) {
++        return BuiltInRegistries.BLOCK.get(ResourceLocation.parse(id)).defaultBlockState();
++    }
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) {
++        if (!Boolean.getBoolean("parity.copycatWindowJoin") || done)
++            return;
++        var minecraft = Minecraft.getInstance();
++        if (minecraft.screen == null || minecraft.getOverlay() != null)
++            return;
++        done = true;
++        try {
++            probe(minecraft);
++        } finally {
++            minecraft.stop();
++        }
++    }
++
++    private static void probe(Minecraft minecraft) {
++        var oak = block("create:oak_window");
++        var birch = block("create:birch_window");
++        var sprite = minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS)
++            .apply(ResourceLocation.parse("create:block/palettes/oak_window_connected"));
++        var model = minecraft.getBlockRenderer().getBlockModel(oak);
++        var pos = new BlockPos(8, 111, -10);
++        for (var face : List.of(Direction.NORTH, Direction.SOUTH)) {
++            var panelInward = AllBlocks.COPYCAT_PANEL.getDefaultState().setValue(CopycatPanelBlock.FACING, face);
++            var panelOutward = panelInward.setValue(CopycatPanelBlock.FACING, face.getOpposite());
++            var step = AllBlocks.COPYCAT_STEP.getDefaultState().setValue(CopycatStepBlock.FACING, face.getOpposite());
++            for (var neighbour : List.of(
++                new Neighbour("air", Blocks.AIR.defaultBlockState(), null),
++                new Neighbour("oak", oak, null),
++                new Neighbour("birch", birch, null),
++                new Neighbour("oak-panel-inward", panelInward, oak),
++                new Neighbour("oak-panel-outward", panelOutward, oak),
++                new Neighbour("birch-panel", panelOutward, birch),
++                new Neighbour("oak-step", step, oak)
++            )) {
++                for (var toward : List.of(Direction.UP, Direction.DOWN)) {
++                    var otherPos = pos.relative(toward);
++                    var scene = new Scene(Map.of(pos, oak, otherPos, neighbour.state()),
++                        Map.of(otherPos, neighbour.data()));
++                    measure(model, sprite, pos, oak, face, toward, neighbour.name(), scene);
++                }
++            }
++            for (var blocker : List.of(
++                new Neighbour("front-oak", oak, null),
++                new Neighbour("front-birch", birch, null),
++                new Neighbour("front-oak-panel-inward", panelInward, oak),
++                new Neighbour("front-oak-panel-outward", panelOutward, oak),
++                new Neighbour("front-birch-panel", panelInward, birch)
++            )) {
++                for (var toward : List.of(Direction.UP, Direction.DOWN)) {
++                    var otherPos = pos.relative(toward);
++                    var blockPos = otherPos.relative(face);
++                    var scene = new Scene(Map.of(pos, oak, otherPos, oak, blockPos, blocker.state()),
++                        Map.of(blockPos, blocker.data()));
++                    measure(model, sprite, pos, oak, face, toward, blocker.name(), scene);
++                }
++            }
++        }
++        System.out.println("CREATE_COPYCAT_WINDOW_JOIN_DONE");
++    }
++
++    private static void measure(BakedModel model, TextureAtlasSprite sprite, BlockPos pos,
++                                BlockState oak, Direction face, Direction toward, String neighbour,
++                                Scene scene) {
++        var data = model.getModelData(scene, pos, oak, ModelData.EMPTY);
++        var quads = model.getQuads(oak, face, RandomSource.create(oak.getSeed(pos)), data, null);
++        if (quads.size() != 1)
++            throw new IllegalStateException("Expected one Oak Window face");
++        int tile = tile(sprite, quads.getFirst());
++        System.out.printf("CREATE_COPYCAT_WINDOW_JOIN %s,%s,%s,%d%n",
++            neighbour, toward.getName(), face.getName(), tile);
++    }
++
++    private static int tile(TextureAtlasSprite sprite, BakedQuad quad) {
++        float u = 0;
++        float v = 0;
++        for (int i = 0; i < 4; i++) {
++            u += BakedQuadHelper.getU(quad.getVertices(), i) / 4;
++            v += BakedQuadHelper.getV(quad.getVertices(), i) / 4;
++        }
++        int x = (int) Math.floor((u - sprite.getU0()) / (sprite.getU1() - sprite.getU0()) * 2);
++        int y = (int) Math.floor((v - sprite.getV0()) / (sprite.getV1() - sprite.getV0()) * 2);
++        return x + 2 * y;
++    }
++}
++

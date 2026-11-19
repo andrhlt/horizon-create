@@ -1,0 +1,9 @@
+case,yaw,pitch,sneaking,look_direction,axis,vertical
+0,0.000000,0.000000,false,south,z,false
+1,90.000000,0.000000,false,west,x,false
+2,0.000000,80.000000,false,down,z,true
+3,90.000000,-80.000000,false,up,x,true
+4,0.000000,0.000000,false,south,x,false
+5,0.000000,0.000000,true,south,z,false
+6,-90.000000,20.000000,false,east,x,true
+7,0.000000,75.000000,false,down,z,true

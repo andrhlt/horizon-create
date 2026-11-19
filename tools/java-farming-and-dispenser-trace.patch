@@ -1,0 +1,145 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..e79c4c57e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,10 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> java.util.Set.of("TestContraptions.arrowDispenser", "TestContraptions.cropFarming",
++                "TestContraptions.ploughing").contains(test.testName()))
++            .sorted(java.util.Comparator.comparing(TestFunction::testName))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+index e74ff27e4..eabe161a3 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -37,6 +37,7 @@ public class TestContraptions {
+ 		BlockPos pos1 = new BlockPos(0, 5, 0);
+ 		BlockPos pos2 = new BlockPos(4, 5, 4);
+ 		helper.succeedWhen(() -> {
++			traceActor(helper, "arrow_dispenser");
+ 			helper.assertSecondsPassed(7);
+ 			List<Arrow> arrows = helper.getEntitiesBetween(EntityType.ARROW, pos1, pos2);
+ 			if (arrows.size() != 4)
+@@ -53,7 +54,10 @@ public class TestContraptions {
+ 		BlockPos lever = new BlockPos(4, 3, 1);
+ 		helper.pullLever(lever);
+ 		BlockPos output = new BlockPos(1, 3, 12);
+-		helper.succeedWhen(() -> helper.assertAnyContained(output, Items.WHEAT, Items.POTATO, Items.CARROT));
++		helper.succeedWhen(() -> {
++			traceActor(helper, "crop_farming");
++			helper.assertAnyContained(output, Items.WHEAT, Items.POTATO, Items.CARROT);
++		});
+ 	}
+ 
+ 	@GameTest(template = "mounted_item_extract", timeoutTicks = CreateGameTestHelper.TWENTY_SECONDS)
+@@ -91,7 +95,10 @@ public class TestContraptions {
+ 		BlockPos dirt = new BlockPos(4, 2, 1);
+ 		BlockPos lever = new BlockPos(3, 3, 2);
+ 		helper.pullLever(lever);
+-		helper.succeedWhen(() -> helper.assertBlockPresent(Blocks.FARMLAND, dirt));
++		helper.succeedWhen(() -> {
++			traceActor(helper, "ploughing");
++			helper.assertBlockPresent(Blocks.FARMLAND, dirt);
++		});
+ 	}
+ 
+ 	@GameTest(template = "redstone_contacts")
+@@ -278,4 +285,57 @@ public class TestContraptions {
+ 			helper.assertBlockProperty(vaultLamp, RedstoneLampBlock.LIT, true);
+ 		});
+ 	}
++	private static void traceActor(CreateGameTestHelper helper, String fixture) {
++		BlockPos origin = helper.absolutePos(new BlockPos(0, 1, 0));
++		int extent = fixture.equals("crop_farming") ? 14 : 7;
++		var bounds = new net.minecraft.world.phys.AABB(origin).expandTowards(6, 7, extent);
++		var level = helper.getLevel();
++		var moving = level.getEntitiesOfClass(
++			com.simibubi.create.content.contraptions.AbstractContraptionEntity.class, bounds);
++		var geometry = moving.stream().map(entity -> String.format(java.util.Locale.ROOT, "%.9f:%.9f:%.9f:%.6f",
++			entity.getX() - origin.getX(), entity.getY() - origin.getY(), entity.getZ() - origin.getZ(),
++			entity instanceof com.simibubi.create.content.contraptions.ControlledContraptionEntity controlled
++				? controlled.getAngle(1.0f) : 0.0f)).sorted().collect(java.util.stream.Collectors.joining("|"));
++		String contents = switch (fixture) {
++			case "ploughing" -> net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(
++				level.getBlockState(helper.absolutePos(new BlockPos(4, 2, 1))).getBlock()).toString();
++			case "crop_farming" -> {
++				var crops = new java.util.ArrayList<String>();
++				for (int x = 1; x <= 3; x++) {
++					for (int z = 5; z <= 11; z++) {
++						var crop = level.getBlockState(helper.absolutePos(new BlockPos(x, 3, z)));
++						if (crop.getBlock() instanceof CropBlock growing)
++							crops.add(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(growing)
++								+ "=" + growing.getAge(crop));
++						else
++							crops.add(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(crop.getBlock()).toString());
++					}
++				}
++				yield String.join("|", crops) + "," + helper.getTotalItems(new BlockPos(1, 3, 12));
++			}
++			default -> {
++				var arrows = level.getEntitiesOfClass(Arrow.class, bounds).stream()
++					.map(arrow -> String.format(java.util.Locale.ROOT, "%.6f:%.6f:%.6f:%.6f:%.6f:%.6f",
++						arrow.getX() - origin.getX(), arrow.getY() - origin.getY(), arrow.getZ() - origin.getZ(),
++						arrow.getDeltaMovement().x, arrow.getDeltaMovement().y, arrow.getDeltaMovement().z))
++					.sorted().collect(java.util.stream.Collectors.joining("|"));
++				long count;
++				if (!moving.isEmpty()) {
++					var inventories = moving.getFirst().getContraption().getStorage().getAllItemStorages().values();
++					count = inventories.stream().filter(store -> store instanceof
++						com.simibubi.create.content.contraptions.behaviour.dispenser.storage.DispenserMountedStorage)
++						.mapToLong(store -> java.util.stream.IntStream.range(0, store.getSlots())
++							.map(slot -> store.getStackInSlot(slot).getCount()).sum()).sum();
++				} else {
++					var dispenser = new BlockPos(2, 5, 2);
++					count = level.getBlockEntity(helper.absolutePos(dispenser)) == null
++						? 0 : helper.getTotalItems(dispenser);
++				}
++				yield count + "," + arrows;
++			}
++		};
++		System.out.printf("ACTOR_TRACE %s,%d,%d,%d:%d:%d,%s,%s%n", fixture, helper.getTick(),
++			level.getGameTime() % 20, origin.getX(), origin.getY(), origin.getZ(), geometry, contents);
++	}
++
+ }
+diff --git a/src/main/resources/create.mixins.json b/src/main/resources/create.mixins.json
+index b5ea0067a..ffadfeb68 100644
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -6,6 +6,7 @@
+   "plugin": "com.simibubi.create.foundation.mixin.CreateMixinPlugin",
+   "compatibilityLevel": "JAVA_21",
+   "mixins": [
++    "ParityGameTestOriginMixin",
+     "ArmorTrimMixin",
+     "BeehiveBlockMixin",
+     "BlockItemMixin",
+diff --git a/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+new file mode 100644
+index 000000000..a1ca98568
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+@@ -0,0 +1,17 @@
++package com.simibubi.create.foundation.mixin;
++
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.ModifyArg;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.gametest.framework.GameTestServer;
++
++@Mixin(GameTestServer.class)
++public class ParityGameTestOriginMixin {
++    @ModifyArg(method = "startTests", at = @At(value = "INVOKE",
++        target = "Lnet/minecraft/gametest/framework/StructureGridSpawner;<init>(Lnet/minecraft/core/BlockPos;IZ)V"), index = 0)
++    private BlockPos parityOrigin(BlockPos vanillaOrigin) {
++        return new BlockPos(3, vanillaOrigin.getY(), -12);
++    }
++}

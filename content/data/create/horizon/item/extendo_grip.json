@@ -1,0 +1,9 @@
+{
+  "template": "minecraft:flint",
+  "max_stack_size": 1,
+  "components": {
+    "minecraft:max_damage": 200,
+    "minecraft:damage": 0
+  },
+  "rarity": "uncommon"
+}

@@ -1,0 +1,99 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.potatoCannon")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -83,36 +83,45 @@
+ 		});
+ 	}
+ 
+-	@GameTest(template = "threshold_switch_pulley")
+-	public static void thresholdSwitchPulley(CreateGameTestHelper helper) {
+-		BlockPos lever = new BlockPos(3, 7, 1);
+-		BlockPos switchPos = new BlockPos(1, 6, 1);
+-		BlockPos finalPos = new BlockPos(2, 2, 1);
+-		helper.runAfterDelay(10, () -> helper.pullLever(lever));
+-		helper.succeedWhen(() -> {
+-			ThresholdSwitchBlockEntity switchBe = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), switchPos);
+-			int level = switchBe.getStockLevel();
+-			int expectedLevel = helper.absolutePos(finalPos).getY();
+-			if (level != expectedLevel)
+-				helper.fail("Unexpected level: " + level);
+-		});
+-	}
+-
+-	@GameTest(template = "netherite_backtank", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
+-	public static void netheriteBacktank(CreateGameTestHelper helper) {
+-		BlockPos lava = new BlockPos(2, 2, 3);
+-		BlockPos zombieSpawn = lava.above(2);
+-		BlockPos armorStandPos = new BlockPos(2, 2, 1);
+-		helper.runAtTickTime(5, () -> {
+-			Zombie zombie = helper.spawn(EntityType.ZOMBIE, zombieSpawn);
+-			ArmorStand armorStand = helper.getFirstEntity(EntityType.ARMOR_STAND, armorStandPos);
+-			for (EquipmentSlot slot : EquipmentSlot.values()) {
+-				zombie.setItemSlot(slot, armorStand.getItemBySlot(slot).copy());
+-			}
+-		});
+-		helper.succeedWhen(() -> {
+-			helper.assertSecondsPassed(9);
+-			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void potatoCannon(CreateGameTestHelper helper) {
++		var world=helper.getLevel(); var server=world.getServer(); var fixture=helper.absolutePos(new BlockPos(2,24,2)); var origin=new BlockPos((fixture.getX() & ~15)+6,fixture.getY(),(fixture.getZ() & ~15)+6);
++		class Attacker extends net.neoforged.neoforge.common.util.FakePlayer {
++			Attacker() {super(world,new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(),"CannonAttacker"));}
++			@Override public boolean canHarmPlayer(net.minecraft.world.entity.player.Player other) {return server.isPvpAllowed();}
++		}
++		helper.runAtTickTime(2,()->{
++			boolean old=server.isPvpAllowed(); server.setPvpAllowed(true);
++			try {
++				var profile=new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(),"CannonVictim");
++				var victim=new net.minecraft.server.level.ServerPlayer(server,world,profile,net.minecraft.server.level.ClientInformation.createDefault());
++				victim.connection=new net.minecraft.server.network.ServerGamePacketListenerImpl(server,new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND),victim,net.minecraft.server.network.CommonListenerCookie.createInitial(profile,false)) {
++					@Override public void send(net.minecraft.network.protocol.Packet<?> packet) {}
++				};
++				victim.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
++				victim.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE).setBaseValue(1);
++				for(int i=0;i<=60;i++) victim.tick();
++				victim.setPos(origin.getX(),origin.getY()+1,origin.getZ()+5.5); victim.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO); victim.setNoGravity(true); world.addNewPlayer(victim);
++				var attacker=new Attacker();attacker.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
++				attacker.setPos(origin.getX()+.5,origin.getY(),origin.getZ()+.5);attacker.setYRot(0);attacker.setXRot(0);
++				var cannon=com.simibubi.create.AllItems.POTATO_CANNON.asStack();attacker.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,cannon);
++				attacker.getInventory().setItem(1,new ItemStack(Items.PUFFERFISH, 3));
++				var result=cannon.use(world,attacker,net.minecraft.world.InteractionHand.MAIN_HAND);
++				var shots=world.getEntitiesOfClass(com.simibubi.create.content.equipment.potatoCannon.PotatoProjectileEntity.class,new net.minecraft.world.phys.AABB(origin).inflate(8)).stream().filter(p->p.getOwner()==attacker).toList();
++				helper.assertTrue(shots.size()==1,"Expected projectile");var shot=shots.get(0);
++				for(int t=0;t<=4;t++) {
++					final int tick=t;
++					helper.runAtTickTime(2+tick,()->{
++						var poison=victim.getEffect(net.minecraft.world.effect.MobEffects.POISON);
++                        var hunger=victim.getEffect(net.minecraft.world.effect.MobEffects.HUNGER);
++                        var nausea=victim.getEffect(net.minecraft.world.effect.MobEffects.CONFUSION);
++                        System.out.printf("PUFFER_PLAYER_EFFECTS,%d,%d,%d,%d,%d,%d,%d%n",tick,poison==null?-1:poison.getDuration(),poison==null?-1:poison.getAmplifier(),hunger==null?-1:hunger.getDuration(),hunger==null?-1:hunger.getAmplifier(),nausea==null?-1:nausea.getDuration(),nausea==null?-1:nausea.getAmplifier()); var v=victim.getDeltaMovement();
++						var q=shot.position(); var m=shot.getDeltaMovement();
++						System.out.printf(java.util.Locale.ROOT,"PUFFER_PLAYER_FLIGHT,%d,%.9f,%b,%b,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",tick,victim.getHealth(),shot.isRemoved(),shot.getStuckEntity()==victim,q.x-victim.getX(),q.y-victim.getY(),q.z-victim.getZ(),m.x,m.y,m.z);
++						if(tick==4) {victim.discard(); server.setPvpAllowed(old); helper.succeed();}
++					});
++				}
++			} catch (Exception e) {server.setPvpAllowed(old); throw new RuntimeException(e);}
+ 		});
+ 	}
+ }
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }

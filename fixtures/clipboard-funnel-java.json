@@ -1,0 +1,74 @@
+[
+  {
+    "source": "plain_insert",
+    "target": "plain_extract",
+    "source_state": "Block{create:brass_funnel}[extracting=false,facing=north,powered=false,waterlogged=false]",
+    "target_state": "Block{create:brass_funnel}[extracting=true,facing=north,powered=false,waterlogged=false]",
+    "copy_canceled": true,
+    "clipboard": "{components:{\"create:clipboard_content\":{copied_values:{Filtering:{Filter:{count:1,id:\"minecraft:quartz\"}}},pages:[],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "paste_canceled": true,
+    "filter": "{count:1,id:\"minecraft:quartz\"}",
+    "count": 3,
+    "up_to": true
+  },
+  {
+    "source": "plain_extract",
+    "target": "depot_pull",
+    "source_state": "Block{create:brass_funnel}[extracting=true,facing=north,powered=false,waterlogged=false]",
+    "target_state": "Block{create:brass_belt_funnel}[facing=north,powered=false,shape=pulling,waterlogged=false]",
+    "copy_canceled": true,
+    "clipboard": "{components:{\"create:clipboard_content\":{copied_values:{Filtering:{Filter:{count:1,id:\"minecraft:quartz\"},Row:1,Value:7}},pages:[],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "paste_canceled": true,
+    "filter": "{count:1,id:\"minecraft:quartz\"}",
+    "count": 3,
+    "up_to": true
+  },
+  {
+    "source": "depot_push",
+    "target": "plain_extract",
+    "source_state": "Block{create:brass_belt_funnel}[facing=north,powered=false,shape=pushing,waterlogged=false]",
+    "target_state": "Block{create:brass_funnel}[extracting=true,facing=north,powered=false,waterlogged=false]",
+    "copy_canceled": true,
+    "clipboard": "{components:{\"create:clipboard_content\":{copied_values:{Filtering:{Filter:{count:1,id:\"minecraft:quartz\"},Row:1,Value:7}},pages:[],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "paste_canceled": true,
+    "filter": "{count:1,id:\"minecraft:quartz\"}",
+    "count": 7,
+    "up_to": false
+  },
+  {
+    "source": "depot_pull",
+    "target": "plain_extract",
+    "source_state": "Block{create:brass_belt_funnel}[facing=north,powered=false,shape=pulling,waterlogged=false]",
+    "target_state": "Block{create:brass_funnel}[extracting=true,facing=north,powered=false,waterlogged=false]",
+    "copy_canceled": true,
+    "clipboard": "{components:{\"create:clipboard_content\":{copied_values:{Filtering:{Filter:{count:1,id:\"minecraft:quartz\"}}},pages:[],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "paste_canceled": true,
+    "filter": "{count:1,id:\"minecraft:quartz\"}",
+    "count": 3,
+    "up_to": true
+  },
+  {
+    "source": "belt_pull",
+    "target": "plain_extract",
+    "source_state": "Block{create:brass_belt_funnel}[facing=north,powered=false,shape=pulling,waterlogged=false]",
+    "target_state": "Block{create:brass_funnel}[extracting=true,facing=north,powered=false,waterlogged=false]",
+    "copy_canceled": true,
+    "clipboard": "{components:{\"create:clipboard_content\":{copied_values:{Filtering:{Filter:{count:1,id:\"minecraft:quartz\"},Row:1,Value:7}},pages:[],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "paste_canceled": true,
+    "filter": "{count:1,id:\"minecraft:quartz\"}",
+    "count": 7,
+    "up_to": false
+  },
+  {
+    "source": "plain_extract",
+    "target": "belt_pull",
+    "source_state": "Block{create:brass_funnel}[extracting=true,facing=north,powered=false,waterlogged=false]",
+    "target_state": "Block{create:brass_belt_funnel}[facing=north,powered=false,shape=pulling,waterlogged=false]",
+    "copy_canceled": true,
+    "clipboard": "{components:{\"create:clipboard_content\":{copied_values:{Filtering:{Filter:{count:1,id:\"minecraft:quartz\"},Row:1,Value:7}},pages:[],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "paste_canceled": true,
+    "filter": "{count:1,id:\"minecraft:quartz\"}",
+    "count": 7,
+    "up_to": false
+  }
+]

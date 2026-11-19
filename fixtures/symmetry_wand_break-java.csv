@@ -1,0 +1,6 @@
+case,source_before_original_break,mirror_after,enabled,tool_damage,drop_count,drops_at_origin_offset
+xy,minecraft:stone,minecraft:air,true,1,1,"minecraft:cobblestone:1@0, 0, 2"
+yz,minecraft:stone,minecraft:air,true,1,1,"minecraft:cobblestone:1@2, 0, 0"
+mismatch,minecraft:stone,minecraft:dirt,true,0,0,
+empty_hand,minecraft:stone,minecraft:air,true,0,1,"minecraft:cobblestone:1@0, 0, 2"
+creative_mismatch,minecraft:stone,minecraft:air,true,0,0,

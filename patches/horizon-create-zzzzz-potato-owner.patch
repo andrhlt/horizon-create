@@ -1,0 +1,13 @@
+--- a/crates/horizon-client/src/entity_nbt.rs
++++ b/crates/horizon-client/src/entity_nbt.rs
+@@ -3305,6 +3305,10 @@
+         fall_distance: p.fall_distance,
+     };
+     let mut tag = base.tag(raw);
++    let owner = match &p.kind {
++        ProjectileKind::Thrown(t) if t.id == "create:potato_projectile" => p.owner_uuid.or(owner),
++        _ => owner,
++    };
+     put_projectile(&mut tag, p, owner);
+     put_projectile_entity_fields(&mut tag, p);
+     // Entity.saveWithoutId writes NoGravity only when set.

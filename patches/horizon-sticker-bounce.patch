@@ -1,0 +1,167 @@
+--- a/crates/horizon-world/src/movement_properties.rs
++++ b/crates/horizon-world/src/movement_properties.rs
+@@ -41,6 +41,7 @@
+ pub struct MovementProperties<'r> {
+     registry: &'r BlockRegistry,
+     definitions: BTreeMap<String, MovementCoefficients>,
++    legacy_bounce_facings: BTreeMap<String, String>,
+ }
+ impl<'r> MovementProperties<'r> {
+     pub fn registry(&self) -> &'r BlockRegistry {
+@@ -66,6 +67,7 @@
+             return Err(invalid("missing movement definitions"));
+         };
+         let mut definitions = BTreeMap::new();
++        let mut legacy_bounce_facings = BTreeMap::new();
+         for (name, properties) in blocks {
+             let name = name.to_string().map_err(|e| invalid(e.to_string()))?;
+             if registry.default_state(&name).is_none() {
+@@ -82,6 +84,12 @@
+                 Some(Tag::Byte(1)) => true,
+                 _ => return Err(invalid("invalid movement gate identity")),
+             };
++            if let Some(value) = properties.get("legacyBounceFacing") {
++                let Tag::String(facing) = value else {
++                    return Err(invalid("invalid legacy bounce facing"));
++                };
++                legacy_bounce_facings.insert(name.clone(), facing.to_string().map_err(|e| invalid(e.to_string()))?);
++            }
+             definitions.insert(
+                 name,
+                 MovementCoefficients {
+@@ -106,6 +114,7 @@
+         Ok(Self {
+             registry,
+             definitions,
++            legacy_bounce_facings,
+         })
+     }
+     /// Bind again when tags reload; existing bindings retain their old snapshot.
+@@ -122,9 +131,16 @@
+         }
+         let states = (0..self.registry.len())
+             .map(|id| {
+-                let name = &self.registry.state(BlockStateId(id as u32)).unwrap().name;
++                let state = self.registry.state(BlockStateId(id as u32)).unwrap();
++                let name = &state.name;
++                let mut coefficients = self.definitions[name];
++                if let Some(facing) = self.legacy_bounce_facings.get(name)
++                    && state.properties.get("facing") != Some(facing)
++                {
++                    coefficients.legacy_bounce_restitution = None;
++                }
+                 MovementBlock {
+-                    coefficients: self.definitions[name],
++                    coefficients,
+                     fence: tags.fences.contains(name),
+                     wall: tags.walls.contains(name),
+                     suppresses_bounce: tags.suppresses_bounce.contains(name),
+--- a/crates/horizon-world/tests/movement_properties.rs
++++ b/crates/horizon-world/tests/movement_properties.rs
+@@ -142,3 +142,49 @@
+         Err(MovementBlockError::Data(_))
+     ));
+ }
++
++#[test]
++fn upright_sticker_bounces_without_changing_other_states() {
++    let sticker = |facing: &str, extended: &str| Tag::compound([
++        ("id", Tag::String("create:sticker".into())),
++        ("properties", Tag::compound([
++            ("facing", Tag::String(facing.into())),
++            ("extended", Tag::String(extended.into())),
++        ])),
++    ]);
++    let states = Tag::List(vec![Tag::String("minecraft:stone".into()),
++        Tag::String("minecraft:slime_block".into()), sticker("up", "false"),
++        sticker("up", "true"), sticker("north", "false")]);
++    let registry = Tag::compound([
++        ("DataVersion", Tag::Int(DATA_VERSION)), ("states", states.clone()),
++        ("defaults", Tag::compound([
++            ("minecraft:stone", Tag::Int(0)), ("minecraft:slime_block", Tag::Int(1)),
++            ("create:sticker", Tag::Int(2)),
++        ])),
++    ]);
++    let definition = |bounce: f32| Tag::compound([
++        ("friction", Tag::Float(0.6f32.to_bits())),
++        ("speedFactor", Tag::Float(1f32.to_bits())),
++        ("jumpFactor", Tag::Float(1f32.to_bits())),
++        ("bounceRestitution", Tag::Float(bounce.to_bits())),
++        ("fallDistanceReduction", Tag::Float(0)), ("fenceGate", Tag::Byte(0)),
++    ]);
++    let movement = Tag::compound([
++        ("DataVersion", Tag::Int(DATA_VERSION)), ("states", states),
++        ("blocks", Tag::compound([
++            ("minecraft:stone", definition(0.0)), ("minecraft:slime_block", definition(1.0)),
++            ("create:sticker", {
++                let mut value = definition(0.0);
++                let Tag::Compound(ref mut fields) = value else { unreachable!() };
++                fields.insert("legacyBounceRestitution".into(), Tag::Float(1f32.to_bits()));
++                fields.insert("legacyBounceFacing".into(), Tag::String("up".into()));
++                value
++            }),
++        ])),
++    ]);
++    let registry = BlockRegistry::from_nbt(&registry).unwrap();
++    let blocks = MovementProperties::from_nbt(&movement, &registry).unwrap()
++        .bind(&MovementTags::default()).unwrap();
++    let bounce = |id| blocks.get(BlockStateId(id)).unwrap().coefficients.legacy_bounce_restitution;
++    assert_eq!((bounce(0), bounce(1), bounce(2), bounce(3), bounce(4)), (None, None, Some(1.0), Some(1.0), None));
++}
+--- a/crates/horizon-mods/src/content.rs
++++ b/crates/horizon-mods/src/content.rs
+@@ -103,6 +103,8 @@
+     pub fall_distance_reduction: Option<f32>,
+     /// Vertical restitution before air travel applies gravity and drag.
+     pub legacy_bounce_restitution: Option<f32>,
++    /// Restrict legacy restitution to states facing this direction.
++    pub legacy_bounce_facing: Option<String>,
+     /// How the block is drawn, whatever the template does (`BlockBehaviour.getRenderShape`).
+     pub render_shape: Option<RenderShape>,
+     /// `false`: the block occludes nothing, so its neighbours' faces are drawn and light passes
+@@ -1350,6 +1352,14 @@
+             ));
+         }
+     }
++    if let Some(facing) = &p.legacy_bounce_facing {
++        let values = file.state_properties.get("facing").map(StateProperty::values);
++        if p.legacy_bounce_restitution.is_none()
++            || values.is_none_or(|values| !values.contains(&facing.as_str()))
++        {
++            return Err("legacy_bounce_facing needs restitution and a declared facing value".into());
++        }
++    }
+     let finite = |v: Option<f32>| v.is_none_or(f32::is_finite);
+     if !finite(p.hardness) || !finite(p.explosion_resistance) || !finite(p.friction) {
+         return Err("hardness, explosion_resistance and friction are numbers".into());
+@@ -2432,6 +2442,18 @@
+     }
+ 
+     #[test]
++    fn legacy_bounce_facing_needs_a_declared_direction_and_restitution() {
++        let block = |properties: &str| {
++            let text = format!(r#"{{"template":"minecraft:stone", "state_properties":{{"facing":{{"type":"enum","values":["up","north"]}}}}, "properties":{properties}}}"#);
++            let files: &[(&str, &[u8])] = &[("data/ruby/horizon/block/panel.json", text.as_bytes())];
++            hmod("bounce-facing", MANIFEST_TEXT, files)
++        };
++        assert!(block(r#"{"legacy_bounce_restitution":1.0,"legacy_bounce_facing":"up"}"#).is_ok());
++        assert!(block(r#"{"legacy_bounce_restitution":1.0,"legacy_bounce_facing":"down"}"#).is_err());
++        assert!(block(r#"{"legacy_bounce_facing":"up"}"#).is_err());
++    }
++
++    #[test]
+     fn blocks_pick_the_states_that_tick_randomly() {
+         let own = r#""state_properties": {"grown": {"type": "boolean"}}"#;
+         let block = |ticks: &str| {
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -2015,6 +2015,9 @@
+                             && fields.contains_key(&JavaString::from("bounceRestitution"))
+                         {
+                             fields.insert("legacyBounceRestitution".into(), Tag::Float(f.to_bits()));
++                            if let Some(facing) = &b.decl.properties.legacy_bounce_facing {
++                                fields.insert("legacyBounceFacing".into(), Tag::String(facing.as_str().into()));
++                            }
+                         }
+                         map.insert(b.decl.id.as_str().into(), v);
+                     }

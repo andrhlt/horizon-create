@@ -1,0 +1,130 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,127 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 40)
++	public static void itemHatchContract(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 14, 3));
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var hatch = com.simibubi.create.AllBlocks.ITEM_HATCH.get();
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var barrel = net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState();
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var water = net.minecraft.world.level.block.Blocks.WATER.defaultBlockState();
++		var paper = net.minecraft.world.item.Items.PAPER;
++		var stick = net.minecraft.world.item.Items.STICK;
++		var alloy = com.simibubi.create.AllItems.ANDESITE_ALLOY.asStack();
++		var trapdoor = net.minecraft.world.item.Items.IRON_TRAPDOOR.getDefaultInstance();
++		var craft = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(alloy, trapdoor));
++		var selection = world.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING,
++			craft, world).orElseThrow();
++		var crafted = selection.value().assemble(craft, world.registryAccess());
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		System.out.printf(java.util.Locale.ROOT, "CREATE_ITEM_HATCH_CRAFT %s,2,1,create:andesite_alloy|minecraft:iron_trapdoor,%s,%d%n",
++			selection.id(), items.getKey(crafted.getItem()), crafted.getCount());
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var open = com.simibubi.create.content.logistics.itemHatch.ItemHatchBlock.OPEN;
++		var wet = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var directions = net.minecraft.core.Direction.values();
++		for (int index = 0; index <= directions.length; index++) {
++			boolean flooded = index == directions.length;
++			var side = flooded ? net.minecraft.core.Direction.EAST : directions[index];
++			var support = origin.east(3 * index);
++			var dst = support.relative(side);
++			world.setBlockAndUpdate(support, stone);
++			world.setBlockAndUpdate(dst, flooded ? water : air);
++			player.setPos(support.getX() + .5, support.getY(), support.getZ() + 2.5);
++			var hit = new net.minecraft.world.phys.BlockHitResult(support.getCenter().relative(side, .5), side, support, false);
++			var held = hatch.asItem().getDefaultInstance();
++			player.setItemInHand(hand, held);
++			var result = held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			var placed = world.getBlockState(dst);
++			var box = placed.is(hatch) ? placed.getShape(world, dst).toAabbs().stream()
++				.map(bounds -> java.util.stream.DoubleStream.of(bounds.minX, bounds.minY, bounds.minZ,
++					bounds.maxX, bounds.maxY, bounds.maxZ)
++					.mapToObj(value -> String.format(java.util.Locale.ROOT, "%.6f", value))
++					.collect(java.util.stream.Collectors.joining(":")))
++				.collect(java.util.stream.Collectors.joining("+")) : "-";
++			System.out.printf(java.util.Locale.ROOT, "CREATE_ITEM_HATCH_PLACE %s,%b,%s,%d,%s,%s%n", side, flooded,
++				result, held.getCount(), placed.is(hatch) ? placed.getValue(facing) + ":" + placed.getValue(wet) : "-", box);
++		}
++		var behind = net.minecraft.core.Direction.NORTH;
++		var cases = java.util.List.of("hand", "sneak", "missing", "full", "partial", "filter_reject", "filter_accept", "empty_hand");
++		for (int index = 0; index < cases.size(); index++) {
++			String name = cases.get(index);
++			var at = origin.south(5).east(3 * index);
++			var containerPos = at.relative(behind);
++			world.setBlockAndUpdate(containerPos, name.equals("missing") ? stone : barrel);
++			world.setBlockAndUpdate(at, hatch.defaultBlockState().setValue(facing, behind));
++			var entity = (com.simibubi.create.content.logistics.itemHatch.ItemHatchBlockEntity) world.getBlockEntity(at);
++			var container = world.getBlockEntity(containerPos) instanceof net.minecraft.world.Container inv ? inv : null;
++			if (name.startsWith("filter_"))
++				entity.filtering.setFilter(new net.minecraft.world.item.ItemStack(name.equals("filter_reject") ? stick : paper));
++			if (name.equals("full") || name.equals("partial")) {
++				for (int slot = 0; slot < container.getContainerSize(); slot++)
++					container.setItem(slot, new net.minecraft.world.item.ItemStack(stick, 64));
++				if (name.equals("partial"))
++					container.setItem(5, new net.minecraft.world.item.ItemStack(paper, 60));
++			}
++			var inventory = player.getInventory();
++			inventory.selected = 0;
++			inventory.clearContent();
++			inventory.setItem(0, new net.minecraft.world.item.ItemStack(paper, name.equals("empty_hand") ? 0 : 9));
++			inventory.setItem(1, new net.minecraft.world.item.ItemStack(stick, 7));
++			inventory.setItem(9, new net.minecraft.world.item.ItemStack(paper, 3));
++			inventory.setItem(10, new net.minecraft.world.item.ItemStack(stick, 4));
++			player.setShiftKeyDown(name.equals("sneak"));
++			var hit = new net.minecraft.world.phys.BlockHitResult(at.getCenter().add(0, 0, .5), behind.getOpposite(), at, false);
++			var result = world.getBlockState(at).useItemOn(player.getItemInHand(hand), world, player, hand, hit);
++			int papers = 0;
++			int sticks = 0;
++			if (container != null) {
++				for (int slot = 0; slot < container.getContainerSize(); slot++) {
++					var stack = container.getItem(slot);
++					if (stack.is(paper)) papers += stack.getCount();
++					if (stack.is(stick)) sticks += stack.getCount();
++				}
++			}
++			System.out.printf(java.util.Locale.ROOT, "CREATE_ITEM_HATCH_DEPOSIT %s,%s,%d,%d,%d,%d,%d,%d,%b%n", name,
++				result,inventory.getItem(0).getCount(), inventory.getItem(1).getCount(), inventory.getItem(9).getCount(),
++				inventory.getItem(10).getCount(), papers, sticks, world.getBlockState(at).getValue(open));
++		}
++		var filterAt = origin.south(9);
++		world.setBlockAndUpdate(filterAt.relative(behind), barrel);
++		world.setBlockAndUpdate(filterAt, hatch.defaultBlockState().setValue(facing, behind));
++		var filterEntity = (com.simibubi.create.content.logistics.itemHatch.ItemHatchBlockEntity) world.getBlockEntity(filterAt);
++		var point = net.minecraft.world.phys.Vec3.atLowerCornerOf(filterAt).add(.5, .20490107680777, .2375);
++		var hit = new net.minecraft.world.phys.BlockHitResult(point, behind.getOpposite(), filterAt, false);
++		for (String change : java.util.List.of("set", "clear", "wrench")) {
++			var stack = switch (change) {
++				case "set" -> new net.minecraft.world.item.ItemStack(paper, 3);
++				case "wrench" -> com.simibubi.create.AllItems.WRENCH.asStack();
++				default -> net.minecraft.world.item.ItemStack.EMPTY;
++			};
++			player.setItemInHand(hand, stack);
++			var click = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock(
++				player, hand, filterAt, hit);
++			com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsInputHandler.onBlockActivated(click);
++			var installed = filterEntity.filtering.getFilter();
++			var center = filterEntity.filtering.getSlotPositioning().getLocalOffset(world, filterAt, world.getBlockState(filterAt));
++			System.out.printf(java.util.Locale.ROOT, "CREATE_ITEM_HATCH_VALUE %s,%.6f,%.6f,%.6f,%b,%s,%d,%d%n", change,
++				center.x, center.y, center.z, click.isCanceled(),
++				installed.isEmpty() ? "-" : items.getKey(installed.getItem()), installed.getCount(),
++				player.getItemInHand(hand).getCount());
++		}
++		var watched = origin.south(5);
++		long start = world.getGameTime();
++		helper.onEachTick(() -> {
++			long tick = world.getGameTime() - start;
++			if (tick <= 11)
++				System.out.printf(java.util.Locale.ROOT, "CREATE_ITEM_HATCH_TICK %d,%b%n", tick,
++					world.getBlockState(watched).getValue(open));
++		});
++		helper.runAfterDelay(12, helper::succeed);
++	}
+ }

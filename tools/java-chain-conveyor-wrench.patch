@@ -1,0 +1,52 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -10,8 +10,10 @@
+ import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorBlockEntity;
+ import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorConnectionPacket;
+ import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorPackage;
++import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorShape.ChainConveyorOBB;
+ import com.simibubi.create.content.kinetics.motor.CreativeMotorBlock;
+ import com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity;
++import com.simibubi.create.content.logistics.box.PackageEntity;
+ import com.simibubi.create.content.logistics.box.PackageItem;
+ import com.simibubi.create.content.logistics.box.PackageStyles;
+ import com.simibubi.create.content.logistics.packagePort.PackagePortTarget.ChainConveyorFrogportTarget;
+@@ -42,6 +44,7 @@
+ import net.minecraft.world.item.component.ItemContainerContents;
+ import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.RedstoneLampBlock;
++import net.minecraft.world.phys.AABB;
+ import net.minecraft.world.phys.Vec3;
+ 
+ import net.neoforged.neoforge.common.util.FakePlayerFactory;
+@@ -217,7 +220,30 @@
+ 					((CreativeMotorBlockEntity) world.getBlockEntity(motorPos)).generatedSpeed.setValue(128);
+ 				if (tick == last - 3) {
+ 					var player = chainPlayer(world, start, 8);
++					var negative = edge.multiply(-1);
++					var origin = Vec3.atLowerCornerOf(start);
++					var span = source.connectionStats.get(edge);
++					var shape = new ChainConveyorOBB(edge, span.start().subtract(origin), span.end().subtract(origin));
++					var eye = reverse ? new Vec3(3.5, 3.27, 5.5) : new Vec3(4, 2.27, 3.75);
++					var aim = reverse ? new Vec3(3.1793, 1.375, 2.6413) : new Vec3(4, 0.375, 1.217);
++					var hit = shape.intersect(eye, aim.add(aim.subtract(eye).normalize()));
++					if (hit == null)
++						throw new IllegalStateException("Java ray missed " + scenario + " chain");
++					System.out.printf(Locale.ROOT, "CREATE_CHAIN_WRENCH_HIT %s,%.9f,%.9f,%.9f%n", scenario, hit.x, hit.y, hit.z);
++					source.addTravellingPackage(new ChainConveyorPackage(2, chainPackage(scenario + "-Removed-A", Items.PAPER, 3)), edge);
++					dest.addTravellingPackage(new ChainConveyorPackage(1.5f, chainPackage(scenario + "-Removed-B", Items.STRING, 2)), negative);
++					source.updateBoxWorldPositions();
++					dest.updateBoxWorldPositions();
+ 					new ChainConveyorConnectionPacket(start, end, new ItemStack(Items.CHAIN), false).handle(player);
++					var dropped = world.getEntitiesOfClass(PackageEntity.class, new AABB(start).inflate(12),
++						pkg -> PackageItem.getAddress(pkg.getBox()).startsWith(scenario + "-Removed-"));
++					if (dropped.size() != 2)
++						throw new IllegalStateException("Unexpected Java package count " + dropped.size());
++					for (var pkg : dropped) {
++						var position = pkg.position().subtract(origin);
++						System.out.printf(Locale.ROOT, "CREATE_CHAIN_WRENCH_DROP %s,%s,%.9f,%.9f,%.9f%n",
++							scenario, chainPayload(pkg.getBox()).substring(scenario.length() + 1), position.x, position.y, position.z);
++					}
+ 					chainConnectionLine(scenario, "disconnected", source, dest, player, edge);
+ 					if (!source.connections.isEmpty() || !dest.connections.isEmpty())
+ 						throw new IllegalStateException("Disconnect packet left a unilateral edge");

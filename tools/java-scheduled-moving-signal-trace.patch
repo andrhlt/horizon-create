@@ -1,0 +1,32 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -190,7 +190,7 @@
+ 			station.assemble(player.getUUID());
+             helper.assertTrue(station.exitAssemblyMode(), "Expected the normal assembly exit");
+ 		});
+-		var signalRail = origin.west(4);
++		var signalRail = origin.west(8);
+         var signalPos = signalRail.south(3);
+         helper.runAfterDelay(16, () -> {
+             var signal = com.simibubi.create.AllBlocks.TRACK_SIGNAL;
+@@ -250,7 +250,7 @@
+             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(click);
+             helper.assertTrue(click.isCanceled() && train.runtime.getSchedule() != null, "Conductor must accept the schedule");
+         });
+-        for (int tick = 23; tick <= 178; tick++) {
++        for (int tick = 23; tick <= 205; tick++) {
+ 			int t = tick;
+ 			helper.runAfterDelay(t, () -> {
+ 				var railway = com.simibubi.create.Create.RAILWAYS;
+@@ -275,9 +275,9 @@
+                 System.out.printf(java.util.Locale.ROOT, "CREATE_SCHEDULED_SIGNAL %d;%s;%s;%.9f%n", t,
+                     signal.getState(), train.navigation.waitingForSignal != null,
+                     train.navigation.waitingForSignal == null ? 0 : train.navigation.distanceToSignal);
+-                if (t == 55)
++                if (t == 115)
+                     level.setBlockAndUpdate(signalPos.above(), Blocks.AIR.defaultBlockState());
+-                if (t == 178) {
++                if (t == 205) {
+                     helper.assertTrue(stopped && train.runtime.completed, "Schedule must finish at Terminal");
+                     helper.succeed();
+                 }

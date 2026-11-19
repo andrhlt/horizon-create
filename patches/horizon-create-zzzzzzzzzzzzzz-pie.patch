@@ -1,0 +1,155 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -38,6 +38,7 @@
+         "minecraft:baked_potato" => (1.25, 15, 5.0, 0.5),
+         "minecraft:poisonous_potato" => (1.25, 15, 5.0, 0.05),
+         "minecraft:melon" => (0.95, 20, 8.0, 2.0),
++        "minecraft:pumpkin_pie" => (1.1, 15, 7.0, 0.05),
+         "minecraft:pumpkin" => (0.95, 15, 6.0, 2.0),
+         "create:honeyed_apple" => (1.35, 15, 6.0, 0.1),
+         "minecraft:golden_apple" | "minecraft:enchanted_golden_apple" => (1.45, 100, 1.0, 0.05),
+@@ -265,6 +266,8 @@
+     pub previous_pitch: f32,
+     pub age: u32,
+     pub stuck: bool,
++    /// Create sticky pie: target, optional guest connection, offset and slide speed.
++    pub create_pie_stuck: Option<(Who, Option<u32>, Vec3, f64)>,
+     /// `Entity.stuckSpeedMultiplier`: set by a cobweb or powder snow its box
+     /// passed through on a block's push (`makeStuckInBlock`); the next push
+     /// (`Entity.move`) then stops it dead. Zero: not stuck.
+@@ -578,6 +581,7 @@
+             previous_pitch: 0.0,
+             age: 0,
+             stuck: false,
++            create_pie_stuck: None,
+             stuck_speed: Vec3::ZERO,
+             left_owner: false,
+             has_been_shot: false,
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -4326,6 +4326,7 @@
+         let mut trails = Vec::new();
+         let mut bubble_tops = Vec::new();
+         let mut snow_contacts = Vec::new();
++        let mut pie_pops = Vec::new();
+         let mut keep_flags = vec![true; projectiles.len()];
+         let mut winds = std::mem::take(&mut self.creatures.pickable_projectile_targets);
+         // The impacts the mods may cancel (`native_projectile_impact`), on a server.
+@@ -4410,6 +4411,32 @@
+                     || projectiles[i].arrow.is_some()
+                 {
+                     pickable_projectile_hitboxes_into(&projectiles, &keep_flags, i, &mut winds);
++                }
++                if let Some((target, guest, mut offset, mut slide)) = projectiles[i].create_pie_stuck {
++                    let target_position = match (target, guest) {
++                        (Who::Mob(id), _) => self.mobs.iter().find(|m| m.id == id && m.alive()).map(|m| m.position),
++                        (Who::Player, None) => self.player.as_ref().filter(|p| !p.health.dead_or_dying()).map(|p| p.position),
++                        (Who::Player, Some(conn)) => self.lan.as_ref().and_then(|host| host.hub.guest(conn))
++                            .filter(|g| !g.dead).map(|g| Vec3::new(g.position[0], g.position[1], g.position[2])),
++                    };
++                    if let Some(position) = target_position {
++                        let p = &mut projectiles[i];
++                        if p.position.y < position.y - 0.1 {
++                            pie_pops.push((p.id, [p.position.x, p.position.y, p.position.z]));
++                            keep_flags[i] = false;
++                        } else {
++                            slide += 0.007;
++                            offset.y -= slide;
++                            p.previous = p.position;
++                            p.position = position.add_vector(offset);
++                            p.velocity = Vec3::ZERO;
++                            p.age += 1;
++                            p.create_pie_stuck = Some((target, guest, offset, slide));
++                            p.needs_sync = true;
++                        }
++                        continue;
++                    }
++                    projectiles[i].create_pie_stuck = None;
+                 }
+                 let p = &mut projectiles[i];
+                 if vanish
+@@ -4603,6 +4630,10 @@
+             }
+         }
+         self.creatures.pickable_projectile_targets = winds;
++        for (id, at) in pie_pops {
++            self.thrown_break_event(id, at);
++            self.item_burst(at, "minecraft:pumpkin_pie");
++        }
+         for (block, position, movement) in snow_contacts {
+             self.powder_snow_particle(block, position, movement);
+         }
+@@ -5604,6 +5635,7 @@
+                     Some("minecraft:enchanted_golden_apple") => &[("regeneration", 400, 1), ("absorption", 2400, 3), ("resistance", 6000, 0), ("fire_resistance", 6000, 0)],
+                     _ => &[],
+                 };
++                let mut pie_stuck = false;
+                 match hit {
+                     Hit::Entity {
+                         who: Who::Mob(id), ..
+@@ -5667,6 +5699,18 @@
+                                     self.mod_effect_added(name, Some(id as i32), amplifier, new);
+                                 }
+                             }
++                            if p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:pumpkin_pie")
++                                && let Some(mob) = self.mobs.iter().find(|m| m.id == id && m.alive())
++                            {
++                                let offset = Vec3::new(p.previous.x - mob.position.x, p.previous.y - mob.position.y, p.previous.z - mob.position.z);
++                                let mut attached = p.clone();
++                                attached.position = p.previous;
++                                attached.previous = p.previous;
++                                attached.velocity = Vec3::ZERO;
++                                attached.create_pie_stuck = Some((Who::Mob(id), None, offset, 0.0));
++                                self.creatures.projectiles.push(attached);
++                                pie_stuck = true;
++                            }
+                             self.player_hurt_mob(p, id);
+                         }
+                         // LivingEntity.hurtServer: PLAYER_HURT_ENTITY.
+@@ -5698,6 +5742,18 @@
+                             for &(effect, duration, amplifier) in effects {
+                                 self.add_player_effect(horizon_client::effects::EffectInstance::new(effect, duration, amplifier));
+                             }
++                            if p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:pumpkin_pie")
++                                && let Some(player) = self.player.as_ref().filter(|player| !player.health.dead_or_dying())
++                            {
++                                let offset = Vec3::new(p.previous.x - player.position.x, p.previous.y - player.position.y, p.previous.z - player.position.z);
++                                let mut attached = p.clone();
++                                attached.position = p.previous;
++                                attached.previous = p.previous;
++                                attached.velocity = Vec3::ZERO;
++                                attached.create_pie_stuck = Some((Who::Player, self.lan_acting, offset, 0.0));
++                                self.creatures.projectiles.push(attached);
++                                pie_stuck = true;
++                            }
+                         }
+                     }
+                     Hit::Block { pos, at, face }
+@@ -5737,15 +5793,18 @@
+                     }
+                     _ => {}
+                 }
+-                self.thrown_break_event(p.id, atp);
+-                let burst_item = if cannon_ammo.is_some() {
+-                    p.item
+-                        .as_ref()
+-                        .map_or("minecraft:potato", |item| item.item.as_ref())
+-                } else {
+-                    t.item
+-                };
+-                self.item_burst(atp, burst_item);
++                if !pie_stuck {
++                    self.thrown_break_event(p.id, atp);
++                    let burst_item = if cannon_ammo.is_some() {
++                        p.item
++                            .as_ref()
++                            .map_or("minecraft:potato", |item| item.item.as_ref())
++                    } else {
++                        t.item
++                    };
++                    self.item_burst(atp, burst_item);
++                }
++
+             }
+             (ProjectileKind::Egg, hit) => {
+                 if let Hit::Entity {

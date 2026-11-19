@@ -1,0 +1,100 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.zincProgression"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1,5 +1,14 @@
+ package com.simibubi.create.infrastructure.gametest.tests;
+ 
++import com.simibubi.create.Create;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.core.registries.Registries;
++import net.minecraft.world.item.crafting.RecipeType;
++import net.minecraft.world.item.crafting.CraftingInput;
++import net.minecraft.world.item.crafting.SingleRecipeInput;
++import net.minecraft.world.item.enchantment.Enchantments;
++import net.minecraft.world.level.GameType;
++import net.minecraft.world.level.block.Block;
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
+ import com.simibubi.create.AllBlockEntityTypes;
+@@ -115,4 +124,70 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void zincProgression(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(1, 1, 1)).above(12);
++		var items = BuiltInRegistries.ITEM;
++		var blocks = BuiltInRegistries.BLOCK;
++		var player = helper.makeMockPlayer(GameType.SURVIVAL);
++		var silk = level.registryAccess().registryOrThrow(Registries.ENCHANTMENT).getHolderOrThrow(Enchantments.SILK_TOUCH);
++		var zincBlocks = java.util.List.of("zinc_ore", "deepslate_zinc_ore", "raw_zinc_block", "zinc_block");
++		for (var name : zincBlocks) {
++			var state = blocks.get(Create.asResource(name)).defaultBlockState();
++			System.out.printf("CREATE_ZINC_MAP %s,%d%n", name, state.getMapColor(level, at).id);
++			for (String tool : java.util.List.of("stone", "iron", "silk")) {
++				var pick = new ItemStack(tool.equals("stone") ? Items.STONE_PICKAXE : Items.IRON_PICKAXE);
++				if (tool.equals("silk"))
++					pick.enchant(silk, 1);
++				boolean canHarvest = !state.requiresCorrectToolForDrops() || pick.isCorrectToolForDrops(state);
++				var drops = canHarvest ? Block.getDrops(state, level, at, null, player, pick) : java.util.List.<ItemStack>of();
++				for (var drop : drops)
++					helper.assertTrue(drop.getCount() == 1, "Unexpected Zinc drop count");
++				helper.assertTrue(drops.size() <= 1, "Multiple Zinc item drops");
++				System.out.printf("CREATE_ZINC_HARVEST %s,%s,%s,%d%n", name, tool,
++					drops.isEmpty() ? "_" : items.getKey(drops.getFirst().getItem()), drops.isEmpty() ? 0 : drops.getFirst().getCount());
++			}
++		}
++		for (String name : java.util.List.of("zinc_ore", "deepslate_zinc_ore", "raw_zinc", "crushed_raw_zinc")) {
++			var input = new SingleRecipeInput(new ItemStack(items.get(Create.asResource(name))));
++			var furnace = level.getRecipeManager().getRecipeFor(RecipeType.SMELTING, input, level).orElseThrow();
++			var blast = level.getRecipeManager().getRecipeFor(RecipeType.BLASTING, input, level).orElseThrow();
++			for (var match : java.util.List.of(furnace, blast)) {
++				var recipe = match.value();
++				var output = recipe.assemble(input, level.registryAccess());
++				System.out.printf(java.util.Locale.ROOT, "CREATE_ZINC_HEATING %s,%s,%s,%d,%.2f,%s,%d%n",
++					name, BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType()), match.id(), recipe.getCookingTime(),
++					recipe.getExperience(), items.getKey(output.getItem()), output.getCount());
++			}
++		}
++
++		for (String spec : java.util.List.of(
++			"materials/raw_zinc;1;1;raw_zinc_block",
++			"materials/raw_zinc_block;3;3;raw_zinc",
++			"materials/zinc_block_from_compacting;3;3;zinc_ingot",
++			"materials/zinc_ingot_from_decompacting;1;1;zinc_block",
++			"appliances/chain_from_zinc;1;3;zinc_nugget,zinc_ingot,zinc_nugget"
++		)) {
++			String[] fields = spec.split(";");
++			int width = Integer.parseInt(fields[1]), height = Integer.parseInt(fields[2]);
++			String[] names = fields[3].split(",");
++			var cells = new java.util.ArrayList<String>();
++			var stacks = new java.util.ArrayList<ItemStack>();
++			for (int cell = 0; cell < width * height; cell++) {
++				var id = Create.asResource(names[cell % names.length]);
++				cells.add(id.toString());
++				stacks.add(new ItemStack(items.get(id)));
++			}
++			var input = CraftingInput.of(width, height, stacks);
++			var match = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, input, level).orElseThrow();
++			helper.assertTrue(match.id().equals(Create.asResource("crafting/" + fields[0])), "Wrong Zinc crafting recipe");
++			var result = match.value().assemble(input, level.registryAccess());
++			helper.assertTrue(match.value().getRemainingItems(input).stream().allMatch(ItemStack::isEmpty), "Zinc crafting remainder");
++			System.out.printf("CREATE_ZINC_CRAFTING crafting/%s;%d;%d;%s;%s;%d;%n",
++				fields[0], width, height, String.join(",", cells), items.getKey(result.getItem()), result.getCount());
++		}
++		helper.succeed();
++	}
+ }

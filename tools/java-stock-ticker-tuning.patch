@@ -1,0 +1,72 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1382,4 +1382,58 @@
+ 		}
+ 	}
+ 
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stockTickerTuning(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var link = helper.absolutePos(new BlockPos(3, 14, 2));
++		var target = link.east(4);
++		var reversed = target.south(3);
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var side = net.minecraft.core.Direction.UP;
++		var frequency = new java.util.UUID(387, 180);
++		var block = AllBlocks.STOCK_TICKER;
++		var useOn = (java.util.function.Function<BlockPos, net.minecraft.world.InteractionResult>) pos -> {
++			player.setPos(pos.getX() + .5, pos.getY(), pos.getZ() + 2.5);
++			player.setYRot(180);
++			var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(side, .5), side, pos, false);
++			return player.getItemInHand(hand).useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++		};
++		helper.runAtTickTime(2, () -> {
++			var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++			for (var pos : java.util.List.of(link, target, reversed))
++				level.setBlockAndUpdate(pos.below(), stone);
++			level.setBlockAndUpdate(link, AllBlocks.STOCK_LINK.getDefaultState());
++			level.getBlockEntity(link, com.simibubi.create.AllBlockEntityTypes.PACKAGER_LINK.get()).orElseThrow().behaviour.freqId = frequency;
++			player.setItemInHand(hand, block.asStack());
++		});
++		helper.runAtTickTime(3, () -> {
++			var result = useOn.apply(link);
++			var held = player.getItemInHand(hand);
++			var linked = com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem.networkFromStack(held);
++			var type = held.get(net.minecraft.core.component.DataComponents.BLOCK_ENTITY_DATA).copyTag().getString("id");
++			System.out.printf("CREATE_TICKER_TUNING %d,tune,%b,%d,%b,%b,%s,_%n", helper.getTick(),
++				result.consumesAction(), held.getCount(), held.hasFoil(), frequency.equals(linked), type);
++		});
++		for (int i = 0; i < 2; i++) {
++			boolean sneaking = i == 1;
++			var pos = sneaking ? reversed : target;
++			helper.runAtTickTime(4 + i, () -> {
++				if (sneaking) {
++					player.setItemInHand(hand, block.asStack());
++					player.setShiftKeyDown(true);
++				}
++				var result = useOn.apply(pos.below());
++				var entity = level.getBlockEntity(pos, com.simibubi.create.AllBlockEntityTypes.STOCK_TICKER.get()).orElseThrow();
++				var facing = level.getBlockState(pos).getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
++				System.out.printf("CREATE_TICKER_TUNING %d,%s,%b,%d,%b,%b,create:stock_ticker,%s%n", helper.getTick(),
++					sneaking ? "sneak_place" : "place", result.consumesAction(), player.getItemInHand(hand).getCount(),
++					false, frequency.equals(entity.behaviour.freqId), facing.getSerializedName());
++				if (sneaking)
++					helper.succeed();
++			});
++		}
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().equals("TestMisc.stockTickerSummary"))
++			.filter(test -> test.testName().equals("TestMisc.stockTickerTuning"))
+ 			.toList();
+ 	}
+ }

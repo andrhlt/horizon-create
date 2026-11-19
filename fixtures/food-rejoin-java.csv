@@ -1,0 +1,7 @@
+food,stage,count,use_remaining,hunger,saturation
+sweet_roll,disconnect,1,24,10,0.000000000
+sweet_roll,rejoin,1,0,10,0.000000000
+chocolate_glazed_berries,disconnect,1,24,10,0.000000000
+chocolate_glazed_berries,rejoin,1,0,10,0.000000000
+honeyed_apple,disconnect,1,24,10,0.000000000
+honeyed_apple,rejoin,1,0,10,0.000000000

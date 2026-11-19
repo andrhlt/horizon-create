@@ -1,0 +1,200 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..0df8a2e45 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestMisc.linearChassis"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..afb53dd22 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -29,6 +29,181 @@ import net.minecraft.world.level.block.RedstoneLampBlock;
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 35)
++	public static void linearChassisTiming(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var anchor = new BlockPos(8, 190, 24);
++		var bearing = anchor.below();
++		var motor = bearing.below();
++		var cargo = anchor.east();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.RotatedPillarBlock.AXIS;
++		var positive = com.simibubi.create.content.contraptions.chassis.LinearChassisBlock.STICKY_TOP;
++		var up = net.minecraft.core.Direction.UP;
++		level.setChunkForced(0, 1, true);
++		var row = com.simibubi.create.AllBlocks.LINEAR_CHASSIS.getDefaultState()
++			.setValue(axis, net.minecraft.core.Direction.Axis.X).setValue(positive, true);
++		var controllerState = com.simibubi.create.AllBlocks.MECHANICAL_BEARING.getDefaultState().setValue(facing, up);
++		var sourceState = com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, up);
++		level.setBlockAndUpdate(anchor, row);
++		level.setBlockAndUpdate(cargo, Blocks.BRICKS.defaultBlockState());
++		level.setBlockAndUpdate(bearing, controllerState);
++		level.setBlockAndUpdate(motor, sourceState);
++		var source = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motor);
++		source.generatedSpeed.setValue(0);
++		for (int t = 0; t <= 18; t++) {
++			int tick = t;
++			Runnable capture = () -> {
++				var controller = (com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity)
++					level.getBlockEntity(bearing);
++				boolean running = controller.isRunning();
++				var contraption = controller.getMovedContraption();
++				int blocks = contraption == null ? 0 : contraption.getContraption().getBlocks().size();
++				System.out.printf("CREATE_LINEAR_CHASSIS_TIMING %d,%s,%d,%s,%s%n",
++					tick, running, blocks, level.getBlockState(anchor).isAir(), level.getBlockState(cargo).isAir());
++				if (tick == 3)
++					source.generatedSpeed.setValue(16);
++				if (tick == 12)
++					source.generatedSpeed.setValue(0);
++				if (tick == 18)
++					helper.succeed();
++			};
++			if (tick == 0)
++				capture.run();
++			else
++				helper.runAfterDelay(tick, capture);
++		}
++	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 15)
++	public static void linearChassisPlacement(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var chassis = com.simibubi.create.AllBlocks.LINEAR_CHASSIS.get();
++		var axis = net.minecraft.world.level.block.RotatedPillarBlock.AXIS;
++		var top = com.simibubi.create.content.contraptions.chassis.LinearChassisBlock.STICKY_TOP;
++		var bottom = com.simibubi.create.content.contraptions.chassis.LinearChassisBlock.STICKY_BOTTOM;
++		var east = net.minecraft.core.Direction.EAST;
++		var up = net.minecraft.core.Direction.UP;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var pos = helper.absolutePos(new BlockPos(3, 10, 3));
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(pos), east, pos, false);
++		var upper = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(pos.east()), up, pos.east(), false);
++		level.setBlockAndUpdate(pos, Blocks.OAK_PLANKS.defaultBlockState());
++		player.setYRot(90);
++		player.setYHeadRot(90);
++		player.setXRot(20);
++		var placed = chassis.getStateForPlacement(new net.minecraft.world.item.context.BlockPlaceContext(
++			player, hand, com.simibubi.create.AllBlocks.LINEAR_CHASSIS.asStack(), hit));
++		level.setBlockAndUpdate(pos.east(), placed);
++		System.out.printf("CREATE_LINEAR_CHASSIS_PLACE look,%s%n", placed.getValue(axis));
++		player.setXRot(85);
++		for (boolean sneak : new boolean[]{false, true}) {
++			player.setShiftKeyDown(sneak);
++			var state = chassis.getStateForPlacement(new net.minecraft.world.item.context.BlockPlaceContext(
++				player, hand, com.simibubi.create.AllBlocks.LINEAR_CHASSIS.asStack(), upper));
++			System.out.printf("CREATE_LINEAR_CHASSIS_PLACE %s,%s%n", sneak ? "sneak" : "inherit", state.getValue(axis));
++		}
++		var at = pos.east();
++		var face = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(at), east, at, false);
++		var slime = new net.minecraft.world.item.ItemStack(Items.SLIME_BALL, 2);
++		for (int step = 0; step < 7; step++) {
++			player.setShiftKeyDown(step == 6);
++			var stack = step == 6 ? net.minecraft.world.item.ItemStack.EMPTY : slime;
++			player.setItemInHand(hand, stack);
++			if (step == 1 || step == 3)
++				level.setBlockAndUpdate(pos, chassis.defaultBlockState().setValue(axis, east.getAxis()));
++			if (step == 2)
++				level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++			if (step == 4)
++				level.setBlockAndUpdate(at.east(), chassis.defaultBlockState().setValue(axis, net.minecraft.core.Direction.Axis.Z));
++			if (step == 5)
++				level.setBlockAndUpdate(at.east(), Blocks.AIR.defaultBlockState());
++			if (step <= 2 || step == 6)
++				level.getBlockState(at).useItemOn(stack, level, player, hand, face);
++			var state = level.getBlockState(at);
++			System.out.printf("CREATE_LINEAR_CHASSIS_GLUE %d,%s,%s,%d%n",
++				step, state.getValue(top), state.getValue(bottom), slime.getCount());
++		}
++		System.out.printf("CREATE_LINEAR_CHASSIS_PROPS %.2f,%.2f,%d,%s%n",
++			placed.getDestroySpeed(level, at), chassis.getExplosionResistance(),
++			placed.getMapColor(level, at).id, placed.requiresCorrectToolForDrops());
++		helper.succeed();
++	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 75)
++	public static void linearChassis(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var anchor = new BlockPos(7, 180, 39);
++		level.setChunkForced(0, 2, true);
++		level.setChunkForced(1, 2, true);
++		var chassis = com.simibubi.create.AllBlocks.LINEAR_CHASSIS.get();
++		var bearing = com.simibubi.create.AllBlocks.MECHANICAL_BEARING.get();
++		var axis = net.minecraft.world.level.block.RotatedPillarBlock.AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var top = com.simibubi.create.content.contraptions.chassis.LinearChassisBlock.STICKY_TOP;
++		var bottom = com.simibubi.create.content.contraptions.chassis.LinearChassisBlock.STICKY_BOTTOM;
++		var directions = new net.minecraft.core.Direction[] {
++			net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP, net.minecraft.core.Direction.SOUTH
++		};
++		for (int scenario = 0; scenario < 5; scenario++) {
++			int test = scenario;
++			var direction = directions[test % directions.length];
++			var bearingFace = direction == net.minecraft.core.Direction.UP
++				? net.minecraft.core.Direction.SOUTH : net.minecraft.core.Direction.UP;
++			var bearingPos = anchor.relative(bearingFace.getOpposite());
++			var build = new java.util.LinkedHashMap<BlockPos, net.minecraft.world.level.block.state.BlockState>();
++			boolean positive = test == 1 || test == 3 || test == 4;
++			boolean negative = test == 2 || test == 3;
++			var row = chassis.defaultBlockState().setValue(axis, direction.getAxis());
++			build.put(anchor, row.setValue(top, positive).setValue(bottom, negative));
++			for (int i = 1; i <= 9; i++) {
++				if (test != 3 || i != 2)
++					build.put(anchor.relative(direction, i), Blocks.STONE.defaultBlockState());
++				else
++					build.put(anchor.relative(direction, i), Blocks.AIR.defaultBlockState());
++			}
++			build.put(anchor.relative(direction, -1), Blocks.DIRT.defaultBlockState());
++			build.put(anchor.relative(direction, -2), Blocks.SMOOTH_STONE.defaultBlockState());
++			var beside = anchor.relative(bearingFace);
++			build.put(beside, row.setValue(top, test == 4));
++			build.put(beside.relative(direction), Blocks.OAK_PLANKS.defaultBlockState());
++			var across = beside.relative(bearingFace);
++			build.put(across, row.setValue(axis, bearingFace.getAxis()));
++			build.put(across.relative(direction), Blocks.BRICKS.defaultBlockState());
++			helper.runAfterDelay(3 + scenario * 9, () -> {
++				build.forEach(level::setBlockAndUpdate);
++				level.setBlockAndUpdate(bearingPos, bearing.defaultBlockState().setValue(facing, bearingFace));
++			});
++			helper.runAfterDelay(5 + scenario * 9, () -> {
++				var state = level.getBlockState(anchor);
++				var adjacent = level.getBlockState(beside);
++				var be = (com.simibubi.create.content.contraptions.chassis.ChassisBlockEntity) level.getBlockEntity(anchor);
++				System.out.printf("CREATE_LINEAR_CHASSIS %d,configuration,%s,%s,%s,%s,%d,-%n",
++					test, state.getValue(axis), state.getValue(top), state.getValue(bottom), adjacent.getValue(top), be.getRange());
++				var controller = (com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity)
++					level.getBlockEntity(bearingPos);
++				controller.assemble();
++				if (controller.getMovedContraption() == null)
++					throw new IllegalStateException("Assembly failed: " + controller.saveWithoutMetadata(level.registryAccess()));
++				var payload = controller.getMovedContraption().getContraption().getBlocks();
++				var ordered = payload.entrySet().stream().map(entry -> {
++					var p = entry.getKey();
++					var reg = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++					return p.getX() + ":" + p.getY() + ":" + p.getZ() + "=" + reg.getKey(entry.getValue().state().getBlock());
++				}).sorted().toList();
++				System.out.printf("CREATE_LINEAR_CHASSIS %d,capture,-,-,-,-,-,%s%n", test, String.join("|", ordered));
++				controller.disassemble();
++				build.keySet().forEach(pos -> level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState()));
++				level.setBlockAndUpdate(bearingPos, Blocks.AIR.defaultBlockState());
++			});
++		}
++		helper.runAfterDelay(51, helper::succeed);
++	}
++
+ 	@GameTest(template = "schematicannon", timeoutTicks = FIFTEEN_SECONDS)
+ 	public static void schematicannon(CreateGameTestHelper helper) {
+ 		// load the structure

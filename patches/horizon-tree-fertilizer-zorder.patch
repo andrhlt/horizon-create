@@ -1,0 +1,71 @@
+--- a/crates/horizon-world/src/level/bonemeal.rs
++++ b/crates/horizon-world/src/level/bonemeal.rs
+@@ -283,6 +283,7 @@
+ 
+ struct TreeFertilizerLevel<'a> {
+     blocks: std::collections::BTreeMap<[i32; 3], BlockStateId>,
++    insertion_order: Vec<[i32; 3]>,
+     soil: BlockStateId,
+     air: BlockStateId,
+     podzol: Option<super::states::BlockId>,
+@@ -304,7 +305,11 @@
+     fn set_raw(&mut self, pos: BlockPos, state: BlockStateId) -> Option<BlockStateId> {
+         let old = self.block_state(pos);
+         if self.podzol != Some(self.behaviours.block(state)) {
+-            self.blocks.insert([pos.x, pos.y, pos.z], state);
++            let key = [pos.x, pos.y, pos.z];
++            if !self.blocks.contains_key(&key) {
++                self.insertion_order.push(key);
++            }
++            self.blocks.insert(key, state);
+         }
+         Some(old)
+     }
+@@ -357,10 +362,12 @@
+         }
+ 
+         let mut blocks = std::collections::BTreeMap::new();
+-        for x in -1..=1 {
+-            for z in -1..=1 {
++        let mut insertion_order = Vec::new();
++        for z in -1..=1 {
++            for x in -1..=1 {
+                 if self.block(level.block_state(pos.offset(x, 0, z))) == self.block(state) {
+                     blocks.insert([x, 10, z], planted);
++                    insertion_order.push([x, 10, z]);
+                 }
+             }
+         }
+@@ -371,6 +378,7 @@
+                 .map(horizon_core::random::LegacyRandom::new);
+             let mut simulated = TreeFertilizerLevel {
+                 blocks,
++                insertion_order,
+                 soil,
+                 air: BlockStateId(0),
+                 podzol: self.table.block_by_name("minecraft:podzol"),
+@@ -382,11 +390,22 @@
+             };
+             self.sim(&mut simulated, &mut Ticks::default())
+                 .perform_bonemeal(kind, BlockPos::new(0, 10, 0), planted);
+-            simulated.blocks
++            (simulated.blocks, simulated.insertion_order)
+         };
+ 
++        // TreesDreamWorld applies its HashMap in Java bucket order. Preserve
++        // insertion order within each bucket through ordinary table resizes.
++        let (blocks, mut order) = blocks;
++        let mut capacity = 16usize;
++        while blocks.len() > capacity * 3 / 4 { capacity *= 2; }
++        order.sort_by_key(|[x, y, z]| {
++            let hash = z.wrapping_mul(31).wrapping_add(*y)
++                .wrapping_mul(31).wrapping_add(*x) as u32;
++            (hash ^ (hash >> 16)) as usize & (capacity - 1)
++        });
+         let mut live = self.sim(level, ticks);
+-        for ([x, y, z], new) in blocks {
++        for [x, y, z] in order {
++            let new = blocks[&[x, y, z]];
+             let at = pos.offset(x, y - 10, z);
+             let old = live.state(at);
+             if self.facts(old).hardness == -1.0

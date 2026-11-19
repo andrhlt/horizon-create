@@ -1,0 +1,68 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.potatoCannon")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,53 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
+-}
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 45)
++	public static void potatoCannon(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var fixture = helper.absolutePos(new BlockPos(2, 24, 2));
++		var origin = new BlockPos((fixture.getX() & ~15) + 6, fixture.getY(), (fixture.getZ() & ~15) + 6);
++		record Trial(String name, int initialFire, boolean invulnerable) {}
++		var trials = java.util.List.of(new Trial("unlit", 0, false), new Trial("invulnerable", 0, true));
++		for (int i = 0; i < trials.size(); i++) {
++			var trial = trials.get(i);
++			int start = 4 + 8 * i;
++			var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++				new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "BakedFixture"));
++			player.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++			player.setPos(origin.getX() + .5, origin.getY(), origin.getZ() + .5);
++			player.setYRot(0); player.setXRot(0);
++			var cannon = com.simibubi.create.AllItems.POTATO_CANNON.asStack();
++			player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, cannon);
++			player.getInventory().setItem(1, new ItemStack(Items.GLISTERING_MELON_SLICE, 3));
++			var target = EntityType.PIG.create(world);
++			target.setPos(origin.getX(), origin.getY() + 1, origin.getZ() + 5.5);
++			target.setNoAi(true); target.setNoGravity(true); target.setPersistenceRequired();
++			target.setRemainingFireTicks(trial.initialFire()); target.setInvulnerable(trial.invulnerable());
++			helper.runAtTickTime(start - 1, () -> world.addFreshEntity(target));
++			for (int tick = 0; tick <= 4; tick++) {
++				final int sample = tick;
++				helper.runAtTickTime(start + tick, () -> {
++					if (sample == 0) {
++                        var shot = com.simibubi.create.AllEntityTypes.POTATO_PROJECTILE.create(world);
++                        shot.setItem(new ItemStack(Items.GLOW_BERRIES));
++                        shot.setPos(origin.getX(), origin.getY()+1.47, origin.getZ()+3.0);
++                        shot.setDeltaMovement(0, 0, 2.0);
++                        world.addFreshEntity(shot);
++					}
++					var p = target.position(); var v = target.getDeltaMovement();
++					var effect = target.getEffect(net.minecraft.world.effect.MobEffects.GLOWING);
++					var shots = world.getEntitiesOfClass(com.simibubi.create.content.equipment.potatoCannon.PotatoProjectileEntity.class,
++						new net.minecraft.world.phys.AABB(origin).inflate(6)).stream().toList();
++					System.out.printf(java.util.Locale.ROOT,"GLOW_CONTROL_TARGET,%s,%d,%.9f,%d,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%d%n",
++						trial.name(), sample, target.getHealth(), effect == null ? -1 : effect.getDuration(), effect == null ? -1 : effect.getAmplifier(), p.x-player.getX(), p.y-player.getY(), p.z-player.getZ(),
++						v.x,v.y,v.z,shots.size());
++					if (sample == 4) {
++						target.discard();
++						if (trial.name().equals("invulnerable")) helper.succeed();
++					}
++				});
++			}
++		}
++	}
++
++}
+\ No newline at end of file

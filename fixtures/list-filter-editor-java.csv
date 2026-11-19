@@ -1,0 +1,9 @@
+open,18,0,0,1,5,4,0,true,false,null,null
+copy,18,1,0,1,5,4,0,true,false,null,null
+duplicate,18,1,0,1,5,4,0,true,false,null,null
+cursor_copy,18,1,1,1,5,0,4,true,false,null,null
+holder,18,1,1,1,5,0,4,true,false,null,null
+clear_second,18,1,0,1,5,4,0,true,false,null,null
+save,18,1,0,1,5,4,0,true,true,true,true
+reopen,18,1,0,1,5,4,0,true,true,true,true
+reset,18,0,0,1,5,4,0,true,false,null,null

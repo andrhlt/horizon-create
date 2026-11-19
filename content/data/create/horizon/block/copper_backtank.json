@@ -1,0 +1,67 @@
+{
+  "template": "minecraft:copper_block",
+  "item": false,
+  "properties": {
+    "waterloggable": true,
+    "occludes": false,
+    "requires_tool": true
+  },
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "east",
+        "south",
+        "west"
+      ]
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "facing": "north",
+    "waterlogged": "false"
+  },
+  "shapes": {
+    "default": [
+      [
+        0.1875,
+        0.0,
+        0.1875,
+        0.8125,
+        0.75,
+        0.8125
+      ],
+      [
+        0.3125,
+        0.75,
+        0.3125,
+        0.6875,
+        1.0,
+        0.6875
+      ]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [
+        0.1875,
+        0.0,
+        0.1875,
+        0.8125,
+        0.75,
+        0.8125
+      ],
+      [
+        0.3125,
+        0.75,
+        0.3125,
+        0.6875,
+        1.0,
+        0.6875
+      ]
+    ]
+  }
+}

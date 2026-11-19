@@ -1,0 +1,62 @@
+--- a/crates/horizon-client/src/mobs.rs
++++ b/crates/horizon-client/src/mobs.rs
+@@ -2338,6 +2338,7 @@
+     pub last_damage: Option<Damage>,
+     pub id: u32,
+     pub species: Species,
++    pub(crate) create_package: bool,
+     pub position: Vec3,
+     pub bounds: Aabb,
+     pub eye_y: f64,
+@@ -2437,10 +2438,9 @@
+     pub carrying: bool,
+ }
+ impl Seen {
+-    /// Whether `canBeCollidedWith` can ever hold for this kind: the slots
+-    /// [`MobWorld::others_solid`] lists.
++    /// Whether another mob can use this as a solid collision candidate.
+     pub fn may_block_mobs(&self) -> bool {
+-        matches!(self.species, Species::Shulker | Species::HappyGhast)
++        self.create_package || matches!(self.species, Species::Shulker | Species::HappyGhast)
+     }
+     /// `canBeCollidedWith(mover)` for a mob of species `mover` moving into
+     /// it (`EntityGetter.getEntityCollisions`): a living shulker
+--- a/crates/horizon-client/src/mobs/seen.rs
++++ b/crates/horizon-client/src/mobs/seen.rs
+@@ -16,6 +16,7 @@
+             last_damage: self.last_damage.map(|(d, _)| d),
+             id: m.id,
+             species: m.species(),
++            create_package: m.kind.id == "create:package",
+             position: m.position,
+             bounds: m.bounds(),
+             hitbox: m.hitbox(),
+--- a/crates/horizon-client/src/mobs/living.rs
++++ b/crates/horizon-client/src/mobs/living.rs
+@@ -832,17 +832,21 @@
+     /// shulker, a happy ghast held still), but not this mob's vehicle or a
+     /// fellow passenger (`Entity.canCollideWith`).
+     fn entity_collisions(&self, w: &MobWorld, movement: Vec3) -> Vec<Aabb> {
+-        let area = self.bounds().expand_towards(movement);
++        let bounds = self.bounds();
++        let area = bounds.expand_towards(movement);
+         if area.average_size() < 1.0e-7 {
+             return Vec::new();
+         }
+         let area = area.inflate(Vec3::new(1.0e-7, 1.0e-7, 1.0e-7));
+         let mover = self.species();
++        let is_package = self.kind.id == "create:package";
+         let blocks = |s: &&super::Seen| {
+-            s.id != self.id
+-                && s.blocks_mob(mover)
+-                && s.bounds.intersects(area)
+-                && !self.passenger_of_same_vehicle(s.id, s.vehicle)
++            s.id != self.id && s.bounds.intersects(area) && if is_package {
++                // PackageEntity.canCollideWith checks only Packages under this one.
++                s.create_package && s.bounds.max_position().y < bounds.min_position().y + 0.125
++            } else {
++                s.blocks_mob(mover) && !self.passenger_of_same_vehicle(s.id, s.vehicle)
++            }
+         };
+         match w.others_solid {
+             Some(slots) => slots

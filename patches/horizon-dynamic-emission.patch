@@ -1,0 +1,239 @@
+--- a/crates/horizon-client-render/src/chunk.rs
++++ b/crates/horizon-client-render/src/chunk.rs
+@@ -644,6 +644,8 @@
+     surface: Heights,
+     /// `Heightmap.Types.MOTION_BLOCKING` per column, kept like `surface`.
+     motion_blocking: Heights,
++    /// Transient per-position block emission supplied by live block entities.
++    pub dynamic_emission: std::collections::HashMap<(i32, i32, i32), u8>,
+     pub lit: bool,
+     /// Light read from a save with `isLightOn`: no light job is needed.
+     pub light_loaded: bool,
+@@ -688,6 +690,7 @@
+             sections: (0..layout.sections()).map(|_| empty.clone()).collect(),
+             surface: Heights::default(),
+             motion_blocking: Heights::default(),
++            dynamic_emission: std::collections::HashMap::new(),
+             lit: false,
+             light_loaded: false,
+             fresh: false,
+--- a/crates/horizon-client-render/src/chunk_map.rs
++++ b/crates/horizon-client-render/src/chunk_map.rs
+@@ -216,6 +216,9 @@
+     }
+ }
+ impl crate::light::LightWorld for ChunkMap {
++    fn dynamic_emission(&self, pos: (i32, i32, i32)) -> Option<u8> {
++        self.get(&(pos.0 >> 4, pos.2 >> 4))?.dynamic_emission.get(&pos).copied()
++    }
+     fn section(&self, cx: i32, s: usize, cz: i32) -> Option<&Arc<crate::chunk::Section>> {
+         self.columns.section(cx, s, cz)
+     }
+--- a/crates/horizon-client-render/src/light.rs
++++ b/crates/horizon-client-render/src/light.rs
+@@ -535,7 +535,7 @@
+     let mut top_section = 0;
+     for chunk in region.iter().flatten().flatten() {
+         for (i, s) in chunk.sections.iter().enumerate().rev() {
+-            if !s.is_uniform(0) {
++            if !s.is_uniform(0) || chunk.dynamic_emission.keys().any(|&(_, y, _)| chunk.layout().section_index(y) == Some(i)) {
+                 top_section = top_section.max(i + 1);
+                 break;
+             }
+@@ -567,7 +567,7 @@
+             let Some(chunk) = chunk else { continue };
+             let x_base = dx * 16;
+             for (si, section) in chunk.sections.iter().enumerate().take(top_section) {
+-                if section.is_uniform(0) {
++                if section.is_uniform(0) && !chunk.dynamic_emission.keys().any(|&(_, y, _)| chunk.layout().section_index(y) == Some(si)) {
+                     continue;
+                 }
+                 let at = At {
+@@ -576,6 +576,12 @@
+                     z: z_base,
+                 };
+                 states_of(section, tables, at, states, block, queue, section_scratch);
++                for (&(x, y, z), &emission) in &chunk.dynamic_emission {
++                    if chunk.layout().section_index(y) != Some(si) { continue; }
++                    let i = at.row(((y - chunk.min_y()) as usize & 15) << 4 | (z as usize & 15)) + (x as usize & 15);
++                    block[i] = emission;
++                    if emission > 0 { queue.push(i as u32); }
++                }
+             }
+         }
+     }
+@@ -882,6 +888,8 @@
+     fn set_section_light(&mut self, cx: i32, s: usize, cz: i32, light: Light);
+     /// The column the world's chunks hold (its level's).
+     fn layout(&self) -> ColumnLayout;
++    /// Live per-position emission; absent entries use block state emission.
++    fn dynamic_emission(&self, _pos: Pos) -> Option<u8> { None }
+ }
+ impl<S: std::hash::BuildHasher> LightWorld for HashMap<(i32, i32), Arc<Chunk>, S> {
+     fn layout(&self) -> ColumnLayout {
+@@ -889,6 +897,9 @@
+             .next()
+             .map_or(ColumnLayout::VANILLA, |c| c.layout())
+     }
++    fn dynamic_emission(&self, pos: Pos) -> Option<u8> {
++        self.get(&(pos.0 >> 4, pos.2 >> 4))?.dynamic_emission.get(&pos).copied()
++    }
+     fn section(&self, cx: i32, s: usize, cz: i32) -> Option<&Arc<Section>> {
+         self.get(&(cx, cz))
+             .filter(|c| c.lit)
+@@ -954,6 +965,10 @@
+         };
+         self.index.insert(key, slot);
+         slot
++    }
++    fn emission(&mut self, p: Pos, tables: &LightTables) -> u8 {
++        if let Some(value) = self.world.dynamic_emission(p) { return value; }
++        self.state(p.0, p.1, p.2).map_or(0, |s| tables.cells[s as usize].emission)
+     }
+     fn state(&mut self, x: i32, y: i32, z: i32) -> Option<u32> {
+         let slot = self.slot(x, y, z)?;
+@@ -1300,9 +1315,7 @@
+         // it would darken and relight everything it lit (flowing lava next to
+         // lava: thousands of cells per block).
+         if !sky && !force && old > 0 {
+-            let emission = world
+-                .state(p.0, p.1, p.2)
+-                .map_or(0, |s| tables.cells[s as usize].emission);
++            let emission = world.emission(p, tables);
+             if emission >= old {
+                 if emission > old {
+                     set_level(world, sky, p, emission);
+@@ -1360,9 +1373,7 @@
+                 };
+                 if p.1 >= lowest { 15 } else { 0 }
+             } else {
+-                world
+-                    .state(p.0, p.1, p.2)
+-                    .map_or(0, |s| tables.cells[s as usize].emission)
++                world.emission(p, tables)
+             };
+             if seed > level(world, sky, p).unwrap_or(15) {
+                 set_level(world, sky, p, seed);
+--- a/crates/horizon-client-render/src/streaming.rs
++++ b/crates/horizon-client-render/src/streaming.rs
+@@ -2171,15 +2171,18 @@
+             return;
+         }
+         let edits = std::mem::take(&mut world.light_edits);
++        let dynamic: Vec<_> = edits.iter().filter(|(_, old, _)| *old == u32::MAX)
++            .map(|(pos, _, _)| *pos).collect();
+         let positions: Vec<(i32, i32, i32)> = edits
+             .iter()
+-            .filter(|(_, old, new)| self.light_tables.differs(*old, *new))
++            .filter(|(_, old, new)| *old == u32::MAX || self.light_tables.differs(*old, *new))
+             .map(|(p, _, _)| *p)
+             .collect();
+         if positions.is_empty() {
+             return;
+         }
+-        let positions = if positions.len() > INLINE_RELIGHT_MAX {
++        // Dynamic sources must be relit before marking their columns for LAN.
++        let positions = if positions.len() > INLINE_RELIGHT_MAX && dynamic.is_empty() {
+             self.relight_on_workers(world, positions)
+         } else {
+             positions
+@@ -2196,6 +2199,13 @@
+             false,
+             &mut changed,
+         );
++        if world.light_log.is_some() {
++            for &(x, _, z) in &dynamic {
++                for dz in -1..=1 { for dx in -1..=1 {
++                    world.dynamic_light_columns.insert(((x >> 4) + dx, (z >> 4) + dz));
++                }}
++            }
++        }
+         Self::mark_light_changes(world, &changed);
+         Self::relight_beside_unlit(world, &changed);
+         if !self.light_snapshots.is_empty() {
+--- a/crates/horizon-client-render/src/world.rs
++++ b/crates/horizon-client-render/src/world.rs
+@@ -83,6 +83,8 @@
+     /// Edits on lit chunks (position, old state, new state), relit
+     /// incrementally by streaming.
+     pub light_edits: Vec<((i32, i32, i32), u32, u32)>,
++    /// Columns affected by dynamic emitters, whose light interior clients cannot infer.
++    pub dynamic_light_columns: crate::fast_hash::FxHashSet<(i32, i32)>,
+     /// Saved entities of chunks that just loaded, spawned by the game.
+     pub loaded_entities: Vec<((i32, i32), Vec<PendingEntity>)>,
+     /// Chunks loaded since the level's last pass, their entity sections not
+@@ -236,6 +238,7 @@
+             dirty_sections: Default::default(),
+             dirty_light: Default::default(),
+             light_edits: Vec::new(),
++            dynamic_light_columns: Default::default(),
+             loaded_entities: Vec::new(),
+             entities_pending: FxHashSet::default(),
+             loaded_chunks: Vec::new(),
+@@ -432,8 +435,10 @@
+                     if bz == 0 { z - 1 } else { z + 1 },
+                 );
+             }
++            let removed_dynamic = self.chunks.get_mut(&(x >> 4, z >> 4))
++                .is_some_and(|chunk| std::sync::Arc::make_mut(chunk).dynamic_emission.remove(&(x, y, z)).is_some());
+             if self.chunks.get(&(x >> 4, z >> 4)).is_some_and(|c| c.lit) {
+-                self.light_edits.push(((x, y, z), previous, state.0));
++                self.light_edits.push(((x, y, z), if removed_dynamic { u32::MAX } else { previous }, state.0));
+             } else {
+                 for dz in -1..=1 {
+                     for dx in -1..=1 {
+--- a/crates/horizon-client/src/game/native_world_edit.rs
++++ b/crates/horizon-client/src/game/native_world_edit.rs
+@@ -130,6 +130,25 @@
+     /// (the ring included); 0 for another dimension, on a client. Lights every
+     /// chunk it is given: call it for the chunks an edit changed, not every
+     /// tick. API @API:chunk_relight_resend@.
++    /// Dynamic emission currently used by the light engine for a block.
++    pub(super) fn native_dynamic_emission(&self, pos: [i32; 3]) -> Option<u8> {
++        self.world.chunks.get(&(pos[0] >> 4, pos[2] >> 4))?
++            .dynamic_emission.get(&(pos[0], pos[1], pos[2])).copied()
++    }
++
++    /// Override a live block's emission and queue normal block-light propagation.
++    pub(super) fn native_set_dynamic_emission(&mut self, pos: [i32; 3], emission: Option<u8>) {
++        let key = (pos[0] >> 4, pos[2] >> 4);
++        let Some(chunk) = self.world.chunks.get_mut(&key) else { return };
++        let chunk = std::sync::Arc::make_mut(chunk);
++        let at = (pos[0], pos[1], pos[2]);
++        let old = chunk.dynamic_emission.get(&at).copied();
++        if old == emission { return; }
++        if let Some(value) = emission { chunk.dynamic_emission.insert(at, value.min(15)); }
++        else { chunk.dynamic_emission.remove(&at); }
++        self.world.light_edits.push((at, u32::MAX, 0));
++    }
++
+     pub(super) fn native_relight_chunks(&mut self, dimension: &str, chunks: &[[i32; 2]]) -> u32 {
+         if !self.native_level_open(dimension) {
+             return 0;
+--- a/crates/horizon-client/src/lan/hub.rs
++++ b/crates/horizon-client/src/lan/hub.rs
+@@ -2967,6 +2967,7 @@
+         // One entry per column, so the order is the columns'.
+         changes.sort_unstable_by_key(|&(column, _)| column);
+         for ((x, z), sections) in changes {
++            let dynamic = world.dynamic_light_columns.contains(&(x, z));
+             if let Some(far) = self.far.as_mut() {
+                 far.changed(x, z);
+             }
+@@ -2976,7 +2977,7 @@
+                     let g = &self.guests[i];
+                     self.watches(g)
+                         && tracked(g, x, z)
+-                        && (-1..=1).any(|dz| (-1..=1).any(|dx| !tracked(g, x + dx, z + dz)))
++                        && (dynamic || (-1..=1).any(|dz| (-1..=1).any(|dx| !tracked(g, x + dx, z + dz))))
+                 })
+                 .collect();
+             if viewers.is_empty() {
+@@ -2990,6 +2991,7 @@
+                 self.guests[i].sender.send(body.clone());
+             }
+         }
++        world.dynamic_light_columns.clear();
+     }
+ 
+     fn broadcast_block_changes(&mut self, world: &mut World) {

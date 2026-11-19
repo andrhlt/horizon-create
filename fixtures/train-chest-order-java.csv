@@ -1,0 +1,13 @@
+layout,tick,leading_item,leading_count,rear_item,rear_count,hopper_item,hopper_count,cargo_idle_ticks
+front,23,minecraft:emerald,1,minecraft:paper,64,minecraft:air,0,0
+front,24,minecraft:emerald,1,minecraft:paper,64,minecraft:air,0,1
+front,25,minecraft:emerald,1,minecraft:paper,64,minecraft:air,0,2
+front,26,minecraft:emerald,1,minecraft:paper,64,minecraft:air,0,3
+front,27,minecraft:emerald,1,minecraft:paper,64,minecraft:air,0,4
+front,28,minecraft:emerald,1,minecraft:paper,63,minecraft:paper,1,1
+deck,23,minecraft:emerald,1,minecraft:paper,64,minecraft:air,0,0
+deck,24,minecraft:emerald,1,minecraft:paper,64,minecraft:air,0,1
+deck,25,minecraft:emerald,1,minecraft:paper,64,minecraft:air,0,2
+deck,26,minecraft:emerald,1,minecraft:paper,64,minecraft:air,0,3
+deck,27,minecraft:emerald,1,minecraft:paper,64,minecraft:air,0,4
+deck,28,minecraft:air,0,minecraft:paper,64,minecraft:emerald,1,1

@@ -1,0 +1,55 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,39 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void weightedEjectorTargetPlacement(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(3, 9, 2));
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var north = net.minecraft.core.Direction.NORTH;
++		var actor = new net.minecraft.server.level.ServerPlayer(level.getServer(), level,
++			new com.mojang.authlib.GameProfile(new java.util.UUID(17, 401), "EjectorProbe"),
++			net.minecraft.server.level.ClientInformation.createDefault());
++		// The client selector accepts one horizontal coordinate within the default 32-block range.
++		// These signed cases exercise that table and the original server packet.
++		var east = net.minecraft.core.Direction.EAST;
++		var west = net.minecraft.core.Direction.WEST;
++		var south = net.minecraft.core.Direction.SOUTH;
++		int[][] cases = {{4,0,0}, {0,2,-5}, {-3,-2,0}, {0,1,9}, {2,0,2}, {0,3,0}, {33,0,0}, {32,0,0}};
++		net.minecraft.core.Direction[] selections = {east, north, west, south, null, null, null, east};
++		for (int i = 0; i < cases.length; i++) {
++			var at = origin.offset(0, 0, i);
++			var shift = cases[i];
++			level.setBlockAndUpdate(at, AllBlocks.WEIGHTED_EJECTOR.getDefaultState().setValue(horizontal, north));
++			var direction = selections[i];
++			if (direction != null) {
++				int distance = Math.abs(shift[0] + shift[2]);
++				new com.simibubi.create.content.logistics.depot.EjectorPlacementPacket(distance, shift[1], at, direction).handle(actor);
++			}
++			var state = level.getBlockState(at);
++			var be = level.getBlockEntity(at);
++			var data = be.saveWithoutMetadata(level.registryAccess());
++			System.out.printf(java.util.Locale.ROOT, "CREATE_EJECTOR_TARGET %d,%d,%d,%d,%s,%s,%d,%d%n",
++				i, shift[0], shift[1], shift[2], direction != null,
++				state.getValue(horizontal).getName(), data.getInt("HorizontalDistance"), data.getInt("VerticalDistance"));
++		}
++		helper.succeed();
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.weightedEjectorTargetPlacement")).toList();
+ 	}
+ }

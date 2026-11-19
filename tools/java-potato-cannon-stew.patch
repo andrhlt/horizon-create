@@ -1,0 +1,75 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.potatoCannon")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,60 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
+-}
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 45)
++	public static void potatoCannon(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var fixture = helper.absolutePos(new BlockPos(2, 24, 2));
++		var origin = new BlockPos((fixture.getX() & ~15) + 6, fixture.getY(), (fixture.getZ() & ~15) + 6);
++		record Trial(String name, net.minecraft.world.item.Item ammo) {}
++		var trials = java.util.List.of(new Trial("stew", Items.SUSPICIOUS_STEW), new Trial("invulnerable", Items.SUSPICIOUS_STEW));
++		for (int i = 0; i < trials.size(); i++) {
++			var trial = trials.get(i);
++			int start = 4 + 6 * i;
++			var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++				new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "BakedFixture"));
++			player.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++			player.setPos(origin.getX() + .5, origin.getY(), origin.getZ() + .5);
++			player.setYRot(0); player.setXRot(0);
++			var cannon = com.simibubi.create.AllItems.POTATO_CANNON.asStack();
++			player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, cannon);
++			player.getInventory().setItem(1, new ItemStack(trial.ammo(), 1));
++			var target = EntityType.PIG.create(world);
++			target.setPos(origin.getX(), origin.getY() + 1, origin.getZ() + 5.5);
++			target.setNoAi(true); target.setNoGravity(true); target.setPersistenceRequired(); target.setInvulnerable(trial.name().equals("invulnerable"));
++			
++			helper.runAtTickTime(start - 1, () -> world.addFreshEntity(target));
++			for (int tick = 0; tick <= 4; tick++) {
++				final int sample = tick;
++				helper.runAtTickTime(start + tick, () -> {
++					if (sample == 0) {
++						var result = cannon.use(world, player, net.minecraft.world.InteractionHand.MAIN_HAND);
++						var shots = world.getEntitiesOfClass(com.simibubi.create.content.equipment.potatoCannon.PotatoProjectileEntity.class,
++							new net.minecraft.world.phys.AABB(origin).inflate(6)).stream().filter(shot -> shot.getOwner() == player).toList();
++						helper.assertTrue(shots.size() == 1, "Expected baked potato projectile");
++						var shot = shots.get(0); var pos = shot.position(); var vel = shot.getDeltaMovement();
++						System.out.printf(java.util.Locale.ROOT,"STEW_LAUNCH,%s,%s,%d,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%s%n",
++							trial.name(), result.getResult(), player.getInventory().getItem(1).getCount(), cannon.getDamageValue(),
++							pos.x-player.getX(), pos.y-player.getY(), pos.z-player.getZ(), vel.x, vel.y, vel.z, shot.getItem().getItem());
++					}
++					var bowls = world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(origin).inflate(8)).stream().filter(item -> item.getItem().is(Items.BOWL)).toList();
++                    System.out.printf("STEW_BOWLS,%s,%d,%d%n",trial.name(),sample,bowls.size());
++                    var p = target.position(); var v = target.getDeltaMovement();
++					var effect = target.getEffect(net.minecraft.world.effect.MobEffects.POISON);
++					var shots = world.getEntitiesOfClass(com.simibubi.create.content.equipment.potatoCannon.PotatoProjectileEntity.class,
++						new net.minecraft.world.phys.AABB(origin).inflate(6)).stream().filter(shot -> shot.getOwner() == player).toList();
++					if (!shots.isEmpty()) { var shot=shots.get(0); var q=shot.position(); var speed=shot.getDeltaMovement();
++						System.out.printf(java.util.Locale.ROOT,"STEW_STUCK,%s,%d,%b,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",trial.name(),sample,shot.getStuckEntity()==target,q.x-target.getX(),q.y-target.getY(),q.z-target.getZ(),speed.x,speed.y,speed.z); }
++					System.out.printf(java.util.Locale.ROOT,"STEW_TARGET,%s,%d,%.9f,%d,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%d%n",
++						trial.name(), sample, target.getHealth(), effect == null ? -1 : effect.getDuration(), effect == null ? -1 : effect.getAmplifier(), p.x-player.getX(), p.y-player.getY(), p.z-player.getZ(),
++						v.x,v.y,v.z,shots.size());
++					if (sample == 4) {
++						target.discard(); bowls.forEach(bowl -> bowl.discard());
++						if (trial.name().equals("invulnerable")) helper.succeed();
++					}
++				});
++			}
++		}
++	}
++
++}
+\ No newline at end of file

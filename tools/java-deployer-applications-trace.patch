@@ -1,0 +1,73 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,70 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 50)
++	public static void deployerApplications(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var base = helper.absolutePos(new BlockPos(3, 14, 3));
++		var blocks = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var first = com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock.AXIS_ALONG_FIRST_COORDINATE;
++		var east = net.minecraft.core.Direction.EAST;
++		var up = net.minecraft.core.Direction.UP;
++		String[] names = {"brass_log", "brass_wood", "copper_log", "copper_wood", "bound_cardboard", "andesite_control"};
++		var wooden = java.util.List.of(net.minecraft.world.level.block.Blocks.STRIPPED_SPRUCE_LOG,
++			net.minecraft.world.level.block.Blocks.STRIPPED_BIRCH_WOOD,
++			net.minecraft.world.level.block.Blocks.STRIPPED_OAK_LOG,
++			net.minecraft.world.level.block.Blocks.STRIPPED_DARK_OAK_WOOD,
++			com.simibubi.create.AllBlocks.CARDBOARD_BLOCK.get(),
++			net.minecraft.world.level.block.Blocks.STRIPPED_ACACIA_LOG);
++		var tools = java.util.List.of(com.simibubi.create.AllItems.BRASS_INGOT.get(),
++			com.simibubi.create.AllItems.BRASS_INGOT.get(), net.minecraft.world.item.Items.COPPER_INGOT,
++			net.minecraft.world.item.Items.COPPER_INGOT, net.minecraft.world.item.Items.STRING,
++			com.simibubi.create.AllItems.ANDESITE_ALLOY.get());
++		var deployers = new java.util.ArrayList<com.simibubi.create.content.kinetics.deployer.DeployerBlockEntity>();
++		for (int i = 0; i < names.length; i++) {
++			var at = base.south(4 * i);
++			var target = at.east(2);
++			level.setBlockAndUpdate(at.above(), net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState());
++			level.setBlockAndUpdate(at, com.simibubi.create.AllBlocks.DEPLOYER.getDefaultState()
++				.setValue(facing, east).setValue(first, true));
++			var input = wooden.get(i).defaultBlockState();
++			if (i == 4)
++				input = blocks.get(net.minecraft.resources.ResourceLocation.parse("create:cardboard_block"))
++					.getStateDefinition().getPossibleStates().stream().filter(state -> state.toString().contains("axis=z")).findFirst().orElseThrow();
++			else
++				input = input.setValue(axis, net.minecraft.core.Direction.Axis.Z);
++			level.setBlockAndUpdate(target, input);
++			var deployer = (com.simibubi.create.content.kinetics.deployer.DeployerBlockEntity) level.getBlockEntity(at);
++			deployers.add(deployer);
++			deployer.redstoneUpdate();
++			level.setBlockAndUpdate(at.below(), com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, up));
++			((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(at.below())).generatedSpeed.setValue(64);
++			var inventory = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, at, null);
++			helper.assertTrue(inventory.insertItem(0, new net.minecraft.world.item.ItemStack(tools.get(i), 2), false).isEmpty(),
++				"Could not fill Deployer");
++			System.out.printf(java.util.Locale.ROOT, "CREATE_DEPLOYER_APP_SETUP %s;%s;%s%n", names[i],
++				input.toString(), net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(tools.get(i)));
++		}
++		helper.runAtTickTime(3, () -> {
++			for (int i = 0; i < names.length; i++)
++				level.removeBlock(base.south(4 * i).above(), false);
++		});
++		helper.onEachTick(() -> {
++			long tick = helper.getTick() - 3;
++			if (tick < 0 || tick > 24)
++				return;
++			for (int i = 0; i < names.length; i++) {
++				var deployer = deployers.get(i);
++				var nbt = deployer.getUpdateTag(level.registryAccess());
++				var target = level.getBlockState(deployer.getBlockPos().east(2));
++				var held = deployer.getPlayer().getMainHandItem();
++				System.out.printf(java.util.Locale.ROOT, "CREATE_DEPLOYER_APP %d;%s;%.0f;%s;%d;%d;%s%n", tick, names[i],
++					deployer.getSpeed(), nbt.getString("State"), nbt.getInt("Timer"), held.getCount(), target.toString());
++			}
++		});
++		helper.runAtTickTime(28, helper::succeed);
++	}
+ }

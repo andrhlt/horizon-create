@@ -1,0 +1,13 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -1534,6 +1534,10 @@
+     /// its way grow, from nothing for its first two ticks up to 0.3 at its
+     /// eighth (`tickCount`, which `age` counts, is raised before the tick).
+     fn hit_margin(&self) -> f64 {
++        if matches!(&self.kind, ProjectileKind::Thrown(t) if t.id == "create:potato_projectile") {
++            // Create 1.21.1's ProjectileUtil.getHitResultOnMoveVector uses 0.3F.
++            return f64::from(0.3_f32);
++        }
+         f64::from(((self.age as i32 - 2) as f32 / 20.0).clamp(0.0, 0.3))
+     }
+     fn tick_inner(&mut self, w: &impl ProjectileWorld, impact: bool) -> (bool, Hit) {

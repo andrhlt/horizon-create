@@ -1,0 +1,27 @@
+diff --git a/crates/horizon-client/src/game/ghasts.rs b/crates/horizon-client/src/game/ghasts.rs
+--- a/crates/horizon-client/src/game/ghasts.rs
++++ b/crates/horizon-client/src/game/ghasts.rs
+@@ -30,7 +30,7 @@
+         let Some(p) = &self.player else {
+             return Vec::new();
+         };
+-        self.mobs
++        let mut boxes = self.mobs
+             .iter()
+             .filter(|m| {
+                 (m.species() == horizon_client::mobs::Species::HappyGhast
+@@ -45,7 +45,13 @@
+                     .filter(|b| Some(b.id) != self.riding)
+                     .map(super::boats::Boat::bounds),
+             )
+-            .collect()
++            .collect();
++        self.append_platform_collisions(&mut boxes);
++        boxes
++    }
++    /// Additional player collision volume, used by a platform native mod.
++    fn append_platform_collisions(&self, boxes: &mut Vec<Aabb>) {
++        let _ = boxes;
+     }
+     /// `EntityGetter.getEntityCollisions` for a mover that is neither a player nor a
+     /// happy ghast (a dropped item, an armor stand, primed TNT, a falling block): the

@@ -1,0 +1,3 @@
+case,result,ammo,damage,health,absorption,regeneration_duration,regeneration_amplifier,absorption_duration,absorption_amplifier,resistance_duration,resistance_amplifier,fire_resistance_duration,fire_resistance_amplifier,removed
+golden,SUCCESS,2,1,19.000000000,4.000000000,100,1,2400,0,-1,-1,-1,-1,true
+enchanted,SUCCESS,2,1,19.000000000,16.000000000,400,1,2400,3,6000,0,6000,0,true

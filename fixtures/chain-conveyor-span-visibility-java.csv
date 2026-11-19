@@ -1,0 +1,8 @@
+distance,visible,offscreen,range
+63,true,true,256
+64,true,true,256
+96,true,true,256
+128,true,true,256
+255,true,true,256
+256,false,true,256
+257,false,true,256

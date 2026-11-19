@@ -1,0 +1,29 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -158,8 +158,10 @@
+ 			world.setBlockAndUpdate(end, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
+ 			world.setBlockAndUpdate(motorPos, AllBlocks.CREATIVE_MOTOR.getDefaultState()
+ 				.setValue(CreativeMotorBlock.FACING, Direction.UP));
+-			if (!reverse)
++			if (!reverse) {
+ 				world.setBlockAndUpdate(portPos, AllBlocks.PACKAGE_FROGPORT.getDefaultState());
++				world.setBlockAndUpdate(start.offset(5, -1, 1), Blocks.LIGHT.defaultBlockState());
++			}
+ 		});
+ 		helper.runAtTickTime(5, () -> {
+ 			var motor = (CreativeMotorBlockEntity) world.getBlockEntity(motorPos);
+@@ -279,6 +281,14 @@
+ 			var base = Vec3.atLowerCornerOf(origin);
+ 			var target = pose.targetPos.subtract(base);
+ 			var physical = pose.pos.subtract(base);
++			var lightPos = BlockPos.containing(pose.pos);
++			var light = lightPos.subtract(origin);
++			var wheelPos = owner.getBlockPos();
++			var block = net.minecraft.world.level.LightLayer.BLOCK;
++			var sky = net.minecraft.world.level.LightLayer.SKY;
++			System.out.printf(Locale.ROOT, "CREATE_CHAIN_SUSPENDED_LIGHT %d,%d,%d,%d,%d,%d,%d,%d%n",
++				tick, light.getX(), light.getY(), light.getZ(), world.getBrightness(block, lightPos),
++				world.getBrightness(sky, lightPos), world.getBrightness(block, wheelPos), world.getBrightness(sky, wheelPos));
+ 			var dangle = net.createmod.catnip.math.VecHelper.rotate(pose.targetPos.add(0, 0.5, 0).subtract(pose.pos),
+ 				-pose.yaw, Direction.Axis.Y);
+ 			var roll = net.minecraft.util.Mth.wrapDegrees((float) dangleHeading(-dangle.x, dangle.y)) / 2;

@@ -1,0 +1,97 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.waterloggedSupportedMachines"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,80 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 40)
++	public static void waterloggedSupportedMachines(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		for (int cx = 0; cx <= 1; cx++)
++			for (int cz = 1; cz <= 2; cz++)
++				world.setChunkForced(cx, cz, true);
++		record Machine(String name, BlockPos pos) {}
++		var machines = java.util.List.of(
++			new Machine("create:hand_crank", new BlockPos(8, 170, 24)),
++			new Machine("create:copper_valve_handle", new BlockPos(16, 170, 24)),
++			new Machine("create:mechanical_harvester", new BlockPos(24, 170, 24)),
++			new Machine("create:mechanical_plough", new BlockPos(8, 170, 32)),
++			new Machine("create:steam_engine", new BlockPos(16, 170, 32)),
++			new Machine("create:powered_shaft", new BlockPos(24, 170, 32))
++		);
++		var source = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var wet = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var face = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var dispenserState = Blocks.DISPENSER.defaultBlockState()
++			.setValue(face, net.minecraft.core.Direction.EAST);
++		helper.runAtTickTime(1, () -> {
++			for (var machine : machines) {
++				var at = machine.pos();
++				world.setBlockAndUpdate(at.west().above(), Blocks.AIR.defaultBlockState());
++				world.setBlockAndUpdate(at.west(), Blocks.AIR.defaultBlockState());
++				world.setBlockAndUpdate(at, Blocks.AIR.defaultBlockState());
++				world.setBlockAndUpdate(at.west().below(), Blocks.STONE.defaultBlockState());
++				world.setBlockAndUpdate(at.below(), Blocks.STONE.defaultBlockState());
++				var engine = com.simibubi.create.AllBlocks.STEAM_ENGINE.getDefaultState();
++				var tank = com.simibubi.create.AllBlocks.FLUID_TANK.getDefaultState();
++				if (machine.name().equals("create:steam_engine")) {
++					world.setBlockAndUpdate(at.below(), tank);
++				} else if (machine.name().equals("create:powered_shaft")) {
++					world.setBlockAndUpdate(at.east(3), tank);
++					world.setBlockAndUpdate(at.east(2), engine
++						.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.ATTACH_FACE,
++							net.minecraft.world.level.block.state.properties.AttachFace.WALL)
++						.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING,
++							net.minecraft.core.Direction.WEST));
++				} else {
++					world.setBlockAndUpdate(at.south(), Blocks.STONE.defaultBlockState());
++				}
++				world.setBlockAndUpdate(at, source.get(net.minecraft.resources.ResourceLocation.parse(machine.name())).defaultBlockState());
++				world.setBlockAndUpdate(at.west(), dispenserState);
++				var dispenser = (net.minecraft.world.level.block.entity.DispenserBlockEntity) world.getBlockEntity(at.west());
++				dispenser.setItem(0, new ItemStack(Items.WATER_BUCKET));
++			}
++		});
++		helper.succeedWhen(() -> {
++			var tick = helper.getTick();
++			if (tick < 3)
++				helper.fail("waiting for rendered placement");
++			for (var machine : machines) {
++				var at = machine.pos();
++				var power = at.west().above();
++				var dispenser = (net.minecraft.world.level.block.entity.DispenserBlockEntity) world.getBlockEntity(at.west());
++				var state = world.getBlockState(at);
++				var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(dispenser.getItem(0).getItem());
++				var placed = source.getKey(state.getBlock());
++				System.out.printf("WATER_SUPPORT_DISPENSER %d,%s,%d,%d,%d,%s,%s,%s%n", tick - 3, machine.name(),
++					at.getX(), at.getY(), at.getZ(), placed,
++					state.hasProperty(wet) ? state.getValue(wet).toString() : "absent", item);
++				if (tick == 3) {
++					world.setBlockAndUpdate(power, Blocks.REDSTONE_BLOCK.defaultBlockState());
++				} else if (tick == 9) {
++					world.setBlockAndUpdate(power, Blocks.AIR.defaultBlockState());
++					dispenser.setItem(0, new ItemStack(Items.BUCKET));
++					world.setBlockAndUpdate(power, Blocks.REDSTONE_BLOCK.defaultBlockState());
++				}
++			}
++			if (tick < 15)
++				helper.fail("waiting for fill and drain");
++		});
++	}
+ }

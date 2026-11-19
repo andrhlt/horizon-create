@@ -1,0 +1,41 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.spouting"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -350,6 +350,26 @@
+ 		ItemStack waterBottle = PotionContents.createItemStack(Items.POTION, Potions.WATER);
+ 
++		helper.getLevel().getGameRules().getRule(net.minecraft.world.level.GameRules.RULE_RANDOMTICKING)
++			.set(0, helper.getLevel().getServer());
+ 		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			System.out.printf("CREATE_SPOUTING %d", helper.getTick());
++			for (var positions : new int[][] {{3,4,1},{3,4,3},{4,4,3},{5,4,3},{6,4,3},{7,4,3},{5,4,1},{6,4,1},{7,4,1}}) {
++				var tag = helper.getBlockEntity(new BlockPos(positions[0],positions[1],positions[2])).saveWithoutMetadata(access);
++				var amount=tag.getList("Tanks",10).getCompound(0).getCompound("TankContent").getCompound("Fluid").getInt("amount");
++				System.out.printf(" %d %d", amount, tag.getInt("ProcessingTicks"));
++			}
++			var farm=helper.getBlockState(farmland);
++			System.out.printf(" %d", farm.getValue(FarmBlock.MOISTURE));
++			for (var pos : new BlockPos[] {new BlockPos(3,2,1), farmland.east(1), farmland.east(2), farmland.east(3), farmland.east(4)}) {
++				System.out.printf(" %s", net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(helper.getBlockState(pos).getBlock()));
++			}
++			for (int i = 0; i < 3; i++) {
++				var saved = helper.getBlockEntity(depot.east(i)).saveWithoutMetadata(access);
++				var stack = saved.getCompound("HeldItem").getCompound("Item");
++				System.out.printf(" %s", stack.getString("id").isEmpty() ? "-" : stack.getString("id"));
++			}
++			System.out.println();
+ 			// lava
+ 			helper.assertBlockPresent(Blocks.LAVA_CAULDRON, 3, 2, 1);
+ 			// water

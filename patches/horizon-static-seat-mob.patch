@@ -1,0 +1,119 @@
+--- a/crates/horizon-client/src/mobs.rs
++++ b/crates/horizon-client/src/mobs.rs
+@@ -1483,6 +1483,11 @@
+ 
+ #[derive(Clone, Debug)]
+ pub enum MobEvent {
++    LegacyBlockLanding {
++        mob: u32,
++        position: [i32; 3],
++        continuing_y: f64,
++    },
+     /// Squid.handleEntityEvent(19), resetting the remote tentacle cycle.
+     SquidCycle {
+         mob: u32,
+--- a/crates/horizon-client/src/mobs/living.rs
++++ b/crates/horizon-client/src/mobs/living.rs
+@@ -1737,29 +1737,54 @@
+             self.fall_distance = 0.0;
+             self.velocity = Self::climbable_velocity(self.velocity);
+         }
++        let incoming_y = self.velocity.y;
+         self.do_move(w, events);
+         let mut movement = self.velocity;
+         if (self.horizontal_collision || self.ai.jumping) && self.on_climbable(w) {
+             movement.y = 0.2;
+         }
+-        let mut y = movement.y;
+-        // LivingEntity.travelInAir: levitation lifts by its amplifier.
+-        if let Some(&(_, _, amp)) = self
+-            .extra
+-            .effects
+-            .iter()
+-            .find(|e| e.0 == "minecraft:levitation")
+-        {
+-            y += (0.05 * f64::from(amp + 1) - movement.y) * 0.2;
+-        } else {
+-            y -= self.effective_gravity();
+-        }
++        let after_gravity = |y, gravity| {
++            // LivingEntity.travelInAir: levitation lifts by its amplifier.
++            if let Some(&(_, _, amp)) = self
++                .extra
++                .effects
++                .iter()
++                .find(|e| e.0 == "minecraft:levitation")
++            {
++                y + (0.05 * f64::from(amp + 1) - y) * 0.2
++            } else {
++                y - gravity
++            }
++        };
++        let y = after_gravity(movement.y, self.effective_gravity());
++        let landing = |vertical: f32, events: &mut Vec<MobEvent>| {
++            if incoming_y < 0.0
++                && self.on_ground
++                && let Some([x, y, z]) = self.supporting
++                && w.movement.get(w.world.block(x, y, z)).is_ok_and(|block| {
++                    block.coefficients.legacy_bounce_restitution.is_some()
++                })
++            {
++                let gravity = self.gravity();
++                let gravity = if self.has_effect("minecraft:slow_falling") && !gravity.is_nan() {
++                    gravity.min(0.01)
++                } else {
++                    gravity
++                };
++                events.push(MobEvent::LegacyBlockLanding {
++                    mob: self.id,
++                    position: [x, y, z],
++                    continuing_y: after_gravity(incoming_y, gravity) * f64::from(vertical),
++                });
++            }
++        };
+         // LivingEntity.shouldDiscardFriction (a breeze's, a frog's or a goat's
+         // long jump).
+         if super::breeze::discards_friction(self)
+             || self.extra.frog.discard_friction
+             || self.extra.goat.discard_friction
+         {
++            landing(1.0, events);
+             self.velocity = Vec3::new(movement.x, y, movement.z);
+             return;
+         }
+@@ -1771,6 +1796,7 @@
+         } else {
+             Self::modified_friction(0.98, air_drag_modifier)
+         };
++        landing(vertical, events);
+         self.velocity = Vec3::new(
+             movement.x * f64::from(f),
+             y * f64::from(vertical),
+@@ -2245,6 +2271,9 @@
+     fn block_bounce_restitution(&mut self, state: BlockStateId) -> Result<f32, ()> {
+         Ok(self.movement(state)?.coefficients.bounce_restitution)
+     }
++    fn legacy_block_bounce(&mut self, state: BlockStateId) -> Result<Option<f32>, ()> {
++        Ok(self.movement(state)?.coefficients.legacy_bounce_restitution)
++    }
+     /// `LivingEntity.getAirDrag`.
+     fn air_drag(&mut self) -> Result<f32, ()> {
+         Ok(self.mob.air_drag())
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -2173,9 +2173,15 @@
+         self.handle_mob_events_reusable(&mut events)
+     }
+ 
++    #[allow(unused_variables)]
++    fn native_legacy_mob_landing(&mut self, mob: u32, position: [i32; 3], continuing_y: f64) {}
++
+     pub(super) fn handle_mob_events_reusable(&mut self, events: &mut Vec<MobEvent>) -> Result<()> {
+         for e in events.drain(..) {
+             match e {
++                MobEvent::LegacyBlockLanding { mob, position, continuing_y } => {
++                    self.native_legacy_mob_landing(mob, position, continuing_y);
++                }
+                 MobEvent::BubbleColumnParticles { pos } => {
+                     self.bubble_column_particles(BlockPos::new(pos[0], pos[1], pos[2]))
+                 }

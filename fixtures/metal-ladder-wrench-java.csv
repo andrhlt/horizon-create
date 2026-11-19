@@ -1,0 +1,16 @@
+material,tick,block,facing,result,inventory
+andesite,1,create:andesite_ladder,north,SUCCESS,0
+andesite,2,create:andesite_ladder,north,PASS,0
+andesite,3,create:andesite_ladder,east,SUCCESS,0
+andesite,4,create:andesite_ladder,east,_,0
+andesite,5,minecraft:air,_,SUCCESS,1
+brass,1,create:brass_ladder,north,SUCCESS,0
+brass,2,create:brass_ladder,north,PASS,0
+brass,3,create:brass_ladder,east,SUCCESS,0
+brass,4,create:brass_ladder,east,_,0
+brass,5,minecraft:air,_,SUCCESS,1
+copper,1,create:copper_ladder,north,SUCCESS,0
+copper,2,create:copper_ladder,north,PASS,0
+copper,3,create:copper_ladder,east,SUCCESS,0
+copper,4,create:copper_ladder,east,_,0
+copper,5,minecraft:air,_,SUCCESS,1

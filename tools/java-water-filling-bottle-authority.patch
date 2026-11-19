@@ -1,0 +1,120 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..7ff5482 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -62,6 +62,7 @@ neoForge {
+             systemProperty("mixin.debug.export", "true")
+ 
+             systemProperty("neoforge.enabledGameTestNamespaces", mod_id as String)
++            systemProperty("parity.water", "true")
+ 
+             loggingConfigFile = project.file("log4j.xml")
+         }
+diff --git a/src/main/java/com/simibubi/create/content/logistics/depot/EjectorBlockEntity.java b/src/main/java/com/simibubi/create/content/logistics/depot/EjectorBlockEntity.java
+index bb3863a..92299d0 100644
+--- a/src/main/java/com/simibubi/create/content/logistics/depot/EjectorBlockEntity.java
++++ b/src/main/java/com/simibubi/create/content/logistics/depot/EjectorBlockEntity.java
+@@ -296,6 +296,9 @@ public class EjectorBlockEntity extends KineticBlockEntity {
+ 	public void tick() {
+ 		super.tick();
+ 
++		if (Boolean.getBoolean("parity.water") && !level.isClientSide && !launchedItems.isEmpty())
++			System.out.printf("WATER_EJECTOR gametime=%d pos=%s nbt=%s early=%s earlyTime=%s%n", level.getGameTime(), worldPosition,
++				saveWithoutMetadata(level.registryAccess()), earlyTarget, earlyTargetTime);
+ 		boolean doLogic = !level.isClientSide || isVirtual();
+ 		State prevState = state;
+ 		float totalTime = Math.max(3, (float) launcher.getTotalFlyingTicks());
+@@ -373,6 +376,16 @@ public class EjectorBlockEntity extends KineticBlockEntity {
+ 		Vec3 target = getLaunchedItemLocation(time + 1);
+ 
+ 		BlockHitResult rayTraceBlocks = level.clip(new ClipContext(source, target, Block.COLLIDER, Fluid.NONE, CollisionContext.empty()));
++		if (Boolean.getBoolean("parity.water"))
++			System.out.printf("WATER_SCAN time=%d from=%s to=%s hit=%s state=%s%n", time, source, target,
++				rayTraceBlocks, level.getBlockState(rayTraceBlocks.getBlockPos()));
++		if (Boolean.getBoolean("parity.water") && rayTraceBlocks.getType() == Type.BLOCK) {
++			var hitPos = rayTraceBlocks.getBlockPos();
++			var hitState = level.getBlockState(hitPos);
++			System.out.printf("WATER_HIT pos=%s point=%s face=%s state=%s collision=%s%n", hitPos,
++				rayTraceBlocks.getLocation(), rayTraceBlocks.getDirection(), hitState,
++				hitState.getCollisionShape(level, hitPos).toAabbs());
++		}
+ 		boolean miss = rayTraceBlocks.getType() == Type.MISS;
+ 
+ 		if (!miss && rayTraceBlocks.getType() == Type.BLOCK) {
+diff --git a/src/main/java/com/simibubi/create/foundation/mixin/ParityWaterOriginMixin.java b/src/main/java/com/simibubi/create/foundation/mixin/ParityWaterOriginMixin.java
+new file mode 100644
+index 0000000..b9fb236
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/ParityWaterOriginMixin.java
+@@ -0,0 +1,11 @@
++package com.simibubi.create.foundation.mixin;
++import net.minecraft.core.BlockPos;
++import net.minecraft.gametest.framework.GameTestServer;
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.ModifyArg;
++@Mixin(GameTestServer.class)
++public class ParityWaterOriginMixin {
++    @ModifyArg(method = "startTests", at = @At(value = "INVOKE", target = "Lnet/minecraft/gametest/framework/StructureGridSpawner;<init>(Lnet/minecraft/core/BlockPos;IZ)V"), index = 0)
++    private BlockPos parityOrigin(BlockPos origin) { return new BlockPos(3, origin.getY(), -12); }
++}
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..9a349c6 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.waterFillingBottle"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d..7be522e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -133,7 +133,28 @@ public class TestProcessing {
+ 		BlockPos output = new BlockPos(2, 2, 4);
+ 		ItemStack expected = PotionContents.createItemStack(Items.POTION, Potions.WATER);
+ 		helper.pullLever(lever);
+-		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			if (tick >= 28 && tick <= 59) {
++				var level = helper.getLevel();
++				var ejectorPos = helper.absolutePos(new BlockPos(2, 2, 1));
++				var chutePos = helper.absolutePos(new BlockPos(2, 3, 4));
++				var ejector = level.getBlockEntity(ejectorPos);
++				var chute = level.getBlockState(chutePos);
++				System.out.printf("WATER_ORACLE tick=%d ejector=%s chute=%s collision=%s%n", tick,
++					ejector == null ? "missing" : ejector.saveWithoutMetadata(level.registryAccess()),
++					chute, chute.getCollisionShape(level, chutePos).toAabbs());
++				var chuteEntity = level.getBlockEntity(chutePos);
++				System.out.printf("WATER_CHUTE tick=%d pos=%s nbt=%s%n", tick, chutePos,
++					chuteEntity == null ? "missing" : chuteEntity.saveWithoutMetadata(level.registryAccess()));
++				var barrelPos = helper.absolutePos(new BlockPos(2, 2, 4));
++				var barrelEntity = level.getBlockEntity(barrelPos);
++				System.out.printf("WATER_BARREL tick=%d pos=%s nbt=%s%n", tick, barrelPos,
++					barrelEntity == null ? "missing" : barrelEntity.saveWithoutMetadata(level.registryAccess()));
++			}
++			if (tick < 59) helper.fail("Awaiting water trace");
++			helper.assertContainerContains(output, expected);
++		});
+ 	}
+ 
+ 	@GameTest(template = "wheat_milling")
+diff --git a/src/main/resources/create.mixins.json b/src/main/resources/create.mixins.json
+index b5ea006..7b4ba64 100644
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -6,6 +6,7 @@
+   "plugin": "com.simibubi.create.foundation.mixin.CreateMixinPlugin",
+   "compatibilityLevel": "JAVA_21",
+   "mixins": [
++    "ParityWaterOriginMixin",
+     "ArmorTrimMixin",
+     "BeehiveBlockMixin",
+     "BlockItemMixin",

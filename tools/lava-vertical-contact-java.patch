@@ -1,0 +1,113 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -364,4 +364,98 @@
+ 			helper.assertContainerContains(depot.east(2), Items.GRASS_BLOCK);
+ 		});
+ 	}
++	@GameTest(template = "3_pipe_split", timeoutTicks = 100)
++	public static void lavaVerticalContactOracle(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		for (int x = 1; x <= 8; x++)
++			for (int y = 0; y <= 7; y++)
++				for (int z = 0; z <= 8; z++)
++					level.setBlock(helper.absolutePos(new BlockPos(x, y, z)), Blocks.AIR.defaultBlockState(), 2);
++		int testCase = 0;
++		for (var liquid : List.of(
++				new VerticalContactFluid("honey", com.simibubi.create.AllFluids.HONEY.getSource().defaultFluidState()),
++				new VerticalContactFluid("chocolate", com.simibubi.create.AllFluids.CHOCOLATE.getSource().defaultFluidState()))) {
++			for (String orientation : new String[] {"lava_above", "lava_below"}) {
++				for (boolean lavaFirst : new boolean[] {true, false})
++					runVerticalContactCase(helper, testCase++, liquid, orientation, lavaFirst);
++			}
++			for (boolean specialFlowing : new boolean[] {false, true}) {
++				var state = specialFlowing
++					? com.simibubi.create.foundation.fluid.FluidHelper.convertToFlowing(liquid.state().getType()).defaultFluidState().setValue(net.minecraft.world.level.material.FlowingFluid.LEVEL, 4)
++					: liquid.state();
++				var variant = new VerticalContactFluid(liquid.name(), state);
++				for (boolean lavaFirst : new boolean[] {true, false})
++					runVerticalContactCase(helper, testCase++, variant, "falling_lava", lavaFirst);
++			}
++		}
++		for (int tick : new int[] {1, 29, 30, 31, 59, 60, 61}) {
++			int at = tick;
++			helper.runAtTickTime(at, () -> verticalContactSampleAll(helper, at));
++		}
++		helper.runAtTickTime(70, helper::succeed);
++	}
++
++	private static final List<VerticalContactCase> verticalContactCases = new ArrayList<>();
++
++	private static void runVerticalContactCase(CreateGameTestHelper helper, int id, VerticalContactFluid liquid, String orientation, boolean lavaFirst) {
++		int x = 2 + (id % 4) * 4;
++		int z = 2 + (id / 4) * 4;
++		var special = new BlockPos(x, 2, z);
++		var lava = orientation.equals("lava_below") ? new BlockPos(x, 2, z).below() : new BlockPos(x, 3, z);
++		var gap = new BlockPos(x, 3, z);
++		if (orientation.equals("lava_below")) {
++			special = new BlockPos(x, 3, z);
++			lava = new BlockPos(x, 2, z);
++		}
++		if (orientation.equals("falling_lava")) {
++			special = new BlockPos(x, 2, z);
++			lava = new BlockPos(x, 4, z);
++		}
++		for (int y = 1; y <= 4; y++) {
++			helper.setBlock(new BlockPos(x - 1, y, z), Blocks.STONE);
++			helper.setBlock(new BlockPos(x + 1, y, z), Blocks.STONE);
++			helper.setBlock(new BlockPos(x, y, z - 1), Blocks.STONE);
++			helper.setBlock(new BlockPos(x, y, z + 1), Blocks.STONE);
++		}
++		helper.setBlock(new BlockPos(x, 1, z), Blocks.STONE);
++		var lavaState = Fluids.LAVA.defaultFluidState();
++		String order = lavaFirst ? "lava_first" : "fluid_first";
++		if (lavaFirst) {
++			helper.getLevel().setBlock(helper.absolutePos(lava), lavaState.createLegacyBlock(), 3);
++			verticalContactSample(helper, id, liquid, orientation, order, "precontact", 0, lava, special, gap);
++			helper.getLevel().setBlock(helper.absolutePos(special), liquid.state().createLegacyBlock(), 3);
++		} else {
++			helper.getLevel().setBlock(helper.absolutePos(special), liquid.state().createLegacyBlock(), 3);
++			verticalContactSample(helper, id, liquid, orientation, order, "precontact", 0, lava, special, gap);
++			helper.getLevel().setBlock(helper.absolutePos(lava), lavaState.createLegacyBlock(), 3);
++		}
++		verticalContactCases.add(new VerticalContactCase(id, liquid, orientation, order, lava, special, gap));
++		verticalContactSample(helper, id, liquid, orientation, order, "immediate", 0, lava, special, gap);
++	}
++
++	private static void verticalContactSampleAll(CreateGameTestHelper helper, int tick) {
++		for (var scenario : verticalContactCases)
++			verticalContactSample(helper, scenario.id(), scenario.liquid(), scenario.orientation(), scenario.order(), "scheduled", tick,
++				scenario.lava(), scenario.special(), scenario.gap());
++	}
++
++	private static void verticalContactSample(CreateGameTestHelper helper, int id, VerticalContactFluid liquid, String orientation, String order, String phase, int tick, BlockPos lava, BlockPos special, BlockPos gap) {
++		var cells = orientation.equals("falling_lava")
++			? List.of(new VerticalContactCell("lava", lava), new VerticalContactCell("gap", gap), new VerticalContactCell("special", special))
++			: List.of(new VerticalContactCell("lava", lava), new VerticalContactCell("special", special));
++		for (var cell : cells) {
++			var state = helper.getBlockState(cell.pos());
++			var fluid = state.getFluidState();
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_LAVA_VERTICAL,%d,%s,%b,%s,%s,%s,%d,%s,%s,%s,%s,%d,%b,%d,%d,%d%n",
++				id, liquid.name(), liquid.state().isSource(), orientation, order, phase, tick, cell.side(),
++				BuiltInRegistries.BLOCK.getKey(state.getBlock()), state, BuiltInRegistries.FLUID.getKey(fluid.getType()), fluid.getAmount(), fluid.isSource(),
++				cell.pos().getX(), cell.pos().getY(), cell.pos().getZ());
++		}
++	}
++
++	private record VerticalContactFluid(String name, net.minecraft.world.level.material.FluidState state) {}
++	private record VerticalContactCase(int id, VerticalContactFluid liquid, String orientation, String order, BlockPos lava, BlockPos special, BlockPos gap) {}
++	private record VerticalContactCell(String side, BlockPos pos) {}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestFluids.lavaVerticalContactOracle"))
++			.toList();
+ 	}
+ }

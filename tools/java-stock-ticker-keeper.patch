@@ -1,0 +1,68 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1292,4 +1292,54 @@
+ 		});
+ 	}
+ 
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stockTickerKeeper(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(4, 16, 4));
++		var stockTicker = com.simibubi.create.AllBlocks.STOCK_TICKER.getDefaultState();
++		var heater = com.simibubi.create.AllBlocks.BLAZE_BURNER.getDefaultState();
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.RED).getDefaultState();
++		var active = heater.setValue(com.simibubi.create.content.processing.burner.BlazeBurnerBlock.HEAT_LEVEL,
++			com.simibubi.create.content.processing.burner.BlazeBurnerBlock.HeatLevel.SMOULDERING);
++		var offset = new BlockPos[] {at.east(), at.east(), at.east(), at.east().below(),
++			at.east().below(2), at.east().south(), at.east(), at.east(), at.east().below()};
++		var actions = new String[] {"alone", "empty_seat", "occupied_seat", "occupied_one_below",
++			"occupied_two_below", "occupied_diagonal", "empty_burner", "adjacent_burner", "burner_below"};
++		level.setBlockAndUpdate(at, stockTicker);
++		var outline = stockTicker.getShape(level, at).toAabbs();
++		System.out.printf("CREATE_STOCK_TICKER_DEFAULT %s|%s%n", stockTicker, outline);
++		for (int i = 0; i < actions.length; i++) {
++			final int index = i;
++			helper.runAtTickTime(i + 2, () -> {
++				var target = offset[index];
++				net.minecraft.world.entity.animal.Pig pig = null;
++				if (index > 0 && index < 6) {
++					level.setBlockAndUpdate(target, seat);
++					if (index > 1) {
++						pig = net.minecraft.world.entity.EntityType.PIG.create(level);
++						pig.setPos(target.getX() + .5, target.getY(), target.getZ() + .5);
++						level.addFreshEntity(pig);
++						com.simibubi.create.content.contraptions.actors.seat.SeatBlock.sitDown(level, target, pig);
++					}
++				} else if (index >= 6) {
++					level.setBlockAndUpdate(target, index == 6 ? heater : active);
++				}
++				var entity = level.getBlockEntity(at, com.simibubi.create.AllBlockEntityTypes.STOCK_TICKER.get()).orElseThrow();
++				System.out.printf("CREATE_STOCK_TICKER_KEEPER %d,%s,%b%n", helper.getTick(), actions[index], entity.isKeeperPresent());
++				if (pig != null) {
++					var chair = pig.getVehicle();
++					pig.discard();
++					if (chair != null)
++						chair.discard();
++				}
++				if (index > 0)
++					level.setBlockAndUpdate(target, air);
++				if (index == actions.length - 1)
++					helper.succeed();
++			});
++		}
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().equals("TestMisc.stockLinkRequesterTune"))
++			.filter(test -> test.testName().equals("TestMisc.stockTickerKeeper"))
+ 			.toList();
+ 	}
+ }

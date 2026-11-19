@@ -1,0 +1,49 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..720317d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestFluids.honeyPipeSplit")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+index 4102b83..5db2009 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -163,6 +163,32 @@ public class TestFluids {
+ 		});
+ 	}
+ 
++	@GameTest(template = "3_pipe_split", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void honeyPipeSplit(CreateGameTestHelper helper) {
++		BlockPos pump = new BlockPos(2, 2, 2);
++		BlockPos source = new BlockPos(1, 2, 2);
++		BlockPos[] tanks = {new BlockPos(5, 2, 1), new BlockPos(5, 2, 2), new BlockPos(5, 2, 3)};
++		var handler = helper.fluidStorageAt(source);
++		handler.drain(Integer.MAX_VALUE, FluidAction.EXECUTE);
++		var honey = com.simibubi.create.foundation.fluid.FluidHelper.convertToStill(com.simibubi.create.AllFluids.HONEY.get());
++		int filled = handler.fill(new FluidStack(honey, 11000), FluidAction.EXECUTE);
++		helper.assertTrue(filled == 11000, "Source must hold 11000 mB honey");
++		helper.flipBlock(pump);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var sourceContents = helper.getTankContents(source);
++			int total = 0;
++			for (var tank : tanks) {
++				var content = helper.getTankContents(tank);
++				helper.assertTrue(content.isEmpty() || content.is(honey), "Destinations must contain honey");
++				total += content.getAmount();
++			}
++			System.out.printf("CREATE_HONEY_PIPE,%d,%d,%d%n", tick, sourceContents.getAmount(), total);
++			helper.assertTrue(tick >= 100, "Waiting for transfer");
++			helper.assertTrue(total > 0, "Honey must transfer");
++		});
++	}
++
+ 	@GameTest(template = "large_waterwheel", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
+ 	public static void largeWaterwheel(CreateGameTestHelper helper) {
+ 		BlockPos wheel = new BlockPos(4, 3, 2);

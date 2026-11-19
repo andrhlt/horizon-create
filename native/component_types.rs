@@ -1,0 +1,19 @@
+fn component_types(types: &mut Vec<String>) {
+    types.extend(
+        [
+            "create:sequenced_assembly",
+            "create:track_connecting_from",
+            "create:track_extend_curve",
+            crate::game::create_station::SELECTED,
+            crate::game::create_station::DIRECTION,
+            crate::game::create_glue::SELECTION,
+            crate::game::create_display_link::SELECTION,
+            crate::game::create_sandpaper::POLISHING,
+            crate::game::create_clipboard::COMPONENT,
+            crate::game::create_toolbox::INVENTORY_COMPONENT,
+            crate::game::create_toolbox::UUID_COMPONENT,
+            crate::game::create_backtank::AIR,
+        ]
+        .map(String::from),
+    );
+}

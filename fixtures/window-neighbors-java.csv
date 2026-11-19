@@ -1,0 +1,9 @@
+neighbor,state
+minecraft:air,"Block{create:oak_window_pane}[east=false,north=false,south=false,waterlogged=false,west=false]"
+minecraft:glass_pane,"Block{create:oak_window_pane}[east=true,north=false,south=false,waterlogged=false,west=false]"
+create:oak_window_pane,"Block{create:oak_window_pane}[east=true,north=false,south=false,waterlogged=false,west=false]"
+create:framed_glass_pane,"Block{create:oak_window_pane}[east=true,north=false,south=false,waterlogged=false,west=false]"
+minecraft:iron_bars,"Block{create:oak_window_pane}[east=true,north=false,south=false,waterlogged=false,west=false]"
+minecraft:stone,"Block{create:oak_window_pane}[east=true,north=false,south=false,waterlogged=false,west=false]"
+minecraft:glass,"Block{create:oak_window_pane}[east=true,north=false,south=false,waterlogged=false,west=false]"
+minecraft:oak_fence,"Block{create:oak_window_pane}[east=false,north=false,south=false,waterlogged=false,west=false]"

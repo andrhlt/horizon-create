@@ -1,0 +1,36 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d3c..7339d376e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -138,10 +138,31 @@ public class TestProcessing {
+ 
+ 	@GameTest(template = "wheat_milling")
+ 	public static void wheatMilling(CreateGameTestHelper helper) {
++		dumpCreateRegistry("block", net.minecraft.core.registries.BuiltInRegistries.BLOCK);
++		dumpCreateRegistry("item", net.minecraft.core.registries.BuiltInRegistries.ITEM);
++		dumpCreateRegistry("entity_type", net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE);
++		dumpCreateRegistry("block_entity_type", net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE);
++		dumpCreateRegistry("fluid", net.minecraft.core.registries.BuiltInRegistries.FLUID);
++		dumpCreateRegistry("menu", net.minecraft.core.registries.BuiltInRegistries.MENU);
++		dumpCreateRegistry("recipe_type", net.minecraft.core.registries.BuiltInRegistries.RECIPE_TYPE);
++		dumpCreateRegistry("sound_event", net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT);
++		dumpCreateRegistry("particle_type", net.minecraft.core.registries.BuiltInRegistries.PARTICLE_TYPE);
++		helper.getLevel().getRecipeManager().getRecipes().stream()
++			.map(net.minecraft.world.item.crafting.RecipeHolder::id)
++			.filter(id -> id.getNamespace().equals("create"))
++			.sorted()
++			.forEach(id -> System.out.println("CREATE_REGISTRY recipe " + id));
+ 		BlockPos output = new BlockPos(1, 2, 1);
+ 		BlockPos lever = new BlockPos(1, 7, 1);
+ 		helper.pullLever(lever);
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	private static void dumpCreateRegistry(String kind, net.minecraft.core.Registry<?> registry) {
++		registry.keySet().stream()
++			.filter(id -> id.getNamespace().equals("create"))
++			.sorted()
++			.forEach(id -> System.out.println("CREATE_REGISTRY " + kind + " " + id));
++	}
+ }

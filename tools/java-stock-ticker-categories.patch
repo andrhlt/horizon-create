@@ -1,0 +1,80 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1505,4 +1505,66 @@
+ 		}
+ 	}
+ 
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stockTickerCategories(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(4, 16, 4));
++		var iron = net.minecraft.world.item.Items.IRON_INGOT.getDefaultInstance();
++		var copper = net.minecraft.world.item.Items.COPPER_INGOT.getDefaultInstance();
++		var gold = net.minecraft.world.item.Items.GOLD_INGOT.getDefaultInstance();
++		var stone = net.minecraft.world.item.Items.ANDESITE.getDefaultInstance();
++		var filter = (java.util.function.BiFunction<String, java.util.List<net.minecraft.world.item.ItemStack>, net.minecraft.world.item.ItemStack>)
++			(name, items) -> {
++				var stack = com.simibubi.create.AllItems.FILTER.asStack();
++				stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal(name));
++				stack.set(com.simibubi.create.AllDataComponents.FILTER_ITEMS,
++					net.minecraft.world.item.component.ItemContainerContents.fromItems(items));
++				return stack;
++			};
++		var a = filter.apply("Iron and Gold", java.util.List.of(iron, gold));
++		var b = filter.apply("Copper and Iron", java.util.List.of(copper, iron));
++		var stacks = java.util.List.of(new com.simibubi.create.content.logistics.BigItemStack(iron, 12),
++			new com.simibubi.create.content.logistics.BigItemStack(copper, 6),
++			new com.simibubi.create.content.logistics.BigItemStack(gold, 3),
++			new com.simibubi.create.content.logistics.BigItemStack(stone, 2));
++		var getTicker = (java.util.function.Supplier<com.simibubi.create.content.logistics.stockTicker.StockTickerBlockEntity>)
++			() -> level.getBlockEntity(at, com.simibubi.create.AllBlockEntityTypes.STOCK_TICKER.get()).orElseThrow();
++		var apply = (java.util.function.Consumer<java.util.List<net.minecraft.world.item.ItemStack>>) filters -> {
++			var ticker = getTicker.get();
++			var nbt = ticker.saveWithoutMetadata(level.registryAccess());
++			nbt.put("Categories", net.createmod.catnip.nbt.NBTHelper.writeItemList(filters, level.registryAccess()));
++			ticker.loadWithComponents(nbt, level.registryAccess());
++		};
++		var print = (java.util.function.Consumer<String>) state -> {
++			var ticker = getTicker.get();
++			var snapshot = ticker.getClientStockSnapshot();
++			var grouped = snapshot == null ? "_" : snapshot.stream().map(group -> group.stream()
++				.map(stack -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.stack.getItem()).getPath()
++					+ ":" + stack.count).collect(java.util.stream.Collectors.joining("+")))
++				.collect(java.util.stream.Collectors.joining("|"));
++			var saved = ticker.saveWithoutMetadata(level.registryAccess()).getList("Categories", 10);
++			System.out.printf("CREATE_TICKER_CATEGORIES %d,%s,%d,%s%n", helper.getTick(), state, saved.size(), grouped);
++		};
++		helper.runAtTickTime(2, () -> {
++			level.setBlockAndUpdate(at, AllBlocks.STOCK_TICKER.getDefaultState());
++			apply.accept(java.util.List.of(a, stone, b));
++			print.accept("loaded");
++		});
++		helper.runAtTickTime(3, () -> {
++			getTicker.get().receiveStockPacket(stacks.subList(0, 2), false);
++			print.accept("part");
++		});
++		helper.runAtTickTime(4, () -> {
++			getTicker.get().receiveStockPacket(stacks.subList(2, 4), true);
++			print.accept("completed");
++		});
++		helper.runAtTickTime(5, () -> {
++			apply.accept(java.util.List.of(b, a));
++			getTicker.get().receiveStockPacket(stacks, true);
++			print.accept("reordered");
++			helper.succeed();
++		});
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().equals("TestMisc.stockTickerOrder"))
++			.filter(test -> test.testName().equals("TestMisc.stockTickerCategories"))
+ 			.toList();
+ 	}
+ }

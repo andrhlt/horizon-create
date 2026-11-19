@@ -1,0 +1,33 @@
+[
+  {
+    "tick": 2,
+    "action": "new",
+    "handled": true,
+    "item_consumed": true,
+    "player_recorded": true
+  },
+  {
+    "tick": 3,
+    "action": "tune",
+    "handled": true,
+    "held_count": 1,
+    "matches_original_frequency": true,
+    "foil": true
+  },
+  {
+    "tick": 4,
+    "action": "place",
+    "handled": true,
+    "item_consumed": true,
+    "matches_original_frequency": true,
+    "player_recorded": true
+  },
+  {
+    "tick": 5,
+    "action": "clear",
+    "handled": true,
+    "held_count": 1,
+    "frequency_cleared": true,
+    "foil": false
+  }
+]

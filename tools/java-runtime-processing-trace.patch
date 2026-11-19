@@ -1,0 +1,22 @@
+--- a/src/main/java/com/simibubi/create/foundation/data/RuntimeDataGenerator.java
++++ b/src/main/java/com/simibubi/create/foundation/data/RuntimeDataGenerator.java
+@@ -61,12 +61,17 @@
+ 		}
+ 
+ 		Create.LOGGER.info("Created {} recipes which will be injected into the game", JSON_FILES.size());
+-		JSON_FILES.forEach(dynamicPack::put);
++		JSON_FILES.forEach((id, json) -> {
++            System.out.println("CREATE_RUNTIME_RECIPE " + id + " " + json);
++            dynamicPack.put(id, json);
++        });
+ 
+ 		Create.LOGGER.info("Created {} tags which will be injected into the game", TAGS.size());
+ 		for (Map.Entry<ResourceLocation, Collection<TagEntry>> tags : TAGS.asMap().entrySet()) {
+ 			TagFile tagFile = new TagFile(new ArrayList<>(tags.getValue()), false);
+-			dynamicPack.put(tags.getKey().withPrefix("tags/item/"), TagFile.CODEC.encodeStart(JsonOps.INSTANCE, tagFile).result().orElseThrow());
++            JsonElement json = TagFile.CODEC.encodeStart(JsonOps.INSTANCE, tagFile).result().orElseThrow();
++            System.out.println("CREATE_RUNTIME_TAG " + tags.getKey() + " " + json);
++            dynamicPack.put(tags.getKey().withPrefix("tags/item/"), json);
+ 		}
+ 
+ 		JSON_FILES.clear();

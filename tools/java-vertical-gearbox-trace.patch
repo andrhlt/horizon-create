@@ -1,0 +1,81 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..39231c6b5 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.verticalGearboxItem"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..130d8fbf4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,62 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 15)
++	public static void verticalGearboxItem(CreateGameTestHelper helper) {
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var east = net.minecraft.core.Direction.EAST;
++		var north = net.minecraft.core.Direction.NORTH;
++		var up = net.minecraft.core.Direction.UP;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var block = com.simibubi.create.AllBlocks.GEARBOX.get();
++		var vertical = com.simibubi.create.AllItems.VERTICAL_GEARBOX.get();
++		float[] yaw = {0, 0, 90, 0, 90, 0, 90, 0, 0};
++		for (int test = 0; test < yaw.length; test++) {
++			var pos = helper.absolutePos(new BlockPos(12 + test * 4, 3, 3));
++			var face = yaw[test] == 90 ? east : north;
++			var support = pos.relative(face.getOpposite());
++			level.setBlockAndUpdate(support, Blocks.STONE.defaultBlockState());
++			if (test == 3 || test == 5)
++				level.setBlockAndUpdate(pos.east(), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis()));
++			if (test == 4 || test == 5 || test == 6)
++				level.setBlockAndUpdate(pos.north(), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, north.getAxis()));
++			if (test == 7)
++				level.setBlockAndUpdate(pos.below(), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, up.getAxis()));
++			if (test == 8)
++				level.setBlockAndUpdate(pos.east(), com.simibubi.create.AllBlocks.CLUTCH.getDefaultState().setValue(axis, east.getAxis())
++					.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED, true));
++			if (test == 8)
++				level.setBlockAndUpdate(pos.east().above(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++			player.setYRot(yaw[test]);
++			player.setYHeadRot(yaw[test]);
++			player.setYBodyRot(yaw[test]);
++			player.yRotO = yaw[test];
++			player.setShiftKeyDown(test == 6);
++			var stack = new ItemStack(test == 0 ? block.asItem() : vertical);
++			player.setItemInHand(hand, stack);
++			var hit = new net.minecraft.world.phys.BlockHitResult(support.getCenter().relative(face, 0.5), face, support, false);
++			var context = new net.minecraft.world.item.context.BlockPlaceContext(player, hand, stack, hit);
++			var result = ((net.minecraft.world.item.BlockItem) stack.getItem()).place(context);
++			var landed = level.getBlockState(pos);
++			var clone = block.getCloneItemStack(landed, hit, level, pos, player);
++			var loot = net.minecraft.world.level.block.Block.getDrops(landed, level, pos, level.getBlockEntity(pos), player, new ItemStack(Items.IRON_PICKAXE));
++			var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++			System.out.printf("CREATE_GEARBOX_PLACE,%d,%s,%s,%s,%s,%d,%s%n", test, result.consumesAction(), landed.getValue(axis),
++				items.getKey(clone.getItem()), items.getKey(loot.getFirst().getItem()), loot.getFirst().getCount(), stack.isEmpty());
++			var wrench = new ItemStack(com.simibubi.create.AllItems.WRENCH.get());
++			player.setItemInHand(hand, wrench);
++			player.setShiftKeyDown(true);
++			int count = player.getInventory().countItem(clone.getItem());
++			var pickupHit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(up, .5), up, pos, false);
++			var pickupContext = new net.minecraft.world.item.context.UseOnContext(player, hand, pickupHit);
++			var pickedUp = block.onSneakWrenched(landed, pickupContext);
++			System.out.printf("CREATE_GEARBOX_PICKUP,%d,%s,%s,%d%n", test, pickedUp.consumesAction(), level.getBlockState(pos).isAir(),
++				player.getInventory().countItem(clone.getItem()) - count);
++		}
++		player.setShiftKeyDown(false);
++		helper.succeed();
++	}
+ }

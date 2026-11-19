@@ -1,0 +1,7 @@
+{
+  "template": "minecraft:raw_gold_block",
+  "properties": {
+    "requires_tool": true,
+    "map_color": 61
+  }
+}

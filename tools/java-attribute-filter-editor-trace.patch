@@ -1,0 +1,100 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..5253fb4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.attributeFilterMenu"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..60cc1c5 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,81 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void attributeFilterMenu(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var inv = player.getInventory();
++		var filter = com.simibubi.create.AllItems.ATTRIBUTE_FILTER.asStack();
++		inv.clearContent();
++		inv.selected = 0;
++		inv.setItem(0, filter);
++		inv.setItem(1, new ItemStack(Items.APPLE, 5));
++		inv.setItem(2, new ItemStack(Items.STONE, 3));
++		var menu = com.simibubi.create.content.logistics.filter.AttributeFilterMenu.create(1, inv, filter);
++		player.containerMenu = menu;
++		attributeFilterMenuRecord("open", menu, filter, player);
++		menu.clicked(28, 0, net.minecraft.world.inventory.ClickType.QUICK_MOVE, player);
++		attributeFilterMenuRecord("reference", menu, filter, player);
++
++		var apple = menu.ghostInventory.getStackInSlot(0);
++		var attributes = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.getAllAttributes(apple, level);
++		for (int i = 0; i < attributes.size(); i++) {
++			var attr = attributes.get(i);
++			var tag = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.saveStatic(attr, player.registryAccess());
++			System.out.printf("ATTRIBUTE_CHOICES,%d,%s%n", i, tag);
++		}
++		var targets = new String[] {"create:consumable", "create:compostable"};
++		for (int step = 0; step < targets.length; step++) {
++			for (var attr : attributes) {
++				var type = com.simibubi.create.api.registry.CreateBuiltInRegistries.ITEM_ATTRIBUTE_TYPE.getKey(attr.getType());
++				if (!targets[step].equals(type.toString()))
++					continue;
++				var option = step == 0
++					? com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.ADD_TAG
++					: com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.ADD_INVERTED_TAG;
++				var data = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.saveStatic(attr, player.registryAccess());
++				new com.simibubi.create.content.logistics.filter.FilterScreenPacket(option, data).handle(player);
++				break;
++			}
++		}
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(
++			com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.WHITELIST2).handle(player);
++		menu.removed(player);
++		attributeFilterMenuRecord("save", menu, filter, player);
++
++		menu = com.simibubi.create.content.logistics.filter.AttributeFilterMenu.create(2, inv, filter);
++		player.containerMenu = menu;
++		attributeFilterMenuRecord("reopen", menu, filter, player);
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(
++			com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.BLACKLIST).handle(player);
++		menu.removed(player);
++		attributeFilterMenuRecord("deny", menu, filter, player);
++
++		menu = com.simibubi.create.content.logistics.filter.AttributeFilterMenu.create(3, inv, filter);
++		player.containerMenu = menu;
++		menu.clearContents();
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(
++			com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.WHITELIST).handle(player);
++		menu.removed(player);
++		attributeFilterMenuRecord("reset", menu, filter, player);
++		player.containerMenu = player.inventoryMenu;
++		helper.succeed();
++	}
++
++	private static void attributeFilterMenuRecord(String action,
++		com.simibubi.create.content.logistics.filter.AttributeFilterMenu menu,
++		ItemStack filter, net.minecraft.server.level.ServerPlayer player) {
++		var inv = player.getInventory();
++		var list = filter.get(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES);
++		var mode = filter.get(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE);
++		var matches = com.simibubi.create.content.logistics.filter.FilterItemStack.of(filter.copy());
++		System.out.printf("ATTRIBUTE_MENU,%s,%d,%d,%d,%d,%d,%s,%d,%b,%b,%b%n", action,
++			menu.ghostInventory.getStackInSlot(0).getCount(), menu.ghostInventory.getStackInSlot(1).getCount(),
++			inv.getItem(0).getCount(), inv.getItem(1).getCount(), inv.getItem(2).getCount(), mode,
++			list == null ? 0 : list.size(), menu.stillValid(player),
++			matches.test(player.level(), new ItemStack(Items.APPLE), false),
++			matches.test(player.level(), new ItemStack(Items.STONE), false));
++	}
+ }

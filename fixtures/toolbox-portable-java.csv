@@ -1,0 +1,2 @@
+original_replacement,item,count,slots,carried_stored,carried_uuid,carried_name,restored_stored,restored_uuid,restored_name
+minecraft:water,create:black_toolbox,1,32,16,true,true,16,true,true

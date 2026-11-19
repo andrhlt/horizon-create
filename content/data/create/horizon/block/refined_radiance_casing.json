@@ -1,0 +1,8 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {
+    "sounds": "minecraft:oak_planks",
+    "light": 12
+  }
+}

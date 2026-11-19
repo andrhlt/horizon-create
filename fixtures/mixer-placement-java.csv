@@ -1,0 +1,8 @@
+case,facing,held,height
+stone,-,0,1
+over_basin,-,0,2
+over_depot,-,0,2
+over_ejector,-,0,2
+over_flat_belt,-,0,2
+over_up_belt,-,0,1
+blocked_basin,-,1,0

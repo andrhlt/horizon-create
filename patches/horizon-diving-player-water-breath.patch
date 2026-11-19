@@ -1,0 +1,95 @@
+diff --git a/crates/horizon-client/src/motion.rs b/crates/horizon-client/src/motion.rs
+--- a/crates/horizon-client/src/motion.rs
++++ b/crates/horizon-client/src/motion.rs
+@@ -293,6 +293,8 @@
+     pub fire_ticks: i32,
+     pub air: i32,
+     pub respiration: i32,
++    pub create_diving_air: bool,
++    pub create_diving_charge_tick: Option<i64>,
+ 
+     pub position: Vec3,
+     pub velocity: Vec3,
+diff --git a/crates/horizon-client/src/motion/body.rs b/crates/horizon-client/src/motion/body.rs
+--- a/crates/horizon-client/src/motion/body.rs
++++ b/crates/horizon-client/src/motion/body.rs
+@@ -75,6 +75,8 @@
+             fire_ticks: -20,
+             air: 300,
+             respiration: 0,
++            create_diving_air: false,
++            create_diving_charge_tick: None,
+             speed: 0.0,
+             item_use_speed: None,
+             item_use_slows_sprint: false,
+diff --git a/crates/horizon-client/src/motion/environment.rs b/crates/horizon-client/src/motion/environment.rs
+--- a/crates/horizon-client/src/motion/environment.rs
++++ b/crates/horizon-client/src/motion/environment.rs
+@@ -50,6 +50,13 @@
+     }
+     /// `LivingEntity.baseTick`'s air supply and drowning, then lava.
+     pub fn tick_environment_damage(&mut self) -> Result<()> {
++        self.tick_environment_damage_with(|_, _, _| {})
++    }
++
++    pub fn tick_environment_damage_with(
++        &mut self,
++        modify_breath: impl FnOnce(&mut Breath, bool, i64),
++    ) -> Result<()> {
+         let eye = BlockPos::containing(self.player.position.add_vector(Vec3::new(
+             0.0,
+             f64::from(self.player.dimensions.eye_height),
+@@ -97,11 +104,17 @@
+             }
+         };
+         // LivingBreatheEvent, on the server's copy of the player only.
+-        let breath = if self.player.client_side {
++        let mut breath = if self.player.client_side {
+             vanilla
+         } else {
+             breathe(self.player.entity_id as u32, "minecraft:player", vanilla)
+         };
++        let in_lava = self.player.is_in_lava();
++        if self.player.client_side && self.player.create_diving_air && !breath.can_breathe && !in_lava {
++            breath.can_breathe = true;
++            breath.refill = 300;
++        }
++        modify_breath(&mut breath, in_lava, self.scene.game_time);
+         // LivingDrownEvent, likewise.
+         if let Some(drowning) = drown(
+             self.player.entity_id as u32,
+diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -3670,6 +3670,7 @@
+         player.item_use_speed = item_use_speed;
+         player.item_use_slows_sprint = item_use_slows_sprint;
+         player.respiration = respiration;
++        player.create_diving_air = create_backtank::has_diving_air(&self.armor);
+         player.glider = glider;
+         // On someone else's server the glide flag is the server's
+         // (`DATA_SHARED_FLAGS_ID`, applied by the SetEntityData handler); the
+diff --git a/crates/horizon-client/src/game/lan_actions.rs b/crates/horizon-client/src/game/lan_actions.rs
+--- a/crates/horizon-client/src/game/lan_actions.rs
++++ b/crates/horizon-client/src/game/lan_actions.rs
+@@ -5225,7 +5225,19 @@
+             w.player.burn_from_stepping_immune = burn_immune;
+             let _ = w.server_block_damage(start);
+             let _ = w.update_soul_speed_block();
+-            let _ = w.tick_environment_damage();
++            let last_charge = w.player.create_diving_charge_tick;
++            let mut charged_at = None;
++            let _ = w.tick_environment_damage_with(|breath, in_lava, tick| {
++                // Player updates can run several times while the world tick is frozen.
++                let charge_due = tick.rem_euclid(20) == 0 && last_charge != Some(tick);
++                if super::create_backtank::breathe_player(&mut game.armor, breath, in_lava, charge_due) {
++                    charged_at = Some(tick);
++                }
++            });
++            if let Some(tick) = charged_at {
++                w.player.create_diving_charge_tick = Some(tick);
++                game.guest_inventory_resend = true;
++            }
+             let _ = w.apply_fire_contact();
+             let _ = w.server_hazards_tick(in_wall);
+             // LivingEntity.aiStep: a Riptide spin counts down on the server's

@@ -1,0 +1,9 @@
+{
+  "template": "minecraft:copper_block",
+  "item": true,
+  "properties": {"occludes": false},
+  "state_properties": {
+    "facing": {"type": "enum", "values": ["north", "east", "south", "west"]}
+  },
+  "default_state": {"facing": "north"}
+}

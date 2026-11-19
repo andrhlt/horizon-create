@@ -1,0 +1,20 @@
+[
+  {
+    "tick": 0,
+    "author": "first",
+    "written": true,
+    "components": "{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"Sort brass\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}}"
+  },
+  {
+    "tick": 1,
+    "author": "second",
+    "written": true,
+    "components": "{\"create:clipboard_content\":{pages:[[{checked:1b,icon:{},item_amount:0,text:\"Sort brass\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}}"
+  },
+  {
+    "tick": 2,
+    "author": "first",
+    "written": false,
+    "components": "{}"
+  }
+]

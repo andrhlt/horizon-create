@@ -1,0 +1,129 @@
+diff --git a/crates/horizon-client/src/game/native_hooks.rs b/crates/horizon-client/src/game/native_hooks.rs
+index 4b5eec8..f9a1b13 100644
+--- a/crates/horizon-client/src/game/native_hooks.rs
++++ b/crates/horizon-client/src/game/native_hooks.rs
+@@ -1965,6 +1965,8 @@ pub(crate) struct NativeRecipeView {
+     pub(crate) width: u32,
+     pub(crate) height: u32,
+     pub(crate) slots: Vec<Vec<NativeStack>>,
++    /// Exact fluids in input slots by index; the corresponding item slot is empty.
++    pub(crate) fluid_inputs: Vec<(usize, NativeFluidStack)>,
+     pub(crate) results: Vec<NativeStack>,
+     /// A short line under the recipe (a cooking time), or "".
+     pub(crate) note: String,
+diff --git a/crates/horizon-client/src/game/native_panel.rs b/crates/horizon-client/src/game/native_panel.rs
+index b02f5b1..d3c707c 100644
+--- a/crates/horizon-client/src/game/native_panel.rs
++++ b/crates/horizon-client/src/game/native_panel.rs
+@@ -546,6 +546,13 @@ impl Game<'_> {
+         }
+         if self.carried.is_some() {
+             self.draw_carried(batch);
++        } else if let Some(fluid) = self.recipe_fluid_hovered(&layout) {
++            let label = self.translate("block.minecraft.water", "Water");
++            let lines = vec![
++                (label, u32::MAX),
++                (format!("{} mB", fluid.amount), u32::MAX),
++            ];
++            self.draw_tooltip_lines(batch, &lines, cursor.0, cursor.1);
+         } else if let Some(stack) = self.browser_pointed_stack(&layout) {
+             self.draw_stack_tooltip(batch, &stack.1, cursor.0, cursor.1);
+         } else {
+@@ -803,6 +810,7 @@ mod tests {
+             width: 5,
+             height: 1,
+             slots: vec![vec![stack("minecraft:oak_log")]; 12],
++            fluid_inputs: Vec::new(),
+             results: vec![stack("minecraft:oak_planks")],
+             note: String::new(),
+             action: Some(true),
+diff --git a/crates/horizon-client/src/game/native_panel_recipes.rs b/crates/horizon-client/src/game/native_panel_recipes.rs
+index 7116d93..add97a0 100644
+--- a/crates/horizon-client/src/game/native_panel_recipes.rs
++++ b/crates/horizon-client/src/game/native_panel_recipes.rs
+@@ -14,6 +14,7 @@ use super::{
+ use horizon_client::{
+     hud::{HudBatch, rgba},
+     items::ItemStack,
++    mod_api::NativeFluidStack,
+     text::Text,
+ };
+ use std::time::Instant;
+@@ -131,6 +132,7 @@ pub(super) struct Shown {
+     /// Each slot's stacks (the result last), as the mod sent them and as
+     /// stacks; a stack the game doesn't have is left out of the cycle.
+     slots: Vec<Vec<(BrowserStack, ItemStack)>>,
++    fluid_inputs: Vec<(usize, NativeFluidStack)>,
+     note: String,
+     action: Option<bool>,
+     has_fuel: bool,
+@@ -208,6 +210,7 @@ impl Pages {
+                     width: r.width as usize,
+                     height: r.height as usize,
+                     slots,
++                    fluid_inputs: r.fluid_inputs.clone(),
+                     note: r.note.clone(),
+                     action: r.action,
+                     has_fuel: !fuels.is_empty(),
+@@ -418,6 +421,21 @@ impl Game<'_> {
+             })
+     }
+ 
++    /// The exact fluid slot under the cursor, independent of item lookup.
++    pub(super) fn recipe_fluid_hovered(&self, layout: &Layout) -> Option<NativeFluidStack> {
++        let pages = self.panel.recipes.as_ref()?;
++        self.recipes_shown(layout)
++            .into_iter()
++            .find_map(|(i, (x, y))| {
++                let recipe = pages.recipes.get(i)?;
++                let (places, _, _) = recipe.places(layout.width());
++                recipe.fluid_inputs.iter().find_map(|(slot, fluid)| {
++                    let &(sx, sy) = places.get(*slot)?;
++                    inside(self.cursor, [x + sx, y + sy, SLOT, SLOT]).then(|| fluid.clone())
++                })
++            })
++    }
++
+     /// Draws the title row, the page's recipes and the page arrows.
+     pub(super) fn draw_browser_recipes(&mut self, batch: &mut HudBatch, layout: &Layout) {
+         let Some(pages) = &self.panel.recipes else {
+@@ -581,6 +599,26 @@ impl Game<'_> {
+                 batch.text(atlas, &note, x, y + h + 2.0, rgba(224, 224, 224, 255), true);
+             }
+             for (k, &(sx, sy)) in at.iter().enumerate().filter(|(_, p)| p.0.is_finite()) {
++                if let Some((_, fluid)) = r.fluid_inputs.iter().find(|(slot, _)| *slot == k) {
++                    if fluid.fluid == "minecraft:water" && fluid.components.is_empty() {
++                        batch.sprite_scaled(
++                            atlas,
++                            "block/water_still",
++                            x + sx + 1.0,
++                            y + sy + 1.0,
++                            16.0,
++                            16.0,
++                            rgba(63, 118, 228, 255),
++                        );
++                        horizon_client::widgets::record_as(
++                            &format!("Water {} mB", fluid.amount),
++                            [x + sx + 1.0, y + sy + 1.0, 16.0, 16.0],
++                            true,
++                            horizon_client::widgets::Kind::Button,
++                        );
++                    }
++                    continue;
++                }
+                 let Some((_, stack)) = self.recipe_slot_now(i, k).cloned() else {
+                     continue;
+                 };
+diff --git a/crates/horizon-client/src/mod_api.rs b/crates/horizon-client/src/mod_api.rs
+index 7c6008f..b5d73f9 100644
+--- a/crates/horizon-client/src/mod_api.rs
++++ b/crates/horizon-client/src/mod_api.rs
+@@ -515,6 +515,8 @@ pub struct NativeCategoryRecipe {
+     /// Its input slots, each with the stacks it takes; none for a recipe
+     /// with no input (a catch).
+     pub inputs: Vec<Vec<NativeStack>>,
++    /// Exact fluids in input slots by index; the corresponding item slot is empty.
++    pub fluid_inputs: Vec<(usize, NativeFluidStack)>,
+     pub outputs: Vec<NativeChanceOutput>,
+     /// Lines about the whole recipe.
+     pub notes: Vec<String>,

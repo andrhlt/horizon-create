@@ -1,0 +1,15 @@
+{
+  "template": "minecraft:gold_block",
+  "item": true,
+  "properties": {
+    "hardness": 3.0,
+    "explosion_resistance": 6.0,
+    "requires_tool": true,
+    "map_color": 7,
+    "light": 15,
+    "sounds": "minecraft:amethyst_block"
+  },
+  "components": {
+    "minecraft:rarity": "uncommon"
+  }
+}

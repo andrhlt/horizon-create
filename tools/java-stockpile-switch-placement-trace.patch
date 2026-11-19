@@ -1,0 +1,70 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..fe205de8a 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.stockpileSwitchPlacement"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..b931ea6e3 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,51 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 50)
++	public static void stockpileSwitchPlacement(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var target = com.simibubi.create.content.redstone.DirectedDirectionalBlock.TARGET;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var stockpile = com.simibubi.create.AllBlocks.THRESHOLD_SWITCH.get();
++		String[] faces = {"north", "south", "east", "west", "up", "down", "north", "north", "north", "north", "up", "down"};
++		float[] yaws = {0, 180, 90, -90, 0, 180, 0, 0, 0, 0, 0, 180};
++		float[] pitches = {16, 16, 16, 16, 60, -60, 0, 0, 0, 0, 60, -60};
++		for (int test = 0; test < faces.length; test++) {
++			var pos = helper.absolutePos(new BlockPos(10 + 3 * test, 7, 4));
++			var side = net.minecraft.core.Direction.byName(faces[test]);
++			var support = pos.relative(side.getOpposite());
++			String block = test < 6 ? "minecraft:barrel" : test == 10 ? "create:fluid_tank" : "minecraft:stone";
++			var supportBlock = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(net.minecraft.resources.ResourceLocation.parse(block));
++			level.setBlockAndUpdate(support, supportBlock.defaultBlockState());
++			String neighboring = "-";
++			if (test == 8 || test == 9) {
++				neighboring = test == 8 ? "east" : "east+west";
++				level.setBlockAndUpdate(pos.east(), Blocks.BARREL.defaultBlockState());
++				if (test == 9)
++					level.setBlockAndUpdate(pos.west(), Blocks.BARREL.defaultBlockState());
++			}
++			player.setYRot(yaws[test]);
++			player.setXRot(pitches[test]);
++			player.setYHeadRot(yaws[test]);
++			player.setYBodyRot(yaws[test]);
++			player.yRotO = yaws[test];
++			player.xRotO = pitches[test];
++			boolean sneak = test < 6 || test == 7 || test == 9 || test == 10;
++			player.setShiftKeyDown(sneak);
++			var stack = new ItemStack(stockpile.asItem());
++			player.setItemInHand(hand, stack);
++			var hit = new net.minecraft.world.phys.BlockHitResult(support.getCenter().relative(side, 0.5), side, support, false);
++			var context = new net.minecraft.world.item.context.BlockPlaceContext(player, hand, stack, hit);
++			var result = ((net.minecraft.world.item.BlockItem) stack.getItem()).place(context);
++			var placed = level.getBlockState(pos);
++			System.out.printf("STOCKPILE_PLACEMENT,%d,%s,%s,%.0f,%.0f,%b,%s,%s,%s,%b%n",
++				test, block, side.getName(), yaws[test], pitches[test], sneak, neighboring,
++				placed.getValue(facing).getName(), placed.getValue(target).getSerializedName(),
++				result.consumesAction() && stack.isEmpty());
++		}
++		player.setShiftKeyDown(false);
++		helper.succeed();
++	}
+ }

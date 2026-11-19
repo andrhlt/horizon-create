@@ -1,0 +1,17 @@
+color,recipe,output,count,retained_uuid,retained_inventory,retained_name
+white,create:crafting/curiosities/toolbox_dyeing,create:white_toolbox,1,true,true,true
+orange,create:crafting/curiosities/toolbox_dyeing,create:orange_toolbox,1,true,true,true
+magenta,create:crafting/curiosities/toolbox_dyeing,create:magenta_toolbox,1,true,true,true
+light_blue,create:crafting/curiosities/toolbox_dyeing,create:light_blue_toolbox,1,true,true,true
+yellow,create:crafting/curiosities/toolbox_dyeing,create:yellow_toolbox,1,true,true,true
+lime,create:crafting/curiosities/toolbox_dyeing,create:lime_toolbox,1,true,true,true
+pink,create:crafting/curiosities/toolbox_dyeing,create:pink_toolbox,1,true,true,true
+gray,create:crafting/curiosities/toolbox_dyeing,create:gray_toolbox,1,true,true,true
+light_gray,create:crafting/curiosities/toolbox_dyeing,create:light_gray_toolbox,1,true,true,true
+cyan,create:crafting/curiosities/toolbox_dyeing,create:cyan_toolbox,1,true,true,true
+purple,create:crafting/curiosities/toolbox_dyeing,create:purple_toolbox,1,true,true,true
+blue,create:crafting/curiosities/toolbox_dyeing,create:blue_toolbox,1,true,true,true
+brown,create:crafting/curiosities/toolbox_dyeing,create:brown_toolbox,1,true,true,true
+green,create:crafting/curiosities/toolbox_dyeing,create:green_toolbox,1,true,true,true
+red,create:crafting/curiosities/toolbox_dyeing,create:red_toolbox,1,true,true,true
+black,create:crafting/curiosities/toolbox_dyeing,create:black_toolbox,1,true,true,true

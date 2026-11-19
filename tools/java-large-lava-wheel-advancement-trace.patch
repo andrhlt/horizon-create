@@ -1,0 +1,29 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -401,12 +401,12 @@
+         var water = level.getServer().getAdvancements().get(com.simibubi.create.Create.asResource("water_wheel"));
+         var magma = level.getServer().getAdvancements().get(com.simibubi.create.Create.asResource("lava_wheel_00000"));
+         var hub = helper.absolutePos(new BlockPos(3, 9, 2));
+-        var wheelState = com.simibubi.create.AllBlocks.WATER_WHEEL.getDefaultState().setValue(
+-            net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING, net.minecraft.core.Direction.NORTH);
++        var wheelState = com.simibubi.create.AllBlocks.LARGE_WATER_WHEEL.getDefaultState().setValue(
++            net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS, net.minecraft.core.Direction.Axis.Z);
+         level.setBlockAndUpdate(hub, wheelState);
+-        wheelState.getBlock().setPlacedBy(level, hub, wheelState, owner, com.simibubi.create.AllBlocks.WATER_WHEEL.asStack());
+-        level.setBlockAndUpdate(hub.east(2), Blocks.STONE.defaultBlockState());
+-        level.setBlockAndUpdate(hub.east(2).above(), Blocks.STONE.defaultBlockState());
++        wheelState.getBlock().setPlacedBy(level, hub, wheelState, owner, com.simibubi.create.AllBlocks.LARGE_WATER_WHEEL.asStack());
++        level.setBlockAndUpdate(hub.east(3), Blocks.STONE.defaultBlockState());
++        level.setBlockAndUpdate(hub.east(3).above(), Blocks.STONE.defaultBlockState());
+         for (int tick = 1; tick <= 18; tick++) {
+             int t = tick;
+             helper.runAfterDelay(t, () -> {
+@@ -417,7 +417,7 @@
+                 System.out.printf(java.util.Locale.ROOT, "CREATE_LAVA_WHEEL %d;%d;%s;%s;%s%n",
+                     t, source.flowScore, waterDone, lavaDone, witnessDone);
+                 if (t == 4)
+-                    level.setBlockAndUpdate(hub.east(), Blocks.LAVA.defaultBlockState().setValue(
++                    level.setBlockAndUpdate(hub.east(2), Blocks.LAVA.defaultBlockState().setValue(
+                         net.minecraft.world.level.block.LiquidBlock.LEVEL, 8));
+                 if (t == 18) {
+                     helper.assertTrue(source.flowScore != 0 && lavaDone && !waterDone && !witnessDone,

@@ -1,0 +1,11 @@
+diff --git a/crates/horizon-client/src/game/minecarts.rs b/crates/horizon-client/src/game/minecarts.rs
+--- a/crates/horizon-client/src/game/minecarts.rs
++++ b/crates/horizon-client/src/game/minecarts.rs
+@@ -2526,6 +2526,7 @@
+                     self.carts[i].position.z,
+                 ];
+                 self.native_vehicle_destroy(self.carts[i].kind.id(), at);
++                super::create_minecart_coupling::cart_destroyed(self, id);
+             }
+             let mut c = self.carts.remove(i);
+             if c.kind == CartKind::Tnt && (fire || speed >= f64::from(0.01f32)) {

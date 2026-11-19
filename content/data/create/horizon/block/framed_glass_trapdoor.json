@@ -1,0 +1,14 @@
+{
+  "template": "minecraft:oak_trapdoor",
+  "item": true,
+  "properties": {
+    "hardness": 3.0,
+    "explosion_resistance": 6.0,
+    "requires_tool": true,
+    "waterloggable": true,
+    "sounds": "minecraft:glass",
+    "map_color": 0,
+    "occludes": false,
+    "trapdoor_sound_source": "minecraft:iron_trapdoor"
+  }
+}

@@ -1,0 +1,11 @@
+gamemode,charged,sound,category,x,y,z,volume,pitch
+SURVIVAL,3,minecraft:entity.snowball.throw,6,0.000000,0.000000,0.000000,0.500000,0.500000
+SURVIVAL,4,minecraft:entity.snowball.throw,6,0.000000,0.000000,0.000000,0.500000,0.500000
+SURVIVAL,8,minecraft:entity.snowball.throw,6,0.000000,0.000000,0.000000,0.500000,0.500000
+SURVIVAL,20,minecraft:entity.snowball.throw,6,0.000000,0.000000,0.000000,0.500000,0.500000
+SURVIVAL,40,minecraft:entity.snowball.throw,6,0.000000,0.000000,0.000000,0.500000,0.500000
+CREATIVE,3,minecraft:entity.snowball.throw,6,0.000000,0.000000,0.000000,0.500000,0.500000
+CREATIVE,4,minecraft:entity.snowball.throw,6,0.000000,0.000000,0.000000,0.500000,0.500000
+CREATIVE,8,minecraft:entity.snowball.throw,6,0.000000,0.000000,0.000000,0.500000,0.500000
+CREATIVE,20,minecraft:entity.snowball.throw,6,0.000000,0.000000,0.000000,0.500000,0.500000
+CREATIVE,40,minecraft:entity.snowball.throw,6,0.000000,0.000000,0.000000,0.500000,0.500000

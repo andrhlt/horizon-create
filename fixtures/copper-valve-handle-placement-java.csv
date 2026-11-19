@@ -1,0 +1,10 @@
+case,clicked_face,facing,waterlogged,survives
+0,down,down,false,true
+1,up,up,false,true
+2,north,north,false,true
+3,south,south,false,true
+4,west,west,false,true
+5,east,east,false,true
+6,up,up,true,true
+7,up,east,false,true
+8,up,up,false,true

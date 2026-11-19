@@ -1,0 +1,114 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.cartAssemblerPlacementAndDrain"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,97 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 40)
++	public static void cartAssemblerPlacementAndDrain(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		for (int cx = 0; cx <= 1; cx++)
++			for (int cz = 1; cz <= 2; cz++)
++				world.setChunkForced(cx, cz, true);
++		var rails = new net.minecraft.world.level.block.BaseRailBlock[] {
++			(net.minecraft.world.level.block.BaseRailBlock) Blocks.RAIL,
++			(net.minecraft.world.level.block.BaseRailBlock) Blocks.POWERED_RAIL,
++			(net.minecraft.world.level.block.BaseRailBlock) Blocks.DETECTOR_RAIL,
++			(net.minecraft.world.level.block.BaseRailBlock) Blocks.ACTIVATOR_RAIL,
++		};
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var wet = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var face = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var item = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var railType = com.simibubi.create.content.contraptions.mounted.CartAssemblerBlock.RAIL_TYPE;
++		var backwards = com.simibubi.create.content.contraptions.mounted.CartAssemblerBlock.BACKWARDS;
++		var shape = com.simibubi.create.content.contraptions.mounted.CartAssemblerBlock.RAIL_SHAPE;
++		var at = new BlockPos(8, 170, 32);
++		var dispenserPos = at.west();
++		var power = dispenserPos.above();
++		helper.runAtTickTime(1, () -> {
++			for (int rail = 0; rail < rails.length; rail++) {
++				for (int variant = 0; variant < 2; variant++) {
++					var target = new BlockPos(8 + rail * 6, 170, 24 + variant * 4);
++					var axis = variant == 0
++						? net.minecraft.world.level.block.state.properties.RailShape.NORTH_SOUTH
++						: net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST;
++					world.setBlockAndUpdate(target, Blocks.AIR.defaultBlockState());
++					world.setBlockAndUpdate(target.east(), Blocks.AIR.defaultBlockState());
++					world.setBlockAndUpdate(target.below(), Blocks.STONE.defaultBlockState());
++					world.setBlockAndUpdate(target, rails[rail].defaultBlockState());
++					world.setBlock(target, world.getBlockState(target).setValue(rails[rail].getShapeProperty(), axis), 2);
++					var held = com.simibubi.create.AllBlocks.CART_ASSEMBLER.asStack(2);
++					player.setItemInHand(hand, held);
++					var yaw = variant == 0 ? 0 : 180;
++					player.setYRot(yaw);
++					var hit = new net.minecraft.world.phys.BlockHitResult(
++						net.minecraft.world.phys.Vec3.atCenterOf(target), net.minecraft.core.Direction.UP, target, false);
++					var result = held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++					var state = world.getBlockState(target);
++					helper.assertTrue(result.consumesAction() && state.hasProperty(backwards), "cart assembler placement failed");
++					System.out.printf("CART_ASSEMBLER_PLACE %s,%s,%d,%s,%s,%s,%s,%s,%d%n",
++						registry.getKey(rails[rail]), axis, yaw, registry.getKey(state.getBlock()), state.getValue(railType),
++						state.getValue(backwards), state.getValue(shape), state.getValue(wet), held.getCount());
++				}
++			}
++			world.setBlockAndUpdate(at, Blocks.AIR.defaultBlockState());
++			world.setBlockAndUpdate(dispenserPos, Blocks.AIR.defaultBlockState());
++			world.setBlockAndUpdate(power, Blocks.AIR.defaultBlockState());
++			world.setBlockAndUpdate(at.below(), Blocks.STONE.defaultBlockState());
++			world.setBlockAndUpdate(at, Blocks.RAIL.defaultBlockState());
++			var stack = com.simibubi.create.AllBlocks.CART_ASSEMBLER.asStack();
++			player.setItemInHand(hand, stack);
++			var hit = new net.minecraft.world.phys.BlockHitResult(
++				net.minecraft.world.phys.Vec3.atCenterOf(at), net.minecraft.core.Direction.UP, at, false);
++			var result = stack.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			helper.assertTrue(result.consumesAction(), "cart assembler placement on original rail failed");
++			world.setBlockAndUpdate(dispenserPos, Blocks.DISPENSER.defaultBlockState().setValue(face, net.minecraft.core.Direction.EAST));
++			var dispenser = (net.minecraft.world.level.block.entity.DispenserBlockEntity) world.getBlockEntity(dispenserPos);
++			dispenser.setItem(0, new ItemStack(Items.WATER_BUCKET));
++			world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
++				new net.minecraft.world.phys.AABB(at).inflate(2)).forEach(entity -> entity.discard());
++		});
++		helper.succeedWhen(() -> {
++			var tick = helper.getTick() - 3;
++			if (tick < 0)
++				helper.fail("waiting for cart assembler dispenser");
++			var state = world.getBlockState(at);
++			var dispenser = (net.minecraft.world.level.block.entity.DispenserBlockEntity) world.getBlockEntity(dispenserPos);
++			var dropType = net.minecraft.world.entity.item.ItemEntity.class;
++			var drops = world.getEntitiesOfClass(dropType, new net.minecraft.world.phys.AABB(at).inflate(1)).stream()
++				.map(drop -> item.getKey(drop.getItem().getItem()).toString())
++				.sorted().collect(java.util.stream.Collectors.joining("|"));
++			System.out.printf("CART_ASSEMBLER_DRAIN %d,%s,%s,%s,%s%n", tick, registry.getKey(state.getBlock()),
++				state.getOptionalValue(wet).map(Object::toString).orElse("absent"), item.getKey(dispenser.getItem(0).getItem()), drops);
++			if (tick == 0) {
++				world.setBlockAndUpdate(power, Blocks.REDSTONE_BLOCK.defaultBlockState());
++			} else if (tick == 6) {
++				world.setBlockAndUpdate(power, Blocks.AIR.defaultBlockState());
++				dispenser.setItem(0, new ItemStack(Items.BUCKET));
++				world.setBlockAndUpdate(power, Blocks.REDSTONE_BLOCK.defaultBlockState());
++			}
++			if (tick < 12)
++				helper.fail("waiting for cart assembler drain");
++		});
++	}
++
+ }

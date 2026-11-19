@@ -1,0 +1,87 @@
+diff --git a/crates/horizon-client/src/game/native_block_entity_draw.rs b/crates/horizon-client/src/game/native_block_entity_draw.rs
+--- a/crates/horizon-client/src/game/native_block_entity_draw.rs
++++ b/crates/horizon-client/src/game/native_block_entity_draw.rs
+@@ -688,6 +688,58 @@
+         true
+     }
+ 
++    /// Draw a block model with geometry selected by a native block entity.
++    pub(super) fn native_draw_transformed_block(
++        &self,
++        draw: &mut BlockEntityDraw,
++        state: horizon_world::registry::BlockStateId,
++        seed: i64,
++        mut transform: impl FnMut(
++            &horizon_client::models::catalog::BakedFace,
++            &mut Vec<horizon_assets::bake::ModelQuad>,
++        ) -> Option<(u32, bool, bool)>,
++    ) {
++        use horizon_client::models::catalog::{BakedFace, BakedModel};
++
++        let catalog = &self.pack.render.model_catalog;
++        let models = if self.pack.render.connected.uses_java_model_random(state.0) {
++            catalog.collect_seeded_with_legacy_weighted(state, seed)
++        } else {
++            catalog.collect_seeded(state, seed)
++        };
++        let Ok(models) = models else {
++            return;
++        };
++        let mut faces = Vec::new();
++        let mut transformed = Vec::new();
++        for (_, model) in models {
++            for face in &model.faces {
++                let (layer, opaque, translucent) = transform(face, &mut transformed)
++                    .filter(|(layer, _, _)| {
++                        self.pack.layer_names.get(layer).is_some_and(|sprite| {
++                            self.gui.atlas.sprites.contains_key(sprite)
++                        })
++                    })
++                    .unwrap_or((face.layer, face.opaque, face.translucent));
++                faces.extend(
++                    transformed.drain(..).map(|quad| {
++                        BakedFace::new(quad, layer, opaque, translucent, face.fusion)
++                    }),
++                );
++            }
++        }
++        let cropped = BakedModel {
++            ambient_occlusion: false,
++            particle: None,
++            faces,
++            cube: None,
++        };
++        let light = draw.light;
++        let grass = self.pack.item_renderer.grass_color(0.5, 1.0) as u32;
++        let tint = |index| self.pack.context.tables.default_tint(state, index, grass);
++        self.baked_model_vertices([&cropped], draw.pose(), |_| light, false, tint, &mut draw.vertices);
++    }
++
+     /// Draws standalone model `model` (`mymod:block/shaft_half`, one a mod
+     /// named in `native_standalone_models`) under `draw`'s pose, as
+     /// `native_draw_block` draws a block's: unturned, from the block's lower
+diff --git a/crates/horizon-client-render/src/models/catalog.rs b/crates/horizon-client-render/src/models/catalog.rs
+--- a/crates/horizon-client-render/src/models/catalog.rs
++++ b/crates/horizon-client-render/src/models/catalog.rs
+@@ -623,6 +623,21 @@
+     }
+ }
+ 
++impl StateModels {
++    /// Collects a Java 1.21.1 WeightedBakedModel for a displayed native block.
++    pub fn collect_seeded_with_legacy_weighted(
++        &self,
++        state: BlockStateId,
++        seed: i64,
++    ) -> Result<Vec<(&Variant, &BakedModel)>> {
++        let mut models = Vec::new();
++        self.each_seeded(state, seed, true, |(variant, model)| {
++            models.push((variant, model))
++        })?;
++        Ok(models)
++    }
++}
++
+ pub fn descriptor(name: &str, overrides: &[(&str, &str)]) -> BlockState {
+     BlockState {
+         name: format!("minecraft:{name}"),

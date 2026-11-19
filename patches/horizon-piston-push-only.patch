@@ -1,0 +1,26 @@
+diff --git a/crates/horizon-mods/src/content.rs b/crates/horizon-mods/src/content.rs
+--- a/crates/horizon-mods/src/content.rs
++++ b/crates/horizon-mods/src/content.rs
+@@ -81,6 +81,9 @@
+     /// Destroy time in seconds of hand mining (-1: unbreakable).
+     pub hardness: Option<f32>,
+     pub explosion_resistance: Option<f32>,
++    /// Pistons can push this block along their direction of extension.
++    #[serde(default)]
++    pub piston_push_only: bool,
+     /// Light emitted, 0 to 15.
+     pub light: Option<u8>,
+     pub requires_tool: Option<bool>,
+diff --git a/crates/horizon-client/src/mod_content.rs b/crates/horizon-client/src/mod_content.rs
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -1353,6 +1353,9 @@
+             }
+             row.set("can_occlude", J::Bool(false));
+             row.set("solid_render", J::Bool(false));
++        }
++        if p.piston_push_only {
++            row.set("push", J::Str("PUSH".into()));
+         }
+         if let Some(v) = p.hardness {
+             row.set("hardness", J::f64(v as f64));

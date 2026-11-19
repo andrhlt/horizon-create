@@ -1,0 +1,7 @@
+case,track_distance,accepted,supply,bogeys
+0,3,0,3,block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air
+1,1,1,2,block.create.small_bogey;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air
+2,2,1,2,block.create.large_bogey;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air
+3,3,0,2,block.create.large_bogey;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air;block.minecraft.air
+4,4,1,1,block.create.large_bogey;block.minecraft.air;block.minecraft.air;block.create.small_bogey;block.minecraft.air;block.minecraft.air;block.minecraft.air
+5,7,0,0,block.create.large_bogey;block.minecraft.air;block.minecraft.air;block.create.small_bogey;block.minecraft.air;block.minecraft.air;block.minecraft.air

@@ -1,0 +1,100 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(t -> t.testName().equals("TestMisc.stickerRemainingBench")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,87 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    private static class StickerFallPig extends net.minecraft.world.entity.animal.Pig {
++        int calls;
++        StickerFallPig(ServerLevel level) { super(EntityType.PIG,level); }
++        @Override public boolean causeFallDamage(float distance,float multiplier,net.minecraft.world.damagesource.DamageSource source) {
++            calls++;return super.causeFallDamage(distance,multiplier,source);
++        }
++    }
++    private static class StickerTrajectoryPig extends net.minecraft.world.entity.animal.Pig {
++        StickerTrajectoryPig(ServerLevel level) { super(EntityType.PIG,level);goalSelector.removeAllGoals(goal -> true);targetSelector.removeAllGoals(goal -> true); }
++    }
++    private static com.google.gson.JsonArray stickerBits(net.minecraft.world.phys.Vec3 v) {
++        var a=new com.google.gson.JsonArray();
++        for(double d:new double[]{v.x,v.y,v.z}) a.add(Long.toUnsignedString(Double.doubleToRawLongBits(d)));
++        return a;
++    }
++    @GameTest(template = "shearing", timeoutTicks = 100)
++    public static void stickerRemainingBench(CreateGameTestHelper helper) throws Exception {
++        var level=helper.getLevel(); var pos=helper.absolutePos(new BlockPos(3,16,3));
++        var block=com.simibubi.create.AllBlocks.STICKER.get();
++        for(var face:net.minecraft.core.Direction.values()) for(boolean extended:new boolean[]{false,true}) {
++            var state=block.defaultBlockState().setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING,face).setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED,extended);
++            level.setBlock(pos,state,2);
++            for(boolean living:new boolean[]{false,true}) for(boolean careful:new boolean[]{false,true})
++            for(double vy:new double[]{-.6,-.1,-.099999999,0,.04,.099999999,.1,.6}) {
++                net.minecraft.world.entity.Entity entity=living?EntityType.PIG.create(level):new net.minecraft.world.entity.item.ItemEntity(level,0,0,0,new ItemStack(Items.STONE));
++                entity.setPos(pos.getX()+.5,pos.getY()+1,pos.getZ()+.5);entity.setShiftKeyDown(careful);
++                entity.setDeltaMovement(.5,vy,.25);block.updateEntityAfterFallOn(level,entity);
++                var row=new com.google.gson.JsonObject();row.addProperty("kind","physics");row.addProperty("facing",face.getSerializedName());row.addProperty("extended",extended);row.addProperty("living",living);row.addProperty("careful",careful);row.addProperty("vy",vy);
++                row.add("bounce",stickerBits(entity.getDeltaMovement()));
++                entity.setDeltaMovement(.5,vy,.25);block.stepOn(level,pos,state,entity);row.add("step",stickerBits(entity.getDeltaMovement()));
++                System.out.println("STICKER_REMAINING "+row);
++            }
++            for(boolean careful:new boolean[]{false,true}) for(float distance:new float[]{0,3,4,10,20}) {
++                var pig=new StickerFallPig(level);pig.setPos(pos.getX()+.5,pos.getY()+1,pos.getZ()+.5);pig.setShiftKeyDown(careful);
++                block.fallOn(level,state,pos,pig,distance);
++                var row=new com.google.gson.JsonObject();row.addProperty("kind","fall");row.addProperty("facing",face.getSerializedName());row.addProperty("extended",extended);row.addProperty("careful",careful);row.addProperty("distance",distance);row.addProperty("health",pig.getHealth());row.addProperty("alive",pig.isAlive());row.addProperty("damage_calls",pig.calls);
++                System.out.println("STICKER_REMAINING "+row);
++            }
++        }
++        String[] states={
++            "minecraft:stone","minecraft:air","minecraft:water","minecraft:lava","minecraft:short_grass","minecraft:fire","minecraft:snow[layers=1]","minecraft:snow[layers=8]",
++            "minecraft:white_carpet","minecraft:moss_carpet","minecraft:ladder[facing=north]","minecraft:torch","minecraft:wall_torch[facing=north]","minecraft:redstone_torch","minecraft:redstone_wall_torch[facing=north]",
++            "minecraft:oak_sign","minecraft:oak_wall_sign[facing=north]","minecraft:oak_hanging_sign","minecraft:oak_wall_hanging_sign[facing=north]","minecraft:stone_pressure_plate","minecraft:lever[face=floor,facing=north]","minecraft:lever[face=wall,facing=north]","minecraft:lever[face=ceiling,facing=north]",
++            "minecraft:grindstone[face=floor,facing=north]","minecraft:grindstone[face=wall,facing=north]","minecraft:grindstone[face=ceiling,facing=north]","minecraft:rail","minecraft:powered_rail","minecraft:repeater[facing=north]","minecraft:comparator[facing=north]","minecraft:redstone_wire",
++            "minecraft:oak_door[half=lower,facing=north]","minecraft:oak_door[half=upper,facing=north]","minecraft:red_bed[part=head,facing=north]","minecraft:red_bed[part=foot,facing=north]","minecraft:flower_pot","minecraft:potted_poppy","minecraft:lantern[hanging=false]","minecraft:lantern[hanging=true]","minecraft:chain[axis=y]",
++            "minecraft:bell[attachment=floor,facing=north]","minecraft:bell[attachment=ceiling,facing=north]","minecraft:bell[attachment=single_wall,facing=north]","minecraft:bell[attachment=double_wall,facing=north]",
++            "create:mechanical_drill[facing=north]","create:mechanical_saw[facing=north]","create:mechanical_bearing[facing=north]","create:portable_storage_interface[facing=north]","create:portable_fluid_interface[facing=north]","create:cart_assembler","create:rope_pulley",
++            "create:mechanical_harvester[facing=north]","create:mechanical_plough[facing=north]","create:mechanical_roller[facing=north]","create:hand_crank[facing=north]","create:copper_valve_handle[facing=north]","create:nozzle[facing=north]","create:redstone_link[facing=north]",
++            "create:white_sail[facing=north]","create:sail_frame[facing=north]","create:piston_extension_pole[facing=north]","create:mechanical_piston_head[facing=north]","create:sticker[facing=north,extended=false]","create:sticker[facing=north,extended=true]",
++            "create:steam_whistle[wall=false,facing=north]","create:steam_whistle[wall=true,facing=north]","create:steam_whistle_extension","create:andesite_belt_funnel[facing=north]","create:brass_belt_funnel[facing=north]","create:andesite_door[half=lower,facing=north]","create:andesite_door[half=upper,facing=north]","create:stock_link[face=wall,facing=north]","create:pulse_repeater[facing=north]","create:pulse_extender[facing=north]","create:pulse_timer[facing=north]","create:powered_latch[facing=north]","create:powered_toggle_latch[facing=north]","create:track","create:fluid_tank","create:item_vault"
++        };
++        level.setBlock(pos.below(),Blocks.STONE.defaultBlockState(),2);
++        for(String requested:states) {
++            var parsed=net.minecraft.commands.arguments.blocks.BlockStateParser.parseForBlock(level.holderLookup(net.minecraft.core.registries.Registries.BLOCK),requested,false);
++            var state=parsed.blockState();level.setBlock(pos,state,2);
++            if(level.getBlockState(pos).getBlock()!=state.getBlock()) throw new IllegalStateException("Fixture replaced "+requested+" with "+level.getBlockState(pos));
++            for(var direction:net.minecraft.core.Direction.values()) {
++                var row=new com.google.gson.JsonObject();row.addProperty("kind","face");row.addProperty("state",requested);row.addProperty("direction",direction.getSerializedName());
++                row.addProperty("attached",com.simibubi.create.api.contraption.BlockMovementChecks.isBlockAttachedTowards(state,level,pos,direction));
++                row.addProperty("necessary",com.simibubi.create.api.contraption.BlockMovementChecks.isMovementNecessary(state,level,pos));
++                row.addProperty("not_supportive",com.simibubi.create.api.contraption.BlockMovementChecks.isNotSupportive(state,direction));
++                row.addProperty("valid",com.simibubi.create.content.contraptions.glue.SuperGlueEntity.isValidFace(level,pos,direction));
++                System.out.println("STICKER_REMAINING "+row);
++            }
++        }
++        for(int scenario=0;scenario<3;scenario++) {
++            var support=new BlockPos((pos.getX()>>4<<4)+2+scenario*4,pos.getY(),(pos.getZ()>>4<<4)+2);
++            var state=scenario==2?Blocks.STONE.defaultBlockState():block.defaultBlockState().setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING,scenario==0?net.minecraft.core.Direction.UP:net.minecraft.core.Direction.NORTH);
++            level.setBlock(support,state,2);
++            var pig=new StickerTrajectoryPig(level);pig.setPos(support.getX()+.5,support.getY()+1,support.getZ()+.5);pig.setDeltaMovement(.2,0,.1);level.addFreshEntity(pig);
++            final int id=scenario;
++            for(int tick=1;tick<=5;tick++) {
++                final int at=tick;
++                helper.runAfterDelay(tick,()-> {
++                    var row=new com.google.gson.JsonObject();row.addProperty("kind","trajectory");row.addProperty("scenario",id);row.addProperty("tick",at);
++                    row.add("position",stickerBits(pig.position().subtract(support.getX(),support.getY(),support.getZ())));row.add("motion",stickerBits(pig.getDeltaMovement()));
++                    System.out.println("STICKER_REMAINING "+row);
++                });
++            }
++        }
++        helper.runAfterDelay(6,helper::succeed);
++    }
+ }

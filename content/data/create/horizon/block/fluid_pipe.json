@@ -1,0 +1,52 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "state_properties": {
+    "north": {
+      "type": "boolean"
+    },
+    "east": {
+      "type": "boolean"
+    },
+    "south": {
+      "type": "boolean"
+    },
+    "west": {
+      "type": "boolean"
+    },
+    "up": {
+      "type": "boolean"
+    },
+    "down": {
+      "type": "boolean"
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "north": "true",
+    "east": "false",
+    "south": "true",
+    "west": "false",
+    "up": "false",
+    "down": "false",
+    "waterlogged": "false"
+  },
+  "properties": {
+    "waterloggable": true,
+    "occludes": false
+  },
+  "shapes": {
+    "default": [
+      [
+        0.25,
+        0.25,
+        0.25,
+        0.75,
+        0.75,
+        0.75
+      ]
+    ]
+  }
+}

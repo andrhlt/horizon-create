@@ -1,0 +1,90 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -364,4 +364,75 @@
+ 			helper.assertContainerContains(depot.east(2), Items.GRASS_BLOCK);
+ 		});
+ 	}
++
++	@GameTest(template = "3_pipe_split", timeoutTicks = 80)
++	public static void lavaContactOracle(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		for (int x = 1; x <= 8; x++)
++			for (int y = 0; y <= 7; y++)
++				for (int z = 0; z <= 8; z++)
++					level.setBlock(helper.absolutePos(new BlockPos(x, y, z)), Blocks.AIR.defaultBlockState(), 2);
++		var lavaStates = List.of(
++				new LavaContactLava("source", Fluids.LAVA.defaultFluidState()),
++				new LavaContactLava("flowing", Fluids.FLOWING_LAVA.defaultFluidState().setValue(net.minecraft.world.level.material.FlowingFluid.LEVEL, 4)));
++		int testCase = 0;
++		for (boolean specialFlowing : new boolean[] {false, true}) {
++			var liquids = List.of(
++					new LavaContactFluid("honey", specialFlowing ? com.simibubi.create.foundation.fluid.FluidHelper.convertToFlowing(com.simibubi.create.AllFluids.HONEY.getSource()).defaultFluidState().setValue(net.minecraft.world.level.material.FlowingFluid.LEVEL, 4) : com.simibubi.create.AllFluids.HONEY.getSource().defaultFluidState()),
++					new LavaContactFluid("chocolate", specialFlowing ? com.simibubi.create.foundation.fluid.FluidHelper.convertToFlowing(com.simibubi.create.AllFluids.CHOCOLATE.getSource()).defaultFluidState().setValue(net.minecraft.world.level.material.FlowingFluid.LEVEL, 4) : com.simibubi.create.AllFluids.CHOCOLATE.getSource().defaultFluidState()));
++			for (var liquid : liquids) {
++				for (var lava : lavaStates) {
++					for (boolean lavaFirst : new boolean[] {true, false}) {
++						int laneX = 1 + (testCase % 4) * 4;
++						int laneZ = 1 + (testCase / 4) * 4;
++						var left = new BlockPos(laneX + 1, 2, laneZ + 1);
++						var right = left.east();
++						for (int dx = -1; dx <= 2; dx++) {
++							helper.setBlock(left.offset(dx, -1, 0), Blocks.STONE);
++							helper.setBlock(left.offset(dx, 0, -1), Blocks.STONE);
++							helper.setBlock(left.offset(dx, 0, 1), Blocks.STONE);
++						}
++						helper.setBlock(left.west(), Blocks.STONE);
++						helper.setBlock(right.east(), Blocks.STONE);
++						if (lavaFirst) {
++							level.setBlock(helper.absolutePos(left), lava.state().createLegacyBlock(), 3);
++							lavaContactSample(helper, testCase, liquid, lava, "lava_first", "precontact", 0, left, right);
++							level.setBlock(helper.absolutePos(right), liquid.state().createLegacyBlock(), 3);
++						} else {
++							level.setBlock(helper.absolutePos(right), liquid.state().createLegacyBlock(), 3);
++							lavaContactSample(helper, testCase, liquid, lava, "fluid_first", "precontact", 0, left, right);
++							level.setBlock(helper.absolutePos(left), lava.state().createLegacyBlock(), 3);
++						}
++						String order = lavaFirst ? "lava_first" : "fluid_first";
++						lavaContactSample(helper, testCase, liquid, lava, order, "immediate", 0, left, right);
++						for (int tick : new int[] {1, 24, 25, 26, 50}) {
++							int at = tick;
++							int id = testCase;
++							helper.runAtTickTime(at, () -> lavaContactSample(helper, id, liquid, lava, order, "scheduled", at, left, right));
++						}
++						testCase++;
++				}
++			}
++		}
++		}
++		helper.runAtTickTime(60, helper::succeed);
++	}
++
++	private static void lavaContactSample(CreateGameTestHelper helper, int testCase, LavaContactFluid liquid, LavaContactLava lava, String order, String phase, int tick, BlockPos lavaPos, BlockPos fluidPos) {
++		for (var sample : List.of(new LavaContactCell("lava", lavaPos), new LavaContactCell("special", fluidPos))) {
++			var state = helper.getBlockState(sample.pos());
++			var fluidState = state.getFluidState();
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_LAVA_CONTACT,%d,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s,%s,%d,%b%n",
++				testCase, liquid.name(), liquid.state().isSource(), lava.name(), lava.state().isSource(), order, phase, tick,
++				sample.side(), BuiltInRegistries.BLOCK.getKey(state.getBlock()), state,
++				BuiltInRegistries.FLUID.getKey(fluidState.getType()), fluidState.getAmount(), fluidState.isSource());
++		}
++	}
++
++	private record LavaContactFluid(String name, net.minecraft.world.level.material.FluidState state) {}
++	private record LavaContactLava(String name, net.minecraft.world.level.material.FluidState state) {}
++	private record LavaContactCell(String side, BlockPos pos) {}
++
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestFluids.lavaContactOracle"))
++			.toList();
+ 	}
+ }

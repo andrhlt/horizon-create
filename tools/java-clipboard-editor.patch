@@ -1,0 +1,54 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -349,6 +349,51 @@
+ 		});
+ 	}
+ 
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void chainConveyorClipboardEditor(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var stack = AllBlocks.CLIPBOARD.asStack();
++		var mock = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		mock.setItemInHand(hand, stack);
++		stack.getItem().use(level, mock, hand);
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_EDITOR opening|%s%n", stack.save(level.registryAccess()));
++		var actor = new net.minecraft.server.level.ServerPlayer(level.getServer(), level,
++			new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "ClipboardTest"),
++			net.minecraft.server.level.ClientInformation.createDefault());
++		actor.getInventory().setItem(0, stack);
++		var empty = new com.simibubi.create.content.equipment.clipboard.ClipboardEditPacket(0, null, null);
++		empty.handle(actor);
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_EDITOR blank_close|%s%n", stack.save(level.registryAccess()));
++		var first = new com.simibubi.create.content.equipment.clipboard.ClipboardEntry(
++			true, net.minecraft.network.chat.Component.literal("Sort brass"));
++		var second = new com.simibubi.create.content.equipment.clipboard.ClipboardEntry(
++			false, net.minecraft.network.chat.Component.literal("#Warehouse"));
++		var third = new com.simibubi.create.content.equipment.clipboard.ClipboardEntry(
++			false, net.minecraft.network.chat.Component.literal("Visit station"));
++		var written = com.simibubi.create.content.equipment.clipboard.ClipboardContent.EMPTY
++			.setType(com.simibubi.create.content.equipment.clipboard.ClipboardOverrides.ClipboardType.WRITTEN)
++			.setPages(java.util.List.of(java.util.List.of(first, second), java.util.List.of(third)))
++			.setPreviouslyOpenedPage(1);
++		new com.simibubi.create.content.equipment.clipboard.ClipboardEditPacket(0, written, null).handle(actor);
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_EDITOR written_close|%s%n", stack.save(level.registryAccess()));
++		stack.getItem().use(level, mock, hand);
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_EDITOR reopen|%s%n", stack.save(level.registryAccess()));
++		var target = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		level.setBlockAndUpdate(target.below(), Blocks.STONE.defaultBlockState());
++		level.setBlockAndUpdate(target, AllBlocks.CLIPBOARD.getDefaultState());
++		actor.setPos(Vec3.atCenterOf(target.above()));
++		new com.simibubi.create.content.equipment.clipboard.ClipboardEditPacket(0, written, target).handle(actor);
++		var block = level.getBlockState(target);
++		var placed = AllBlocks.CLIPBOARD.get().getCloneItemStack(level, target, block).save(level.registryAccess());
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_EDITOR placed_close|%s|%s%n", block, placed);
++		new com.simibubi.create.content.equipment.clipboard.ClipboardEditPacket(0, null, target).handle(actor);
++		block = level.getBlockState(target);
++		placed = AllBlocks.CLIPBOARD.get().getCloneItemStack(level, target, block).save(level.registryAccess());
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_EDITOR placed_clear|%s|%s%n", block, placed);
++		helper.succeed();
++	}
++
+ 	private static void runChainConveyor(CreateGameTestHelper helper, String scenario, BlockPos edge, boolean reverse) {
+ 		var world = helper.getLevel();
+ 		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);

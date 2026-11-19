@@ -1,0 +1,124 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.basinMaterials") || test.testName().equals("TestMisc.cookingMaterials"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,109 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 90)
++	public static void basinMaterials(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var up = net.minecraft.core.Direction.UP;
++		var names = java.util.List.of("iron_alloy", "zinc_alloy", "dough", "mud_dirt", "mud_coarse", "mud_rooted", "grass_rejected");
++		var primary = java.util.List.of("minecraft:andesite", "minecraft:andesite", "create:wheat_flour", "minecraft:dirt",
++			"minecraft:coarse_dirt", "minecraft:rooted_dirt", "minecraft:grass_block");
++		var secondary = java.util.List.of("minecraft:iron_nugget", "create:zinc_nugget", "-", "-", "-", "-", "-");
++		int[] water = {0,0,1000,250,250,250,250};
++		var output = java.util.List.of("create:andesite_alloy", "create:andesite_alloy", "create:dough", "minecraft:mud",
++			"minecraft:mud", "minecraft:mud", "-");
++		var basins = new java.util.ArrayList<com.simibubi.create.content.processing.basin.BasinBlockEntity>();
++		var mixers = new java.util.ArrayList<com.simibubi.create.content.kinetics.mixer.MechanicalMixerBlockEntity>();
++		for (int i = 0; i < names.size(); i++) {
++			var motor = new BlockPos(2, 15, 2 + 2 * i);
++			var cog = motor.above();
++			var mixer = cog.east();
++			var basin = mixer.below(2);
++			helper.setBlock(motor, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, up));
++			((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(motor)).generatedSpeed.setValue(256);
++			helper.setBlock(cog, com.simibubi.create.AllBlocks.COGWHEEL.getDefaultState().setValue(axis, up.getAxis()));
++			helper.setBlock(mixer, com.simibubi.create.AllBlocks.MECHANICAL_MIXER.getDefaultState());
++			helper.setBlock(basin, com.simibubi.create.AllBlocks.BASIN.getDefaultState());
++			mixers.add((com.simibubi.create.content.kinetics.mixer.MechanicalMixerBlockEntity) helper.getBlockEntity(mixer));
++			basins.add((com.simibubi.create.content.processing.basin.BasinBlockEntity) helper.getBlockEntity(basin));
++			System.out.printf(java.util.Locale.ROOT, "CREATE_BASIN_MATERIAL_SETUP %s,%s,%s,%d,%s%n",
++				names.get(i), primary.get(i), secondary.get(i), water[i], output.get(i));
++		}
++		helper.onEachTick(() -> {
++			long tick = helper.getTick() - 4;
++			if (tick < 0 || tick > 52)
++				return;
++			for (int i = 0; i < names.size(); i++) {
++				var basin = basins.get(i);
++				var mixer = mixers.get(i);
++				var fluid = basin.inputTank.getCapability().getFluidInTank(0);
++				var result = basin.getOutputInventory().getStackInSlot(0);
++				System.out.printf(java.util.Locale.ROOT, "CREATE_BASIN_MATERIAL %d,%s,%.0f,%b,%d,%d,%d,%d,%d,%s,%d%n",
++					tick, names.get(i), mixer.getSpeed(), mixer.running, mixer.runningTicks, mixer.processingTicks,
++					basin.getInputInventory().getStackInSlot(0).getCount(), basin.getInputInventory().getStackInSlot(1).getCount(),
++					fluid.getAmount(), result.isEmpty() ? "-" : items.getKey(result.getItem()), result.getCount());
++				if (tick == 0) {
++					var ingredient = items.get(net.minecraft.resources.ResourceLocation.parse(primary.get(i))).getDefaultInstance();
++					basin.getInputInventory().insertItem(0, ingredient, false);
++					if (!secondary.get(i).equals("-")) {
++						var other = items.get(net.minecraft.resources.ResourceLocation.parse(secondary.get(i))).getDefaultInstance();
++						basin.getInputInventory().insertItem(1, other, false);
++					}
++					if (water[i] > 0)
++						basin.inputTank.getCapability().fill(new net.neoforged.neoforge.fluids.FluidStack(
++							net.minecraft.world.level.material.Fluids.WATER, water[i]),
++							net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
++				}
++				if (tick == 52 && !output.get(i).equals("-"))
++					helper.assertTrue(output.get(i).equals(items.getKey(result.getItem()).toString()), "Missing output for " + names.get(i));
++				if (tick == 52 && output.get(i).equals("-"))
++					helper.assertTrue(result.isEmpty() && fluid.getAmount() == water[i], "Grass must remain and keep its water");
++			}
++		});
++		helper.runAtTickTime(57, helper::succeed);
++	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 230)
++	public static void cookingMaterials(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var bread = net.minecraft.world.item.Items.BREAD;
++		var labels = java.util.List.of("furnace_bread", "smoker_bread", "furnace_scoria");
++		var inputs = java.util.List.of(com.simibubi.create.AllItems.DOUGH.get(), com.simibubi.create.AllItems.DOUGH.get(), net.minecraft.world.item.Items.SOUL_SAND);
++		var outputs = java.util.List.of(bread, bread, items.get(net.minecraft.resources.ResourceLocation.parse("create:scoria")));
++		var machines = new java.util.ArrayList<net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity>();
++		for (int i = 0; i < labels.size(); i++) {
++			var pos = new BlockPos(2, 13, 2 + 2 * i);
++			var type = i == 1 ? net.minecraft.world.level.block.Blocks.SMOKER : net.minecraft.world.level.block.Blocks.FURNACE;
++			helper.setBlock(pos, type.defaultBlockState());
++			machines.add((net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity) helper.getBlockEntity(pos));
++			System.out.printf(java.util.Locale.ROOT, "CREATE_COOKING_MATERIAL_SETUP %s,%s,%s,%s%n", labels.get(i),
++				net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(type), items.getKey(inputs.get(i)), items.getKey(outputs.get(i)));
++		}
++		helper.onEachTick(() -> {
++			long tick = helper.getTick() - 4;
++			if (tick < 0 || tick > 202)
++				return;
++			for (int i = 0; i < labels.size(); i++) {
++				var machine = machines.get(i);
++				var tag = machine.saveWithoutMetadata(world.registryAccess());
++				var result = machine.getItem(2);
++				System.out.printf(java.util.Locale.ROOT, "CREATE_COOKING_MATERIAL %d,%s,%b,%d,%d,%d,%s,%d%n", tick,
++					labels.get(i), machine.getBlockState().getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT),
++					tag.getShort("CookTime"), tag.getShort("CookTimeTotal"), machine.getItem(0).getCount(),
++					result.isEmpty() ? "-" : items.getKey(result.getItem()), result.getCount());
++				if (tick == 0) {
++					machine.setItem(0, inputs.get(i).getDefaultInstance());
++					machine.setItem(1, net.minecraft.world.item.Items.COAL.getDefaultInstance());
++				}
++				if (tick == 202)
++					helper.assertTrue(result.is(outputs.get(i)), "Missing cooking result for " + labels.get(i));
++			}
++		});
++		helper.runAtTickTime(207, helper::succeed);
++	}
+ }

@@ -1,0 +1,106 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,90 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	private static net.minecraft.server.level.ServerPlayer pressFixturePlayer(CreateGameTestHelper helper, String name) {
++		var server = helper.getLevel().getServer();
++		var profile = new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), name);
++		var cookie = net.minecraft.server.network.CommonListenerCookie.createInitial(profile, false);
++		var player = new net.minecraft.server.level.ServerPlayer(server, helper.getLevel(),
++			cookie.gameProfile(), cookie.clientInformation());
++		var connection = new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
++		new io.netty.channel.embedded.EmbeddedChannel(connection);
++		new net.minecraft.server.network.ServerGamePacketListenerImpl(server, connection, player, cookie) {
++			@Override
++			public void send(net.minecraft.network.protocol.Packet<?> packet,
++				net.minecraft.network.PacketSendListener callback) {}
++		};
++		helper.getLevel().addNewPlayer(player);
++		player.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
++		player.getAbilities().flying = true;
++		player.onUpdateAbilities();
++		return player;
++	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void pressPlacementRules(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = pressFixturePlayer(helper, "PressPlacement");
++		player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
++		var result = helper.absolutePos(new BlockPos(3, 11, 1));
++		var support = result.below();
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var n = net.minecraft.core.Direction.NORTH;
++		var s = net.minecraft.core.Direction.SOUTH;
++		var e = net.minecraft.core.Direction.EAST;
++		var w = net.minecraft.core.Direction.WEST;
++		var up = net.minecraft.core.Direction.UP;
++		record Case(String name, float yaw, boolean sneak, String support, net.minecraft.core.Direction... shafts) {}
++		var cases = java.util.List.of(
++			new Case("empty_north", 0, false, "stone"), new Case("empty_east", 90, false, "stone"),
++			new Case("empty_south", 180, false, "stone"), new Case("empty_west", 270, false, "stone"),
++			new Case("north_shaft", 90, false, "stone", n), new Case("east_shaft", 0, false, "stone", e),
++			new Case("south_shaft", 90, false, "stone", s), new Case("west_shaft", 0, false, "stone", w),
++			new Case("opposed_z", 90, false, "stone", n, s), new Case("opposed_x", 0, false, "stone", e, w),
++			new Case("crossed_north_east", 180, false, "stone", n, e),
++			new Case("sneaking_side", 0, true, "stone", w), new Case("over_basin", 90, true, "basin"),
++			new Case("over_depot", 90, true, "depot"), new Case("over_ejector", 90, true, "ejector"),
++			new Case("over_flat_belt", 90, true, "flat"), new Case("over_up_belt", 90, true, "up"),
++			new Case("blocked_basin", 90, true, "blocked")
++		);
++		for (var probe : cases) {
++			level.setBlockAndUpdate(result, air);
++			level.setBlockAndUpdate(result.above(), probe.support().equals("blocked") ? stone : air);
++			var beltSlope = com.simibubi.create.content.kinetics.belt.BeltBlock.SLOPE;
++			var belt = AllBlocks.BELT.getDefaultState();
++			level.setBlockAndUpdate(support, switch (probe.support()) {
++				case "basin", "blocked" -> AllBlocks.BASIN.getDefaultState();
++				case "depot" -> AllBlocks.DEPOT.getDefaultState();
++				case "ejector" -> AllBlocks.WEIGHTED_EJECTOR.getDefaultState();
++				case "flat" -> belt.setValue(beltSlope, com.simibubi.create.content.kinetics.belt.BeltSlope.HORIZONTAL);
++				case "up" -> belt.setValue(beltSlope, com.simibubi.create.content.kinetics.belt.BeltSlope.UPWARD);
++				default -> stone;
++			});
++			for (var side : java.util.List.of(n, s, e, w))
++				level.setBlockAndUpdate(result.relative(side), air);
++			for (var side : probe.shafts())
++				level.setBlockAndUpdate(result.relative(side),
++					AllBlocks.SHAFT.getDefaultState().setValue(axis, side.getAxis()));
++			player.moveTo(result.getX() + 2.5, result.getY() + 1, result.getZ() + .5, probe.yaw(), 0);
++			player.setShiftKeyDown(probe.sneak());
++			var stack = AllBlocks.MECHANICAL_PRESS.asStack();
++			player.setItemInHand(hand, stack);
++			var hit = new net.minecraft.world.phys.BlockHitResult(
++				support.getCenter().relative(up, .5), up, support, false);
++			stack.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			var lower = level.getBlockState(result);
++			var upper = level.getBlockState(result.above());
++			int height = AllBlocks.MECHANICAL_PRESS.has(lower) ? 1 : AllBlocks.MECHANICAL_PRESS.has(upper) ? 2 : 0;
++			String orient = height == 0 ? "-" : (height == 1 ? lower : upper).getValue(horizontal).getName();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_PRESS_PLACEMENT %s,%s,%d,%d%n",
++				probe.name(), orient, stack.getCount(), height);
++			helper.assertTrue(probe.support().equals("blocked") == (height == 0), "Unexpected Press placement.");
++		}
++		helper.succeed();
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.pressPlacementRules")).toList();
+ 	}
+ }

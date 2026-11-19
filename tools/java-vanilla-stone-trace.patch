@@ -1,0 +1,131 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..4b763412d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.vanillaStonePalette"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d3c..386de645a 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -1,5 +1,19 @@
+ package com.simibubi.create.infrastructure.gametest.tests;
+ 
++import net.minecraft.core.Direction;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.resources.ResourceLocation;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.item.context.UseOnContext;
++import net.minecraft.world.item.crafting.RecipeType;
++import net.minecraft.world.item.crafting.SingleRecipeInput;
++import net.minecraft.world.level.GameType;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.RotatedPillarBlock;
++import net.minecraft.world.level.block.SlabBlock;
++import net.minecraft.world.level.block.WallBlock;
++import net.minecraft.world.phys.BlockHitResult;
++
+ import java.util.List;
+ 
+ import com.simibubi.create.AllBlocks;
+@@ -144,4 +158,79 @@ public class TestProcessing {
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = 20)
++	public static void vanillaStonePalette(CreateGameTestHelper helper) {
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(2, 9, 1));
++		int found = 0;
++		for (var id : registry.keySet().stream().sorted().toList()) {
++			if (!id.getNamespace().equals("create") || !id.getPath().matches("(?:cut_|polished_cut_|small_|layered_)?(?:granite|diorite|andesite|calcite|dripstone|deepslate|tuff)(?:_bricks?|_pillar)?(?:_slab|_stairs|_wall)?"))
++				continue;
++			var block = registry.get(id);
++			var state = block.defaultBlockState();
++			var shape = state.getCollisionShape(level, at);
++			var bounds = shape.bounds();
++			var properties = new java.util.TreeMap<String, String>();
++			for (var property : state.getProperties())
++				properties.put(property.getName(), String.valueOf(state.getValue(property)));
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_VANILLA_STONE %s,%.2f,%.2f,%d,%b,%d,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f%n",
++				id, state.getDestroySpeed(level, at), block.getExplosionResistance(),
++				state.getMapColor(level, at).id, state.requiresCorrectToolForDrops(),
++				block.getStateDefinition().getPossibleStates().size(), String.join(";", properties.entrySet().stream()
++					.map(property -> property.getKey() + "=" + property.getValue()).toList()),
++				bounds.minX, bounds.minY, bounds.minZ, bounds.maxX, bounds.maxY, bounds.maxZ);
++			helper.assertTrue(block.asItem() != Items.AIR, "Every palette block has its original item ID");
++			found++;
++		}
++		helper.assertTrue(found == 126, "Expected seven 18-block families cut from vanilla stone");
++		var player = helper.makeMockPlayer(GameType.SURVIVAL);
++		var hand = InteractionHand.MAIN_HAND;
++		var stone = Blocks.STONE.defaultBlockState();
++		var air = Blocks.AIR.defaultBlockState();
++		var far = at.above(16);
++		player.setPos(far.getX() + .5, far.getY(), far.getZ() - 2.0);
++		for (var material : java.util.List.of("andesite", "calcite", "deepslate", "diorite", "dripstone", "granite", "tuff")) {
++			var ingredient = ResourceLocation.withDefaultNamespace(material.equals("dripstone") ? "dripstone_block" : material);
++			var recipes = level.getRecipeManager();
++			var input = new SingleRecipeInput(new ItemStack(BuiltInRegistries.ITEM.get(ingredient)));
++			var name = "cut_" + material + "_slab_from_stone_types_" + material + "_stonecutting";
++			var id = com.simibubi.create.Create.asResource(name);
++			var recipe = recipes.getRecipesFor(RecipeType.STONECUTTING, input, level).stream()
++				.filter(entry -> entry.id().equals(id)).findFirst().orElseThrow();
++			var slab = recipe.value().assemble(input, level.registryAccess());
++			var count = slab.getCount();
++			level.setBlockAndUpdate(far.below(), stone);
++			level.setBlockAndUpdate(far, air);
++			player.setItemInHand(hand, slab);
++			var first = new BlockHitResult(far.below().getCenter().relative(Direction.UP, .5), Direction.UP, far.below(), false);
++			slab.useOn(new UseOnContext(player, hand, first));
++			var single = level.getBlockState(far).getValue(SlabBlock.TYPE);
++			var second = new BlockHitResult(far.getCenter(), Direction.UP, far, false);
++			slab.useOn(new UseOnContext(player, hand, second));
++			var combined = level.getBlockState(far).getValue(SlabBlock.TYPE);
++			helper.assertTrue(slab.isEmpty(), "Placing the slabs consumes both Stonecutter outputs");
++			var backing = far.east(2);
++			level.setBlockAndUpdate(backing, stone);
++			level.setBlockAndUpdate(backing.west(), air);
++			var pillar = registry.get(com.simibubi.create.Create.asResource(material + "_pillar")).asItem().getDefaultInstance();
++			player.setItemInHand(hand, pillar);
++			var westFace = new BlockHitResult(backing.getCenter().relative(Direction.WEST, .5), Direction.WEST, backing, false);
++			pillar.useOn(new UseOnContext(player, hand, westFace));
++			var axis = level.getBlockState(backing.west()).getValue(RotatedPillarBlock.AXIS);
++			var wall = registry.get(com.simibubi.create.Create.asResource("cut_" + material + "_wall")).defaultBlockState();
++			var left = far.east(4);
++			level.setBlockAndUpdate(left.east(), air);
++			level.setBlockAndUpdate(left, wall);
++			level.setBlockAndUpdate(left.east(), wall.updateShape(Direction.WEST, wall, level, left.east(), left));
++			var east = level.getBlockState(left).getValue(WallBlock.EAST_WALL);
++			var west = level.getBlockState(left.east()).getValue(WallBlock.WEST_WALL);
++			System.out.printf("CREATE_VANILLA_STONE_ACTION %s,%s,%s,%d,%s,%s,%s,%s,%s%n",
++				material, ingredient, recipe.id(), count, single, combined, axis, east, west);
++		}
++		helper.succeed();
++	}
++
+ }

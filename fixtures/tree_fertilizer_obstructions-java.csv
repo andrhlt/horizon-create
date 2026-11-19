@@ -1,0 +1,6 @@
+case,stage,result,remaining,trunk_y1_oak_log,side_stone_preserved,bedrock_y1_preserved,bedrock_y2_preserved,side_leaf_attempted,spruce_base_logs,podzol_count
+baseline,0,SUCCESS,1,true,false,false,false,,,
+stone,1,SUCCESS,1,true,true,false,false,true,,
+bedrock,0,SUCCESS,1,false,false,true,false,,,
+combined,0,SUCCESS,1,true,false,false,true,,,
+spruce_2x2,0,SUCCESS,1,,,,,,4,0

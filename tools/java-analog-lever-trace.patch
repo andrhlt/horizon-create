@@ -1,0 +1,112 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..8ac222199 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestMisc.analogLever"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..90e2a2a11 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,93 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 45)
++	public static void analogLeverRemoval(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var leverPos = new BlockPos(8, 180, 22);
++		var support = leverPos.below();
++		var weak = leverPos.east();
++		var strong = support.south();
++		var block = com.simibubi.create.AllBlocks.ANALOG_LEVER.get();
++		var power = net.minecraft.world.level.block.RedStoneWireBlock.POWER;
++		world.setChunkForced(0, 1, true);
++		for (var at : java.util.List.of(support, weak.below(), strong.below()))
++			world.setBlockAndUpdate(at, Blocks.SMOOTH_STONE.defaultBlockState());
++		world.setBlockAndUpdate(leverPos, block.defaultBlockState().setValue(
++			net.minecraft.world.level.block.state.properties.BlockStateProperties.ATTACH_FACE,
++			net.minecraft.world.level.block.state.properties.AttachFace.FLOOR));
++		world.setBlockAndUpdate(weak, Blocks.REDSTONE_WIRE.defaultBlockState());
++		world.setBlockAndUpdate(strong, Blocks.REDSTONE_WIRE.defaultBlockState());
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(leverPos), net.minecraft.core.Direction.UP, leverPos, false);
++		helper.runAfterDelay(3, () -> block.useWithoutItem(world.getBlockState(leverPos), world, leverPos, player, hit));
++
++		for (int tick = 15; tick <= 23; tick++) {
++			int t = tick;
++			helper.runAfterDelay(t, () -> {
++				if (t == 20)
++					world.removeBlock(leverPos, false);
++				System.out.printf(java.util.Locale.ROOT, "CREATE_ANALOG_LEVER_REMOVAL %d,%d,%d%n", t,
++					world.getBlockState(weak).getValue(power), world.getBlockState(strong).getValue(power));
++				if (t == 23) {
++					helper.assertTrue(world.getBlockState(weak).getValue(power) == 0
++						&& world.getBlockState(strong).getValue(power) == 0, "Removed lever left either wire powered");
++					helper.succeed();
++				}
++			});
++		}
++	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 110)
++	public static void analogLever(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var leverPos = new BlockPos(8, 180, 8);
++		var support = leverPos.below();
++		var weak = leverPos.east();
++		var strong = support.south();
++		var block = com.simibubi.create.AllBlocks.ANALOG_LEVER.get();
++		var strength = net.minecraft.world.level.block.RedStoneWireBlock.POWER;
++		world.setChunkForced(0, 0, true);
++		for (var at : java.util.List.of(support, weak.below(), strong.below()))
++			world.setBlockAndUpdate(at, Blocks.SMOOTH_STONE.defaultBlockState());
++		world.setBlockAndUpdate(leverPos, block.defaultBlockState().setValue(
++			net.minecraft.world.level.block.state.properties.BlockStateProperties.ATTACH_FACE,
++			net.minecraft.world.level.block.state.properties.AttachFace.FLOOR));
++		world.setBlockAndUpdate(weak, Blocks.REDSTONE_WIRE.defaultBlockState());
++		world.setBlockAndUpdate(strong, Blocks.REDSTONE_WIRE.defaultBlockState());
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(leverPos), net.minecraft.core.Direction.UP, leverPos, false);
++
++		for (int tick = 0; tick <= 104; tick++) {
++			int t = tick;
++			Runnable sample = () -> {
++				var lever = (com.simibubi.create.content.redstone.analogLever.AnalogLeverBlockEntity) world.getBlockEntity(leverPos);
++				var state = world.getBlockState(leverPos);
++				var tag = lever.saveWithoutMetadata(world.registryAccess());
++				System.out.printf(java.util.Locale.ROOT, "CREATE_ANALOG_LEVER %d,%d,%d,%d,%d,%d,%d,%d%n", t,
++					lever.getState(), tag.getInt("ChangeTimer"),
++					block.getSignal(state, world, leverPos, net.minecraft.core.Direction.NORTH),
++					block.getDirectSignal(state, world, leverPos, net.minecraft.core.Direction.UP),
++					block.getDirectSignal(state, world, leverPos, net.minecraft.core.Direction.DOWN),
++					world.getBlockState(weak).getValue(strength), world.getBlockState(strong).getValue(strength));
++				if (t == 3 || t == 9 || (t >= 29 && t <= 45) || (t >= 62 && t <= 79)) {
++					player.setShiftKeyDown(t >= 62);
++					block.useWithoutItem(state, world, leverPos, player, hit);
++				}
++				if (t == 104) {
++					helper.assertTrue(lever.getState() == 0 && world.getBlockState(weak).getValue(strength) == 0
++						&& world.getBlockState(strong).getValue(strength) == 0, "Lever did not return to zero");
++					helper.succeed();
++				}
++			};
++			if (t == 0)
++				sample.run();
++			else
++				helper.runAfterDelay(t, sample);
++		}
++	}
++
+ }

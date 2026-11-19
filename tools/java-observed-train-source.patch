@@ -1,0 +1,55 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..47cec80 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.observedTrainSource"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..b4d3733 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,36 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void observedTrainSource(CreateGameTestHelper helper) {
++		helper.runAtTickTime(4, () -> {
++			var level = helper.getLevel();
++			var point = new com.simibubi.create.content.trains.observer.TrackObserver();
++			var observer = new com.simibubi.create.content.trains.observer.TrackObserverBlockEntity(
++				com.simibubi.create.AllBlockEntityTypes.TRACK_OBSERVER.get(), BlockPos.ZERO,
++				com.simibubi.create.AllBlocks.TRACK_OBSERVER.getDefaultState()) {
++				@Override public com.simibubi.create.content.trains.observer.TrackObserver getObserver() { return point; }
++			};
++			var context = new com.simibubi.create.content.redstone.displayLink.DisplayLinkContext(level, null) {
++				@Override public net.minecraft.world.level.block.entity.BlockEntity getSourceBlockEntity() { return observer; }
++				@Override public net.minecraft.nbt.CompoundTag sourceConfig() { return new net.minecraft.nbt.CompoundTag(); }
++			};
++			var source = new com.simibubi.create.content.redstone.displayLink.source.ObservedTrainNameSource();
++			var stats = new com.simibubi.create.content.redstone.displayLink.target.DisplayTargetStats(1, 32, null);
++			var id = java.util.UUID.fromString("00000000-0000-0000-0000-000000000123");
++			var train = new com.simibubi.create.content.trains.entity.Train(id, null, null, java.util.List.of(), java.util.List.of(), false,
++				net.minecraft.network.chat.Component.literal("Test Express"),
++				com.simibubi.create.content.trains.entity.TrainIconType.getDefault(), 0);
++			com.simibubi.create.Create.RAILWAYS.trains.put(id, train);
++			System.out.printf("CREATE_OBSERVED_TRAIN,%s,%d,%s%n", "blank", source.getPassiveRefreshTicks(), source.provideText(context, stats));
++			point.keepAlive(train);
++			for (int tick = 0; tick <= 8; tick++) {
++				var lines = source.provideText(context, stats);
++				System.out.printf("CREATE_OBSERVED_TRAIN,%d,%s,%s%n", tick, point.isActivated(), lines.isEmpty() ? "" : lines.get(0).getString());
++				point.tick(null, false);
++			}
++			com.simibubi.create.Create.RAILWAYS.trains.remove(id);
++			helper.succeed();
++		});
++	}
+ }

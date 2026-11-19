@@ -1,0 +1,92 @@
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+index 657f93b..45a2e93 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+@@ -95,6 +95,7 @@ public class CrossPlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+index 4e7785d..3b3571a 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+@@ -91,6 +91,7 @@ public class PlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+index ee1f50c..a2cbd61 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+@@ -118,6 +118,7 @@ public abstract class SymmetryMirror {
+ 	@OnlyIn(Dist.CLIENT)
+ 	public abstract PartialModel getModel();
+ 
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {}
+ 
+ 	protected Vec3 getDiff(BlockPos position) {
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..408b429 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.symmetryWandBreak")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..70171d9 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,39 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void symmetryWandBreak(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var base = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		helper.runAtTickTime(4, () -> {
++			for (int scenario = 0; scenario < 5; scenario++) {
++				for (BlockPos d : BlockPos.betweenClosed(-8,-2,-8,8,4,8)) level.setBlock(base.offset(d), Blocks.AIR.defaultBlockState(), 2);
++				level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(base).inflate(16)).forEach(e -> e.discard());
++				var player = helper.makeMockPlayer(scenario == 4 ? net.minecraft.world.level.GameType.CREATIVE : net.minecraft.world.level.GameType.SURVIVAL);
++				var wand = com.simibubi.create.AllItems.WAND_OF_SYMMETRY.asStack();
++				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, wand);
++				player.setYRot(scenario == 1 ? -90 : 0);
++				level.setBlock(base.below(), Blocks.STONE.defaultBlockState(), 2);
++				var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(base.below()), net.minecraft.core.Direction.UP, base.below(), false);
++				com.simibubi.create.AllItems.WAND_OF_SYMMETRY.get().useOn(new net.minecraft.world.item.context.UseOnContext(player, net.minecraft.world.InteractionHand.MAIN_HAND, hit));
++				player.getInventory().setItem(1, wand);
++				var tool = scenario == 3 ? ItemStack.EMPTY : new ItemStack(Items.IRON_PICKAXE);
++				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, tool);
++				var source = scenario == 1 ? base.east(2) : base.south(2);
++				var target = scenario == 1 ? base.west(2) : base.north(2);
++				level.setBlock(source, Blocks.STONE.defaultBlockState(), 2);
++				level.setBlock(target, (scenario == 2 || scenario == 4 ? Blocks.DIRT : Blocks.STONE).defaultBlockState(), 2);
++				var event = new net.neoforged.neoforge.event.level.BlockEvent.BreakEvent(level, source, level.getBlockState(source), player);
++				com.simibubi.create.content.equipment.symmetryWand.SymmetryHandler.onBlockDestroyed(event);
++				var drops = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(base).inflate(16));
++				String drop = drops.stream().map(e -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(e.getItem().getItem()) + ":" + e.getItem().getCount() + "@" + e.blockPosition().subtract(base).toShortString()).sorted().collect(java.util.stream.Collectors.joining("|"));
++				System.out.printf("CREATE_SYMMETRY_BREAK,%s,%s,%s,%s,%d,%d,%s%n", new String[]{"xy","yz","mismatch","empty_hand","creative_mismatch"}[scenario],
++					net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(source).getBlock()),
++					net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(target).getBlock()),
++					com.simibubi.create.content.equipment.symmetryWand.SymmetryWandItem.isEnabled(wand), tool.getDamageValue(), drops.size(), drop);
++			}
++			helper.succeed();
++		});
++	}
++
+ }

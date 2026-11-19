@@ -1,0 +1,41 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -35,6 +35,7 @@
+ pub fn create_cannon_ammo(item: &str) -> Option<CreateCannonAmmo> {
+     let (velocity, reload, damage, knockback) = match item {
+         "minecraft:potato" => (1.25, 15, 5.0, 1.5),
++        "minecraft:baked_potato" => (1.25, 15, 5.0, 0.5),
+         "minecraft:carrot" => (1.45, 12, 4.0, 0.3),
+         "minecraft:apple" => (1.45, 10, 5.0, 0.5),
+         "minecraft:beetroot" => (1.6, 5, 2.0, 0.1),
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5590,11 +5590,18 @@
+                     })
+                 });
+                 let damage = cannon_ammo.map_or(t.damage, |ammo| ammo.damage);
++                let baked = cannon_ammo.is_some()
++                    && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:baked_potato");
+                 match hit {
+                     Hit::Entity {
+                         who: Who::Mob(id), ..
+                     } => {
+                         let push = [p.velocity.x, p.velocity.z];
++                        // Create calls setRemainingFireTicks before damage, even
++                        // when that damage will be refused.
++                        if baked && let Some(mob) = self.mobs.iter_mut().find(|m| m.id == id) {
++                            mob.fire_ticks = 60;
++                        }
+                         let hurt = self
+                             .mobs
+                             .iter_mut()
+@@ -5631,6 +5638,9 @@
+                     Hit::Entity {
+                         who: Who::Player, ..
+                     } if damage > 0.0 => {
++                        if baked && let Some(player) = self.player.as_mut() {
++                            player.set_remaining_fire_ticks(60);
++                        }
+                         let from = [p.previous.x, p.previous.y, p.previous.z];
+                         self.mob_hits_player(damage, from, "minecraft:thrown");
+                     }

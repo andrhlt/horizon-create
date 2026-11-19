@@ -1,0 +1,108 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,92 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void funnelNeighbourShapes(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var west = net.minecraft.core.Direction.WEST;
++		var east = net.minecraft.core.Direction.EAST;
++		var north = net.minecraft.core.Direction.NORTH;
++		var up = net.minecraft.core.Direction.UP;
++		var facing = com.simibubi.create.content.logistics.funnel.FunnelBlock.FACING;
++		var horizontal = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.HORIZONTAL_FACING;
++		var extracting = com.simibubi.create.content.logistics.funnel.FunnelBlock.EXTRACTING;
++		var powered = com.simibubi.create.content.logistics.funnel.AbstractFunnelBlock.POWERED;
++		var water = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		for (int c = 0; c < 8; c++) {
++			var target = new BlockPos(5, 105, -11 + c * 3);
++			var chunk = new net.minecraft.world.level.ChunkPos(target);
++			level.setChunkForced(chunk.x, chunk.z, true);
++			level.getChunk(chunk.x, chunk.z);
++			level.setBlockAndUpdate(target.below(), air);
++			level.setBlockAndUpdate(target.east(), net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState());
++			if (c == 4)
++				level.setBlockAndUpdate(target.above(), net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState());
++			var initial = AllBlocks.BRASS_FUNNEL.getDefaultState().setValue(facing, c == 2 ? up : c == 3 ? north : west)
++				.setValue(extracting, c != 0).setValue(powered, c == 4).setValue(water, c == 4);
++			level.setBlockAndUpdate(target, initial);
++			var originalBE = level.getBlockEntity(target);
++			var filter = com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(level, target,
++				com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE);
++			helper.assertTrue(filter != null, "Brass Funnel must have a filter behavior");
++			filter.setFilter(new ItemStack(Items.IRON_INGOT));
++			var saw = AllBlocks.MECHANICAL_SAW.getDefaultState();
++			var belt = AllBlocks.BELT.getDefaultState();
++			var slope = com.simibubi.create.content.kinetics.belt.BeltBlock.SLOPE;
++			var below = switch (c) {
++				case 1 -> AllBlocks.WEIGHTED_EJECTOR.getDefaultState();
++				case 3 -> belt.setValue(horizontal, east);
++				case 5 -> AllBlocks.ITEM_DRAIN.getDefaultState();
++				case 6 -> saw.setValue(facing, up);
++				case 7 -> belt.setValue(horizontal, east).setValue(slope,
++					com.simibubi.create.content.kinetics.belt.BeltSlope.VERTICAL);
++				default -> AllBlocks.DEPOT.getDefaultState();
++			};
++			funnelShapeRow(helper, c, 0, target, originalBE);
++			level.setBlockAndUpdate(target.below(), below);
++			funnelShapeRow(helper, c, 1, target, originalBE);
++			if (c == 3) {
++				level.setBlockAndUpdate(target.below(), below.setValue(horizontal, north));
++				funnelShapeRow(helper, c, 2, target, originalBE);
++				level.setBlockAndUpdate(target.below(), below);
++				funnelShapeRow(helper, c, 3, target, originalBE);
++			} else if (c == 6 || c == 7) {
++				var second = c == 6 ? saw.setValue(facing, north) : belt.setValue(horizontal, east);
++				level.setBlockAndUpdate(target.below(), second);
++				funnelShapeRow(helper, c, 2, target, originalBE);
++				var third = c == 6 ? below : second.setValue(slope,
++					com.simibubi.create.content.kinetics.belt.BeltSlope.SIDEWAYS);
++				level.setBlockAndUpdate(target.below(), third);
++				funnelShapeRow(helper, c, 3, target, originalBE);
++			}
++			level.setBlockAndUpdate(target.below(), air);
++			funnelShapeRow(helper, c, 4, target, originalBE);
++			level.setChunkForced(chunk.x, chunk.z, false);
++		}
++		helper.succeed();
++	}
++
++	private static void funnelShapeRow(CreateGameTestHelper helper, int c, int action, BlockPos target,
++		net.minecraft.world.level.block.entity.BlockEntity originalBE) {
++		var level = helper.getLevel();
++		var state = level.getBlockState(target);
++		var shape = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.SHAPE;
++		var direction = com.simibubi.create.content.logistics.funnel.AbstractFunnelBlock.getFunnelFacing(state);
++		helper.assertTrue(direction != null, "A Funnel remains present over changed support");
++		var filter = com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(level, target,
++			com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE);
++		var isBelt = state.hasProperty(shape);
++		var mode = isBelt ? state.getValue(shape).getSerializedName()
++			: state.getValue(com.simibubi.create.content.logistics.funnel.FunnelBlock.EXTRACTING).toString();
++		var keepFilter = filter != null && filter.getFilter().is(Items.IRON_INGOT);
++		System.out.printf("CREATE_FUNNEL_NEIGHBOUR %d,%d,%s,%s,%s,%s,%s,%s,%s%n",
++			c, action, isBelt ? "belt" : "plain", direction.getName(), mode,
++			state.getValue(com.simibubi.create.content.logistics.funnel.AbstractFunnelBlock.POWERED),
++			state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED),
++			keepFilter, originalBE == level.getBlockEntity(target));
++		helper.assertTrue(keepFilter && originalBE == level.getBlockEntity(target),
++			"Neighbour changes preserve the same configured Funnel block entity");
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.funnelNeighbourShapes")).toList();
+ 	}
+ }

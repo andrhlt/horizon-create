@@ -1,0 +1,10 @@
+--- a/crates/horizon-client/src/game/commands/data.rs
++++ b/crates/horizon-client/src/game/commands/data.rs
+@@ -1143,6 +1143,7 @@
+                     let state = self.world.block(p[0], p[1], p[2]);
+                     // Redraw what shows the block entity (signs, banners).
+                     let _ = self.world.set(p[0], p[1], p[2], state);
++                    self.native_block_entity_data_loaded(*p);
+                 }
+                 Ok(())
+             }

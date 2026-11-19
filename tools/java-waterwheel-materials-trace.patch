@@ -1,0 +1,47 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..4eb88c3 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.waterwheelMaterials"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+index 4102b83..51df329 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -221,6 +221,8 @@ public class TestFluids {
+ 				.map(Holder::value).map(ItemLike::asItem).collect(Collectors.toCollection(ArrayList::new));
+ 		List<BlockPos> chests = List.of(new BlockPos(6, 4, 2), new BlockPos(6, 4, 3));
+ 		List<BlockPos> deployers = chests.stream().map(pos -> pos.below(2)).toList();
++		System.out.println("CREATE_MATERIAL_ORDER " + planks.stream().map(BuiltInRegistries.ITEM::getKey)
++			.map(Object::toString).collect(Collectors.joining(" ")));
+ 		helper.runAfterDelay(3, () -> chests.forEach(chest ->
+ 				planks.forEach(plank -> ItemHandlerHelper.insertItem(helper.itemStorageAt(chest), new ItemStack(plank), false))
+ 		));
+@@ -237,10 +239,18 @@ public class TestFluids {
+ 			Block block = blockItem.getBlock();
+ 
+ 			WaterWheelBlockEntity smallWheelBe = helper.getBlockEntity(AllBlockEntityTypes.WATER_WHEEL.get(), smallWheel);
++			WaterWheelBlockEntity largeWheelBe = helper.getBlockEntity(AllBlockEntityTypes.LARGE_WATER_WHEEL.get(), largeWheel);
++			var lookup = helper.getLevel().registryAccess();
++			var first = helper.getBlockEntity(deployers.get(0)).saveWithoutMetadata(lookup);
++			var second = helper.getBlockEntity(deployers.get(1)).saveWithoutMetadata(lookup);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_MATERIAL %d %s %s %s %d %.1f %s %d %.1f%n",
++				helper.getTick(), BuiltInRegistries.BLOCK.getKey(smallWheelBe.material.getBlock()),
++				BuiltInRegistries.BLOCK.getKey(largeWheelBe.material.getBlock()),
++				first.getString("State"), first.getInt("Timer"), first.getFloat("Speed"),
++				second.getString("State"), second.getInt("Timer"), second.getFloat("Speed"));
+ 			if (!smallWheelBe.material.is(block))
+ 				helper.fail("Small waterwheel has not consumed " + BuiltInRegistries.ITEM.getKey(plank));
+ 
+-			WaterWheelBlockEntity largeWheelBe = helper.getBlockEntity(AllBlockEntityTypes.LARGE_WATER_WHEEL.get(), largeWheel);
+ 			if (!largeWheelBe.material.is(block))
+ 				helper.fail("Large waterwheel has not consumed " + BuiltInRegistries.ITEM.getKey(plank));
+ 

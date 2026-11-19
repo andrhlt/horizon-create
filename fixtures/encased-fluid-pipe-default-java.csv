@@ -1,0 +1,2 @@
+id,faces,item,hardness,resistance,map_color,full_collision,empty_occlusion_shape,outline_boxes,collision_boxes,entity
+create:encased_fluid_pipe,000000,minecraft:air,3.0000,6.0000,44,true,false,0.0000:0.0000:0.0000:1.0000:1.0000:1.0000,0.0000:0.0000:0.0000:1.0000:1.0000:1.0000,true

@@ -1,0 +1,52 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "state_properties": {
+    "powered": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "powered": "true"
+  },
+  "shapes": {
+    "default": [
+      [
+        0.0625,
+        0.5,
+        0.0625,
+        0.9375,
+        1.0,
+        0.9375
+      ],
+      [
+        0.125,
+        0.0,
+        0.125,
+        0.875,
+        0.5,
+        0.875
+      ]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [
+        0.0625,
+        0.5,
+        0.0625,
+        0.9375,
+        1.0,
+        0.9375
+      ],
+      [
+        0.125,
+        0.0,
+        0.125,
+        0.875,
+        0.5,
+        0.875
+      ]
+    ]
+  }
+}

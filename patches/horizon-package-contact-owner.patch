@@ -1,0 +1,42 @@
+--- a/crates/horizon-client/src/mobs.rs
++++ b/crates/horizon-client/src/mobs.rs
+@@ -1742,6 +1742,9 @@
+         target: Who,
+         velocity: [f64; 3],
+     },
++    ClearPackageTossedBy {
++        target: u32,
++    },
+     /// `SonicBoom`: 10 damage to the target, then a push along `direction`
+     /// (the unit vector from the warden's chest to the target's eyes) only
+     /// if the hit landed, less the target's knockback resistance.
+--- a/crates/horizon-client/src/mobs/ai.rs
++++ b/crates/horizon-client/src/mobs/ai.rs
+@@ -1830,6 +1830,13 @@
+         hurt(m, w, events, 6.0, Damage::of(DamageKind::Cramming));
+     }
+     for (who, at, _, same, vehicle) in targets {
++        // A Package forgets its thrower on ordinary mob contact, even if it vetoes the impulse.
++        if m.kind.id != "create:package"
++            && let Who::Mob(id) = who
++            && w.seen(id).is_some_and(|receiver| receiver.create_package)
++        {
++            events.push(MobEvent::ClearPackageTossedBy { target: id });
++        }
+         // Warden.doPush: touching it angers it, then the push itself.
+         if m.species() == Species::Warden {
+             super::warden::do_push(m, w, who, events);
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -2439,6 +2439,11 @@
+                         }
+                     }
+                 }
++                MobEvent::ClearPackageTossedBy { target } => {
++                    if let Some(horizon_world::nbt::Tag::Compound(data)) = self.persist.raw.get_mut(&target) {
++                        data.remove(&"CreatePackageTossedBy".into());
++                    }
++                }
+                 MobEvent::Push { target, velocity } => {
+                     let v = Vec3::new(velocity[0], velocity[1], velocity[2]);
+                     match target {

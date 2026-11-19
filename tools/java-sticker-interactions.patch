@@ -1,0 +1,35 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(t -> t.testName().equals("TestMisc.stickerInteractionsBench")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,22 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "shearing", timeoutTicks = 100)
++    public static void stickerInteractionsBench(CreateGameTestHelper helper) {
++        var level=helper.getLevel();var pos=helper.absolutePos(new BlockPos(3,16,3));
++        var block=com.simibubi.create.AllBlocks.STICKER.get();
++        for(var face:net.minecraft.core.Direction.values()) {
++            var state=block.defaultBlockState().setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING,face).setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED,true).setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.POWERED,true);
++            level.setBlock(pos,state,2);
++            for(var target:net.minecraft.core.Direction.values()) {
++                var rotated=block.getRotatedBlockState(state,target);
++                var row=new com.google.gson.JsonObject();row.addProperty("kind","wrench");row.addProperty("facing",face.getSerializedName());row.addProperty("target",target.getSerializedName());
++                row.addProperty("result",rotated.getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING).getSerializedName());row.addProperty("extended",rotated.getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED));row.addProperty("powered",rotated.getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.POWERED));
++                System.out.println("STICKER_INTERACTIONS "+row);
++            }
++            var row=new com.google.gson.JsonObject();row.addProperty("kind","weak_power");row.addProperty("direction",face.getSerializedName());row.addProperty("check",block.shouldCheckWeakPower(state,level,pos,face));System.out.println("STICKER_INTERACTIONS "+row);
++        }
++        helper.succeed();
++    }
+ }

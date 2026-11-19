@@ -1,0 +1,6 @@
+action,left_lower,left_upper,right_lower,right_upper,tick,speed
+before,false,false,false,false,51,0.187499996
+opened,true,true,true,true,51,0.187499996
+opened_next_tick,true,true,true,true,52,0.194999996
+closed,false,false,false,false,53,0.202499995
+closed_next_tick,false,false,false,false,54,0.209999995

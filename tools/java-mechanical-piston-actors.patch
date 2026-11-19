@@ -1,0 +1,68 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(t -> t.testName().startsWith("TestContraptions.mechanicalStickerActors")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -278,4 +278,55 @@
+ 			helper.assertBlockProperty(vaultLamp, RedstoneLampBlock.LIT, true);
+ 		});
+ 	}
++
++    @GameTest(template = "ploughing", timeoutTicks = 80)
++    public static void mechanicalStickerActors(CreateGameTestHelper helper) {mechanicalStickerBatch(helper,5);}
++    private static void mechanicalStickerBatch(CreateGameTestHelper helper,int scenario) {
++        var level=helper.getLevel();
++        var piston=helper.absolutePos(new BlockPos(2,3,1));
++        var face=net.minecraft.core.Direction.EAST;
++        var state=level.getBlockState(piston);
++        helper.assertTrue(com.simibubi.create.AllBlocks.MECHANICAL_PISTON.has(state) || com.simibubi.create.AllBlocks.STICKY_MECHANICAL_PISTON.has(state),"missing piston at "+piston+" got "+state);
++        level.setBlock(piston.east(2),Blocks.STONE.defaultBlockState(),3);
++        level.setBlock(piston.east(4),Blocks.AIR.defaultBlockState(),3);
++        helper.pullLever(new BlockPos(3,3,2));
++        boolean powered=level.hasNeighborSignal(piston.east());
++        level.setBlock(piston.east(),com.simibubi.create.AllBlocks.STICKER.getDefaultState().setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING,face).setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED,true).setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.POWERED,powered),3);
++        level.setBlock(piston.east().above(),com.simibubi.create.AllBlocks.MECHANICAL_PLOUGH.getDefaultState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING,face),3);
++        level.setBlock(piston.east(2).above(),com.simibubi.create.AllBlocks.MECHANICAL_HARVESTER.getDefaultState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING,face),3);
++        var glueBox=new net.minecraft.world.phys.AABB(piston.east()).expandTowards(1,1,0);
++        level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level,glueBox));
++        var pistonBe=(com.simibubi.create.foundation.blockEntity.SmartBlockEntity)level.getBlockEntity(piston);
++        pistonBe.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE).setValue(0);
++        for(int tick=0;tick<=23;tick++) {
++            final int t=tick;
++            helper.runAtTickTime(tick+2,()-> {
++                if(t==10) {
++                    var motor=level.getBlockEntity(helper.absolutePos(new BlockPos(4,2,2)));
++                    if(motor instanceof com.simibubi.create.foundation.blockEntity.SmartBlockEntity smart) {
++                        var scroll=smart.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE);
++                        if(scroll!=null)scroll.setValue(-64);
++                    }
++                }
++                var be=(com.simibubi.create.content.contraptions.piston.LinearActuatorBlockEntity)level.getBlockEntity(piston);
++                var row=new com.google.gson.JsonObject();row.addProperty("case",scenario);row.addProperty("tick",t);row.addProperty("pending",be.assembleNextTick);row.addProperty("mode",be.saveWithoutMetadata(level.registryAccess()).getInt("ScrollValue"));row.addProperty("extension_length",be.saveWithoutMetadata(level.registryAccess()).getInt("ExtensionLength"));row.addProperty("movement_speed",be.getMovementSpeed());row.addProperty("exception",be.getLastAssemblyException()==null?"":be.getLastAssemblyException().getMessage());row.addProperty("offset",be.offset);row.addProperty("running",be.running);row.addProperty("speed",be.getSpeed());row.addProperty("sticker_extended",level.getBlockState(piston.east()).hasProperty(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED) && level.getBlockState(piston.east()).getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED));row.addProperty("state",level.getBlockState(piston).getValue(com.simibubi.create.content.contraptions.piston.MechanicalPistonBlock.STATE).getSerializedName());
++                var cells=new com.google.gson.JsonArray();var stickerStates=new com.google.gson.JsonArray();
++                for(int x=-2;x<=5;x++) {
++                    var st=level.getBlockState(piston.relative(face,x));cells.add(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).toString());
++                    if(com.simibubi.create.AllBlocks.STICKER.has(st)) {var sr=new com.google.gson.JsonObject();sr.addProperty("distance",x);sr.addProperty("extended",st.getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED));sr.addProperty("powered",st.getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.POWERED));stickerStates.add(sr);}
++                }
++                row.add("cells",cells);row.add("sticker_states",stickerStates);
++                var actors=new com.google.gson.JsonArray();for(int x=0;x<=4;x++)actors.add(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(piston.relative(face,x).above()).getBlock()).toString());row.add("actor_cells",actors);
++                var moved=be.movedContraption;var blocks=new java.util.ArrayList<String>();boolean capturedExtended=false;
++                if(moved!=null)for(var entry:moved.getContraption().getBlocks().values()) {
++                    blocks.add(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(entry.state().getBlock()).toString());
++                    if(com.simibubi.create.AllBlocks.STICKER.has(entry.state()) && entry.state().getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED))capturedExtended=true;
++                }
++                row.addProperty("captured_extended",capturedExtended);
++                java.util.Collections.sort(blocks);var payload=new com.google.gson.JsonArray();for(String id:blocks)payload.add(id);row.add("payload",payload);
++                System.out.println("CREATE_PISTON_STICKER "+row);
++                if(t==23)helper.succeed();
++            });
++        }
++    }
+ }

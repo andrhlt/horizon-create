@@ -1,0 +1,149 @@
+{
+  "include_components": true,
+  "actions": [
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 3
+    },
+    {
+      "op": "fill",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "minecraft:water",
+      "amount": 1500
+    },
+    {
+      "op": "probe",
+      "label": "empty-after-fill",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "configure",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "create:potion",
+      "components": {
+        "minecraft:potion_contents": {
+          "potion": "minecraft:healing"
+        },
+        "create:potion_fluid_bottle_type": "regular"
+      },
+      "amount": 1000
+    },
+    {
+      "op": "probe",
+      "label": "configured",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "fill",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "minecraft:lava",
+      "amount": 9000
+    },
+    {
+      "op": "drain",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "create:potion",
+      "components": {
+        "minecraft:potion_contents": {
+          "potion": "minecraft:strength"
+        },
+        "create:potion_fluid_bottle_type": "regular"
+      },
+      "amount": 1000
+    },
+    {
+      "op": "drain",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "create:potion",
+      "components": {
+        "minecraft:potion_contents": {
+          "potion": "minecraft:healing"
+        },
+        "create:potion_fluid_bottle_type": "regular"
+      },
+      "amount": 1000
+    },
+    {
+      "op": "drain",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "amount": 3000
+    },
+    {
+      "op": "probe",
+      "label": "after-transfers",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "configure",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "minecraft:empty",
+      "amount": 0
+    },
+    {
+      "op": "probe",
+      "label": "cleared",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  ]
+}

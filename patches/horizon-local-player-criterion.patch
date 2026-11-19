@@ -1,0 +1,16 @@
+--- a/crates/horizon-client/src/game/native_criteria.rs
++++ b/crates/horizon-client/src/game/native_criteria.rs
+@@ -65,7 +65,12 @@
+         if !mod_trigger(trigger) || self.remote.is_some() {
+             return false;
+         }
+-        if self.lan_acting_uuid == Some(uuid) {
++        if self.lan_acting_uuid == Some(uuid)
++            || (self.lan_acting.is_none()
++                && !self.no_player_here()
++                && self.player.is_some()
++                && self.native_acting_id() == uuid)
++        {
+             self.trigger_mod_criteria(trigger, &test);
+             return true;
+         }

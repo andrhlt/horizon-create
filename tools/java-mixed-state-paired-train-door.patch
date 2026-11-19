@@ -1,0 +1,280 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..faa3941 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.scheduledTrainDoors")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..2efc826 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,263 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 250)
++	public static void scheduledTrainDoors(CreateGameTestHelper helper) {
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var level = helper.getLevel();
++        var manualCarriage = new com.simibubi.create.content.trains.entity.CarriageContraptionEntity[1];
++        var manualPos = new BlockPos[1];
++        java.util.function.Consumer<String> manualSample = label -> {
++            var blocks = manualCarriage[0].getContraption().getBlocks();
++            boolean lower = blocks.get(manualPos[0]).state().getValue(net.minecraft.world.level.block.DoorBlock.OPEN);
++            boolean upper = blocks.get(manualPos[0].above()).state().getValue(net.minecraft.world.level.block.DoorBlock.OPEN);
++            boolean otherLower = blocks.get(manualPos[0].east()).state().getValue(net.minecraft.world.level.block.DoorBlock.OPEN);
++            boolean otherUpper = blocks.get(manualPos[0].east().above()).state().getValue(net.minecraft.world.level.block.DoorBlock.OPEN);
++            System.out.printf("CREATE_MIXED_STATE_PAIRED_DOOR,%s,%s,%s,%s,%s%n", label, lower, upper, otherLower, otherUpper);
++        };
++		var track = com.simibubi.create.AllBlocks.TRACK.get();
++		var casing = com.simibubi.create.AllBlocks.RAILWAY_CASING.asItem();
++		var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
++		var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
++		var origin = new BlockPos(9, 112, -8);
++		for (int x = -20; x <= 24; x++) {
++			var cell = origin.east(x);
++			level.setChunkForced(cell.getX() >> 4, cell.getZ() >> 4, true);
++			level.setBlockAndUpdate(origin.offset(x,-1,0), Blocks.SMOOTH_STONE.defaultBlockState());
++			level.setBlockAndUpdate(origin.east(x), rail);
++			level.setBlockAndUpdate(origin.east(x).above(), Blocks.AIR.defaultBlockState());
++		}
++		var destination = origin.south(2);
++		level.setBlockAndUpdate(destination, Blocks.AIR.defaultBlockState());
++		level.setBlockAndUpdate(destination.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++		var item = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) com.simibubi.create.AllBlocks.TRACK_STATION.asItem();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        var stationType = com.simibubi.create.AllBlocks.TRACK_STATION;
++        var arrivalRail = origin.west(13);
++        var wrongWayRail = origin.west(6);
++        var arrivalStation = arrivalRail.south(2);
++        var wrongWayStation = wrongWayRail.south(2);
++        helper.runAfterDelay(10, () -> {
++            var locations = java.util.List.of(arrivalStation, wrongWayStation);
++            var targets = java.util.List.of(arrivalRail, wrongWayRail);
++            for (int index = 0; index < 2; index++) {
++                var target = targets.get(index);
++                var at = locations.get(index);
++                var support = at.below();
++                level.setChunkForced(at.getX() >> 4, at.getZ() >> 4, true);
++                level.setBlockAndUpdate(at, Blocks.AIR.defaultBlockState());
++                level.setBlockAndUpdate(at.above(), Blocks.AIR.defaultBlockState());
++                level.setBlockAndUpdate(support, Blocks.SMOOTH_STONE.defaultBlockState());
++                player.setItemInHand(hand, new ItemStack(item));
++                player.setYRot(index == 0 ? 90 : -90);
++                player.setXRot(20);
++                player.setPos(target.getX() + .5, target.getY() + 1, target.getZ() + .5);
++                clickTrackForAssembly(item, player, target);
++                player.setPos(support.getX() + .5, support.getY() + 1, support.getZ() + .5);
++                clickTrackForAssembly(item, player, support);
++                helper.assertTrue(stationType.has(level.getBlockState(at)), "Station placement failed at " + at);
++            }
++        });
++        helper.runAfterDelay(4, () -> {
++            for (int x = -20; x <= 24; x++) {
++                var cell = origin.east(x);
++                com.simibubi.create.content.trains.track.TrackPropagator.onRailAdded(level, cell, level.getBlockState(cell));
++            }
++        });
++		helper.runAfterDelay(7, () -> {
++
++			player.setItemInHand(hand, new ItemStack(item));
++			player.setYRot(90);
++			player.setXRot(20);
++			player.setPos(origin.getX() + .5, origin.getY() + 1, origin.getZ() + .5);
++			clickTrackForAssembly(item, player, origin);
++            player.setPos(destination.getX() + .5, destination.getY() + 1, destination.getZ() + .5);
++			clickTrackForAssembly(item, player, destination.below());
++		});
++		helper.runAfterDelay(12, () -> {
++			var station = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(destination);
++			helper.assertTrue(station != null && station.enterAssemblyMode(null), "Station must enter assembly mode");
++			player.setItemInHand(hand, new ItemStack(casing, 3));
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east()), "Expected first bogey");
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east(4)), "Expected rear bogey");
++			for (int x = 1; x <= 4; x++)
++				level.setBlockAndUpdate(origin.east(x).above(2), Blocks.OAK_PLANKS.defaultBlockState());
++			var controls = com.simibubi.create.AllBlocks.TRAIN_CONTROLS.get().defaultBlockState()
++				.setValue(com.simibubi.create.content.contraptions.actors.trainControls.ControlsBlock.FACING,
++					net.minecraft.core.Direction.EAST);
++			level.setBlockAndUpdate(origin.east().above(3), controls);
++            var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.WHITE).get().defaultBlockState();
++            level.setBlockAndUpdate(origin.east(2).above(3), seat);
++            var chestPos = origin.east(3).above(3);
++            level.setBlockAndUpdate(chestPos, Blocks.CHEST.defaultBlockState());
++            var chest = (net.minecraft.world.level.block.entity.ChestBlockEntity) level.getBlockEntity(chestPos);
++            chest.setItem(0, new ItemStack(Items.PAPER, 64));
++            chest.setItem(1, new ItemStack(Items.PAPER, 7));
++            chest.setItem(2, new ItemStack(Items.REDSTONE, 64));
++            var door = com.simibubi.create.AllBlocks.TRAIN_DOOR.get();
++            for (var direction : java.util.List.of(net.minecraft.core.Direction.NORTH, net.minecraft.core.Direction.SOUTH)) {
++                var pos = origin.east(4).above(3).relative(direction);
++                level.setBlockAndUpdate(pos.below(), Blocks.OAK_PLANKS.defaultBlockState());
++                var state = door.defaultBlockState().setValue(net.minecraft.world.level.block.DoorBlock.FACING, direction);
++                level.setBlockAndUpdate(pos, state);
++                level.setBlockAndUpdate(pos.above(), state.setValue(net.minecraft.world.level.block.DoorBlock.HALF,
++                    net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER));
++            }
++			            var near = origin.east(3).above(3).north();
++            var far = origin.east(4).above(3).north();
++            level.setBlockAndUpdate(near.below(), Blocks.OAK_PLANKS.defaultBlockState());
++            var left = door.defaultBlockState().setValue(net.minecraft.world.level.block.DoorBlock.FACING, net.minecraft.core.Direction.NORTH)
++                .setValue(net.minecraft.world.level.block.DoorBlock.HINGE, net.minecraft.world.level.block.state.properties.DoorHingeSide.LEFT);
++            var right = left.setValue(net.minecraft.world.level.block.DoorBlock.HINGE, net.minecraft.world.level.block.state.properties.DoorHingeSide.RIGHT);
++            level.setBlockAndUpdate(near, left);
++            level.setBlockAndUpdate(near.above(), left.setValue(net.minecraft.world.level.block.DoorBlock.HALF, net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER));
++            level.setBlockAndUpdate(far, right);
++            level.setBlockAndUpdate(far.above(), right.setValue(net.minecraft.world.level.block.DoorBlock.HALF, net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER));
++			var area = com.simibubi.create.content.contraptions.glue.SuperGlueEntity.span(
++                origin.east().above().north(), origin.east(4).above(4).south());
++
++			level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, area));
++			station.assemble(player.getUUID());
++            helper.assertTrue(station.exitAssemblyMode(), "Expected the normal assembly exit");
++		});
++		helper.runAfterDelay(22, () -> {
++            var train = com.simibubi.create.Create.RAILWAYS.trains.values().stream()
++                .filter(candidate -> candidate.owner.equals(player.getUUID())).findFirst().orElseThrow();
++            var carriage = train.carriages.getFirst().anyAvailableEntity();
++            var contraption = (com.simibubi.create.content.trains.entity.CarriageContraption) carriage.getContraption();
++            var driver = EntityType.VILLAGER.create(level);
++            driver.setNoAi(true);
++            var at = carriage.position();
++            driver.setPos(at.x, at.y + 2, at.z);
++            level.addFreshEntity(driver);
++            carriage.addSittingPassenger(driver, contraption.getSeats().indexOf(new BlockPos(1, 2, 0)));
++            helper.assertTrue(driver.getRootVehicle() == carriage, "Expected a seated conductor");
++            var start = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(destination);
++            var finish = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(arrivalStation);
++            var other = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(wrongWayStation);
++            start.getStation().name = "Origin";
++            finish.getStation().name = "Terminal";
++            other.getStation().name = "Wrong way";
++            var control = com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(
++                level, arrivalStation, com.simibubi.create.content.decoration.slidingDoor.DoorControlBehaviour.TYPE);
++            control.mode = com.simibubi.create.content.decoration.slidingDoor.DoorControl.NORTH;
++            var mounted = train.carriages.getFirst().storage.getAllItems();
++            helper.assertTrue(mounted != null && mounted.getSlots() == 27
++                && mounted.getStackInSlot(0).is(Items.PAPER) && mounted.getStackInSlot(0).getCount() == 64
++                && mounted.getStackInSlot(1).is(Items.PAPER) && mounted.getStackInSlot(1).getCount() == 7
++                && mounted.getStackInSlot(2).is(Items.REDSTONE) && mounted.getStackInSlot(2).getCount() == 64,
++                "The original carriage mounted one chest with both real paper stacks and the redstone decoy");
++            var schedule = new com.simibubi.create.content.trains.schedule.Schedule();
++            schedule.cyclic = false;
++            for (String name : java.util.List.of("Origin", "Terminal")) {
++                var entry = new com.simibubi.create.content.trains.schedule.ScheduleEntry();
++                var instruction = new com.simibubi.create.content.trains.schedule.destination.DestinationInstruction();
++                instruction.getData().putString("Text", name);
++                entry.instruction = instruction;
++                var delay = new com.simibubi.create.content.trains.schedule.condition.ScheduledDelay();
++                delay.getData().putInt("Value", name.equals("Origin") ? 3 : 5);
++                delay.getData().putInt("TimeUnit", 0);
++                if (name.equals("Origin")) {
++                    var fullStack = new com.simibubi.create.content.trains.schedule.condition.ItemThresholdCondition();
++                    var pieces = new com.simibubi.create.content.trains.schedule.condition.ItemThresholdCondition();
++                    for (var condition : java.util.List.of(fullStack, pieces)) {
++                        condition.setItem(0, new ItemStack(Items.PAPER));
++                        condition.getData().putInt("Operator", 2);
++                    }
++                    fullStack.getData().putInt("Measure", 1);
++                    fullStack.getData().putString("Threshold", "1");
++                    pieces.getData().putInt("Measure", 0);
++                    pieces.getData().putString("Threshold", "71");
++                    var tooMany = new com.simibubi.create.content.trains.schedule.condition.ItemThresholdCondition();
++                    tooMany.setItem(0, new ItemStack(Items.PAPER));
++                    tooMany.getData().putInt("Operator", 0);
++                    tooMany.getData().putInt("Measure", 0);
++                    tooMany.getData().putString("Threshold", "71");
++                    entry.conditions.add(java.util.List.of(fullStack, pieces));
++                    entry.conditions.add(java.util.List.of(tooMany));
++                } else
++                    entry.conditions.add(java.util.List.of(delay));
++                schedule.entries.add(entry);
++            }
++            var programmed = com.simibubi.create.AllItems.SCHEDULE.asStack();
++            programmed.set(com.simibubi.create.AllDataComponents.TRAIN_SCHEDULE, schedule.write(level.registryAccess()));
++            System.out.println("CREATE_SCHEDULED_ITEM " + programmed.get(com.simibubi.create.AllDataComponents.TRAIN_SCHEDULE));
++            player.setItemInHand(hand, programmed);
++            player.setPos(at.x + 1, at.y + 1, at.z);
++            var click = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.EntityInteractSpecific(
++                player, hand, driver, net.minecraft.world.phys.Vec3.ZERO);
++            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(click);
++            helper.assertTrue(click.isCanceled() && train.runtime.getSchedule() != null, "Conductor must accept the schedule");
++            manualCarriage[0] = carriage;
++            manualPos[0] = contraption.getBlocks().entrySet().stream().filter(entry ->
++                com.simibubi.create.AllBlocks.TRAIN_DOOR.has(entry.getValue().state()) &&
++                entry.getValue().state().getValue(net.minecraft.world.level.block.DoorBlock.FACING) == net.minecraft.core.Direction.NORTH &&
++                entry.getValue().state().getValue(net.minecraft.world.level.block.DoorBlock.HINGE) == net.minecraft.world.level.block.state.properties.DoorHingeSide.LEFT &&
++                entry.getValue().state().getValue(net.minecraft.world.level.block.DoorBlock.HALF) == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER)
++                .map(java.util.Map.Entry::getKey).findFirst().orElseThrow();
++            var behaviour = new com.simibubi.create.content.contraptions.behaviour.DoorMovingInteraction();
++            helper.assertTrue(behaviour.handlePlayerInteraction(null, hand, manualPos[0], carriage),
++                "Expected the single-leaf setup to close");
++            manualSample.accept("before");
++            helper.assertTrue(behaviour.handlePlayerInteraction(player, hand, manualPos[0], carriage),
++                "Expected manual open");
++            manualSample.accept("opened");
++        });
++        helper.runAfterDelay(23, () -> manualSample.accept("opened_next_tick"));
++        helper.runAfterDelay(24, () -> {
++            var behaviour = new com.simibubi.create.content.contraptions.behaviour.DoorMovingInteraction();
++            helper.assertTrue(behaviour.handlePlayerInteraction(player, hand, manualPos[0], manualCarriage[0]),
++                "Expected manual close");
++            manualSample.accept("closed");
++        });
++        helper.runAfterDelay(25, () -> { manualSample.accept("closed_next_tick"); helper.succeed(); });
++        for (int tick = 23; tick <= 145; tick++) {
++			int t = tick;
++			helper.runAfterDelay(t, () -> {
++				var railway = com.simibubi.create.Create.RAILWAYS;
++				var train = railway.trains.values().stream().filter(candidate -> candidate.owner.equals(player.getUUID()))
++					.findFirst().orElse(null);
++				helper.assertTrue(train != null, "Station failed assembly: " + level.getBlockEntity(destination).saveWithoutMetadata(level.registryAccess()));
++				var c = train.carriages.getFirst();
++				double a = c.leadingBogey().leading().getPosition(train.graph).x - origin.getX();
++				double b = c.leadingBogey().trailing().getPosition(train.graph).x - origin.getX();
++				double d = c.trailingBogey().leading().getPosition(train.graph).x - origin.getX();
++				double e = c.trailingBogey().trailing().getPosition(train.graph).x - origin.getX();
++                var approach = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(arrivalStation);
++                var global = approach.getStation();
++                var stopped = global != null && train.getCurrentStation() == global;
++                var doors = c.anyAvailableEntity().getContraption().getBlocks().values().stream()
++                    .filter(info -> com.simibubi.create.AllBlocks.TRAIN_DOOR.has(info.state()))
++                    .sorted(java.util.Comparator.comparingInt(info -> info.pos().getZ() * 16 + info.pos().getY()))
++                    .toList();
++                helper.assertTrue(doors.size() == 6, "expected three complete mounted train doors");
++                var bits = new StringBuilder();
++                for (var door : doors)
++                    bits.append(door.state().getValue(net.minecraft.world.level.block.DoorBlock.OPEN) ? '1' : '0');
++                System.out.printf(java.util.Locale.ROOT, "CREATE_TRAIN_DOORS,%d,%.9f,%s,%s%n",
++                    t, train.speed, stopped, bits);
++                var approaching = global != null && train.navigation.destination == global;
++                boolean atOrigin = train.getCurrentStation() != null && train.getCurrentStation().name.equals("Origin");
++                System.out.printf(java.util.Locale.ROOT, "CREATE_SCHEDULED_STATIC_CARGO_TRIP %d;%.9f;%.9f;%.9f;%.9f;%.9f;%d;%d;%.9f;%d;%s;%d;%d;%d%n",
++                    t, train.speed, a, b, d, e, approaching ? 1 : 0, stopped ? 1 : 0,
++                    approaching ? train.navigation.distanceToDestination : 0, atOrigin ? 1 : 0,
++                    train.runtime.state, train.runtime.currentEntry, train.runtime.paused ? 1 : 0, train.runtime.completed ? 1 : 0);
++                var wait = train.runtime.conditionProgress.isEmpty() ? 0 : train.runtime.conditionProgress.getFirst();
++                var rejected = train.runtime.conditionProgress.size() < 2 ? 0 : train.runtime.conditionProgress.get(1);
++                System.out.printf(java.util.Locale.ROOT, "CREATE_SCHEDULED_STATIC_CARGO %d;%d;%d%n", t, wait, rejected);
++                if (t == 145) {
++                    helper.assertTrue(stopped && train.runtime.completed, "Schedule must finish at Terminal");
++                    helper.succeed();
++                }
++			});
++		}
++	}
++
++	private static void clickTrackForAssembly(com.simibubi.create.content.trains.track.TrackTargetingBlockItem item,
++			net.minecraft.world.entity.player.Player player, BlockPos pos) {
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(pos).add(0,.5,0), net.minecraft.core.Direction.UP, pos, false);
++		item.useOn(new net.minecraft.world.item.context.UseOnContext(player,
++			net.minecraft.world.InteractionHand.MAIN_HAND, hit));
++	}
+ }

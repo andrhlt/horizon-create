@@ -1,0 +1,127 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.stationDropSchedule"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,112 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 60)
++	public static void stationDropSchedule(CreateGameTestHelper helper) {
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var level = helper.getLevel();
++		var track = com.simibubi.create.AllBlocks.TRACK.get();
++		var casing = com.simibubi.create.AllBlocks.RAILWAY_CASING.asItem();
++		var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
++		var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
++		var origin = helper.absolutePos(new BlockPos(1, 8, 0));
++		for (int x = -20; x <= 24; x++) {
++			level.setBlockAndUpdate(origin.offset(x,-1,0), Blocks.SMOOTH_STONE.defaultBlockState());
++			level.setBlockAndUpdate(origin.east(x), rail);
++			level.setBlockAndUpdate(origin.east(x).above(), Blocks.AIR.defaultBlockState());
++		}
++		var destination = origin.south(2);
++		level.setBlockAndUpdate(destination, Blocks.AIR.defaultBlockState());
++		level.setBlockAndUpdate(destination.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++		var item = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) com.simibubi.create.AllBlocks.TRACK_STATION.asItem();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		helper.runAfterDelay(7, () -> {
++			player.setItemInHand(hand, new ItemStack(item));
++			player.setYRot(90);
++			player.setXRot(20);
++			clickTrackForAssembly(item, player, origin);
++			clickTrackForAssembly(item, player, destination.below());
++		});
++		helper.runAfterDelay(12, () -> {
++			var station = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(destination);
++			helper.assertTrue(station != null && station.enterAssemblyMode(null), "Station must enter assembly mode");
++			player.setItemInHand(hand, new ItemStack(casing, 3));
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east()), "Expected first bogey");
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east(4)), "Expected rear bogey");
++			for (int x = 1; x <= 4; x++)
++				level.setBlockAndUpdate(origin.east(x).above(2), Blocks.OAK_PLANKS.defaultBlockState());
++			var controls = com.simibubi.create.AllBlocks.TRAIN_CONTROLS.get().defaultBlockState()
++				.setValue(com.simibubi.create.content.contraptions.actors.trainControls.ControlsBlock.FACING,
++					net.minecraft.core.Direction.EAST);
++			level.setBlockAndUpdate(origin.east().above(3), controls);
++			var area = com.simibubi.create.content.contraptions.glue.SuperGlueEntity.span(origin.east().above(), origin.east(4).above(3));
++			level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, area));
++			station.assemble(player.getUUID());
++		});
++
++		helper.runAfterDelay(23, () -> {
++			var blockEntity = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(destination);
++			var train = blockEntity.getStation().getPresentTrain();
++			helper.assertTrue(train != null, "Expected train at the bound station");
++			var profile = new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "StationFixture");
++			var cookie = net.minecraft.server.network.CommonListenerCookie.createInitial(profile, false);
++			var sender = new net.minecraft.server.level.ServerPlayer(level.getServer(), level, profile, cookie.clientInformation());
++			var connection = new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
++			sender.connection = new net.minecraft.server.network.ServerGamePacketListenerImpl(level.getServer(), connection, sender, cookie) {
++				@Override
++				public void send(net.minecraft.network.protocol.Packet<?> packet) {}
++			};
++			sender.setPos(destination.getX()+1, destination.getY(), destination.getZ()+1);
++			var registry = level.registryAccess();
++			var schedule = new com.simibubi.create.content.trains.schedule.Schedule();
++			for (var filter : java.util.List.of("Main Platform", "East Yard")) {
++				var entry = new com.simibubi.create.content.trains.schedule.ScheduleEntry();
++				var instruction = new com.simibubi.create.content.trains.schedule.destination.DestinationInstruction();
++				instruction.getData().putString("Text", filter);
++				entry.instruction = instruction;
++				entry.conditions.add(java.util.List.of(new com.simibubi.create.content.trains.schedule.condition.ScheduledDelay()));
++				schedule.entries.add(entry);
++			}
++			schedule.savedProgress = 1;
++			var key = com.simibubi.create.AllDataComponents.TRAIN_SCHEDULE;
++			var packet = com.simibubi.create.content.trains.station.StationEditPacket.dropSchedule(destination);
++			var area = new net.minecraft.world.phys.AABB(destination).inflate(.1);
++			java.util.function.Supplier<java.util.List<net.minecraft.world.entity.item.ItemEntity>> items = () ->
++				level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, area, drop ->
++					com.simibubi.create.AllItems.SCHEDULE.isIn(drop.getItem()));
++			java.util.function.BiConsumer<String, Boolean> click = (label, auto) -> {
++				if (!label.equals("absent"))
++					train.runtime.setSchedule(schedule, auto);
++				packet.handle(sender);
++				var handItem = sender.getMainHandItem();
++				var dropped = items.get();
++				var component = handItem.get(key);
++				var ground = dropped.isEmpty() ? null : dropped.getFirst().getItem().get(key);
++				var exact = component != null ? component.equals(schedule.write(registry)) : ground != null && ground.equals(schedule.write(registry));
++				var atCenter = !dropped.isEmpty() && dropped.getFirst().position().equals(net.minecraft.world.phys.Vec3.atCenterOf(destination));
++				var still = !dropped.isEmpty() && dropped.getFirst().getDeltaMovement().equals(net.minecraft.world.phys.Vec3.ZERO);
++				System.out.printf("CREATE_STATION_DROP %s,%s,%s,%d,%s,%s,%s%n", label, train.runtime.getSchedule() != null,
++					net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(handItem.getItem()), dropped.size(), exact, atCenter, still);
++				dropped.forEach(net.minecraft.world.entity.Entity::discard);
++			};
++			click.accept("absent", false);
++			click.accept("empty_hand", false);
++			helper.assertTrue(sender.getMainHandItem().get(key) != null, "Schedule must be returned to main hand");
++			sender.setItemInHand(hand, new ItemStack(net.minecraft.world.item.Items.PAPER));
++			click.accept("occupied_hand", false);
++			sender.setItemInHand(hand, ItemStack.EMPTY);
++			click.accept("auto", true);
++			helper.assertTrue(train.runtime.getSchedule() == null, "Schedule must be cleared");
++			helper.succeed();
++		});
++	}
++
++	private static void clickTrackForAssembly(com.simibubi.create.content.trains.track.TrackTargetingBlockItem item,
++			net.minecraft.world.entity.player.Player player, BlockPos pos) {
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(pos).add(0,.5,0), net.minecraft.core.Direction.UP, pos, false);
++		item.useOn(new net.minecraft.world.item.context.UseOnContext(player,
++			net.minecraft.world.InteractionHand.MAIN_HAND, hit));
++	}
+ }

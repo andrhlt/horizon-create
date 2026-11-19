@@ -1,0 +1,84 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..7b70628e5 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.handCrank"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..ea46ba134 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -3,6 +3,11 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
+ import com.simibubi.create.AllBlockEntityTypes;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++import net.minecraft.world.level.GameType;
++import net.minecraft.core.Direction;
++import com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock;
++import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllDataComponents;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+@@ -115,4 +120,40 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 58)
++	public static void handCrank(CreateGameTestHelper helper) {
++		var stress = new BlockPos(2, 2, 0);
++		var rear = new BlockPos(2, 2, 1);
++		var crank = new BlockPos(2, 2, 2);
++		var front = new BlockPos(2, 2, 3);
++		var shaft = AllBlocks.SHAFT.getDefaultState()
++			.setValue(BlockStateProperties.AXIS, Direction.Axis.Z);
++		helper.setBlock(stress, AllBlocks.STRESSOMETER.getDefaultState()
++			.setValue(BlockStateProperties.FACING, Direction.UP)
++			.setValue(DirectionalAxisKineticBlock.AXIS_ALONG_FIRST_COORDINATE, false));
++		helper.setBlock(rear, shaft);
++		helper.setBlock(front, shaft);
++		helper.setBlock(crank, AllBlocks.HAND_CRANK.getDefaultState()
++			.setValue(BlockStateProperties.FACING, Direction.SOUTH));
++		var player = helper.makeMockPlayer(GameType.SURVIVAL);
++		var source = helper.getBlockEntity(AllBlockEntityTypes.HAND_CRANK.get(), crank);
++		var gauge = helper.getBlockEntity(AllBlockEntityTypes.STRESSOMETER.get(), stress);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var a = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), rear);
++			var b = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), front);
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_HAND_CRANK %d,%d,%b,%.1f,%.1f,%.1f,%.1f,%.1f,%.9f,%.9f,%.9f%n",
++				tick, source.inUse, source.backwards, source.getSpeed(), a.getSpeed(), b.getSpeed(),
++				gauge.getSpeed(), gauge.getNetworkCapacity(), source.independentAngle,
++				source.chasingAngularVelocity, player.getFoodData().getExhaustionLevel());
++			if (tick == 4 || tick == 9 || tick == 16 || tick == 31) {
++				player.setShiftKeyDown(tick == 16 || tick == 31);
++				helper.useBlock(crank, player);
++			}
++			if (tick < 55)
++				helper.fail("Waiting for the final crank observation");
++		});
++	}
+ }

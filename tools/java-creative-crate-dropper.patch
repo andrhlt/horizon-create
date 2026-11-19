@@ -1,0 +1,106 @@
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+index 657f93b..45a2e93 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+@@ -95,6 +95,7 @@ public class CrossPlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+index 4e7785d..3b3571a 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+@@ -91,6 +91,7 @@ public class PlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+index ee1f50c..a2cbd61 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+@@ -118,6 +118,7 @@ public abstract class SymmetryMirror {
+ 	@OnlyIn(Dist.CLIENT)
+ 	public abstract PartialModel getModel();
+ 
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {}
+ 
+ 	protected Vec3 getDiff(BlockPos position) {
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..397e1ee 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.creativeCrateDropper")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..a5b40b3 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,53 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void creativeCrateDropper(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		java.util.function.IntConsumer record = frame -> {
++			for (int lane = 0; lane < 2; lane++) {
++				var pos = origin.south(lane * 5);
++				var dropper = (net.minecraft.world.level.block.entity.DropperBlockEntity) level.getBlockEntity(pos);
++				var box = new net.minecraft.world.phys.AABB(pos).inflate(12, 12, 2);
++				int drops = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, box).size();
++				int filterCount = 0;
++				if (lane == 0) {
++					var crate = (com.simibubi.create.content.logistics.crate.CreativeCrateBlockEntity) level.getBlockEntity(pos.east());
++					filterCount = crate.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE).getFilter().getCount();
++				}
++				System.out.printf("CREATE_CRATE_DROPPER,%s,%d,%d,%d,%d%n",
++					lane == 0 ? "crate" : "air", frame, dropper.getItem(0).getCount(), drops, filterCount);
++				if (frame == 12 && (dropper.getItem(0).getCount() != 2 || drops != lane || filterCount != (lane == 0 ? 7 : 0)))
++					throw new IllegalStateException("Unexpected dropper result in lane " + lane);
++			}
++		};
++		helper.runAtTickTime(4, () -> {
++			for (int lane = 0; lane < 2; lane++) {
++				var pos = origin.south(lane * 5);
++				for (int x = -1; x <= 3; x++)
++					for (int z = -1; z <= 1; z++)
++						level.setBlock(pos.offset(x, -1, z), Blocks.STONE.defaultBlockState(), 3);
++				if (lane == 0) {
++					level.setBlock(pos.east(), com.simibubi.create.AllBlocks.CREATIVE_CRATE.getDefaultState(), 3);
++					var crate = (com.simibubi.create.content.logistics.crate.CreativeCrateBlockEntity) level.getBlockEntity(pos.east());
++					crate.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE)
++						.setFilter(new ItemStack(Items.GOLD_INGOT, 7));
++				}
++				level.setBlock(pos, Blocks.DROPPER.defaultBlockState().setValue(
++					net.minecraft.world.level.block.DispenserBlock.FACING, net.minecraft.core.Direction.EAST), 3);
++				((net.minecraft.world.level.block.entity.DropperBlockEntity) level.getBlockEntity(pos))
++					.setItem(0, new ItemStack(Items.IRON_INGOT, 3));
++				level.setBlock(pos.west(), Blocks.REDSTONE_BLOCK.defaultBlockState(), 3);
++			}
++			record.accept(0);
++		});
++		for (int tick = 1; tick <= 12; tick++) {
++			final int frame = tick;
++			helper.runAtTickTime(4 + tick, () -> record.accept(frame));
++		}
++		helper.runAtTickTime(17, helper::succeed);
++	}
++
+ }

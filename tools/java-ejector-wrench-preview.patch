@@ -1,0 +1,31 @@
+--- a/src/main/java/com/simibubi/create/content/logistics/depot/EjectorTargetHandler.java
++++ b/src/main/java/com/simibubi/create/content/logistics/depot/EjectorTargetHandler.java
+@@ -217,10 +217,17 @@
+ 			.colored(intColor)
+ 			.lineWidth(1 / 16f);
+ 
++		if (wrench && Boolean.getBoolean("parity.ejector.wrench"))
++			System.out.printf(java.util.Locale.ROOT, "JAVA_EJECTOR_ARC %d,%d,%d,%d,%d,%d,%d,%06x,%.9f,%.9f%n",
++				pos.getX(), pos.getY(), pos.getZ(), currentSelection.getX(), currentSelection.getY(), currentSelection.getZ(),
++				segments, intColor, AnimationTickHolder.getRenderTime(), tickOffset);
+ 		for (int i = 0; i < segments; i++) {
+ 			double ticks = ((AnimationTickHolder.getRenderTime() / 3) % tickOffset) + i * tickOffset;
+ 			Vec3 vec = launcher.getGlobalPos(ticks, d, pos)
+ 				.add(xDiff - validX, 0, zDiff - validZ);
++			if (wrench && Boolean.getBoolean("parity.ejector.wrench"))
++				System.out.printf(java.util.Locale.ROOT, "JAVA_EJECTOR_DUST %d,%d,%d,%d,%.9f,%.9f,%.9f,%.9f%n",
++					pos.getX(), pos.getY(), pos.getZ(), i, ticks, vec.x, vec.y, vec.z);
+ 			world.addParticle(data, vec.x, vec.y, vec.z, 0, 0, 0);
+ 		}
+ 	}
+@@ -262,6 +269,10 @@
+ 		BlockState state = world.getBlockState(pos);
+ 		VoxelShape shape = state.getShape(world, pos);
+ 		AABB boundingBox = shape.isEmpty() ? new AABB(BlockPos.ZERO) : shape.bounds();
++		if (Boolean.getBoolean("parity.ejector.wrench"))
++			System.out.printf(java.util.Locale.ROOT, "JAVA_EJECTOR_OUTLINE %d,%d,%d,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,ffcb74,0.06250%n",
++				pos.getX(), pos.getY(), pos.getZ(), boundingBox.minX, boundingBox.minY, boundingBox.minZ,
++				boundingBox.maxX, boundingBox.maxY, boundingBox.maxZ);
+ 		Outliner.getInstance().showAABB("target", boundingBox.move(pos))
+ 			.colored(0xffcb74)
+ 			.lineWidth(1 / 16f);

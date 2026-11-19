@@ -1,0 +1,38 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.couplingProbe")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,25 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++ @GameTest(template = "threshold_switch_pulley", timeoutTicks = 40)
++ public static void couplingProbe(CreateGameTestHelper helper) {
++  var world = helper.getLevel();
++  var a = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  var b = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  var c = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++  var held = com.simibubi.create.AllItems.MINECART_COUPLING.asStack(3);
++  player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, held);
++  a.setPos(8.5, 170.0625, 24.5); b.setPos(11.5, 170.0625, 24.5); c.setPos(14.5, 170.0625, 24.5);
++  world.addFreshEntity(a); world.addFreshEntity(b); world.addFreshEntity(c);
++  helper.runAtTickTime(5, () -> {
++   var handler = com.simibubi.create.content.contraptions.minecart.CouplingHandler.class;
++   boolean first = com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player, world, a.getId(), b.getId());
++   boolean second = com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player, world, b.getId(), c.getId());
++   boolean loop = com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player, world, c.getId(), a.getId());
++   var mid = b.getData(com.simibubi.create.AllAttachmentTypes.MINECART_CONTROLLER);
++   System.out.printf("COUPLING_CHAIN first=%s,second=%s,loop=%s,count=%d,middleFull=%s%n", first, second, loop, held.getCount(), mid.isFullyCoupled());
++   helper.assertTrue(first && second && !loop && held.getCount() == 1 && mid.isFullyCoupled(), "chain mismatch"); helper.succeed();
++  });
++ }
+ }

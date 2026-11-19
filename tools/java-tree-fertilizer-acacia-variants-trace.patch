@@ -1,0 +1,61 @@
+diff --git a/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java b/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java
+index 7c714b9..aaa75a6 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java
++++ b/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java
+@@ -40,6 +40,8 @@ public class TreeFertilizerItem extends Item {
+ 
+ 			BlockPos saplingPos = context.getClickedPos();
+ 			TreesDreamWorld world = new TreesDreamWorld((ServerLevel) context.getLevel(), saplingPos);
++			// Fixture-only seed: repeat the same vanilla tree across obstruction cases.
++			world.getRandom().setSeed(Long.getLong("parity.tree.seed", 8675309L));
+ 
+ 			for (BlockPos pos : BlockPos.betweenClosed(-1, 0, -1, 1, 0, 1)) {
+ 				if (context.getLevel()
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..0383f25 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.treeFertilizerSpecies"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..326a87e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,29 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void treeFertilizerSpecies(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var item = com.simibubi.create.AllItems.TREE_FERTILIZER.get();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		helper.runAtTickTime(4, () -> {
++			for (long seed = 1; seed <= 12; seed++) {
++                System.setProperty("parity.tree.seed", Long.toString(seed));
++                var sapling = Blocks.ACACIA_SAPLING;
++				for (BlockPos delta : BlockPos.betweenClosed(-5, -1, -5, 5, 16, 5))
++					level.setBlock(origin.offset(delta), delta.getY() == -1 ? Blocks.DIRT.defaultBlockState() : Blocks.AIR.defaultBlockState(), 2);
++				level.setBlockAndUpdate(origin, sapling.defaultBlockState());
++				var stack = new ItemStack(item, 2);
++				player.setItemInHand(hand, stack);
++				var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(origin), net.minecraft.core.Direction.UP, origin, false);
++				var result = item.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++				var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++				System.out.printf("CREATE_FERTILIZER_VARIANTS,%d,%s,%s,%d,%s,%s%n", seed, registry.getKey(sapling), result, stack.getCount(), registry.getKey(level.getBlockState(origin).getBlock()), registry.getKey(level.getBlockState(origin.above()).getBlock()));
++			}
++			helper.succeed();
++		});
++	}
+ }

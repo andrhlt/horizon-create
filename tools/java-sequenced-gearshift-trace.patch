@@ -1,0 +1,130 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..b57f99f63 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.sequencedGearshiftManualProgram"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..20dbab09b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,98 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++
++
++
++
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 55)
++	public static void sequencedGearshiftManualProgram(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_AXIS;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var east = net.minecraft.core.Direction.EAST;
++		var pos = new BlockPos(12, 3, 2);
++		var motor = pos.west();
++		var shaft = pos.east();
++		var power = pos.above();
++		var level = helper.getLevel();
++		helper.setBlock(motor, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east));
++		helper.setBlock(pos, com.simibubi.create.AllBlocks.SEQUENCED_GEARSHIFT.getDefaultState().setValue(horizontal, east.getAxis())
++			.setValue(com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftBlock.VERTICAL, false)
++			.setValue(com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftBlock.STATE, 0));
++		helper.setBlock(shaft, com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis()));
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var instructions = com.simibubi.create.content.kinetics.transmission.sequencer.SequencerInstructions.values();
++		var directions = com.simibubi.create.content.kinetics.transmission.sequencer.InstructionSpeedModifiers.values();
++		var packetType = com.simibubi.create.content.kinetics.transmission.sequencer.ConfigureSequencedGearshiftPacket.class;
++		var program = new java.util.Vector<com.simibubi.create.content.kinetics.transmission.sequencer.Instruction>(5);
++		program.add(new com.simibubi.create.content.kinetics.transmission.sequencer.Instruction(instructions[0], directions[0], 45));
++		program.add(new com.simibubi.create.content.kinetics.transmission.sequencer.Instruction(instructions[2], 4));
++		program.add(new com.simibubi.create.content.kinetics.transmission.sequencer.Instruction(instructions[3], -1));
++		program.add(new com.simibubi.create.content.kinetics.transmission.sequencer.Instruction(instructions[1], directions[3], 1));
++		program.add(new com.simibubi.create.content.kinetics.transmission.sequencer.Instruction(instructions[4]));
++		var blocks = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var createIds = blocks.keySet().stream().filter(id -> id.getNamespace().equals("create")).sorted().toList();
++		for (var id : createIds)
++			if (blocks.get(id) instanceof com.simibubi.create.content.kinetics.base.KineticBlock kinetic
++				&& kinetic.asItem() instanceof net.minecraft.world.item.BlockItem)
++				System.out.printf("CREATE_SEQUENCER_KINETIC_ITEM,%s%n", id);
++		player.setYRot(0);
++		player.setXRot(0);
++		for (var placementFace : new net.minecraft.core.Direction[]{east, net.minecraft.core.Direction.UP}) {
++			var anchor = new BlockPos(12, 3, placementFace == east ? 7 : 12);
++			helper.setBlock(anchor, com.simibubi.create.AllBlocks.SEQUENCED_GEARSHIFT.getDefaultState()
++				.setValue(horizontal, east.getAxis())
++				.setValue(com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftBlock.VERTICAL, placementFace != east));
++			var placedAt = helper.absolutePos(anchor);
++			var ray = new net.minecraft.world.phys.BlockHitResult(placedAt.getCenter().relative(placementFace, 0.5), placementFace, placedAt, false);
++			var stack = new ItemStack(com.simibubi.create.AllBlocks.SHAFT.asItem());
++			var context = new net.minecraft.world.item.context.BlockPlaceContext(player, net.minecraft.world.InteractionHand.MAIN_HAND, stack, ray);
++			var trial = com.simibubi.create.AllBlocks.SHAFT.get().getStateForPlacement(context);
++			System.out.printf("CREATE_SEQUENCER_SHAFT_PLACEMENT,%s,%s%n", placementFace, trial.getValue(axis));
++		}
++		for (var action : instructions) {
++			System.out.printf(java.util.Locale.ROOT, "CREATE_SEQUENCER_OPTION,%s,%d,%d,%d,%s,%s%n",
++				action, action.defaultValue, action.maxValue, action.shiftStep, action.hasValueParameter, action.hasSpeedParameter);
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var gearshift = helper.getBlockEntity(AllBlockEntityTypes.SEQUENCED_GEARSHIFT.get(), pos);
++			var input = helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), motor);
++			var output = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), shaft);
++			if (tick == 2) {
++				var before = gearshift.saveWithoutMetadata(level.registryAccess()).getList("Instructions", net.minecraft.nbt.Tag.TAG_COMPOUND);
++				System.out.printf("CREATE_SEQUENCER_DEFAULT,%s%n", before);
++				var packet = new com.simibubi.create.content.kinetics.transmission.sequencer.ConfigureSequencedGearshiftPacket(helper.absolutePos(pos), program);
++				try {
++					var apply = packetType.getDeclaredMethod("applySettings", net.minecraft.server.level.ServerPlayer.class, gearshift.getClass());
++					apply.setAccessible(true);
++					apply.invoke(packet, player, gearshift);
++				} catch (ReflectiveOperationException exception) {
++					throw new IllegalStateException(exception);
++				}
++				var after = gearshift.saveWithoutMetadata(level.registryAccess()).getList("Instructions", net.minecraft.nbt.Tag.TAG_COMPOUND);
++				System.out.printf("CREATE_SEQUENCER_PROGRAM,%s%n", after);
++			}
++			var data = gearshift.saveWithoutMetadata(level.registryAccess());
++			var state = gearshift.getBlockState().getValue(com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftBlock.STATE);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_SEQUENCER_TICK,%d,%d,%d,%d,%d,%.5f,%.4f,%.4f,%s%n", tick,
++				state, data.getInt("InstructionIndex"), data.getInt("InstructionDuration"), data.getInt("Timer"),
++				data.getFloat("InstructionProgress"), gearshift.getSpeed(), output.getSpeed(), data.getBoolean("PrevPowered"));
++			if (tick == 0)
++				input.generatedSpeed.setValue(32);
++			if (tick == 4 || tick == 20)
++				helper.setBlock(power, Blocks.REDSTONE_BLOCK.defaultBlockState());
++			if (tick == 5 || tick == 21)
++				helper.setBlock(power, Blocks.AIR.defaultBlockState());
++			if (tick < 43)
++				helper.fail("Waiting for the complete manual program");
++		});
++	}
+ }

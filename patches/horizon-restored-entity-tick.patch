@@ -1,0 +1,23 @@
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -5609,4 +5609,7 @@
+         self.tick_world(running)
+     }
++    /// Native hook point for entities that joined while loading world chunks.
++    fn tick_restored_entities(&mut self, _loaded_after: u32) {}
++
+     /// What the tick runs after the local player's own update: effects, the
+     /// world's entities and blocks, and the network hub.
+@@ -5704,8 +5707,12 @@
+             horizon_client::spans::time("touch_arrows", || self.touch_arrows());
+         }
++        let loaded_after = self.next_entity;
+         horizon_client::spans::time("spawn_loaded_entities", || self.spawn_loaded_entities());
+         // The ride the player's file names, once the vehicle is in the world.
+         self.restore_root_vehicle();
+         if running {
++            if self.next_entity > loaded_after {
++                self.tick_restored_entities(loaded_after);
++            }
+             self.ordered_before(ordered_tick::Batch::Mobs)?;
+             horizon_client::spans::time("tick_mobs", || self.tick_mobs())?;

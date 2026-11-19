@@ -1,0 +1,80 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageArrow"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,65 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void packageArrow(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(3, 4, 2));
++		var at = net.minecraft.world.phys.Vec3.atBottomCenterOf(pos);
++		var bounds = new net.minecraft.world.phys.AABB(pos).inflate(8);
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		player.setPos(at.x - 8, at.y, at.z);
++		for (int x = -4; x <= 6; x++) {
++			world.setBlockAndUpdate(pos.offset(x, -1, 0), Blocks.OBSIDIAN.defaultBlockState());
++			for (int y = 0; y < 3; y++)
++				world.setBlockAndUpdate(pos.offset(x, y, 0), Blocks.AIR.defaultBlockState());
++		}
++		for (String scenario : new String[]{"ordinary", "piercing", "adventure", "invulnerable", "burning"}) {
++			player.gameMode.changeGameModeForPlayer(scenario.equals("adventure")
++				? net.minecraft.world.level.GameType.ADVENTURE : net.minecraft.world.level.GameType.SURVIVAL);
++			var stack = new ItemStack(com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES.getFirst());
++			var cargo = net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
++			cargo.set(0, new ItemStack(Items.CLAY_BALL, 3));
++			stack.set(com.simibubi.create.AllDataComponents.PACKAGE_CONTENTS,
++				net.minecraft.world.item.component.ItemContainerContents.fromItems(cargo));
++			var box = com.simibubi.create.content.logistics.box.PackageEntity.fromItemStack(world, at, stack);
++			box.setInvulnerable(scenario.equals("invulnerable"));
++			world.addFreshEntity(box);
++			var pig = EntityType.PIG.create(world);
++			pig.setPos(at.x + 1.0, at.y, at.z);
++			world.addFreshEntity(pig);
++			var arrow = new net.minecraft.world.entity.projectile.Arrow(
++				world, at.x - 1.5, at.y + 0.375, at.z, new ItemStack(Items.ARROW), null);
++			if (scenario.equals("piercing")) {
++				var nbt = new net.minecraft.nbt.CompoundTag();
++				arrow.addAdditionalSaveData(nbt);
++				nbt.putByte("PierceLevel", (byte) 1);
++				arrow.readAdditionalSaveData(nbt);
++			}
++			arrow.setOwner(player);
++			arrow.setBaseDamage(1);
++			arrow.setDeltaMovement(3, 0, 0);
++			if (scenario.equals("burning"))
++				arrow.setRemainingFireTicks(100);
++			world.addFreshEntity(arrow);
++			for (int tick = 0; tick <= 4; tick++) {
++				if (tick > 0 && !arrow.isRemoved())
++					world.tickNonPassenger(arrow);
++				var relative = arrow.position().subtract(at);
++				var motion = arrow.getDeltaMovement();
++				int spilled = world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, bounds).stream()
++					.filter(item -> item.getItem().is(Items.CLAY_BALL)).mapToInt(item -> item.getItem().getCount()).sum();
++				System.out.printf(java.util.Locale.ROOT,
++					"PACKAGE_ARROW,%s,%d,%b,%.9f,%d,%b,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.3f%n",
++					scenario, tick, box.isRemoved(), box.getHealth(), spilled, arrow.isRemoved(), arrow.getPierceLevel(),
++					relative.x, relative.y, relative.z, motion.x, motion.y, motion.z, pig.getHealth());
++			}
++			box.discard();
++			pig.discard();
++			arrow.discard();
++			world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, bounds).forEach(entity -> entity.discard());
++		}
++		helper.succeed();
++	}
+ }

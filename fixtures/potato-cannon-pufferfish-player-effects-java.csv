@@ -1,0 +1,6 @@
+tick,poison_duration,poison_amplifier,hunger_duration,hunger_amplifier,nausea_duration,nausea_amplifier
+0,-1,-1,-1,-1,-1,-1
+1,-1,-1,-1,-1,-1,-1
+2,1200,1,300,2,300,0
+3,1200,1,300,2,300,0
+4,1200,1,300,2,300,0

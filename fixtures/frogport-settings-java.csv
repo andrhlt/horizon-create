@@ -1,0 +1,8 @@
+tick,address,receive,linked,loop_filter,saved_address,saved_receive
+2,,true,false,-,,true
+3,Warehouse,true,false,-,Warehouse,true
+4,Warehouse,true,true,Warehouse,Warehouse,true
+5,Warehouse,false,true,-,Warehouse,false
+6,Warehouse,false,true,-,Warehouse,false
+7,WarehouseABCDEFGHIJKLMNOP,true,true,WarehouseABCDEFGHIJKLMNOP,WarehouseABCDEFGHIJKLMNOP,true
+8,WarehouseABCDEFGHIJKLMNOP,true,true,WarehouseABCDEFGHIJKLMNOP,WarehouseABCDEFGHIJKLMNOP,true

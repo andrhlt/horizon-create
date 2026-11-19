@@ -1,0 +1,50 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..4c8a1fd 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.brassMixing"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d..beb1e82 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -28,7 +28,30 @@ public class TestProcessing {
+ 		BlockPos lever = new BlockPos(2, 3, 2);
+ 		BlockPos chest = new BlockPos(7, 3, 1);
+ 		helper.pullLever(lever);
+-		helper.succeedWhen(() -> helper.assertContainerContains(chest, AllItems.BRASS_INGOT.get()));
++		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			var mixer = (com.simibubi.create.content.kinetics.mixer.MechanicalMixerBlockEntity)
++				helper.getBlockEntity(new BlockPos(4, 5, 1));
++			var basin = helper.getBlockEntity(new BlockPos(4, 3, 1)).saveWithoutMetadata(access);
++			var input = basin.getCompound("InputItems").getList("Items", 10);
++			int copper = 0;
++			int zinc = 0;
++			for (int i = 0; i < input.size(); i++) {
++				var stack = input.getCompound(i);
++				if (stack.getString("id").equals("create:zinc_ingot")) zinc += stack.getInt("count");
++				if (stack.getString("id").equals("minecraft:copper_ingot")) copper += stack.getInt("count");
++			}
++			var overflow = basin.getList("Overflow", 10);
++			var held = basin.getCompound("OutputItems").getList("Items", 10);
++			int waiting = 0;
++			for (int i = 0; i < overflow.size(); i++) waiting += overflow.getCompound(i).getInt("count");
++			for (int i = 0; i < held.size(); i++) waiting += held.getCompound(i).getInt("count");
++			System.out.printf(java.util.Locale.ROOT, "CREATE_BRASS %d %.7f %d %d %d %d %d %d %d %.7f %.7f%n", helper.getTick(),
++				mixer.getSpeed(), mixer.running ? 1 : 0, mixer.runningTicks, mixer.processingTicks,
++				copper, zinc, waiting, helper.getTotalItems(chest),
++				mixer.getRenderedHeadOffset(0), mixer.getRenderedHeadRotationSpeed(0));
++			helper.assertContainerContains(chest, AllItems.BRASS_INGOT.get());
++		});
+ 	}
+ 
+ 	@GameTest(template = "brass_mixing_2", timeoutTicks = CreateGameTestHelper.TWENTY_SECONDS)

@@ -1,0 +1,108 @@
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+index 657f93b..45a2e93 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+@@ -95,6 +95,7 @@ public class CrossPlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+index 4e7785d..3b3571a 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+@@ -91,6 +91,7 @@ public class PlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+index ee1f50c..a2cbd61 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+@@ -118,6 +118,7 @@ public abstract class SymmetryMirror {
+ 	@OnlyIn(Dist.CLIENT)
+ 	public abstract PartialModel getModel();
+ 
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {}
+ 
+ 	protected Vec3 getDiff(BlockPos position) {
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..ee38312 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.copperDivingBreath")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..cf53c95 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,55 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++	@GameTest(template = "shearing", timeoutTicks = 100)
++	public static void copperDivingBreath(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		var pigs = new net.minecraft.world.entity.animal.Pig[2];
++		java.util.function.IntConsumer record = frame -> {
++			for (int i = 0; i < pigs.length; i++) {
++				var pig = pigs[i];
++				int tank = pig.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST)
++					.getOrDefault(com.simibubi.create.AllDataComponents.BACKTANK_AIR, 0);
++				System.out.printf("CREATE_COPPER_BREATH,%s,%d,%d,%d,%d,%s%n",
++					i == 0 ? "gear" : "ordinary", frame, level.getGameTime() % 20, pig.getAirSupply(), tank,
++					pig.isEyeInFluid(net.minecraft.tags.FluidTags.WATER));
++				if (frame == 48 && (tank != 0 || !pig.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)
++					|| (i == 0 ? pig.getAirSupply() < 270 : pig.getAirSupply() > 250)))
++					throw new IllegalStateException("Unexpected copper diving airflow");
++			}
++		};
++		helper.runAtTickTime(4, () -> {
++			for (int i = 0; i < pigs.length; i++) {
++				var pos = origin.east(4 * i);
++				for (int x = -1; x <= 1; x++)
++					for (int z = -1; z <= 1; z++)
++						for (int y = -1; y <= 2; y++)
++							level.setBlock(pos.offset(x, y, z),
++								x == 0 && z == 0 && y >= 0 ? Blocks.WATER.defaultBlockState() : Blocks.STONE.defaultBlockState(), 3);
++				var pig = net.minecraft.world.entity.EntityType.PIG.create(level);
++				pig.setNoAi(true);
++				pig.setNoGravity(true);
++				pig.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
++				pig.setAirSupply(280);
++				if (i == 0) {
++					pig.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, com.simibubi.create.AllItems.COPPER_DIVING_HELMET.asStack());
++					var tank = com.simibubi.create.AllItems.COPPER_BACKTANK.asStack();
++					tank.set(com.simibubi.create.AllDataComponents.BACKTANK_AIR, 2);
++					pig.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, tank);
++				}
++				level.addFreshEntity(pig);
++				pigs[i] = pig;
++			}
++			record.accept(0);
++		});
++		for (int tick = 1; tick <= 48; tick++) {
++			final int frame = tick;
++			helper.runAtTickTime(4 + tick, () -> record.accept(frame));
++		}
++		helper.runAtTickTime(53, helper::succeed);
++	}
++
+ }

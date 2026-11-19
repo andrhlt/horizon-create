@@ -1,0 +1,41 @@
+--- a/crates/horizon-world/src/level/tick.rs
++++ b/crates/horizon-world/src/level/tick.rs
+@@ -1644,7 +1644,10 @@
+     pub(crate) fn copper_next(&self, state: BlockStateId) -> Option<BlockStateId> {
+         let b = self.b;
+         let name = &*b.table.info(b.block(state)).name;
+-        let path = name.strip_prefix("minecraft:")?;
++        let (namespace, path) = name.split_once(':')?;
++        if namespace != "minecraft" && namespace != "create" {
++            return None;
++        }
+         let next = if path == "copper_block" {
+             "exposed_copper".to_owned()
+         } else if let Some(rest) = path.strip_prefix("exposed_") {
+@@ -1656,7 +1659,7 @@
+         } else {
+             format!("exposed_{path}")
+         };
+-        let block = b.table.block_by_name(&format!("minecraft:{next}"))?;
++        let block = b.table.block_by_name(&format!("{namespace}:{next}"))?;
+         Some(b.table.with_properties_of(block, state))
+     }
+     /// `WeatheringCopper.getPrevious` (and `getFirst` by repeating it) by
+@@ -1679,11 +1682,15 @@
+     fn copper_stepped(&self, state: BlockStateId, all_the_way: bool) -> Option<BlockStateId> {
+         let b = self.b;
+         let name = &*b.table.info(b.block(state)).name;
+-        let mut path = Self::copper_previous_name(name.strip_prefix("minecraft:")?)?;
++        let (namespace, path) = name.split_once(':')?;
++        if namespace != "minecraft" && namespace != "create" {
++            return None;
++        }
++        let mut path = Self::copper_previous_name(path)?;
+         while all_the_way && let Some(earlier) = Self::copper_previous_name(&path) {
+             path = earlier;
+         }
+-        let block = b.table.block_by_name(&format!("minecraft:{path}"))?;
++        let block = b.table.block_by_name(&format!("{namespace}:{path}"))?;
+         Some(b.table.with_properties_of(block, state))
+     }
+     /// `LightningBolt.clearCopperOnLightningStrike`: the struck copper goes

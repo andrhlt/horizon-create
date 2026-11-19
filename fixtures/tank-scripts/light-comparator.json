@@ -1,0 +1,178 @@
+{
+  "include_signals": true,
+  "actions": [
+    {
+      "op": "place",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 5
+    },
+    {
+      "op": "probe",
+      "label": "empty",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "fill",
+      "pos": [
+        0,
+        1,
+        0
+      ],
+      "fluid": "minecraft:lava",
+      "amount": 1000
+    },
+    {
+      "op": "probe",
+      "label": "partial",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "fill",
+      "pos": [
+        0,
+        2,
+        0
+      ],
+      "fluid": "minecraft:lava",
+      "amount": 15000
+    },
+    {
+      "op": "probe",
+      "label": "two-thirds",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "fill",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "minecraft:lava",
+      "amount": 8000
+    },
+    {
+      "op": "probe",
+      "label": "full",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "drain",
+      "pos": [
+        0,
+        2,
+        0
+      ],
+      "amount": 24000
+    },
+    {
+      "op": "probe",
+      "label": "drained",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    }
+  ],
+  "integration_only": true
+}

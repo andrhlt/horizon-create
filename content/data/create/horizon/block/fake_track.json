@@ -1,0 +1,26 @@
+{
+  "template": "minecraft:short_grass",
+  "item": false,
+  "state_properties": {
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "waterlogged": "false"
+  },
+  "properties": {
+    "random_ticks": true,
+    "render_shape": "ENTITYBLOCK_ANIMATED",
+    "occludes": false,
+    "map_color": 6,
+    "waterloggable": true,
+    "sounds": "minecraft:stone"
+  },
+  "shapes": {
+    "default": []
+  },
+  "collision_shapes": {
+    "default": []
+  }
+}

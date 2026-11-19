@@ -1,0 +1,11 @@
+action,cancelled,held_count,assigned,paused,inventory_schedule_count,cooldown,sounds
+ordinary_seat,true,2,false,true,2,true,create:deny
+blank,false,1,false,true,1,false,
+empty_entries,true,1,false,true,1,true,create:deny
+assign,true,1,true,false,1,true,create:confirm
+again,true,1,true,false,1,true,create:deny
+ordinary_empty,false,0,true,false,0,false,
+occupied_hand,true,1,true,false,0,false,create:deny
+resume,true,0,true,false,0,true,create:confirm
+remove_early,false,0,true,false,0,true,
+remove,true,1,false,true,1,true,minecraft:entity.item.pickup

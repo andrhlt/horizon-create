@@ -1,0 +1,260 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..70f5d5139 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,8 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    // The renderer-free passenger fixture joins mock players on a dedicated server.
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+new file mode 100644
+index 000000000..a1ca98568
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+@@ -0,0 +1,17 @@
++package com.simibubi.create.foundation.mixin;
++
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.ModifyArg;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.gametest.framework.GameTestServer;
++
++@Mixin(GameTestServer.class)
++public class ParityGameTestOriginMixin {
++    @ModifyArg(method = "startTests", at = @At(value = "INVOKE",
++        target = "Lnet/minecraft/gametest/framework/StructureGridSpawner;<init>(Lnet/minecraft/core/BlockPos;IZ)V"), index = 0)
++    private BlockPos parityOrigin(BlockPos vanillaOrigin) {
++        return new BlockPos(3, vanillaOrigin.getY(), -12);
++    }
++}
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..99d20b0a3 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestContraptions.elevatorPassengers"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+index e74ff27e4..eb57b2d87 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -1,30 +1,57 @@
+ package com.simibubi.create.infrastructure.gametest.tests;
+ 
++import static com.simibubi.create.content.contraptions.actors.contraptionControls.ContraptionControlsMovement.tickFloorSelection;
++
+ import java.util.List;
++import java.util.Locale;
++import java.util.UUID;
+ import java.util.concurrent.atomic.AtomicInteger;
+ 
++import com.mojang.authlib.GameProfile;
+ import com.simibubi.create.AllBlockEntityTypes;
+ import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllEntityTypes;
+ import com.simibubi.create.content.contraptions.Contraption;
+ import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
++import com.simibubi.create.content.contraptions.actors.contraptionControls.ContraptionControlsMovement.ElevatorFloorSelection;
++import com.simibubi.create.content.contraptions.elevator.ElevatorColumn;
++import com.simibubi.create.content.contraptions.elevator.ElevatorContactBlockEntity;
++import com.simibubi.create.content.contraptions.elevator.ElevatorContactEditPacket;
++import com.simibubi.create.content.contraptions.elevator.ElevatorContraption;
+ import com.simibubi.create.content.contraptions.elevator.ElevatorPulleyBlockEntity;
++import com.simibubi.create.content.contraptions.elevator.ElevatorTargetFloorPacket;
++import com.simibubi.create.content.contraptions.sync.ContraptionInteractionPacket;
++import com.simibubi.create.content.decoration.slidingDoor.DoorControl;
+ import com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftBlock;
+ import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
+ import com.simibubi.create.infrastructure.gametest.GameTestGroup;
+ 
++import io.netty.channel.embedded.EmbeddedChannel;
+ import it.unimi.dsi.fastutil.objects.Object2LongMap;
+ import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
+ import net.minecraft.gametest.framework.GameTest;
++import net.minecraft.network.Connection;
++import net.minecraft.network.PacketSendListener;
++import net.minecraft.network.protocol.Packet;
++import net.minecraft.network.protocol.PacketFlow;
++import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket;
++import net.minecraft.server.level.ServerPlayer;
++import net.minecraft.server.network.CommonListenerCookie;
++import net.minecraft.server.network.ServerGamePacketListenerImpl;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.entity.Entity;
+ import net.minecraft.world.entity.EntityType;
+ import net.minecraft.world.entity.projectile.Arrow;
+ import net.minecraft.world.item.Item;
+ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.item.Items;
++import net.minecraft.world.level.GameType;
+ import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.CropBlock;
+ import net.minecraft.world.level.block.LeverBlock;
+ import net.minecraft.world.level.block.RedstoneLampBlock;
++import net.minecraft.world.phys.Vec3;
+ 
+ import net.neoforged.neoforge.fluids.FluidStack;
+ 
+@@ -194,6 +221,134 @@ public class TestContraptions {
+ 		});
+ 	}
+ 
++	@GameTest(template = "elevator", timeoutTicks = 120)
++	public static void elevatorPassengers(CreateGameTestHelper helper) {
++		BlockPos pulley = new BlockPos(5, 12, 3);
++		BlockPos mirror = new BlockPos(5, 12, 1);
++		BlockPos bottom = new BlockPos(2, 2, 2);
++		BlockPos top = new BlockPos(2, 11, 2);
++		BlockPos hostSeat = new BlockPos(5, 3, 2);
++		BlockPos guestSeat = new BlockPos(4, 3, 2);
++		BlockPos origin = helper.absolutePos(new BlockPos(0, 1, 0));
++		helper.setBlock(hostSeat, helper.getBlockState(guestSeat));
++
++		ServerPlayer host = createElevatorPlayer(helper, "ParityHost");
++		ServerPlayer guest = createElevatorPlayer(helper, "ParityGuest");
++
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var main = helper.getBlockEntity(AllBlockEntityTypes.ELEVATOR_PULLEY.get(), pulley);
++			var cabin = main.getAttachedContraption();
++			var elevator = cabin == null ? null : (ElevatorContraption) cabin.getContraption();
++			var target = elevator == null ? null : elevator.getCurrentTargetY(helper.getLevel());
++			System.out.printf(Locale.ROOT, "ELEVATOR_PASSENGERS %d,%b,%b,%s,%s,%s,%s,%s,%s%n",
++				tick, helper.getBlockState(bottom.above()).getValue(RedstoneLampBlock.LIT),
++				helper.getBlockState(top.above()).getValue(RedstoneLampBlock.LIT),
++				cabin == null ? "" : String.format(Locale.ROOT, "%.9f", cabin.getY() - origin.getY()),
++				target == null ? "" : Integer.toString(target - origin.getY()),
++				elevatorNames(helper, bottom), elevatorNames(helper, top),
++				elevatorPassenger(host, origin, tick > 20), elevatorPassenger(guest, origin, tick > 20));
++
++			switch ((int) tick) {
++				case 15 -> main.clicked();
++				case 18 -> {
++					placeElevatorPlayer(helper, host, 0.5, 3.0, 2.5);
++					new ElevatorContactEditPacket(helper.absolutePos(bottom), "G", "Ground", DoorControl.ALL).handle(host);
++					placeElevatorPlayer(helper, guest, 0.5, 12.0, 2.5);
++					new ElevatorContactEditPacket(helper.absolutePos(top), "U", "Upper", DoorControl.ALL).handle(guest);
++					helper.assertTrue(elevatorNames(helper, bottom).equals("G,Ground"), "Lower contact was not renamed");
++					helper.assertTrue(elevatorNames(helper, top).equals("U,Upper"), "Upper contact was not renamed");
++				}
++				case 20 -> {
++					helper.assertTrue(elevator != null, "Cabin did not assemble");
++					helper.assertTrue(helper.getBlockEntity(AllBlockEntityTypes.ELEVATOR_PULLEY.get(), mirror)
++						.getMirrorParent() != null, "Second pulley did not attach");
++					placeElevatorPlayer(helper, host, 5.5, 4.0, 2.5);
++					placeElevatorPlayer(helper, guest, 4.5, 4.0, 2.5);
++					new ContraptionInteractionPacket(cabin, InteractionHand.MAIN_HAND,
++						helper.absolutePos(hostSeat).subtract(elevator.anchor), Direction.UP).handle(host);
++					new ContraptionInteractionPacket(cabin, InteractionHand.MAIN_HAND,
++						helper.absolutePos(guestSeat).subtract(elevator.anchor), Direction.UP).handle(guest);
++					helper.assertTrue(host.getVehicle() == cabin && guest.getVehicle() == cabin,
++						"Both players must board their cabin seats");
++				}
++				case 25 -> {
++					// The actual client ray-traces the control before applying this scroll index.
++					// Here the renderer-free GameTest exercises Create's selection and packet handling.
++					elevator.namesList = ElevatorColumn.get(helper.getLevel(), elevator.getGlobalColumn()).compileNamesList();
++					var selection = new ElevatorFloorSelection();
++					tickFloorSelection(selection, elevator);
++					helper.assertTrue(selection.currentShortName.equals("G"), "Control did not begin at lower floor");
++					selection.currentIndex++;
++					tickFloorSelection(selection, elevator);
++					helper.assertTrue(selection.currentShortName.equals("U") && selection.currentLongName.equals("Upper"),
++						"Control did not select the named upper floor");
++					System.out.printf(Locale.ROOT, "ELEVATOR_SELECTED %d,%s,%s,%d%n",
++						tick, selection.currentShortName, selection.currentLongName, selection.currentTargetY - origin.getY());
++					new ElevatorTargetFloorPacket(cabin, selection.currentTargetY).handle(guest);
++				}
++				case 90 -> {
++					helper.assertBlockProperty(top.above(), RedstoneLampBlock.LIT, true);
++					helper.assertBlockProperty(bottom.above(), RedstoneLampBlock.LIT, false);
++					helper.assertTrue(cabin.getY() - origin.getY() == 10.0, "Cabin did not settle at the upper floor");
++					helper.assertTrue(host.getVehicle() == cabin && guest.getVehicle() == cabin,
++						"Both players must still be riding at arrival");
++					var sneak = new ServerboundPlayerInputPacket(0, 0, false, true);
++					host.connection.handlePlayerInput(sneak);
++					guest.connection.handlePlayerInput(sneak);
++				}
++				case 91 -> {
++					helper.assertTrue(!host.isPassenger() && !guest.isPassenger(), "Both players must dismount");
++					helper.getLevel().removePlayerImmediately(host, Entity.RemovalReason.DISCARDED);
++					helper.getLevel().removePlayerImmediately(guest, Entity.RemovalReason.DISCARDED);
++					return;
++				}
++			}
++			helper.fail("Waiting for the passenger trip");
++		});
++	}
++
++	private static ServerPlayer createElevatorPlayer(CreateGameTestHelper helper, String name) {
++		var server = helper.getLevel().getServer();
++		var cookie = CommonListenerCookie.createInitial(new GameProfile(UUID.randomUUID(), name), false);
++		var player = new ServerPlayer(server, helper.getLevel(), cookie.gameProfile(), cookie.clientInformation());
++		var connection = new Connection(PacketFlow.SERVERBOUND);
++		new EmbeddedChannel(connection);
++		// Server players and their packet listener tick normally in the level.
++		// Discard outbound packets because the fixture runs without a client handshake.
++		new ServerGamePacketListenerImpl(server, connection, player, cookie) {
++			@Override
++			public void send(Packet<?> packet, PacketSendListener callback) {}
++		};
++		helper.getLevel().addNewPlayer(player);
++		player.setGameMode(GameType.CREATIVE);
++		player.getAbilities().flying = true;
++		player.onUpdateAbilities();
++		placeElevatorPlayer(helper, player, 0.5, 4.0, 0.5);
++		return player;
++	}
++
++	private static void placeElevatorPlayer(CreateGameTestHelper helper, ServerPlayer player,
++		double x, double y, double z) {
++		var position = helper.absoluteVec(new Vec3(x, y, z));
++		player.moveTo(position.x, position.y, position.z, 0, 0);
++	}
++
++	private static String elevatorNames(CreateGameTestHelper helper, BlockPos pos) {
++		var entity = helper.getLevel().getBlockEntity(helper.absolutePos(pos));
++		if (!(entity instanceof ElevatorContactBlockEntity contact))
++			return ",";
++		var names = contact.getNames();
++		return names.getFirst() + "," + names.getSecond();
++	}
++
++	private static String elevatorPassenger(ServerPlayer passenger, BlockPos origin, boolean include) {
++		if (!include)
++			return ",,,";
++		return String.format(Locale.ROOT, "%b,%.9f,%.9f,%.9f", passenger.isPassenger(),
++			passenger.getX() - origin.getX(), passenger.getY() - origin.getY(), passenger.getZ() - origin.getZ());
++	}
++
+ 	@GameTest(template = "roller_filling")
+ 	public static void rollerFilling(CreateGameTestHelper helper) {
+ 		BlockPos lever = new BlockPos(7, 6, 1);
+diff --git a/src/main/resources/create.mixins.json b/src/main/resources/create.mixins.json
+index b5ea0067a..ffadfeb68 100644
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -6,6 +6,7 @@
+   "plugin": "com.simibubi.create.foundation.mixin.CreateMixinPlugin",
+   "compatibilityLevel": "JAVA_21",
+   "mixins": [
++    "ParityGameTestOriginMixin",
+     "ArmorTrimMixin",
+     "BeehiveBlockMixin",
+     "BlockItemMixin",

@@ -1,0 +1,97 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..2b17cd6bb 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.creativeMotorValueSettings"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..750a69001 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,65 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 46)
++	public static void creativeMotorValueSettings(CreateGameTestHelper helper) {
++		var motor = com.simibubi.create.AllBlocks.CREATIVE_MOTOR;
++		var shaft = com.simibubi.create.AllBlocks.SHAFT;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var south = net.minecraft.core.Direction.SOUTH;
++		var up = net.minecraft.core.Direction.UP;
++		var west = net.minecraft.core.Direction.WEST;
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(helper.getLevel());
++		var horizontal = new BlockPos(12, 2, 2);
++		var vertical = new BlockPos(18, 2, 2);
++		helper.setBlock(horizontal, motor.getDefaultState().setValue(facing, south));
++		helper.setBlock(horizontal.south(), shaft.getDefaultState().setValue(axis, south.getAxis()));
++		helper.setBlock(vertical, motor.getDefaultState().setValue(facing, up));
++		helper.setBlock(vertical.above(), shaft.getDefaultState().setValue(axis, up.getAxis()));
++		var first = helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), horizontal);
++		var second = helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), vertical);
++		var firstShaft = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), horizontal.south());
++		var secondShaft = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), vertical.above());
++		var board = first.generatedSpeed.createBoard(player, null);
++		System.out.printf("CREATE_MOTOR_BOARD,%s,%d,%d,%d%n", board.title().getString(),
++			board.maxValue(), board.milestoneInterval(), board.rows().size());
++
++		for (var instance : java.util.List.of(first, second)) {
++			var state = instance.getBlockState();
++			var pos = instance.getBlockPos();
++			var slot = (com.simibubi.create.foundation.blockEntity.behaviour.ValueBoxTransform.Sided)
++				instance.generatedSpeed.getSlotPositioning();
++			for (var side : net.minecraft.core.Direction.values()) {
++				slot.fromSide(side);
++				var center = slot.getLocalOffset(helper.getLevel(), pos, state);
++				boolean active = slot.testHit(helper.getLevel(), pos, state, center);
++				System.out.printf(java.util.Locale.ROOT, "CREATE_MOTOR_HIT,%s,%s,%s,%.5f,%.5f,%.5f%n",
++					state.getValue(facing), side, active, center.x, center.y, center.z);
++			}
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_CREATIVE_MOTOR,%d,%d,%d,%.4f,%.4f,%.4f,%.4f%n",
++				tick, first.generatedSpeed.getValue(), second.generatedSpeed.getValue(),
++				first.getSpeed(), firstShaft.getSpeed(), second.getSpeed(), secondShaft.getSpeed());
++			if (tick == 4 || tick == 11 || tick == 20 || tick == 28 || tick == 36) {
++				int row = tick == 11 || tick == 36 ? 0 : 1;
++				int value = tick == 4 ? 64 : tick == 11 ? 24 : tick == 20 ? 0 : tick == 28 ? 700 : 11;
++				for (var instance : java.util.List.of(first, second)) {
++					var packet = new com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsPacket(
++						instance.getBlockPos(), row, value, null, null, west, false, instance.generatedSpeed.netId()) {
++							public void apply(net.minecraft.server.level.ServerPlayer player,
++								com.simibubi.create.foundation.blockEntity.SmartBlockEntity block) {
++								applySettings(player, block);
++							}
++					};
++					packet.apply(player, instance);
++				}
++			}
++			if (tick < 41)
++				helper.fail("Waiting for creative motor settings observations");
++		});
++	}
+ }

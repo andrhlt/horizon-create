@@ -1,0 +1,62 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -3,6 +3,12 @@
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
+ import java.util.Locale;
++import java.util.ArrayList;
++import java.util.List;
++
++import com.simibubi.create.content.equipment.clipboard.ClipboardContent;
++import com.simibubi.create.content.equipment.clipboard.ClipboardEntry;
++import net.minecraft.network.chat.Component;
+ 
+ import com.simibubi.create.AllBlockEntityTypes;
+ import com.simibubi.create.AllBlocks;
+@@ -145,6 +151,46 @@
+ 		runChainConveyor(helper, "rising_reversal", new BlockPos(6, 2, 3), true);
+ 	}
+ 
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void chainConveyorFrogportClipboard(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		helper.runAtTickTime(2, () -> {
++			world.setBlockAndUpdate(pos, AllBlocks.PACKAGE_FROGPORT.getDefaultState());
++			var port = (FrogportBlockEntity) world.getBlockEntity(pos);
++			var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++			var clipboard = AllBlocks.CLIPBOARD.asStack();
++			player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, clipboard);
++			String[] cases = {"blank", "first", "duplicate", "spaced_duplicate", "first_free", "append_page"};
++			for (String scenario : cases) {
++				port.addressFilter = scenario.equals("blank") ? "　" : "Warehouse";
++				if (scenario.equals("spaced_duplicate")) {
++					var spaced = new ClipboardEntry(true, Component.literal("# Warehouse"));
++					clipboard.set(AllDataComponents.CLIPBOARD_CONTENT,
++						ClipboardContent.EMPTY.setPages(List.of(List.of(spaced))));
++				}
++				if (scenario.equals("first_free") || scenario.equals("append_page")) {
++					var full = new ArrayList<ClipboardEntry>();
++					for (int i = 0; i < 12; i++)
++						full.add(new ClipboardEntry(true, Component.literal("Line " + i)));
++					var pages = new ArrayList<List<ClipboardEntry>>();
++					pages.add(full);
++					if (scenario.equals("first_free")) {
++						pages.add(List.of(new ClipboardEntry(true, Component.literal("Keep"))));
++						pages.add(List.of());
++					}
++					clipboard.set(AllDataComponents.CLIPBOARD_CONTENT,
++						ClipboardContent.EMPTY.setPages(pages).setReadOnly(true).setPreviouslyOpenedPage(1));
++				}
++				var input = clipboard.save(world.registryAccess());
++				var result = port.use(player);
++				System.out.printf(Locale.ROOT, "CREATE_FROGPORT_CLIPBOARD %s|%s|%s|%s%n", scenario, result,
++					input, clipboard.save(world.registryAccess()));
++			}
++			helper.succeed();
++		});
++	}
++
+ 	private static void runChainConveyor(CreateGameTestHelper helper, String scenario, BlockPos edge, boolean reverse) {
+ 		var world = helper.getLevel();
+ 		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);

@@ -1,0 +1,7 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "patch_sha256": "e23c5a06baba34965200acc7e7bf7a4ba2da3d39faab6a87aeb1b94d7f86873c",
+  "records": 1,
+  "seconds": 32.46061224999903,
+  "scope": "Actual Sticker.defaultBlockState and world-resolved physical properties/collision. Dedicated original Java GameTest, no client/GPU."
+}

@@ -1,0 +1,3 @@
+CREATE_POSTBOX_BUFFER inserted {Items:[{Slot:17,components:{"create:package_address":"Parcel Depot"},count:1,id:"create:cardboard_package_12x12"}],Size:18}
+CREATE_POSTBOX_BUFFER cleared {Items:[],Size:18}
+CREATE_POSTBOX_BUFFER restored {Items:[{Slot:3,components:{"create:package_address":"Parcel Depot"},count:1,id:"create:cardboard_package_12x12"},{Slot:17,components:{"create:package_address":"Remote Depot"},count:1,id:"create:cardboard_package_12x12"}],Size:18} primed=false

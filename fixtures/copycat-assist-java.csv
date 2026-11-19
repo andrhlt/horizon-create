@@ -1,0 +1,13 @@
+tick,case,result,held,neighbors
+4,panel-east-on-floor,SUCCESS,1,"east1=Block{create:copycat_panel}[facing=up,waterlogged=false]"
+4,panel-up-on-wall,SUCCESS,1,"up1=Block{create:copycat_panel}[facing=north,waterlogged=false]"
+4,panel-fallback-west,SUCCESS,1,"west1=Block{create:copycat_panel}[facing=up,waterlogged=false]"
+4,panel-blocked,SUCCESS,2,
+4,panel-water,SUCCESS,1,"east1=Block{create:copycat_panel}[facing=up,waterlogged=true]"
+4,step-extend,SUCCESS,1,"east1=Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]|east2=Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]"
+4,step-upper-extend,SUCCESS,1,"east1=Block{create:copycat_step}[facing=south,half=top,waterlogged=false]|east2=Block{create:copycat_step}[facing=south,half=top,waterlogged=false]"
+4,step-water,SUCCESS,1,"east1=Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]|east2=Block{create:copycat_step}[facing=south,half=bottom,waterlogged=true]"
+4,panel-flowing-water,SUCCESS,1,"east1=Block{create:copycat_panel}[facing=up,waterlogged=false]"
+4,step-flowing-water,SUCCESS,1,"east1=Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]|east2=Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]"
+4,step-opposite-facing,SUCCESS,1,"east1=Block{create:copycat_step}[facing=north,half=bottom,waterlogged=false]|east2=Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]"
+4,step-perpendicular-facing,SUCCESS,1,"west1=Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]|east1=Block{create:copycat_step}[facing=west,half=bottom,waterlogged=false]"

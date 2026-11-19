@@ -1,0 +1,60 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..6ff8022 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageFilterAddress"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..44eb8f5 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,41 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void packageFilterAddress(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var inventory = player.getInventory();
++		var component = com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS;
++		var opts = com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.UPDATE_ADDRESS;
++		var filter = com.simibubi.create.AllItems.PACKAGE_FILTER.asStack();
++		inventory.clearContent();
++		inventory.selected = 0;
++		inventory.setItem(0, filter);
++		inventory.setItem(2, new ItemStack(Items.STONE, 4));
++		String[] scenarios = {null, "Workshop-East", null, " Atelier Nord* ", "   ", "Shed-02", null};
++		for (int step = 0; step < scenarios.length; step++) {
++			var menu = com.simibubi.create.content.logistics.filter.PackageFilterMenu.create(step + 1, inventory, filter);
++			player.containerMenu = menu;
++			String before = filter.get(component);
++			if (scenarios[step] != null) {
++				var data = new net.minecraft.nbt.CompoundTag();
++				data.putString("Address", scenarios[step]);
++				new com.simibubi.create.content.logistics.filter.FilterScreenPacket(opts, data).handle(player);
++			}
++			if (step == 6)
++				menu.clearContents();
++			menu.removed(player);
++			System.out.printf("PACKAGE_FILTER_EDIT,%d,%s,%s,%d,%d,%b%n", step, packageAddressEvidence(before),
++				packageAddressEvidence(filter.get(component)), inventory.getItem(0).getCount(), inventory.getItem(2).getCount(), menu.stillValid(player));
++		}
++		player.containerMenu = player.inventoryMenu;
++		helper.succeed();
++	}
++
++	private static String packageAddressEvidence(String text) {
++		if (text == null)
++			return "-";
++		return java.util.HexFormat.of().formatHex(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
++	}
+ }

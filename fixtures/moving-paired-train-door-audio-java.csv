@@ -1,0 +1,3 @@
+action,count,sound,sample_pitch
+opened,1,minecraft:block.iron_door.open,0.9042065
+closed,0,,

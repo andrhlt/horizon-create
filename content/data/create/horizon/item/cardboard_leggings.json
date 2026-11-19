@@ -1,0 +1,31 @@
+{
+  "template": "minecraft:leather_leggings",
+  "max_stack_size": 1,
+  "components": {
+    "minecraft:max_damage": 60,
+    "minecraft:equippable": {
+      "slot": "legs",
+      "asset_id": "create:cardboard",
+      "equip_sound": "minecraft:item.armor.equip_leather"
+    },
+    "minecraft:attribute_modifiers": [
+      {
+        "type": "minecraft:armor",
+        "id": "minecraft:armor.legs",
+        "amount": 1.0,
+        "operation": "add_value",
+        "slot": "legs"
+      }
+    ],
+    "minecraft:enchantable": {
+      "value": 4
+    },
+    "minecraft:repairable": {
+      "items": "create:cardboard"
+    },
+    "minecraft:cooking_fuel": {
+      "burn_time": 1000,
+      "speed_multiplier": "minecraft:cooking/speed_default"
+    }
+  }
+}

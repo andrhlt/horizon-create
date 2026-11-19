@@ -1,0 +1,12 @@
+phase,tick,owns,owner_exists,awarded,amount
+placed,0,true,true,false,0
+locked,0,true,true,false,0
+start,0,true,true,false,0
+tick,1,false,false,true,1
+tick,2,false,false,true,1
+tick,3,false,false,true,1
+tick,4,false,false,true,1
+tick,5,false,false,true,1
+tick,6,false,false,true,1
+tick,7,false,false,true,1
+replace,8,false,false,true,1

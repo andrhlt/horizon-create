@@ -1,0 +1,100 @@
+--- a/build.gradle
++++ b/build.gradle
+@@ -71,6 +71,10 @@
+             if (project.hasProperty("parityMovingDeparture")) {
+                 gameDirectory = project.file("run/moving-port-client")
+                 systemProperty("parity.movingDeparture", "true")
++                systemProperty("parity.movingArrival", project.hasProperty("parityMovingArrival").toString())
++                systemProperty("parity.activeArrival", project.hasProperty("parityActiveArrival").toString())
++                systemProperty("parity.fastArrival", project.hasProperty("parityFastArrival").toString())
++                systemProperty("parity.movingItemPortPreview", project.hasProperty("parityMovingItemArrival").toString())
+                 systemProperty("neoforge.enableGameTest", "true")
+                 programArguments.addAll("--quickPlaySingleplayer",
+                     "MovingPortDepartureReference", "--width", "960", "--height", "540")
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -168,6 +168,12 @@
+ 		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
+ 		var stationType = com.simibubi.create.AllBlocks.TRACK_STATION;
+ 		var arrivalRail = origin.west(13);
++		boolean arrivalDock = Boolean.getBoolean("parity.movingArrival");
++		var terminalPort = Boolean.getBoolean("parity.fastArrival")
++			? origin.west(3).above(3).south(2) : arrivalRail.east(3).above(3).south(2);
++		boolean activeArrival = Boolean.getBoolean("parity.activeArrival");
++		var terminalPump = terminalPort.east();
++		var terminalSink = terminalPump.east(2);
+ 		var wrongWayRail = origin.west(6);
+ 		var arrivalStation = arrivalRail.south(2);
+ 		var wrongWayStation = wrongWayRail.south(2);
+@@ -228,6 +234,19 @@
+ 			var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
+ 			level.setBlockAndUpdate(mountedInterface, port.setValue(facing, net.minecraft.core.Direction.SOUTH));
+ 			level.setBlockAndUpdate(transferInterface, port.setValue(facing, net.minecraft.core.Direction.NORTH));
++			if (arrivalDock)
++				level.setBlockAndUpdate(terminalPort, port.setValue(facing, net.minecraft.core.Direction.NORTH));
++			if (activeArrival) {
++				level.setBlockAndUpdate(terminalPump, com.simibubi.create.AllBlocks.MECHANICAL_PUMP.get()
++					.defaultBlockState().setValue(com.simibubi.create.content.fluids.pump.PumpBlock.FACING, east));
++				level.setBlockAndUpdate(terminalPump.east(), com.simibubi.create.AllBlocks.GLASS_FLUID_PIPE.get()
++					.defaultBlockState().setValue(axis, net.minecraft.core.Direction.Axis.X));
++				level.setBlockAndUpdate(terminalSink, com.simibubi.create.AllBlocks.FLUID_TANK.get().defaultBlockState());
++				level.setBlockAndUpdate(terminalPump.above(), com.simibubi.create.AllBlocks.COGWHEEL.get().defaultBlockState()
++					.setValue(axis, net.minecraft.core.Direction.Axis.X));
++				level.setBlockAndUpdate(terminalPort.above(), com.simibubi.create.AllBlocks.CREATIVE_MOTOR.get().defaultBlockState()
++					.setValue(com.simibubi.create.content.kinetics.motor.CreativeMotorBlock.FACING, east));
++			}
+ 			var fluidTank = com.simibubi.create.AllBlocks.FLUID_TANK.get().defaultBlockState();
+ 			var cargoPos = origin.east(4).above(3);
+ 			level.setBlockAndUpdate(cargoPos, fluidTank);
+@@ -338,6 +357,20 @@
+ 						t, rawPort.getInt("Timer"), rawPort.getFloat("Distance"));
+ 					traceFixedTrainPortRender(t, transfer, rawPort.getInt("Timer"));
+ 				}
++
++				if (arrivalDock) {
++					var terminal = (com.simibubi.create.content.contraptions.actors.psi.PortableStorageInterfaceBlockEntity)
++						level.getBlockEntity(terminalPort);
++					var nbt = terminal.saveWithoutMetadata(level.registryAccess());
++					System.out.printf(java.util.Locale.ROOT, "JAVA_TRAIN_ARRIVE_FIXED %d;%d;%b;%.9f%n",
++						t, nbt.getInt("Timer"), terminal.canTransfer(), nbt.getFloat("Distance"));
++					if (activeArrival) {
++						var tank = (com.simibubi.create.content.fluids.tank.FluidTankBlockEntity) level.getBlockEntity(terminalSink);
++						var terminalPumpEntity = (com.simibubi.create.content.fluids.pump.PumpBlockEntity) level.getBlockEntity(terminalPump);
++						System.out.printf(java.util.Locale.ROOT, "JAVA_TRAIN_ARRIVE_CARGO %d;%.4f;%d;%d%n",
++							t, terminalPumpEntity.getSpeed(), source, tank.getTankInventory().getFluidAmount());
++					}
++				}
+ 				if (departure && t == 23) {
+ 					JavaTrainDepartureProbe.carriage = c.anyAvailableEntity().getUUID();
+ 					System.out.println("JAVA_TRAIN_DEPART_FIXTURE " + JavaTrainDepartureProbe.carriage);
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaTrainDepartureProbe.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaTrainDepartureProbe.java
+@@ -94,7 +94,12 @@
+         if (mc.level.getBlockEntity(PORT) == null)
+             return;
+         elapsed++;
+-        if (elapsed == 35 || elapsed == 70 || elapsed == 95 || elapsed == 110 || elapsed == 130)
++        if (elapsed == 125 && Boolean.getBoolean("parity.movingArrival")) {
++            var name = mc.player.getGameProfile().getName();
++            server.execute(() -> server.getCommands().performPrefixedCommand(
++                server.createCommandSourceStack().withPermission(4), "tp " + name + " 96.5 117.2 -4.3 140 25"));
++        }
++        if (elapsed == 35 || elapsed == 70 || elapsed == 95 || elapsed == 110 || elapsed == 130 || elapsed == 150 || elapsed == 175)
+             Screenshot.grab(mc.gameDirectory, "train-departure-port-" + elapsed + ".png", mc.getMainRenderTarget(), message -> {});
+         if (elapsed == 240)
+             mc.stop();
+--- a/src/main/java/com/simibubi/create/content/contraptions/actors/psi/PortableStorageInterfaceMovement.java
++++ b/src/main/java/com/simibubi/create/content/contraptions/actors/psi/PortableStorageInterfaceMovement.java
+@@ -164,7 +164,12 @@
+ 				.subtract(context.position);
+ 			diff = VecHelper.project(diff, Vec3.atLowerCornerOf(currentFacing.getNormal()));
+ 			float distance = (float) (diff.length() + 1.85f - 1);
++			boolean newArrival = Boolean.getBoolean("parity.movingArrival") && psi.connectedEntity == null
++				&& context.contraption instanceof CarriageContraption && psi.getBlockPos().getX() == 95;
+ 			psi.startTransferringTo(context.contraption, distance);
++			if (newArrival)
++				System.out.printf(java.util.Locale.ROOT, "JAVA_TRAIN_SERVER_PORT_ATTACH %d;%.9f;%d%n",
++					context.world.getGameTime(), context.position.x, psi.transferTimer);
+ 		} else {
+ 			context.data.put(_clientPrevPos_, NbtUtils.writeBlockPos(pos));
+ 			if (context.contraption instanceof CarriageContraption || context.contraption.entity.isStalled()

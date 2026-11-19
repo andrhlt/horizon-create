@@ -1,0 +1,10 @@
+{"type":"use_item","tick":3,"pos":[0,0,0],"held":{"components":{"minecraft:potion_contents":{"potion":"minecraft:healing"}},"count":1,"id":"minecraft:potion"},"inventory":[]}
+{"type":"probe","label":"creative-0-0","tick":3,"pos":[0,0,0],"block":"create:fluid_tank","controller":[0,0,0],"capacity":8000,"fluid":"create:potion","amount":250,"components":{"create:potion_fluid_bottle_type":"regular","minecraft:potion_contents":{"potion":"minecraft:healing"}}}
+{"type":"use_item","tick":3,"pos":[0,0,0],"held":{"components":{"minecraft:potion_contents":{"potion":"minecraft:strength"}},"count":1,"id":"minecraft:potion"},"inventory":[]}
+{"type":"probe","label":"creative-0-1","tick":3,"pos":[0,0,0],"block":"create:fluid_tank","controller":[0,0,0],"capacity":8000,"fluid":"create:potion","amount":250,"components":{"create:potion_fluid_bottle_type":"regular","minecraft:potion_contents":{"potion":"minecraft:healing"}}}
+{"type":"use_item","tick":3,"pos":[0,0,0],"held":{"count":1,"id":"minecraft:glass_bottle"},"inventory":[]}
+{"type":"probe","label":"creative-0-2","tick":3,"pos":[0,0,0],"block":"create:fluid_tank","controller":[0,0,0],"capacity":8000,"fluid":"minecraft:empty","amount":0,"components":null}
+{"type":"use_item","tick":3,"pos":[6,0,0],"held":{"components":{"minecraft:potion_contents":{"potion":"minecraft:healing"}},"count":1,"id":"minecraft:potion"},"inventory":[]}
+{"type":"probe","label":"survival-6-0","tick":3,"pos":[6,0,0],"block":"create:creative_fluid_tank","controller":[6,0,0],"capacity":8000,"fluid":"create:potion","amount":8000,"components":{"create:potion_fluid_bottle_type":"regular","minecraft:potion_contents":{"potion":"minecraft:healing"}}}
+{"type":"use_item","tick":3,"pos":[6,0,0],"held":{"count":1,"id":"minecraft:glass_bottle"},"inventory":[{"slot":1,"item":{"components":{"minecraft:potion_contents":{"potion":"minecraft:healing"}},"count":1,"id":"minecraft:potion"}}]}
+{"type":"probe","label":"survival-6-1","tick":3,"pos":[6,0,0],"block":"create:creative_fluid_tank","controller":[6,0,0],"capacity":8000,"fluid":"minecraft:empty","amount":0,"components":null}

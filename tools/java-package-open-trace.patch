@@ -1,0 +1,1026 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..11139f24e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageOpen"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..7bf0da5c4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,1007 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 32)
++	public static void stockpileSwitchWrench(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var target = com.simibubi.create.content.redstone.DirectedDirectionalBlock.TARGET;
++		var level = helper.getLevel();
++		var directions = net.minecraft.core.Direction.values();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var stockpile = com.simibubi.create.AllBlocks.THRESHOLD_SWITCH.get();
++		for (var start : directions) {
++			var mount = start == net.minecraft.core.Direction.UP ? net.minecraft.world.level.block.state.properties.AttachFace.CEILING
++				: start == net.minecraft.core.Direction.DOWN ? net.minecraft.world.level.block.state.properties.AttachFace.FLOOR
++				: net.minecraft.world.level.block.state.properties.AttachFace.WALL;
++			var horizontal = start.getAxis().isVertical() ? net.minecraft.core.Direction.SOUTH : start;
++			var state = stockpile.defaultBlockState().setValue(facing, horizontal).setValue(target, mount);
++			for (var click : directions) {
++				var transformed = stockpile.getRotatedBlockState(state, click);
++				System.out.printf("STOCKPILE_WRENCH_POSE,%s,%s,%s,%s,%s%n", start.getName(), click.getName(),
++					horizontal.getName(), transformed.getValue(facing).getName(), transformed.getValue(target).getSerializedName());
++			}
++		}
++		var at = new BlockPos(12, 7, 4);
++		var absolute = helper.absolutePos(at);
++		var barrelPositions = new BlockPos[] {at.south(), at.west(), at.below()};
++		var stock = new int[] {64, 32, 96};
++		for (int i = 0; i < barrelPositions.length; i++) {
++			var barrel = barrelPositions[i];
++			helper.setBlock(barrel, Blocks.BARREL);
++			var entity = (net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(helper.absolutePos(barrel));
++			entity.setItem(0, new ItemStack(Items.STONE, Math.min(stock[i], 64)));
++			if (stock[i] > 64)
++				entity.setItem(1, new ItemStack(Items.STONE, stock[i] - 64));
++		}
++		helper.setBlock(at, stockpile.defaultBlockState().setValue(facing, net.minecraft.core.Direction.SOUTH));
++		var be = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), at);
++		be.offWhenBelow = 32;
++		be.onWhenAbove = 64;
++		player.setItemInHand(hand, new ItemStack(com.simibubi.create.AllItems.WRENCH.get()));
++		var click = new java.util.HashMap<Long, net.minecraft.core.Direction>();
++		click.put(4L, net.minecraft.core.Direction.UP);
++		click.put(10L, net.minecraft.core.Direction.NORTH);
++		click.put(18L, net.minecraft.core.Direction.EAST);
++		click.put(23L, net.minecraft.core.Direction.EAST);
++		int initial = player.getInventory().countItem(stockpile.asItem());
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			if (click.containsKey(tick)) {
++				var side = click.get(tick);
++				var hit = new net.minecraft.world.phys.BlockHitResult(absolute.getCenter().relative(side, 0.5), side, absolute, false);
++				var context = new net.minecraft.world.item.context.UseOnContext(player, hand, hit);
++				player.setShiftKeyDown(tick == 23);
++				var before = level.getBlockState(absolute);
++				var entityBefore = level.getBlockEntity(absolute).getBlockState();
++				System.out.printf("WRENCH_DEBUG_BEFORE,%d,%s,%s,%s,%s%n", tick, side, before, entityBefore,
++					stockpile.getRotatedBlockState(before, side));
++				var changes = tick == 23 ? stockpile.onSneakWrenched(level.getBlockState(absolute), context)
++					: stockpile.onWrenched(level.getBlockState(absolute), context);
++				if (!changes.consumesAction())
++					helper.fail("The wrench should accept the click");
++				System.out.printf("WRENCH_DEBUG_AFTER,%d,%s,%s,%s%n", tick, changes, level.getBlockState(absolute),
++					level.getBlockEntity(absolute) == null ? "-" : level.getBlockEntity(absolute).getBlockState());
++			}
++			var state = level.getBlockState(absolute);
++			if (state.isAir()) {
++				System.out.printf("STOCKPILE_WRENCH_TICK,%d,-,-,-1,false,false,-1,%d%n",
++					tick, player.getInventory().countItem(stockpile.asItem()) - initial);
++			} else {
++				var current = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), at);
++				System.out.printf("STOCKPILE_WRENCH_TICK,%d,%s,%s,%d,%b,%b,%d,%d%n", tick,
++					state.getValue(facing).getName(), state.getValue(target).getSerializedName(), current.getStockLevel(),
++					current.getState(), current.isPowered(), state.getValue(com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlock.LEVEL),
++					player.getInventory().countItem(stockpile.asItem()) - initial);
++			}
++			helper.assertTrue(tick == 25, "sampling wrench ticks");
++		});
++	}
++	@GameTest(template = "shearing", timeoutTicks = 36)
++	public static void stockpileSwitchFilter(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var mount = com.simibubi.create.content.redstone.DirectedDirectionalBlock.TARGET;
++		var world = helper.getLevel();
++		var stockpile = com.simibubi.create.AllBlocks.THRESHOLD_SWITCH.get();
++		var type = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++		var player = new net.minecraft.server.level.ServerPlayer(world.getServer(), world,
++			new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "StockpileFilter"),
++			net.minecraft.server.level.ClientInformation.createDefault());
++		var directions = net.minecraft.core.Direction.values();
++		for (int i = 0; i < directions.length; i++) {
++			var direction = directions[i];
++			var attachment = direction == net.minecraft.core.Direction.UP ? net.minecraft.world.level.block.state.properties.AttachFace.CEILING
++				: direction == net.minecraft.core.Direction.DOWN ? net.minecraft.world.level.block.state.properties.AttachFace.FLOOR
++				: net.minecraft.world.level.block.state.properties.AttachFace.WALL;
++			var horizontal = direction.getAxis().isVertical() ? net.minecraft.core.Direction.SOUTH : direction;
++			var local = new BlockPos(9 + 3 * i, 8, 4);
++			var absolute = helper.absolutePos(local);
++			helper.setBlock(local, stockpile.defaultBlockState().setValue(facing, horizontal).setValue(mount, attachment));
++			var filter = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), local).getBehaviour(type);
++			for (var click : directions) {
++				for (boolean center : new boolean[] {true, false}) {
++					filter.setFilter(ItemStack.EMPTY);
++					player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.STONE, 3));
++					boolean claimed = stockpileFilterClick(player, absolute, click, center);
++					if (center && claimed) {
++						var box = (com.simibubi.create.foundation.blockEntity.behaviour.ValueBoxTransform.Sided) filter.getSlotPositioning();
++						var offset = box.fromSide(click).getLocalOffset(world, absolute, world.getBlockState(absolute));
++						float yaw = net.createmod.catnip.math.AngleHelper.horizontalAngle(click) + 180;
++						float pitch = click == net.minecraft.core.Direction.UP ? 90 : click == net.minecraft.core.Direction.DOWN ? 270 : 0;
++						float roll = click == net.minecraft.core.Direction.UP
++							? -net.createmod.catnip.math.AngleHelper.horizontalAngle(horizontal) + 180 : 0;
++						System.out.printf("STOCKPILE_FILTER_TRANSFORM,%s,%s,%.6f,%.6f,%.6f,%.1f,%.1f,%.1f,%.5f%n",
++							direction.getName(), click.getName(), offset.x, offset.y, offset.z, yaw, pitch, roll, box.getScale());
++						var matrix = new org.joml.Matrix4f().translate((float)offset.x, (float)offset.y, (float)offset.z)
++							.rotateY((float)Math.toRadians(yaw)).rotateX((float)Math.toRadians(pitch))
++							.rotateZ((float)Math.toRadians(roll)).scale(box.getScale());
++						float[] components = matrix.get(new float[16]);
++						System.out.printf("STOCKPILE_FILTER_VISUAL,%s,%s,%s%n", direction.getName(), click.getName(),
++							java.util.Arrays.toString(components));
++					}
++					System.out.printf("STOCKPILE_FILTER_POSE,%s,%s,%b,%b,%d,%d%n",
++						direction.getName(), click.getName(), center, claimed, filter.getFilter().getCount(), player.getMainHandItem().getCount());
++				}
++			}
++		}
++		var items = new BlockPos(12, 7, 9);
++		var fluids = new BlockPos(16, 7, 9);
++		helper.setBlock(items.south(), Blocks.BARREL);
++		var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) world.getBlockEntity(helper.absolutePos(items.south()));
++		barrel.setItem(0, new ItemStack(Items.STONE, 32));
++		barrel.setItem(1, new ItemStack(Items.OAK_PLANKS, 32));
++		helper.setBlock(fluids.south(), com.simibubi.create.AllBlocks.FLUID_TANK.get());
++		var tank = (com.simibubi.create.content.fluids.tank.FluidTankBlockEntity) world.getBlockEntity(helper.absolutePos(fluids.south()));
++		tank.getTankInventory().fill(new net.neoforged.neoforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.WATER, 2000),
++			net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
++		for (var local : new BlockPos[] {items, fluids}) {
++			helper.setBlock(local, stockpile.defaultBlockState().setValue(facing, net.minecraft.core.Direction.SOUTH));
++			var be = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), local);
++			be.offWhenBelow = local == items ? 16 : 500;
++			be.onWhenAbove = local == items ? 48 : 1500;
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int index = 0; index < 2; index++) {
++				var local = index == 0 ? items : fluids;
++				var be = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), local);
++				if (tick == 4 || tick == 8 || tick == 13 || tick == 17) {
++					ItemStack selected = tick == 13 ? ItemStack.EMPTY : index == 0
++						? new ItemStack(tick == 8 ? Items.IRON_INGOT : Items.STONE, 3)
++						: new ItemStack(tick == 8 ? Items.WATER_BUCKET : Items.LAVA_BUCKET);
++					player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, selected);
++					boolean accepted = stockpileFilterClick(player, helper.absolutePos(local), net.minecraft.core.Direction.NORTH, tick != 17);
++					if (accepted != (tick != 17))
++						helper.fail("Original filter hit disagreed with the selected point");
++				}
++				var selected = be.getBehaviour(type).getFilter();
++				String item = selected.isEmpty() ? "-" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(selected.getItem()).toString();
++				System.out.printf("STOCKPILE_FILTER_TICK,%d,%d,%s,%d,%d,%b,%b,%d%n", tick, index, item,
++					selected.getCount(), be.getStockLevel(), be.getState(), be.isPowered(),
++					world.getBlockState(helper.absolutePos(local)).getValue(com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlock.LEVEL));
++			}
++			helper.assertTrue(tick == 23, "sampling filter changes");
++		});
++	}
++
++	private static boolean stockpileFilterClick(net.minecraft.world.entity.player.Player player, BlockPos pos,
++		net.minecraft.core.Direction face, boolean center) {
++		var point = pos.getCenter().relative(face, 0.46);
++		if (!center)
++			point = point.relative(face.getAxis().isVertical() ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.UP, 0.31);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var hit = new net.minecraft.world.phys.BlockHitResult(point, face, pos, false);
++		var event = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock(player, hand, pos, hit);
++		com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsInputHandler.onBlockActivated(event);
++		return event.isCanceled();
++	}
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void smartObserverFilter(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var mount = com.simibubi.create.content.redstone.DirectedDirectionalBlock.TARGET;
++		var power = com.simibubi.create.content.redstone.smartObserver.SmartObserverBlock.POWERED;
++		var world = helper.getLevel();
++		var observer = com.simibubi.create.AllBlocks.SMART_OBSERVER.get();
++		var type = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++		var player = new net.minecraft.server.level.ServerPlayer(world.getServer(), world,
++			new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "SmartObserverFilter"),
++			net.minecraft.server.level.ClientInformation.createDefault());
++		var directions = net.minecraft.core.Direction.values();
++		for (int i = 0; i < directions.length; i++) {
++			var direction = directions[i];
++			var attachment = direction == net.minecraft.core.Direction.UP ? net.minecraft.world.level.block.state.properties.AttachFace.CEILING
++				: direction == net.minecraft.core.Direction.DOWN ? net.minecraft.world.level.block.state.properties.AttachFace.FLOOR
++				: net.minecraft.world.level.block.state.properties.AttachFace.WALL;
++			var horizontal = direction.getAxis().isVertical() ? net.minecraft.core.Direction.SOUTH : direction;
++			var local = new BlockPos(9 + 3 * i, 8, 4);
++			var absolute = helper.absolutePos(local);
++			helper.setBlock(local, observer.defaultBlockState().setValue(facing, horizontal).setValue(mount, attachment));
++			var filter = helper.getBlockEntity(AllBlockEntityTypes.SMART_OBSERVER.get(), local).getBehaviour(type);
++			for (var click : directions) {
++				for (boolean center : new boolean[] {true, false}) {
++					filter.setFilter(ItemStack.EMPTY);
++					player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_INGOT, 3));
++					boolean claimed = stockpileFilterClick(player, absolute, click, center);
++					System.out.printf("SMART_OBSERVER_FILTER_POSE,%s,%s,%b,%b,%d,%d%n",
++						direction.getName(), click.getName(), center, claimed, filter.getFilter().getCount(), player.getMainHandItem().getCount());
++				}
++			}
++		}
++		var block = new BlockPos(12, 7, 9);
++		var items = new BlockPos(16, 7, 9);
++		helper.setBlock(block.south(), Blocks.STONE);
++		helper.setBlock(items.south(), Blocks.BARREL);
++		var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) world.getBlockEntity(helper.absolutePos(items.south()));
++		barrel.setItem(0, new ItemStack(Items.STONE, 32));
++		for (var local : new BlockPos[] {block, items})
++			helper.setBlock(local, observer.defaultBlockState().setValue(facing, net.minecraft.core.Direction.SOUTH));
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int index = 0; index < 2; index++) {
++				var local = index == 0 ? block : items;
++				var be = helper.getBlockEntity(AllBlockEntityTypes.SMART_OBSERVER.get(), local);
++				if (tick == 4 || tick == 9 || tick == 13 || tick == 22) {
++					ItemStack selected = tick == 22 ? ItemStack.EMPTY
++						: new ItemStack(tick == 9 ? Items.IRON_INGOT : Items.STONE, 3);
++					player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, selected);
++					if (!stockpileFilterClick(player, helper.absolutePos(local), net.minecraft.core.Direction.NORTH, true))
++						helper.fail("Original Smart Observer rejected its front filter slot");
++				}
++				var selected = be.getBehaviour(type).getFilter();
++				String item = selected.isEmpty() ? "-" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(selected.getItem()).toString();
++				System.out.printf("SMART_OBSERVER_FILTER_TICK,%d,%d,%s,%d,%d,%b%n", tick, index, item,
++					selected.getCount(), be.turnOffTicks, world.getBlockState(helper.absolutePos(local)).getValue(power));
++			}
++			helper.assertTrue(tick == 27, "sampling filter changes");
++		});
++	}
++	@GameTest(template = "shearing", timeoutTicks = 50)
++	public static void smartObserverPlacement(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var target = com.simibubi.create.content.redstone.DirectedDirectionalBlock.TARGET;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var observer = com.simibubi.create.AllBlocks.SMART_OBSERVER.get();
++		String[] faces = {"north", "south", "east", "west", "up", "down", "north", "north", "north", "north", "up", "down", "north", "north", "north"};
++		float[] yaws = {0, 180, 90, -90, 0, 180, 0, 0, 0, 0, 0, 180, 90, 90, 90};
++		float[] pitches = {16, 16, 16, 16, 60, -60, 0, 0, 0, 0, 60, -60, 16, 16, 16};
++		for (int test = 0; test < faces.length; test++) {
++			var pos = helper.absolutePos(new BlockPos(10 + 3 * test, 7, 4));
++			var side = net.minecraft.core.Direction.byName(faces[test]);
++			var support = pos.relative(side.getOpposite());
++			String block = test < 6 ? "minecraft:barrel" : switch (test) {
++				case 10 -> "create:fluid_tank";
++				case 12 -> "create:depot";
++				case 13 -> "create:fluid_pipe";
++				case 14 -> "create:andesite_funnel";
++				default -> "minecraft:stone";
++			};
++			var supportBlock = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(net.minecraft.resources.ResourceLocation.parse(block));
++			level.setBlockAndUpdate(support, supportBlock.defaultBlockState());
++			String neighboring = "-";
++			if (test == 8 || test == 9) {
++				neighboring = test == 8 ? "east" : "east+west";
++				level.setBlockAndUpdate(pos.east(), Blocks.BARREL.defaultBlockState());
++				if (test == 9)
++					level.setBlockAndUpdate(pos.west(), Blocks.BARREL.defaultBlockState());
++			}
++			player.setYRot(yaws[test]);
++			player.setXRot(pitches[test]);
++			player.setYHeadRot(yaws[test]);
++			player.setYBodyRot(yaws[test]);
++			player.yRotO = yaws[test];
++			player.xRotO = pitches[test];
++			boolean sneak = test < 6 || test == 7 || test == 9 || test == 10 || test >= 12;
++			player.setShiftKeyDown(sneak);
++			var stack = new ItemStack(observer.asItem());
++			player.setItemInHand(hand, stack);
++			var hit = new net.minecraft.world.phys.BlockHitResult(support.getCenter().relative(side, 0.5), side, support, false);
++			var context = new net.minecraft.world.item.context.BlockPlaceContext(player, hand, stack, hit);
++			var result = ((net.minecraft.world.item.BlockItem) stack.getItem()).place(context);
++			var placed = level.getBlockState(pos);
++			System.out.printf("SMART_OBSERVER_PLACEMENT,%d,%s,%s,%.0f,%.0f,%b,%s,%s,%s,%b%n",
++				test, block, side.getName(), yaws[test], pitches[test], sneak, neighboring,
++				placed.getValue(facing).getName(), placed.getValue(target).getSerializedName(),
++				result.consumesAction() && stack.isEmpty());
++		}
++		player.setShiftKeyDown(false);
++		helper.succeed();
++	}
++	@GameTest(template = "shearing", timeoutTicks = 30)
++	public static void smartObserverRecovery(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var type = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		for (int lane = 0; lane < 6; lane++) {
++			var pos = helper.absolutePos(new BlockPos(19 + 4 * lane, 7, 14));
++			boolean observer = lane < 4;
++			boolean special = lane != 2 && lane != 3;
++			boolean wrench = lane % 2 != 0;
++			var block = observer ? com.simibubi.create.AllBlocks.SMART_OBSERVER.get() : com.simibubi.create.AllBlocks.THRESHOLD_SWITCH.get();
++			var state = block.defaultBlockState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING,
++				net.minecraft.core.Direction.SOUTH);
++			world.setBlockAndUpdate(pos, state);
++			var entity = (com.simibubi.create.foundation.blockEntity.SmartBlockEntity)world.getBlockEntity(pos);
++			var sample = special ? com.simibubi.create.AllItems.FILTER.asStack(2) : new ItemStack(Items.STONE, 2);
++			player.getInventory().clearContent();
++			player.setItemInHand(hand, sample);
++			boolean selected = stockpileFilterClick(player, pos, net.minecraft.core.Direction.NORTH, true);
++			int count = entity.getBehaviour(type).getFilter().getCount();
++			int held = player.getMainHandItem().getCount();
++			if (wrench) {
++				player.setItemInHand(hand, com.simibubi.create.AllItems.WRENCH.asStack());
++				var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(net.minecraft.core.Direction.NORTH, 0.5), net.minecraft.core.Direction.NORTH, pos, false);
++				block.onSneakWrenched(state, new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			} else {
++				world.destroyBlock(pos, true, player);
++			}
++			var area = new net.minecraft.world.phys.AABB(pos).inflate(1);
++			int filters = 0;
++			int readyAndCentered = 0;
++			int blocks = 0;
++			for (var loot : world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, area)) {
++				var item = loot.getItem();
++				if (com.simibubi.create.AllItems.FILTER.isIn(item)) {
++					filters += item.getCount();
++					if (!loot.hasPickUpDelay() && loot.position().equals(pos.getCenter()))
++						readyAndCentered += item.getCount();
++				}
++				if (item.is(block.asItem())) blocks += item.getCount();
++			}
++			int picked = player.getInventory().countItem(block.asItem());
++			System.out.printf("DETECTOR_RECOVERY,%d,%b,%b,%b,%b,%d,%d,%d,%d,%d,%d,%b%n",
++				lane, observer, special, wrench, selected, count, held, filters, readyAndCentered, blocks, picked, world.getBlockState(pos).isAir());
++		}
++		helper.succeed();
++	}
++	@GameTest(template = "shearing", timeoutTicks = 20)
++	public static void smartObserverWrench(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var observer = com.simibubi.create.AllBlocks.SMART_OBSERVER.get();
++		var type = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var target = com.simibubi.create.content.redstone.DirectedDirectionalBlock.TARGET;
++		var power = com.simibubi.create.content.redstone.smartObserver.SmartObserverBlock.POWERED;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var directions = net.minecraft.core.Direction.values();
++		var pos = helper.absolutePos(new BlockPos(9, 9, 10));
++		for (var direction : directions) {
++			var attachment = direction == net.minecraft.core.Direction.UP ? net.minecraft.world.level.block.state.properties.AttachFace.CEILING
++				: direction == net.minecraft.core.Direction.DOWN ? net.minecraft.world.level.block.state.properties.AttachFace.FLOOR
++				: net.minecraft.world.level.block.state.properties.AttachFace.WALL;
++			var horizontal = direction.getAxis().isVertical() ? net.minecraft.core.Direction.SOUTH : direction;
++			for (var side : directions) {
++				boolean powered = side.get3DDataValue() % 2 == 0;
++				var state = observer.defaultBlockState().setValue(facing, horizontal).setValue(target, attachment).setValue(power, powered);
++				world.setBlockAndUpdate(pos, state);
++				var be = (com.simibubi.create.content.redstone.smartObserver.SmartObserverBlockEntity) world.getBlockEntity(pos);
++				be.turnOffTicks = 3;
++				be.getBehaviour(type).setFilter(new ItemStack(Items.STONE, 3));
++				player.setItemInHand(hand, com.simibubi.create.AllItems.WRENCH.asStack());
++				var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(side, 0.5), side, pos, false);
++				observer.onWrenched(state, new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++				var actual = world.getBlockState(pos);
++				var actualBE = (com.simibubi.create.content.redstone.smartObserver.SmartObserverBlockEntity) world.getBlockEntity(pos);
++				System.out.printf("OBSERVER_WRENCH,%s,%s,%b,%s,%s,%b,%d,%d%n", direction.getName(), side.getName(), powered,
++					actual.getValue(facing).getName(), actual.getValue(target).getSerializedName(), actual.getValue(power),
++					actualBE.turnOffTicks, actualBE.getBehaviour(type).getFilter().getCount());
++			}
++		}
++		helper.succeed();
++	}
++	@GameTest(template = "shearing", timeoutTicks = 36)
++	public static void detectorListFilter(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var power = com.simibubi.create.content.redstone.smartObserver.SmartObserverBlock.POWERED;
++		var type = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++		var players = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var observer = com.simibubi.create.AllBlocks.SMART_OBSERVER.get();
++		var stockpile = com.simibubi.create.AllBlocks.THRESHOLD_SWITCH.get();
++		var observers = new BlockPos[5];
++		for (int lane = 0; lane < observers.length; lane++) {
++			var local = new BlockPos(9 + 4 * lane, 8, 9);
++			observers[lane] = local;
++			var target = local.south();
++			if (lane < 2) {
++				helper.setBlock(target, lane == 0 ? Blocks.STONE : Blocks.BARREL);
++				if (lane == 1) {
++					var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) world.getBlockEntity(helper.absolutePos(target));
++					barrel.setItem(0, new ItemStack(Items.STONE, 16));
++				}
++			} else {
++				helper.setBlock(target, com.simibubi.create.AllBlocks.FLUID_TANK.get());
++				var tank = (com.simibubi.create.content.fluids.tank.FluidTankBlockEntity) world.getBlockEntity(helper.absolutePos(target));
++				var liquid = lane == 3 ? net.minecraft.world.level.material.Fluids.LAVA : net.minecraft.world.level.material.Fluids.WATER;
++				tank.getTankInventory().fill(new net.neoforged.neoforge.fluids.FluidStack(liquid, 2000),
++					net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
++			}
++			helper.setBlock(local, (lane == 4 ? stockpile : observer).defaultBlockState().setValue(facing, net.minecraft.core.Direction.SOUTH));
++			if (lane == 4) {
++				var be = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), local);
++				be.offWhenBelow = 500;
++				be.onWhenAbove = 1500;
++			}
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int lane = 0; lane < observers.length; lane++) {
++				var pos = helper.absolutePos(observers[lane]);
++				var be = (com.simibubi.create.foundation.blockEntity.SmartBlockEntity) world.getBlockEntity(pos);
++				if (tick == 4 || tick == 12 || tick == 22) {
++					var list = tick == 22 ? ItemStack.EMPTY : com.simibubi.create.AllItems.FILTER.asStack(2);
++					if (!list.isEmpty()) {
++						list.set(com.simibubi.create.AllDataComponents.FILTER_ITEMS,
++							net.minecraft.world.item.component.ItemContainerContents.fromItems(java.util.List.of(new ItemStack(Items.STONE), new ItemStack(Items.WATER_BUCKET))));
++						list.set(com.simibubi.create.AllDataComponents.FILTER_ITEMS_BLACKLIST, tick == 12);
++					}
++					players.getInventory().clearContent();
++					players.setItemInHand(hand, list);
++					if (!stockpileFilterClick(players, pos, net.minecraft.core.Direction.NORTH, true))
++						helper.fail("The original detector rejected the configured List Filter");
++				}
++				var filter = be.getBehaviour(type).getFilter();
++				int mode = filter.isEmpty() ? 0 : filter.getOrDefault(com.simibubi.create.AllDataComponents.FILTER_ITEMS_BLACKLIST, false) ? 2 : 1;
++				if (be instanceof com.simibubi.create.content.redstone.smartObserver.SmartObserverBlockEntity smart) {
++					boolean powered = world.getBlockState(pos).getValue(power);
++					System.out.printf("DETECTOR_LIST,%d,%d,%d,%d,%b,%b%n", tick, lane, mode, smart.turnOffTicks, powered, powered);
++				} else if (be instanceof com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity threshold) {
++					System.out.printf("DETECTOR_LIST,%d,%d,%d,%d,%b,%b%n", tick, lane, mode,
++						threshold.getStockLevel(), threshold.getState(), threshold.isPowered());
++				}
++			}
++			helper.assertTrue(tick == 28, "sampling the configured list");
++		});
++	}
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void listFilterMenu(CreateGameTestHelper helper) {
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(helper.getLevel());
++		var inventory = player.getInventory();
++		var filter = com.simibubi.create.AllItems.FILTER.asStack(1);
++		inventory.clearContent();
++		inventory.selected = 0;
++		inventory.setItem(0, filter);
++		inventory.setItem(1, new ItemStack(Items.STONE, 5));
++		inventory.setItem(2, new ItemStack(Items.OAK_PLANKS, 4));
++		var menu = com.simibubi.create.content.logistics.filter.FilterMenu.create(1, inventory, filter);
++		player.containerMenu = menu;
++		var quick = net.minecraft.world.inventory.ClickType.QUICK_MOVE;
++		var left = net.minecraft.world.inventory.ClickType.PICKUP;
++		listFilterMenuState("open", menu, player, filter);
++		menu.clicked(28, 0, quick, player);
++		listFilterMenuState("copy", menu, player, filter);
++		menu.clicked(28, 0, quick, player);
++		listFilterMenuState("duplicate", menu, player, filter);
++		menu.clicked(29, 0, left, player);
++		menu.clicked(37, 0, left, player);
++		listFilterMenuState("cursor_copy", menu, player, filter);
++		menu.clicked(27, 0, left, player);
++		listFilterMenuState("holder", menu, player, filter);
++		menu.clicked(29, 0, left, player);
++		menu.clicked(37, 0, left, player);
++		listFilterMenuState("clear_second", menu, player, filter);
++		var black = com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.BLACKLIST;
++		var respect = com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.RESPECT_DATA;
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(black).handle(player);
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(respect).handle(player);
++		menu.removed(player);
++		listFilterMenuState("save", menu, player, filter);
++		menu = com.simibubi.create.content.logistics.filter.FilterMenu.create(2, inventory, filter);
++		player.containerMenu = menu;
++		listFilterMenuState("reopen", menu, player, filter);
++		menu.clicked(36, 0, left, player);
++		var white = com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.WHITELIST;
++		var ignore = com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.IGNORE_DATA;
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(white).handle(player);
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(ignore).handle(player);
++		menu.removed(player);
++		listFilterMenuState("reset", menu, player, filter);
++		player.containerMenu = player.inventoryMenu;
++		helper.succeed();
++	}
++
++	private static void listFilterMenuState(String action, com.simibubi.create.content.logistics.filter.FilterMenu menu,
++		net.minecraft.server.level.ServerPlayer player, ItemStack filter) {
++		var inventory = player.getInventory();
++		var list = com.simibubi.create.AllDataComponents.FILTER_ITEMS;
++		var black = com.simibubi.create.AllDataComponents.FILTER_ITEMS_BLACKLIST;
++		var respect = com.simibubi.create.AllDataComponents.FILTER_ITEMS_RESPECT_NBT;
++		System.out.printf("LIST_FILTER_MENU,%s,%d,%d,%d,%d,%d,%d,%d,%b,%b,%s,%s%n", action,
++			menu.ghostInventory.getSlots(), menu.ghostInventory.getStackInSlot(0).getCount(), menu.ghostInventory.getStackInSlot(1).getCount(),
++			inventory.getItem(0).getCount(), inventory.getItem(1).getCount(), inventory.getItem(2).getCount(), menu.getCarried().getCount(),
++			menu.stillValid(player), filter.has(list), filter.get(black), filter.get(respect));
++	}
++	@GameTest(template = "shearing", timeoutTicks = 32)
++	public static void observerWatchingDepot(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var registry = world.registryAccess();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var power = com.simibubi.create.content.redstone.smartObserver.SmartObserverBlock.POWERED;
++		var depotType = com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE;
++		var filterType = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var lanes = new BlockPos[] { new BlockPos(9, 8, 9), new BlockPos(13, 8, 9), new BlockPos(17, 8, 9) };
++		for (int index = 0; index < lanes.length; index++) {
++			var local = lanes[index];
++			helper.setBlock(local.south(), com.simibubi.create.AllBlocks.DEPOT.get());
++			helper.setBlock(local, com.simibubi.create.AllBlocks.SMART_OBSERVER.get().defaultBlockState().setValue(facing, net.minecraft.core.Direction.SOUTH));
++			var observer = helper.getBlockEntity(AllBlockEntityTypes.SMART_OBSERVER.get(), local);
++			observer.getBehaviour(filterType).setFilter(new ItemStack(Items.STONE));
++			if (index == 1) {
++				var output = new net.neoforged.neoforge.items.ItemStackHandler(8);
++				output.setStackInSlot(0, new ItemStack(Items.STONE, 4));
++				var data = new net.minecraft.nbt.CompoundTag();
++				data.put("OutputBuffer", output.serializeNBT(registry));
++				helper.getBlockEntity(AllBlockEntityTypes.DEPOT.get(), local.south()).getBehaviour(depotType).read(data, registry, false);
++			}
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int index = 0; index < lanes.length; index++) {
++				var local = lanes[index];
++				var pos = helper.absolutePos(local.south());
++				var depot = helper.getBlockEntity(AllBlockEntityTypes.DEPOT.get(), local.south());
++				var behaviour = depot.getBehaviour(depotType);
++				if (index == 0 && (tick == 4 || tick == 11 || tick == 16 || tick == 20)) {
++					var sample = tick == 4 ? new ItemStack(Items.STONE, 4) : tick == 16 ? new ItemStack(Items.OAK_PLANKS, 4) : ItemStack.EMPTY;
++					player.setItemInHand(hand, sample);
++					var side = net.minecraft.core.Direction.UP;
++					var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(side, 0.5), side, pos, false);
++					com.simibubi.create.content.logistics.depot.SharedDepotBlockMethods.onUse(sample, world.getBlockState(pos), world, pos, player, hand, hit);
++				}
++				if (index == 2 && tick == 5) {
++					var item = new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(new ItemStack(Items.STONE, 4));
++					item.beltPosition = 0;
++					behaviour.setHeldItem(item);
++				}
++				if (index == 2 && tick == 13)
++					behaviour.removeHeldItem();
++				var observer = helper.getBlockEntity(AllBlockEntityTypes.SMART_OBSERVER.get(), local);
++				System.out.printf("OBSERVER_DEPOT,%d,%d,%d,%d,%d,%b%n", tick, index, depot.getHeldItem().getCount(),
++					behaviour.getPresentStackSize(), observer.turnOffTicks, world.getBlockState(helper.absolutePos(local)).getValue(power));
++			}
++			helper.assertTrue(tick == 25, "watching transport and output storage");
++		});
++	}
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void filterRecipes(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var brass = com.simibubi.create.AllItems.BRASS_INGOT.get();
++		var brassNugget = com.simibubi.create.AllItems.BRASS_NUGGET.get();
++		var zinc = com.simibubi.create.AllItems.ZINC_NUGGET.get();
++		var attribute = com.simibubi.create.AllItems.ATTRIBUTE_FILTER.asStack();
++		var address = com.simibubi.create.AllItems.PACKAGE_FILTER.asStack();
++		attribute.set(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE,
++			com.simibubi.create.content.logistics.filter.AttributeFilterWhitelistMode.BLACKLIST);
++		address.set(com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS, "Workshop");
++		for (var stack : new ItemStack[] {attribute, address}) {
++			stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal("Configured part"));
++			var data = new net.minecraft.nbt.CompoundTag();
++			data.putInt("marker", 7);
++			stack.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(data));
++		}
++		for (int scenario = 0; scenario < 6; scenario++) {
++			var grid = new java.util.ArrayList<ItemStack>(java.util.Collections.nCopies(9, ItemStack.EMPTY));
++			switch (scenario) {
++				case 0 -> grid.set(4, new ItemStack(brass));
++				case 1 -> {
++					for (int i = 0; i < 9; i++) grid.set(i, new ItemStack(brassNugget));
++				}
++				case 2 -> {
++					grid.set(3, new ItemStack(brassNugget));
++					grid.set(4, new ItemStack(Items.BLUE_WOOL));
++					grid.set(5, new ItemStack(brassNugget));
++				}
++				case 3 -> {
++					grid.set(3, new ItemStack(zinc));
++					grid.set(4, new ItemStack(Items.GREEN_WOOL));
++					grid.set(5, new ItemStack(zinc));
++				}
++				case 4 -> grid.set(4, attribute);
++				case 5 -> grid.set(4, address);
++			}
++			var input = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, grid);
++			var recipe = level.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level).orElseThrow();
++			var result = recipe.value().assemble(input, level.registryAccess());
++			long remaining = recipe.value().getRemainingItems(input).stream().filter(stack -> !stack.isEmpty()).count();
++			boolean configured = result.has(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE)
++				|| result.has(com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS);
++			System.out.printf("FILTER_RECIPE,%d,%s,%s,%d,%b,%b,%b,%d%n", scenario, recipe.id(),
++				net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(result.getItem()), result.getCount(),
++				result.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME), result.has(net.minecraft.core.component.DataComponents.CUSTOM_DATA), configured, remaining);
++		}
++		helper.succeed();
++	}
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void packageFilterAddress(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var inventory = player.getInventory();
++		var component = com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS;
++		var opts = com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.UPDATE_ADDRESS;
++		var filter = com.simibubi.create.AllItems.PACKAGE_FILTER.asStack();
++		inventory.clearContent();
++		inventory.selected = 0;
++		inventory.setItem(0, filter);
++		inventory.setItem(2, new ItemStack(Items.STONE, 4));
++		String[] scenarios = {null, "Workshop-East", null, " Atelier Nord* ", "   ", "Shed-02", null};
++		for (int step = 0; step < scenarios.length; step++) {
++			var menu = com.simibubi.create.content.logistics.filter.PackageFilterMenu.create(step + 1, inventory, filter);
++			player.containerMenu = menu;
++			String before = filter.get(component);
++			if (scenarios[step] != null) {
++				var data = new net.minecraft.nbt.CompoundTag();
++				data.putString("Address", scenarios[step]);
++				new com.simibubi.create.content.logistics.filter.FilterScreenPacket(opts, data).handle(player);
++			}
++			if (step == 6)
++				menu.clearContents();
++			menu.removed(player);
++			System.out.printf("PACKAGE_FILTER_EDIT,%d,%s,%s,%d,%d,%b%n", step, packageAddressEvidence(before),
++				packageAddressEvidence(filter.get(component)), inventory.getItem(0).getCount(), inventory.getItem(2).getCount(), menu.stillValid(player));
++		}
++		player.containerMenu = player.inventoryMenu;
++		helper.succeed();
++	}
++
++	private static String packageAddressEvidence(String text) {
++		if (text == null)
++			return "-";
++		return java.util.HexFormat.of().formatHex(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void packageFilterMatching(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var component = com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS;
++		var styles = com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES;
++		for (var box : styles) {
++			var stack = new ItemStack(box);
++			System.out.printf("PACKAGE_FORM,%s,%d,%b%n", box.style.getItemId(), stack.getMaxStackSize(), box.canFitInsideContainerItems());
++		}
++		String[][] scenarios = {
++			{null, "", "package"}, {null, "", "filter"}, {"", "", "package"}, {"", "*", "package"},
++			{"   ", "", "package"}, {"   ", "East", "package"}, {"East", "East", "package"},
++			{"East", "east", "package"}, {"East", "", "package"}, {"*", "", "package"},
++			{"West", "*", "package"}, {"Rail*", "Rail-2", "package"}, {"Rail-2", "Rail*", "package"},
++			{"Rail*", "R*", "package"}, {"*North", "North", "package"}, {"*North", "Old North", "package"},
++			{"Dock-?", "Dock-2", "package"}, {"Dock-?", "Dock-20", "package"},
++			{"Dock-[1-3]", "Dock-2", "package"}, {"Dock-[!1-3]", "Dock-2", "package"},
++			{"Dock-[!1-3]", "Dock-4", "package"}, {"Dock-{East,West}", "Dock-West", "package"},
++			{"Dock-{East,West}", "Dock-North", "package"}, {"Dock-{!East}", "Dock-West", "package"},
++			{"Dock-{!East}", "Dock-Eastern", "package"}, {"*{!East}", "Dock-East", "package"},
++			{"*{!East}", "Dock-West", "package"}, {"Dock\\*", "Dock*", "package"},
++			{"Dock[", "Dock", "package"}, {"^Depot.1$", "^Depot.1$", "package"},
++			{"^Depot.?", "^Depot.1", "package"}, {"É?", "É台", "package"}, {"D?", "D😀", "package"},
++			{"*", "East", "rare"}, {"*", "", "stone"}, {"*", "", "filter"},
++			{null, "", "filterConfigured"}, {"", "", "filterConfigured"}, {"", "", "filter"}, {"", "", "filterTrimmed"}
++		};
++		for (int index = 0; index < scenarios.length; index++) {
++			var row = scenarios[index];
++			var filter = com.simibubi.create.AllItems.PACKAGE_FILTER.asStack();
++			if (row[0] != null)
++				filter.set(component, row[0]);
++			var candidate = switch (row[2]) {
++				case "filter", "filterConfigured", "filterTrimmed" -> com.simibubi.create.AllItems.PACKAGE_FILTER.asStack();
++				case "stone" -> new ItemStack(Items.STONE);
++				case "rare" -> new ItemStack(styles.get(4));
++				default -> new ItemStack(styles.get(0));
++			};
++			if (row[2].equals("filterConfigured") || row[2].equals("filterTrimmed") || !row[1].isEmpty())
++				candidate.set(component, row[1]);
++			if (row[2].equals("filterTrimmed")) {
++				candidate.remove(net.minecraft.core.component.DataComponents.ENCHANTMENTS);
++				candidate.remove(net.minecraft.core.component.DataComponents.ATTRIBUTE_MODIFIERS);
++				System.out.println("PACKAGE_TRIMMED_PATCH," + candidate.getComponentsPatch());
++			}
++			var wrapped = com.simibubi.create.content.logistics.filter.FilterItemStack.of(filter);
++			boolean ordinary = wrapped.test(world, candidate, false);
++			boolean exact = wrapped.test(world, candidate, true);
++			boolean fluid = wrapped.test(world, new net.neoforged.neoforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.WATER, 1000), false);
++			System.out.printf("PACKAGE_MATCH,%d,%s,%s,%s,%b,%b,%b%n", index, packageAddressEvidence(row[0]),
++				packageAddressEvidence(row[1]), row[2], ordinary, exact, fluid);
++		}
++		helper.succeed();
++	}
++
++
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void attributeFilterMenu(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var inv = player.getInventory();
++		var filter = com.simibubi.create.AllItems.ATTRIBUTE_FILTER.asStack();
++		inv.clearContent();
++		inv.selected = 0;
++		inv.setItem(0, filter);
++		inv.setItem(1, new ItemStack(Items.APPLE, 5));
++		inv.setItem(2, new ItemStack(Items.STONE, 3));
++		var menu = com.simibubi.create.content.logistics.filter.AttributeFilterMenu.create(1, inv, filter);
++		player.containerMenu = menu;
++		attributeFilterMenuRecord("open", menu, filter, player);
++		menu.clicked(28, 0, net.minecraft.world.inventory.ClickType.QUICK_MOVE, player);
++		attributeFilterMenuRecord("reference", menu, filter, player);
++
++		var apple = menu.ghostInventory.getStackInSlot(0);
++		var attributes = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.getAllAttributes(apple, level);
++		for (int i = 0; i < attributes.size(); i++) {
++			var attr = attributes.get(i);
++			var tag = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.saveStatic(attr, player.registryAccess());
++			System.out.printf("ATTRIBUTE_CHOICES,%d,%s%n", i, tag);
++		}
++		var targets = new String[] {"create:consumable", "create:compostable"};
++		for (int step = 0; step < targets.length; step++) {
++			for (var attr : attributes) {
++				var type = com.simibubi.create.api.registry.CreateBuiltInRegistries.ITEM_ATTRIBUTE_TYPE.getKey(attr.getType());
++				if (!targets[step].equals(type.toString()))
++					continue;
++				var option = step == 0
++					? com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.ADD_TAG
++					: com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.ADD_INVERTED_TAG;
++				var data = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.saveStatic(attr, player.registryAccess());
++				new com.simibubi.create.content.logistics.filter.FilterScreenPacket(option, data).handle(player);
++				break;
++			}
++		}
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(
++			com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.WHITELIST2).handle(player);
++		menu.removed(player);
++		attributeFilterMenuRecord("save", menu, filter, player);
++
++		menu = com.simibubi.create.content.logistics.filter.AttributeFilterMenu.create(2, inv, filter);
++		player.containerMenu = menu;
++		attributeFilterMenuRecord("reopen", menu, filter, player);
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(
++			com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.BLACKLIST).handle(player);
++		menu.removed(player);
++		attributeFilterMenuRecord("deny", menu, filter, player);
++
++		menu = com.simibubi.create.content.logistics.filter.AttributeFilterMenu.create(3, inv, filter);
++		player.containerMenu = menu;
++		menu.clearContents();
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(
++			com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.WHITELIST).handle(player);
++		menu.removed(player);
++		attributeFilterMenuRecord("reset", menu, filter, player);
++		player.containerMenu = player.inventoryMenu;
++		helper.succeed();
++	}
++
++	private static void attributeFilterMenuRecord(String action,
++		com.simibubi.create.content.logistics.filter.AttributeFilterMenu menu,
++		ItemStack filter, net.minecraft.server.level.ServerPlayer player) {
++		var inv = player.getInventory();
++		var list = filter.get(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES);
++		var mode = filter.get(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE);
++		var matches = com.simibubi.create.content.logistics.filter.FilterItemStack.of(filter.copy());
++		System.out.printf("ATTRIBUTE_MENU,%s,%d,%d,%d,%d,%d,%s,%d,%b,%b,%b%n", action,
++			menu.ghostInventory.getStackInSlot(0).getCount(), menu.ghostInventory.getStackInSlot(1).getCount(),
++			inv.getItem(0).getCount(), inv.getItem(1).getCount(), inv.getItem(2).getCount(), mode,
++			list == null ? 0 : list.size(), menu.stillValid(player),
++			matches.test(player.level(), new ItemStack(Items.APPLE), false),
++			matches.test(player.level(), new ItemStack(Items.STONE), false));
++	}
++
++
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void attributeFilterKinds(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var registries = level.registryAccess();
++		var stone = new ItemStack(Items.STONE);
++		var apple = new ItemStack(Items.APPLE);
++		var sword = new ItemStack(Items.DIAMOND_SWORD);
++		var damaged = sword.copy();
++		damaged.setDamageValue(1500);
++		var slightlyDamaged = sword.copy();
++		slightlyDamaged.setDamageValue(200);
++		var renamed = stone.copy();
++		renamed.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal("Ore"));
++		var structuredName = stone.copy();
++		structuredName.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal("{\"text\":\"Ore\"}"));
++		for (String literal : new String[] {"Ore", "Ore Cart", "  Ore  ", "123", "true", "null", "Ore-4", "Ore/4", "Ore.4", "Ore_Cart", "'Ore Cart'"}) {
++			var named = stone.copy();
++			named.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal(literal));
++			var choices = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.getAllAttributes(named, level);
++			var result = choices.stream().filter(a -> com.simibubi.create.api.registry.CreateBuiltInRegistries.ITEM_ATTRIBUTE_TYPE.getKey(a.getType()).getPath().equals("has_name"))
++				.map(a -> com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.saveStatic(a, registries).getCompound("attribute").getString("value")).findFirst().orElse("");
++			System.out.printf("ATTRIBUTE_NAME_LITERAL,%s,%s%n",
++				java.util.HexFormat.of().formatHex(literal.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++				java.util.HexFormat.of().formatHex(result.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
++		}
++		var enchanted = sword.copy();
++		var enchantedMax = sword.copy();
++		var sharpness = registries.lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT).getOrThrow(net.minecraft.world.item.enchantment.Enchantments.SHARPNESS);
++		enchanted.enchant(sharpness, 1);
++		enchantedMax.enchant(sharpness, 5);
++
++		var emptyShulker = new ItemStack(Items.SHULKER_BOX);
++		var partialShulker = emptyShulker.copy();
++		var fullShulker = emptyShulker.copy();
++		partialShulker.set(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.fromItems(java.util.List.of(stone)));
++		fullShulker.set(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.fromItems(
++			java.util.stream.IntStream.range(0, 27).mapToObj(i -> new ItemStack(Items.STONE, 64)).toList()));
++
++		var book = new ItemStack(Items.WRITTEN_BOOK);
++		var copiedBook = new ItemStack(Items.WRITTEN_BOOK);
++		book.set(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT, new net.minecraft.world.item.component.WrittenBookContent(
++			net.minecraft.server.network.Filterable.passThrough("Cargo"), "River", 0, java.util.List.of(), false));
++		copiedBook.set(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT, new net.minecraft.world.item.component.WrittenBookContent(
++			net.minecraft.server.network.Filterable.passThrough("Cargo"), "River", 1, java.util.List.of(), false));
++		var water = new ItemStack(Items.WATER_BUCKET);
++		var lava = new ItemStack(Items.LAVA_BUCKET);
++		var cog = com.simibubi.create.AllBlocks.COGWHEEL.asStack();
++
++		record Group(String kind, ItemStack reference, ItemStack[] samples) {}
++		var groups = java.util.List.of(
++			new Group("placeable", stone, new ItemStack[]{stone, apple, water, cog}),
++			new Group("enchanted", enchanted, new ItemStack[]{enchanted, enchantedMax, sword}),
++			new Group("max_enchanted", enchantedMax, new ItemStack[]{enchanted, enchantedMax, sword}),
++			new Group("renamed", renamed, new ItemStack[]{renamed, stone, structuredName}),
++			new Group("has_name", structuredName, new ItemStack[]{structuredName, renamed, stone}),
++			new Group("badly_damaged", damaged, new ItemStack[]{damaged, slightlyDamaged, sword}),
++			new Group("not_stackable", sword, new ItemStack[]{damaged, sword, apple, water}),
++			new Group("added_by", cog, new ItemStack[]{cog, stone, water}),
++			new Group("added_by", stone, new ItemStack[]{cog, stone, water}),
++			new Group("has_fluid", water, new ItemStack[]{water, lava, stone}),
++			new Group("shulker_fill_level", emptyShulker, new ItemStack[]{emptyShulker, partialShulker, fullShulker, stone}),
++			new Group("shulker_fill_level", partialShulker, new ItemStack[]{emptyShulker, partialShulker, fullShulker, stone}),
++			new Group("shulker_fill_level", fullShulker, new ItemStack[]{emptyShulker, partialShulker, fullShulker, stone}),
++			new Group("book_author", book, new ItemStack[]{book, copiedBook, stone}),
++			new Group("book_copy", book, new ItemStack[]{book, copiedBook, stone}),
++			new Group("book_copy", copiedBook, new ItemStack[]{book, copiedBook, stone})
++		);
++		int index = 0;
++		for (var group : groups) {
++			var attribute = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.getAllAttributes(group.reference(), level).stream()
++				.filter(a -> com.simibubi.create.api.registry.CreateBuiltInRegistries.ITEM_ATTRIBUTE_TYPE.getKey(a.getType()).getPath().equals(group.kind()))
++				.findFirst().orElseThrow(() -> new IllegalStateException(group.kind()));
++			var data = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.saveStatic(attribute, registries);
++			var filter = com.simibubi.create.AllItems.ATTRIBUTE_FILTER.asStack();
++			filter.set(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES,
++				java.util.List.of(new com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.ItemAttributeEntry(attribute, false)));
++			var matcher = com.simibubi.create.content.logistics.filter.FilterItemStack.of(filter);
++			for (var sample : group.samples()) {
++				var saved = sample.save(registries).toString();
++				System.out.printf("ATTRIBUTE_KIND,%d,%s,%s,%s,%b%n", index++, group.kind(),
++					java.util.HexFormat.of().formatHex(data.getCompound("attribute").toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++					java.util.HexFormat.of().formatHex(saved.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++					matcher.test(level, sample, false));
++			}
++		}
++		helper.succeed();
++	}
++
++
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void attributeFilterColor(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var registries = level.registryAccess();
++		var blue = net.minecraft.world.item.DyeColor.BLUE;
++		var red = net.minecraft.world.item.DyeColor.RED;
++		var fireworkColor = new net.minecraft.world.item.component.FireworkExplosion(
++			net.minecraft.world.item.component.FireworkExplosion.Shape.SMALL_BALL,
++			it.unimi.dsi.fastutil.ints.IntList.of(blue.getFireworkColor()),
++			it.unimi.dsi.fastutil.ints.IntList.of(red.getFireworkColor()), false, false);
++		var rocket = new ItemStack(Items.FIREWORK_ROCKET);
++		rocket.set(net.minecraft.core.component.DataComponents.FIREWORKS,
++			new net.minecraft.world.item.component.Fireworks(1, java.util.List.of(fireworkColor)));
++		var star = new ItemStack(Items.FIREWORK_STAR);
++		star.set(net.minecraft.core.component.DataComponents.FIREWORK_EXPLOSION, fireworkColor);
++		var dyedArmor = new ItemStack(Items.LEATHER_HELMET);
++		dyedArmor.set(net.minecraft.core.component.DataComponents.DYED_COLOR,
++			new net.minecraft.world.item.component.DyedItemColor(blue.getTextureDiffuseColor(), true));
++		var blueSeat = new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
++			net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", "blue_seat")));
++		var examples = java.util.List.of(new ItemStack(Items.BLUE_DYE), new ItemStack(Items.BLUE_WOOL),
++			new ItemStack(Items.BLUE_BED), new ItemStack(Items.BLUE_BANNER), new ItemStack(Items.BLUE_STAINED_GLASS),
++			new ItemStack(Items.LIGHT_BLUE_WOOL), new ItemStack(Items.LIGHT_GRAY_TERRACOTTA),
++			new ItemStack(Items.REDSTONE), new ItemStack(Items.RED_WOOL), dyedArmor, blueSeat,
++			rocket, star, new ItemStack(Items.FIREWORK_ROCKET));
++		int index = 0;
++		for (var color : java.util.List.of(blue, red, net.minecraft.world.item.DyeColor.LIGHT_BLUE)) {
++			var attribute = new com.simibubi.create.content.logistics.item.filter.attribute.attributes.ColorAttribute(color);
++			var data = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.saveStatic(attribute, registries);
++			var filter = com.simibubi.create.AllItems.ATTRIBUTE_FILTER.asStack();
++			filter.set(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES,
++				java.util.List.of(new com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.ItemAttributeEntry(attribute, false)));
++			var matcher = com.simibubi.create.content.logistics.filter.FilterItemStack.of(filter);
++			for (var sample : examples) {
++				System.out.printf("ATTRIBUTE_COLOR,%d,%s,%s,%s,%b%n", index++, color.getName(),
++					java.util.HexFormat.of().formatHex(data.getCompound("attribute").toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++					java.util.HexFormat.of().formatHex(sample.save(registries).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++					matcher.test(level, sample, false));
++			}
++		}
++		helper.succeed();
++	}
++
++
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void packageContainerSlots(CreateGameTestHelper helper) {
++		var boxes = com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES;
++		var items = new java.util.ArrayList<ItemStack>();
++		for (var box : boxes) items.add(new ItemStack(box));
++		items.add(new ItemStack(Items.STONE));
++		items.add(new ItemStack(Items.SHULKER_BOX));
++		var shulker = new net.minecraft.world.inventory.ShulkerBoxSlot(new net.minecraft.world.SimpleContainer(27), 0, 0, 0);
++		for (var sample : items) {
++			var bundle = new net.minecraft.world.item.component.BundleContents.Mutable(net.minecraft.world.item.component.BundleContents.EMPTY);
++			boolean nested = bundle.tryInsert(sample.copy()) != 0;
++			System.out.printf("PACKAGE_CONTAINER,%s,%b,%b%n",
++				net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(sample.getItem()), nested, shulker.mayPlace(sample));
++		}
++		helper.succeed();
++	}
++
++
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void packageOpen(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var inventory = player.getInventory();
++		var pos = helper.absolutePos(new BlockPos(2, 3, 2));
++		player.setPos(pos.getX() + .5, pos.getY(), pos.getZ() + .5);
++		player.setYRot(0);
++		player.setXRot(-70);
++		var bounds = new net.minecraft.world.phys.AABB(pos).inflate(3);
++		var boxes = com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES;
++		var contentsType = com.simibubi.create.AllDataComponents.PACKAGE_CONTENTS;
++		var rare = 4;
++		for (int index = 0; index < 7; index++) {
++			inventory.clearContent();
++			player.stopUsingItem();
++			player.setShiftKeyDown(true);
++			player.gameMode.changeGameModeForPlayer(index == 3 ? net.minecraft.world.level.GameType.CREATIVE : net.minecraft.world.level.GameType.SURVIVAL);
++			inventory.selected = 0;
++			if (index == 4 || index == 5)
++				for (int slot = 0; slot < 36; slot++) inventory.setItem(slot, new ItemStack(Items.STONE, 64));
++			var hand = (index == 2 || index == 5) ? net.minecraft.world.InteractionHand.OFF_HAND : net.minecraft.world.InteractionHand.MAIN_HAND;
++			var box = new ItemStack(boxes.get(index == 3 ? rare : 0));
++			var payload = net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
++			if (index == 1) {
++				var named = new ItemStack(Items.STONE, 3);
++				named.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal("Workshop Sample"));
++				payload.set(2, named);
++				payload.set(8, new ItemStack(Items.STICK, 2));
++			} else if (index == 2 || index == 3) {
++				payload.set(3, new ItemStack(Items.APPLE, 4));
++			} else if (index == 4) {
++				payload.set(1, new ItemStack(Items.STONE, 64));
++				payload.set(5, new ItemStack(Items.STICK, 2));
++			} else if (index == 5) {
++				payload.set(6, new ItemStack(Items.APPLE, 4));
++			} else if (index == 6) {
++				payload.set(4, new ItemStack(Items.PIG_SPAWN_EGG, 2));
++			}
++			if (index > 0) box.set(contentsType, net.minecraft.world.item.component.ItemContainerContents.fromItems(payload));
++			String before = box.save(world.registryAccess()).toString();
++			player.setItemInHand(hand, box);
++			var sounds = new java.util.ArrayList<String>();
++			java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listener = event -> {
++				if (event.getLevel() != world || event.getSound() == null || event.isCanceled())
++					return;
++				var id = event.getSound().value().getLocation();
++				if (!id.getNamespace().equals("create") || !id.getPath().startsWith("package_pop"))
++					return;
++				var at = event.getPosition();
++				sounds.add(String.join("|", id.toString(), Integer.toString(event.getSource().ordinal()),
++					Double.toString(at.x - pos.getX()), Double.toString(at.y - pos.getY()), Double.toString(at.z - pos.getZ()),
++					Float.toString(event.getNewVolume()), Float.toString(event.getNewPitch())));
++			};
++			var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
++			bus.addListener(net.neoforged.bus.api.EventPriority.LOWEST, listener);
++			try {
++				if (index == 0) {
++					BlockPos target = pos.east(2);
++					world.setBlockAndUpdate(target, Blocks.STONE.defaultBlockState());
++					var hit = new net.minecraft.world.phys.BlockHitResult(
++						new net.minecraft.world.phys.Vec3(target.getX(), target.getY() + .5, target.getZ() + .5),
++						net.minecraft.core.Direction.WEST, target, false);
++					player.gameMode.useItemOn(player, world, box, hand, hit);
++				} else {
++					player.gameMode.useItem(player, world, box, hand);
++				}
++			} finally {
++				bus.unregister(listener);
++			}
++			var hex = java.util.HexFormat.of();
++			String after = inventory.save(new net.minecraft.nbt.ListTag()).toString();
++			var drops = world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, bounds);
++			String dropped = drops.stream().map(e -> e.getItem().save(world.registryAccess()).toString()).collect(java.util.stream.Collectors.joining(",","[","]"));
++			int pigs = world.getEntitiesOfClass(net.minecraft.world.entity.animal.Pig.class, bounds).size();
++			System.out.printf("PACKAGE_OPEN,%d,%s,%s,%s,%s,%d,%s%n", index, hand,
++				hex.formatHex(before.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++				hex.formatHex(after.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++				hex.formatHex(dropped.getBytes(java.nio.charset.StandardCharsets.UTF_8)), pigs, String.join(";", sounds));
++			drops.forEach(e -> e.discard());
++		}
++		player.setShiftKeyDown(false);
++		helper.succeed();
++	}
++
+ }

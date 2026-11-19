@@ -1,0 +1,97 @@
+diff --git a/src/main/java/com/simibubi/create/content/contraptions/minecart/CouplingPhysics.java b/src/main/java/com/simibubi/create/content/contraptions/minecart/CouplingPhysics.java
+index ab8552c..ba11055 100644
+--- a/src/main/java/com/simibubi/create/content/contraptions/minecart/CouplingPhysics.java
++++ b/src/main/java/com/simibubi/create/content/contraptions/minecart/CouplingPhysics.java
+@@ -34,10 +34,19 @@ public class CouplingPhysics {
+ 
+ 		float couplingLength = c.getFirst()
+ 			.getCouplingLength(true);
++		traceTwoCurves(world, carts, "pre");
+ 		softCollisionStep(world, carts, couplingLength);
++		traceTwoCurves(world, carts, "soft");
+ 		if (world.isClientSide)
+ 			return;
+ 		hardCollisionStep(world, carts, couplingLength);
++		traceTwoCurves(world, carts, "hard");
++	}
++
++	private static void traceTwoCurves(Level world, Couple<AbstractMinecart> carts, String phase) {
++		if (world.isClientSide || carts.getFirst().getUUID().getMostSignificantBits() != 0 || carts.getFirst().getUUID().getLeastSignificantBits() != 1) return;
++		AbstractMinecart a = carts.getFirst(), b = carts.getSecond();
++		System.out.printf(java.util.Locale.ROOT, "TWO_CURVE_PHASE %d %s %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f%n", world.getGameTime(), phase, a.getX(), a.getZ(), a.getDeltaMovement().x, a.getDeltaMovement().z, b.getX(), b.getZ(), b.getDeltaMovement().x, b.getDeltaMovement().z);
+ 	}
+ 
+ 	public static void hardCollisionStep(Level world, Couple<AbstractMinecart> carts, double couplingLength) {
+@@ -81,6 +90,7 @@ public class CouplingPhysics {
+ 
+ 			float maxResolveSpeed = 1.75f;
+ 			correction = VecHelper.clamp(correction, Math.min(maxResolveSpeed, maxSpeed.get(current)));
++			if (cart.getUUID().getMostSignificantBits() == 0 && cart.getUUID().getLeastSignificantBits() <= 2) System.out.printf(java.util.Locale.ROOT, "TWO_CURVE_HARD %d cart=%d stress=%.9f railPos=%s state=%s shape=%s correction=(%.9f,%.9f,%.9f)%n", world.getGameTime(), cart.getUUID().getLeastSignificantBits(), stress, railPosition, railState, shape, correction.x, correction.y, correction.z);
+ 
+ 			if (corrections.get(current) == null)
+ 				corrections.set(current, correction);
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..2d04283 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.couplingProbe"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..3668b3c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,44 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
+-}
++ @GameTest(template = "threshold_switch_pulley", timeoutTicks = 220)
++ public static void couplingProbe(CreateGameTestHelper helper) {
++  var world=helper.getLevel();
++  for (int cx=0;cx<=2;cx++) for (int cz=0;cz<=2;cz++) world.setChunkForced(cx,cz,true);
++  world.getEntitiesOfClass(net.minecraft.world.entity.vehicle.AbstractMinecart.class,new net.minecraft.world.phys.AABB(0,160,0,45,180,45)).forEach(cart -> cart.discard());
++  for (int x=4;x<=16;x++) for (int z=20;z<=40;z++) {
++   for (int y=170;y<=173;y++) world.setBlock(new BlockPos(x,y,z),Blocks.AIR.defaultBlockState(),2);
++   world.setBlock(new BlockPos(x,169,z),Blocks.STONE.defaultBlockState(),2);
++  }
++  var shape=net.minecraft.world.level.block.state.properties.BlockStateProperties.RAIL_SHAPE;
++  for (int z : new int[]{24,32}) {
++   for (int x=9;x<=11;x++) world.setBlock(new BlockPos(x,170,z),Blocks.RAIL.defaultBlockState().setValue(shape,net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST),2);
++   for (int x : new int[]{8,12}) for (int q=z+1;q<=z+5;q++) world.setBlock(new BlockPos(x,170,q),Blocks.RAIL.defaultBlockState().setValue(shape,net.minecraft.world.level.block.state.properties.RailShape.NORTH_SOUTH),2);
++   world.setBlock(new BlockPos(8,170,z),Blocks.RAIL.defaultBlockState().setValue(shape,net.minecraft.world.level.block.state.properties.RailShape.SOUTH_EAST),2);
++   world.setBlock(new BlockPos(12,170,z),Blocks.RAIL.defaultBlockState().setValue(shape,net.minecraft.world.level.block.state.properties.RailShape.SOUTH_WEST),2);
++  }
++  var a=new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART,world);
++  var b=new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART,world);
++  var base=new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART,world);
++  a.setUUID(new java.util.UUID(0,1)); b.setUUID(new java.util.UUID(0,2)); base.setUUID(new java.util.UUID(0,3));
++  a.setPos(8.95,170.0625,24.55); b.setPos(12.05,170.0625,24.55); base.setPos(8.95,170.0625,32.55);
++  world.addFreshEntity(a);world.addFreshEntity(b);world.addFreshEntity(base);
++  var player=helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++  player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,com.simibubi.create.AllItems.MINECART_COUPLING.asStack(2));
++  helper.runAtTickTime(60,()->{
++   for (int z : new int[]{24,32}) {
++    helper.assertTrue(world.getBlockState(new BlockPos(8,170,z)).getValue(shape)==net.minecraft.world.level.block.state.properties.RailShape.SOUTH_EAST,"wrong left curve");
++    helper.assertTrue(world.getBlockState(new BlockPos(12,170,z)).getValue(shape)==net.minecraft.world.level.block.state.properties.RailShape.SOUTH_WEST,"wrong right curve");
++   }
++   a.setPos(8.95,170.0625,24.55); b.setPos(12.05,170.0625,24.55); base.setPos(8.95,170.0625,32.55);
++   a.setDeltaMovement(0,0,0); b.setDeltaMovement(0,0,0); base.setDeltaMovement(0,0,0);
++   helper.assertTrue(com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player,world,a.getId(),b.getId()),"curve pair failed");
++   a.setDeltaMovement(-0.03,0,0.03);b.setDeltaMovement(0.03,0,0.03);base.setDeltaMovement(-0.03,0,0.03);
++   System.out.printf(java.util.Locale.ROOT,"COUPLING_TWO_CURVES 0,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",a.getX(),a.getZ(),a.getDeltaMovement().x,a.getDeltaMovement().z,b.getX(),b.getZ(),b.getDeltaMovement().x,b.getDeltaMovement().z,base.getX(),base.getZ(),base.getDeltaMovement().x,base.getDeltaMovement().z);
++  });
++  for(int t=61;t<=140;t++){final int tick=t;helper.runAtTickTime(t,()->{
++   System.out.printf(java.util.Locale.ROOT,"COUPLING_TWO_CURVES %d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",tick-60,a.getX(),a.getZ(),a.getDeltaMovement().x,a.getDeltaMovement().z,b.getX(),b.getZ(),b.getDeltaMovement().x,b.getDeltaMovement().z,base.getX(),base.getZ(),base.getDeltaMovement().x,base.getDeltaMovement().z);
++   if(tick==140)helper.succeed();
++  });}
++ }
++}
+\ No newline at end of file

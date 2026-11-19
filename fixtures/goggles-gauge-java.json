@@ -1,0 +1,1529 @@
+{
+  "cases": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      8,
+      256,
+      0
+    ],
+    [
+      -32.25,
+      256,
+      128
+    ],
+    [
+      64,
+      256,
+      152
+    ],
+    [
+      100,
+      256,
+      192
+    ],
+    [
+      112,
+      256,
+      240
+    ],
+    [
+      256,
+      256,
+      288
+    ],
+    [
+      32,
+      1048576,
+      512.75
+    ],
+    [
+      1.024,
+      1048576,
+      0
+    ],
+    [
+      1.005,
+      1048576,
+      0
+    ]
+  ],
+  "readouts": [
+    {
+      "case": 0,
+      "gauge": "speed",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 0,
+      "gauge": "speed",
+      "line": 1,
+      "text": "    Rotation Speed",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.speedometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 0,
+      "gauge": "speed",
+      "line": 2,
+      "text": "     ▒▒▒ None (0 RPM) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ▒▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.speedRequirement.none"
+              },
+              " ",
+              "(",
+              "0",
+              " ",
+              {
+                "translate": "create.generic.unit.rpm"
+              },
+              ")",
+              " "
+            ],
+            "color": "dark_gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 0,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 0,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 0,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     ▒▒▒ No Rotation",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ▒▒▒ ",
+            "extra": [
+              {
+                "translate": "create.gui.stressometer.no_rotation"
+              }
+            ],
+            "color": "dark_gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "speed",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "speed",
+      "line": 1,
+      "text": "    Rotation Speed",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.speedometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "speed",
+      "line": 2,
+      "text": "     █▒▒ Slow (8 RPM) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " █▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.speedRequirement.slow"
+              },
+              " ",
+              "(",
+              "8",
+              " ",
+              {
+                "translate": "create.generic.unit.rpm"
+              },
+              ")",
+              " "
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     █▒▒ Low (0%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " █▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.low"
+              },
+              " (0%) "
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     256su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "256",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              }
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "speed",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "speed",
+      "line": 1,
+      "text": "    Rotation Speed",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.speedometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "speed",
+      "line": 2,
+      "text": "     ██▒ Moderate (32.25 RPM) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ██▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.speedRequirement.medium"
+              },
+              " ",
+              "(",
+              "32.25",
+              " ",
+              {
+                "translate": "create.generic.unit.rpm"
+              },
+              ")",
+              " "
+            ],
+            "color": "aqua"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     █▒▒ Low (50%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " █▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.low"
+              },
+              " (50%) "
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     128su / 256su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "128",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              },
+              {
+                "text": " / ",
+                "color": "gray"
+              },
+              {
+                "text": "256",
+                "extra": [
+                  {
+                    "translate": "create.generic.unit.stress"
+                  }
+                ],
+                "color": "dark_gray"
+              }
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "speed",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "speed",
+      "line": 1,
+      "text": "    Rotation Speed",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.speedometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "speed",
+      "line": 2,
+      "text": "     ██▒ Moderate (64 RPM) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ██▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.speedRequirement.medium"
+              },
+              " ",
+              "(",
+              "64",
+              " ",
+              {
+                "translate": "create.generic.unit.rpm"
+              },
+              ")",
+              " "
+            ],
+            "color": "aqua"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     ██▒ Moderate (59%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ██▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.medium"
+              },
+              " (59%) "
+            ],
+            "color": "yellow"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     104su / 256su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "104",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              },
+              {
+                "text": " / ",
+                "color": "gray"
+              },
+              {
+                "text": "256",
+                "extra": [
+                  {
+                    "translate": "create.generic.unit.stress"
+                  }
+                ],
+                "color": "dark_gray"
+              }
+            ],
+            "color": "yellow"
+          }
+        ]
+      }
+    },
+    {
+      "case": 4,
+      "gauge": "speed",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 4,
+      "gauge": "speed",
+      "line": 1,
+      "text": "    Rotation Speed",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.speedometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 4,
+      "gauge": "speed",
+      "line": 2,
+      "text": "     ███ Fast (100 RPM) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ███ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.speedRequirement.fast"
+              },
+              " ",
+              "(",
+              "100",
+              " ",
+              {
+                "translate": "create.generic.unit.rpm"
+              },
+              ")",
+              " "
+            ],
+            "color": "light_purple"
+          }
+        ]
+      }
+    },
+    {
+      "case": 4,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 4,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 4,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     ██▒ Moderate (75%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ██▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.medium"
+              },
+              " (75%) "
+            ],
+            "color": "yellow"
+          }
+        ]
+      }
+    },
+    {
+      "case": 4,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 4,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     64su / 256su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "64",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              },
+              {
+                "text": " / ",
+                "color": "gray"
+              },
+              {
+                "text": "256",
+                "extra": [
+                  {
+                    "translate": "create.generic.unit.stress"
+                  }
+                ],
+                "color": "dark_gray"
+              }
+            ],
+            "color": "yellow"
+          }
+        ]
+      }
+    },
+    {
+      "case": 5,
+      "gauge": "speed",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 5,
+      "gauge": "speed",
+      "line": 1,
+      "text": "    Rotation Speed",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.speedometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 5,
+      "gauge": "speed",
+      "line": 2,
+      "text": "     ███ Fast (112 RPM) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ███ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.speedRequirement.fast"
+              },
+              " ",
+              "(",
+              "112",
+              " ",
+              {
+                "translate": "create.generic.unit.rpm"
+              },
+              ")",
+              " "
+            ],
+            "color": "light_purple"
+          }
+        ]
+      }
+    },
+    {
+      "case": 5,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 5,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 5,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     ███ High (93%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ███ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.high"
+              },
+              " (93%) "
+            ],
+            "color": "gold"
+          }
+        ]
+      }
+    },
+    {
+      "case": 5,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 5,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     16su / 256su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "16",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              },
+              {
+                "text": " / ",
+                "color": "gray"
+              },
+              {
+                "text": "256",
+                "extra": [
+                  {
+                    "translate": "create.generic.unit.stress"
+                  }
+                ],
+                "color": "dark_gray"
+              }
+            ],
+            "color": "gold"
+          }
+        ]
+      }
+    },
+    {
+      "case": 6,
+      "gauge": "speed",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 6,
+      "gauge": "speed",
+      "line": 1,
+      "text": "    Rotation Speed",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.speedometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 6,
+      "gauge": "speed",
+      "line": 2,
+      "text": "     ███ Fast (256 RPM) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ███ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.speedRequirement.fast"
+              },
+              " ",
+              "(",
+              "256",
+              " ",
+              {
+                "translate": "create.generic.unit.rpm"
+              },
+              ")",
+              " "
+            ],
+            "strikethrough": true,
+            "color": "dark_gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 6,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 6,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 6,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     ███ Overstressed (112%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ███ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.overstressed"
+              },
+              " (112%) "
+            ],
+            "color": "red"
+          }
+        ]
+      }
+    },
+    {
+      "case": 6,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 6,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     -32su / 256su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "-32",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              },
+              {
+                "text": " / ",
+                "color": "gray"
+              },
+              {
+                "text": "256",
+                "extra": [
+                  {
+                    "translate": "create.generic.unit.stress"
+                  }
+                ],
+                "color": "dark_gray"
+              }
+            ],
+            "color": "red"
+          }
+        ]
+      }
+    },
+    {
+      "case": 7,
+      "gauge": "speed",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 7,
+      "gauge": "speed",
+      "line": 1,
+      "text": "    Rotation Speed",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.speedometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 7,
+      "gauge": "speed",
+      "line": 2,
+      "text": "     ██▒ Moderate (32 RPM) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ██▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.speedRequirement.medium"
+              },
+              " ",
+              "(",
+              "32",
+              " ",
+              {
+                "translate": "create.generic.unit.rpm"
+              },
+              ")",
+              " "
+            ],
+            "color": "aqua"
+          }
+        ]
+      }
+    },
+    {
+      "case": 7,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 7,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 7,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     █▒▒ Low (0%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " █▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.low"
+              },
+              " (0%) "
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 7,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 7,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     1,048,063.25su / 1,048,576su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "1,048,063.25",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              },
+              {
+                "text": " / ",
+                "color": "gray"
+              },
+              {
+                "text": "1,048,576",
+                "extra": [
+                  {
+                    "translate": "create.generic.unit.stress"
+                  }
+                ],
+                "color": "dark_gray"
+              }
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 8,
+      "gauge": "speed",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 8,
+      "gauge": "speed",
+      "line": 1,
+      "text": "    Rotation Speed",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.speedometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 8,
+      "gauge": "speed",
+      "line": 2,
+      "text": "     █▒▒ Slow (1.02 RPM) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " █▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.speedRequirement.slow"
+              },
+              " ",
+              "(",
+              "1.02",
+              " ",
+              {
+                "translate": "create.generic.unit.rpm"
+              },
+              ")",
+              " "
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 8,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 8,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 8,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     █▒▒ Low (0%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " █▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.low"
+              },
+              " (0%) "
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 8,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 8,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     1,048,576su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "1,048,576",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              }
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 9,
+      "gauge": "speed",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 9,
+      "gauge": "speed",
+      "line": 1,
+      "text": "    Rotation Speed",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.speedometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 9,
+      "gauge": "speed",
+      "line": 2,
+      "text": "     █▒▒ Slow (1 RPM) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " █▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.speedRequirement.slow"
+              },
+              " ",
+              "(",
+              "1",
+              " ",
+              {
+                "translate": "create.generic.unit.rpm"
+              },
+              ")",
+              " "
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 9,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 9,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 9,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     █▒▒ Low (0%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " █▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.low"
+              },
+              " (0%) "
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 9,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 9,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     1,048,576su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "1,048,576",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              }
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    }
+  ]
+}

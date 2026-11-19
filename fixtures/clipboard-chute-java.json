@@ -1,0 +1,39 @@
+{
+  "copy": {
+    "plain": {
+      "canceled": true,
+      "stack": "{components:{\"create:clipboard_content\":{copied_values:{Filtering:{Filter:{count:1,id:\"minecraft:quartz\"},Row:1,Value:7}},pages:[],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+    },
+    "filter": {
+      "canceled": true,
+      "stack": "{components:{\"create:clipboard_content\":{copied_values:{Filtering:{Filter:{count:1,id:\"create:filter\"},Row:0,Value:4}},pages:[],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+    },
+    "hidden_amount": {
+      "canceled": true,
+      "stack": "{components:{\"create:clipboard_content\":{copied_values:{Filtering:{Filter:{count:1,id:\"minecraft:quartz\"}}},pages:[],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+    }
+  },
+  "paste": {
+    "plain": {
+      "canceled": true,
+      "stack": "{count:1,id:\"minecraft:quartz\"}",
+      "count": 7,
+      "up_to": false,
+      "supply": 0
+    },
+    "missing": {
+      "canceled": true,
+      "stack": "{count:1,id:\"minecraft:quartz\"}",
+      "count": 4,
+      "up_to": true,
+      "supply": 0
+    },
+    "supplied": {
+      "canceled": true,
+      "stack": "{count:1,id:\"create:filter\"}",
+      "count": 4,
+      "up_to": true,
+      "supply": 0
+    }
+  }
+}

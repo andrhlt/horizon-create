@@ -1,0 +1,13 @@
+recipe,width,height,slots,output,count,remainder
+crafting/appliances/book,2,2,"create:cardboard,minecraft:paper,minecraft:paper,minecraft:paper",minecraft:book,1,
+crafting/appliances/clipboard_clear,1,1,create:clipboard,create:clipboard,1,
+crafting/appliances/item_frame,3,3,"minecraft:stick,minecraft:stick,minecraft:stick,minecraft:stick,create:cardboard,minecraft:stick,minecraft:stick,minecraft:stick,minecraft:stick",minecraft:item_frame,1,
+crafting/appliances/name_tag,3,1,"minecraft:black_dye,minecraft:string,create:cardboard",minecraft:name_tag,1,
+crafting/appliances/slime_ball,2,1,"create:dough,minecraft:lime_dye",minecraft:slime_ball,1,
+crafting/curiosities/cake,3,3,"_,minecraft:milk_bucket,_,minecraft:sugar,minecraft:egg,minecraft:sugar,_,create:dough,_",minecraft:cake,1,minecraft:bucket:1
+crafting/kinetics/fluid_tank,1,3,"create:copper_sheet,minecraft:barrel,create:copper_sheet",create:fluid_tank,1,
+crafting/kinetics/item_vault,1,3,"create:iron_sheet,minecraft:barrel,create:iron_sheet",create:item_vault,1,
+crafting/kinetics/steam_engine,1,3,"create:golden_sheet,create:andesite_alloy,minecraft:copper_block",create:steam_engine,1,
+crafting/materials/brass_ingot_from_decompacting,1,1,create:brass_block,create:brass_ingot,9,
+crafting/materials/cardboard_from_bound_block,1,1,create:bound_cardboard_block,create:cardboard,4,
+crafting/palettes/scorchia,3,3,"create:scoria,create:scoria,create:scoria,create:scoria,minecraft:black_dye,create:scoria,create:scoria,create:scoria,create:scoria",create:scorchia,8,

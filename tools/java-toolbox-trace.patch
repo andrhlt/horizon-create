@@ -1,0 +1,402 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -5,7 +5,7 @@
+ import com.simibubi.create.infrastructure.gametest.tests.TestContraptions;
+ import com.simibubi.create.infrastructure.gametest.tests.TestFluids;
+ import com.simibubi.create.infrastructure.gametest.tests.TestItems;
+-import com.simibubi.create.infrastructure.gametest.tests.TestMisc;
++import com.simibubi.create.infrastructure.gametest.tests.TestToolboxes;
+ import com.simibubi.create.infrastructure.gametest.tests.TestProcessing;
+ import com.simibubi.create.infrastructure.gametest.tests.TestRegressions;
+ 
+@@ -22,7 +22,7 @@
+ 			TestContraptions.class,
+ 			TestFluids.class,
+ 			TestItems.class,
+-			TestMisc.class,
++			TestToolboxes.class,
+ 			TestProcessing.class,
+ 			TestRegressions.class
+ 	};
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestToolboxes."))
++			.toList();
+ 	}
+ }
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestToolboxes.java
+@@ -0,0 +1,353 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import java.util.List;
++import java.util.Locale;
++import java.util.UUID;
++import java.util.stream.Collectors;
++import java.util.stream.IntStream;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.equipment.toolbox.ToolboxBlockEntity;
++import com.simibubi.create.content.equipment.toolbox.ToolboxInventory;
++import com.simibubi.create.content.equipment.toolbox.ToolboxMenu;
++import com.simibubi.create.foundation.blockEntity.behaviour.animatedContainer.AnimatedContainerBehaviour;
++import com.simibubi.create.foundation.item.ItemHelper;
++import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
++import com.simibubi.create.infrastructure.gametest.GameTestGroup;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.core.component.DataComponents;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.gametest.framework.GameTest;
++import net.minecraft.network.chat.Component;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.item.DyeColor;
++import net.minecraft.world.item.DyeItem;
++import net.minecraft.world.item.ItemStack;
++import net.minecraft.world.item.Items;
++import net.minecraft.world.item.context.BlockPlaceContext;
++import net.minecraft.world.item.context.UseOnContext;
++import net.minecraft.world.item.crafting.CraftingInput;
++import net.minecraft.world.item.crafting.RecipeType;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++import net.minecraft.world.phys.BlockHitResult;
++import net.minecraft.world.phys.Vec3;
++import net.neoforged.neoforge.common.util.FakePlayerFactory;
++
++@GameTestGroup(path = "misc")
++public class TestToolboxes {
++	@GameTest(template = "shearing")
++	public static void toolboxAnimation(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(1, 16, 1));
++		var brown = AllBlocks.TOOLBOXES.get(DyeColor.BROWN).get();
++		level.setBlockAndUpdate(pos, brown.defaultBlockState());
++		var box = (ToolboxBlockEntity) level.getBlockEntity(pos);
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var guest = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var tracker = box.getBehaviour(AnimatedContainerBehaviour.TYPE);
++		box.tick();
++		ToolboxMenu hostMenu = null;
++		ToolboxMenu guestMenu = null;
++		for (int tick = 0; tick <= 18; tick++) {
++			if (tick == 1 || tick == 11) {
++				hostMenu = ToolboxMenu.create(40, player.getInventory(), box);
++				player.containerMenu = hostMenu;
++			}
++			if (tick == 2) {
++				guestMenu = ToolboxMenu.create(41, guest.getInventory(), box);
++				guest.containerMenu = guestMenu;
++			}
++			if (tick == 8 || tick == 12) {
++				hostMenu.removed(player);
++				player.containerMenu = player.inventoryMenu;
++			}
++			if (tick == 6) {
++				guestMenu.removed(guest);
++				guest.containerMenu = guest.inventoryMenu;
++			}
++			int viewers = tracker.openCount;
++			box.tick();
++			System.out.printf(Locale.ROOT, "CREATE_TOOLBOX_ANIMATION %d,%d,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",
++				tick, viewers, tracker.openCount, box.lid.getValue(0), box.lid.getValue(.5f), box.lid.getValue(1),
++				box.drawers.getValue(0), box.drawers.getValue(.5f), box.drawers.getValue(1));
++		}
++		helper.succeed();
++	}
++
++	@GameTest(template = "shearing")
++	public static void toolboxReference(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(1, 16, 1));
++		var brown = AllBlocks.TOOLBOXES.get(DyeColor.BROWN).get();
++		var player = FakePlayerFactory.getMinecraft(level);
++		var hand = InteractionHand.MAIN_HAND;
++		var facing = BlockStateProperties.HORIZONTAL_FACING;
++		var wet = BlockStateProperties.WATERLOGGED;
++		var hit = new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false);
++		level.setBlockAndUpdate(pos.below(), Blocks.STONE.defaultBlockState());
++		for (var color : DyeColor.values()) {
++			var block = AllBlocks.TOOLBOXES.get(color).get();
++			var state = block.defaultBlockState();
++			System.out.printf(Locale.ROOT, "CREATE_TOOLBOX_DEFAULT %s,%s,%s,%s,%d,%.2f,%.2f,%d,%s%n",
++				color.getName(), BuiltInRegistries.BLOCK.getKey(block), state.getValue(facing).getSerializedName(),
++				state.getValue(wet), state.getMapColor(level, pos).id, state.getDestroySpeed(level, pos),
++				block.getExplosionResistance(), new ItemStack(block).getMaxStackSize(),
++				block.asItem().canFitInsideContainerItems());
++		}
++		for (int yaw : new int[] {0, 90, 180, 270}) {
++			player.setYRot(yaw);
++			for (boolean water : new boolean[] {false, true}) {
++				level.setBlockAndUpdate(pos, (water ? Blocks.WATER : Blocks.AIR).defaultBlockState());
++				player.setItemInHand(hand, new ItemStack(brown));
++				var state = brown.getStateForPlacement(new BlockPlaceContext(new UseOnContext(player, hand, hit)));
++				var box = state.getShape(level, pos).bounds();
++				System.out.printf(Locale.ROOT, "CREATE_TOOLBOX_PLACE %d,%s,%s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f%n",
++					yaw, water, state.getValue(facing).getSerializedName(), state.getValue(wet), box.minX, box.minY,
++					box.minZ, box.maxX, box.maxY, box.maxZ);
++			}
++		}
++		var state = brown.defaultBlockState().setValue(facing, Direction.EAST).setValue(wet, true);
++		level.setBlockAndUpdate(pos, state);
++		var entity = (ToolboxBlockEntity) level.getBlockEntity(pos);
++		var uuid = UUID.fromString("02000000-1640-4700-a000-000000000087");
++		entity.setUniqueId(uuid);
++		entity.setCustomName(Component.literal("Fixture Toolbox"));
++		var storage = new ToolboxInventory(null);
++		storage.setStackInSlot(0, new ItemStack(Items.COBBLESTONE, 16));
++		entity.readInventory(storage);
++		for (var color : DyeColor.values()) {
++			var dye = DyeItem.byColor(color);
++			var stack = new ItemStack(dye, 3);
++			player.setItemInHand(hand, stack);
++			level.getBlockState(pos).useItemOn(stack, level, player, hand, hit);
++			var changed = level.getBlockState(pos);
++			var current = (ToolboxBlockEntity) level.getBlockEntity(pos);
++			var clone = changed.getBlock().getCloneItemStack(level, pos, changed);
++			System.out.printf("CREATE_TOOLBOX_BLOCK_DYE %s,%s,%s,%s,%d,%s,%s,%d%n", color.getName(),
++				BuiltInRegistries.BLOCK.getKey(changed.getBlock()), changed.getValue(facing).getSerializedName(),
++				changed.getValue(wet), stack.getCount(), current == entity, uuid.equals(current.getUniqueId()),
++				clone.get(AllDataComponents.TOOLBOX_INVENTORY).getStackInSlot(0).getCount());
++		}
++		var picker = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var beforeAttack = level.getBlockState(pos);
++		beforeAttack.attack(level, pos, picker);
++		var carried = picker.getInventory().getItem(0);
++		var carriedStorage = carried.get(AllDataComponents.TOOLBOX_INVENTORY);
++		var discharged = level.getBlockState(pos);
++		level.setBlockAndUpdate(pos, beforeAttack);
++		level.getBlockState(pos).getBlock().setPlacedBy(level, pos, beforeAttack, picker, carried);
++		var replaced = (ToolboxBlockEntity) level.getBlockEntity(pos);
++		var restored = beforeAttack.getBlock().getCloneItemStack(level, pos, beforeAttack);
++		var restoredStorage = restored.get(AllDataComponents.TOOLBOX_INVENTORY);
++		System.out.printf("CREATE_TOOLBOX_PORTABLE %s,%s,%d,%d,%d,%s,%s,%d,%s,%s%n",
++			BuiltInRegistries.BLOCK.getKey(discharged.getBlock()), BuiltInRegistries.ITEM.getKey(carried.getItem()),
++			carried.getCount(), carriedStorage.getSlots(), carriedStorage.getStackInSlot(0).getCount(),
++			uuid.equals(carried.get(AllDataComponents.TOOLBOX_UUID)), carried.getHoverName().getString().equals("Fixture Toolbox"),
++			restoredStorage.getStackInSlot(0).getCount(), uuid.equals(replaced.getUniqueId()),
++			restored.getHoverName().getString().equals("Fixture Toolbox"));
++		replaced.readInventory(new ToolboxInventory(null));
++		picker.getInventory().clearContent();
++		var menu = ToolboxMenu.create(41, picker.getInventory(), replaced);
++		var click = net.minecraft.world.inventory.ClickType.PICKUP;
++		long menuTick = level.getGameTime();
++		for (int slot : new int[] {0, 1, 4, 8, 12, 16, 20, 24, 28}) {
++			var inMenu = menu.getSlot(slot);
++			System.out.printf("CREATE_TOOLBOX_MENU_LAYOUT %d,%d,%d,%s%n", slot, inMenu.x, inMenu.y, inMenu.isActive());
++		}
++		printMenu("initial", menu, level.getGameTime() - menuTick);
++		menu.setCarried(new ItemStack(Items.COBBLESTONE, 64));
++		menu.clicked(0, 0, click, picker);
++		printMenu("insert_first", menu, level.getGameTime() - menuTick);
++		menu.setCarried(new ItemStack(Items.COBBLESTONE, 51));
++		menu.clicked(0, 0, click, picker);
++		printMenu("append", menu, level.getGameTime() - menuTick);
++		menu.setCarried(new ItemStack(Items.STONE, 15));
++		menu.clicked(0, 0, click, picker);
++		printMenu("wrong_item", menu, level.getGameTime() - menuTick);
++		menu.setCarried(ItemStack.EMPTY);
++		menu.clicked(0, 1, click, picker);
++		printMenu("half_pickup", menu, level.getGameTime() - menuTick);
++		menu.setCarried(ItemStack.EMPTY);
++		menu.clicked(0, 0, click, picker);
++		printMenu("pickup", menu, level.getGameTime() - menuTick);
++		menu.setCarried(ItemStack.EMPTY);
++		menu.clicked(0, 0, click, picker);
++		printMenu("deplete", menu, level.getGameTime() - menuTick);
++		menu.setCarried(ItemStack.EMPTY);
++		menu.clicked(0, 0, click, picker);
++		printMenu("clear_filter", menu, level.getGameTime() - menuTick);
++		menu.setCarried(new ItemStack(Items.DIRT, 7));
++		menu.clicked(0, 1, click, picker);
++		printMenu("insert_one", menu, level.getGameTime() - menuTick);
++		menu.setCarried(ItemStack.EMPTY);
++		picker.getInventory().setItem(0, new ItemStack(Items.STONE, 19));
++		menu.clicked(59, 0, net.minecraft.world.inventory.ClickType.QUICK_MOVE, picker);
++		printMenu("quick_move_in", menu, level.getGameTime() - menuTick);
++		menu.clicked(4, 0, net.minecraft.world.inventory.ClickType.QUICK_MOVE, picker);
++		printMenu("quick_move_out", menu, level.getGameTime() - menuTick);
++		menu.removed(picker);
++		var depositInventory = new ToolboxInventory(null);
++		depositInventory.setStackInSlot(0, new ItemStack(Items.COBBLESTONE, 64));
++		depositInventory.setStackInSlot(4, new ItemStack(Items.DIRT, 1));
++		replaced.readInventory(depositInventory);
++		player.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 2.5);
++		player.getInventory().clearContent();
++		for (int i = 0; i < 3; i++)
++			player.getInventory().setItem(i, new ItemStack(Items.COBBLESTONE, 64));
++		player.getInventory().setItem(3, new ItemStack(Items.COBBLESTONE, 16));
++		player.getInventory().setItem(4, new ItemStack(Items.DIRT, 8));
++		player.getInventory().setItem(5, new ItemStack(Items.STONE, 17));
++		player.getInventory().setItem(6, new ItemStack(brown));
++		var deposit = new com.simibubi.create.content.equipment.toolbox.ToolboxDisposeAllPacket(pos);
++		long depositTick = level.getGameTime();
++		deposit.handle(player);
++		var afterDeposit = beforeAttack.getBlock().getCloneItemStack(level, pos, beforeAttack)
++			.get(AllDataComponents.TOOLBOX_INVENTORY);
++		String heldAfterDeposit = IntStream.range(0, 7)
++			.mapToObj(slot -> describeStack(player.getInventory().getItem(slot))).collect(Collectors.joining("|"));
++		String storedAfterDeposit = IntStream.range(0, 8)
++			.mapToObj(slot -> describeStack(afterDeposit.getStackInSlot(slot))).collect(Collectors.joining("|"));
++		System.out.printf("CREATE_TOOLBOX_DEPOSIT %d,%s,%s%n", level.getGameTime() - depositTick,
++			heldAfterDeposit, storedAfterDeposit);
++		level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++		level.setBlockAndUpdate(pos, beforeAttack);
++		replaced = (ToolboxBlockEntity) level.getBlockEntity(pos);
++		var linkedInventory = new ToolboxInventory(null);
++		linkedInventory.setStackInSlot(0, new ItemStack(Items.COBBLESTONE, 64));
++		linkedInventory.setStackInSlot(1, new ItemStack(Items.COBBLESTONE, 32));
++		replaced.readInventory(linkedInventory);
++		player.getInventory().clearContent();
++		var equip = new com.simibubi.create.content.equipment.toolbox.ToolboxEquipPacket(pos, 0, 0);
++		var unlink = new com.simibubi.create.content.equipment.toolbox.ToolboxEquipPacket(null, 0, 0);
++		equip.handle(player);
++		printLink("equip", 0, player, replaced, beforeAttack);
++		replaced.tick();
++		printLink("initial_restock", 1, player, replaced, beforeAttack);
++		player.getInventory().setItem(0, new ItemStack(Items.COBBLESTONE, 27));
++		replaced.tick();
++		printLink("consumed", 2, player, replaced, beforeAttack);
++		player.getInventory().setItem(0, new ItemStack(Items.COBBLESTONE, 47));
++		replaced.tick();
++		printLink("surplus", 3, player, replaced, beforeAttack);
++		player.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 15.5);
++		player.getInventory().setItem(0, new ItemStack(Items.COBBLESTONE, 20));
++		replaced.tick();
++		printLink("out_of_range", 4, player, replaced, beforeAttack);
++		player.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 2.5);
++		replaced.tick();
++		printLink("back_in_range", 5, player, replaced, beforeAttack);
++		unlink.handle(player);
++		printLink("unequip", 5, player, replaced, beforeAttack);
++		var packed = new ItemStack(brown);
++		packed.set(AllDataComponents.TOOLBOX_UUID, uuid);
++		packed.set(AllDataComponents.TOOLBOX_INVENTORY, storage);
++		packed.set(DataComponents.CUSTOM_NAME, Component.literal("Fixture Toolbox"));
++		for (var color : DyeColor.values()) {
++			var dye = new ItemStack(DyeItem.byColor(color));
++			var input = CraftingInput.of(2, 1, List.of(dye, packed));
++			var recipe = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, input, level).orElseThrow();
++			var result = recipe.value().assemble(input, level.registryAccess());
++			System.out.printf("CREATE_TOOLBOX_CRAFT_DYE %s,%s,%s,%d,%s,%s,%s%n", color.getName(), recipe.id(),
++				BuiltInRegistries.ITEM.getKey(result.getItem()), result.getCount(),
++				uuid.equals(result.get(AllDataComponents.TOOLBOX_UUID)),
++				storage.equals(result.get(AllDataComponents.TOOLBOX_INVENTORY)),
++				result.getHoverName().getString().equals("Fixture Toolbox"));
++		}
++		for (var color : DyeColor.values()) {
++			var packedColor = packed.transmuteCopy(AllBlocks.TOOLBOXES.get(color).get().asItem());
++			var dye = new ItemStack(DyeItem.byColor(color));
++			var input = CraftingInput.of(2, 1, List.of(dye, packedColor));
++			var recipe = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, input, level).orElseThrow();
++			var result = recipe.value().assemble(input, level.registryAccess());
++			System.out.printf("CREATE_TOOLBOX_CRAFT_SAME_DYE %s,%s,%s,%d,%s,%s,%s%n", color.getName(), recipe.id(),
++				BuiltInRegistries.ITEM.getKey(result.getItem()), result.getCount(),
++				uuid.equals(result.get(AllDataComponents.TOOLBOX_UUID)),
++				storage.equals(result.get(AllDataComponents.TOOLBOX_INVENTORY)),
++				result.getHoverName().getString().equals("Fixture Toolbox"));
++		}
++		var packedBlue = packed.transmuteCopy(AllBlocks.TOOLBOXES.get(DyeColor.BLUE).get().asItem());
++		for (var material : List.of(Items.AMETHYST_SHARD, Items.LAPIS_LAZULI, Items.COAL, Items.RED_DYE)) {
++			var tagInput = CraftingInput.of(2, 1, List.of(new ItemStack(material), packedBlue));
++			var tagRecipe = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, tagInput, level).orElseThrow();
++			var tagResult = tagRecipe.value().assemble(tagInput, level.registryAccess());
++			System.out.printf("CREATE_TOOLBOX_CRAFT_TAG_DYE %s,%s,%s,%s,%d,%s,%s,%s%n",
++				BuiltInRegistries.ITEM.getKey(material), BuiltInRegistries.ITEM.getKey(packedBlue.getItem()),
++				tagRecipe.id(), BuiltInRegistries.ITEM.getKey(tagResult.getItem()), tagResult.getCount(),
++				uuid.equals(tagResult.get(AllDataComponents.TOOLBOX_UUID)),
++				storage.equals(tagResult.get(AllDataComponents.TOOLBOX_INVENTORY)),
++				tagResult.getHoverName().getString().equals("Fixture Toolbox"));
++		}
++		var twoBoxes = CraftingInput.of(2, 1, List.of(new ItemStack(brown), packedBlue));
++		var boxedDyeRecipe = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, twoBoxes, level);
++		System.out.printf("CREATE_TOOLBOX_CRAFT_DOUBLE_BOX %s%n", boxedDyeRecipe.isPresent());
++		var empty = ItemStack.EMPTY;
++		var sheet = AllItems.GOLDEN_SHEET.asStack();
++		var craft = CraftingInput.of(3, 3, List.of(empty, AllBlocks.COGWHEEL.asStack(), empty,
++			sheet, new ItemStack(Items.CHEST), sheet.copy(), empty, new ItemStack(Items.LEATHER), empty));
++		var recipe = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, craft, level).orElseThrow();
++		var result = recipe.value().assemble(craft, level.registryAccess());
++		System.out.printf("CREATE_TOOLBOX_CRAFT_BASE %s,%s,%d%n", recipe.id(),
++			BuiltInRegistries.ITEM.getKey(result.getItem()), result.getCount());
++
++		var inventory = new ToolboxInventory(null);
++		printInventory("empty", 0, inventory);
++		var remainder = inventory.insertItem(0, new ItemStack(Items.COBBLESTONE, 64), false);
++		printInventory("insert_first", remainder.getCount(), inventory);
++		remainder = inventory.insertItem(1, new ItemStack(Items.STONE, 15), false);
++		printInventory("reject_wrong_compartment", remainder.getCount(), inventory);
++		remainder = inventory.insertItem(3, new ItemStack(Items.COBBLESTONE, 51), false);
++		printInventory("settle_gap", remainder.getCount(), inventory);
++		var removed = inventory.takeFromCompartment(75, 0, false);
++		printInventory("take_high_slots_first", removed.getCount(), inventory);
++		removed = inventory.takeFromCompartment(40, 0, false);
++		printInventory("depleted", removed.getCount(), inventory);
++		remainder = inventory.insertItem(0, new ItemStack(Items.STONE, 1), false);
++		printInventory("remember_filter", remainder.getCount(), inventory);
++		inventory.inLimitedMode(inv -> printInventory("limited_rejects_empty",
++			inv.insertItem(4, new ItemStack(Items.DIRT, 7), false).getCount(), inv));
++		remainder = inventory.insertItem(4, new ItemStack(Items.DIRT, 7), false);
++		printInventory("new_compartment", remainder.getCount(), inventory);
++		remainder = inventory.insertItem(8, new ItemStack(brown), false);
++		printInventory("reject_toolbox", remainder.getCount(), inventory);
++		helper.succeed();
++	}
++
++	private static String describeStack(ItemStack stack) {
++		return stack.isEmpty() ? "_" : BuiltInRegistries.ITEM.getKey(stack.getItem()) + "=" + stack.getCount();
++	}
++
++	private static void printMenu(String action, ToolboxMenu menu, long tick) {
++		String items = IntStream.range(0, 8).mapToObj(slot -> describeStack(menu.getSlot(slot).getItem()))
++			.collect(Collectors.joining("|"));
++		System.out.printf("CREATE_TOOLBOX_MENU %s,%d,%s,%s,%s,%d,%d,%s%n", action, tick,
++			describeStack(menu.getCarried()), describeStack(menu.getFilter(0)), describeStack(menu.getFilter(1)),
++			menu.totalCountInCompartment(0), menu.totalCountInCompartment(1), items);
++	}
++
++	private static void printLink(String action, int toolboxTick, net.minecraft.server.level.ServerPlayer player,
++			ToolboxBlockEntity entity, net.minecraft.world.level.block.state.BlockState state) {
++		var level = player.serverLevel();
++		var position = entity.getBlockPos();
++		var stack = state.getBlock().getCloneItemStack(level, position, state);
++		var stored = stack.get(AllDataComponents.TOOLBOX_INVENTORY);
++		String slots = IntStream.range(0, 4).mapToObj(slot -> describeStack(stored.getStackInSlot(slot)))
++			.collect(Collectors.joining("|"));
++		boolean linked = player.getPersistentData().getCompound("CreateToolboxData").contains("0");
++		System.out.printf("CREATE_TOOLBOX_LINK %s,%d,%s,%s,%s%n", action, toolboxTick, linked,
++			describeStack(player.getInventory().getItem(0)), slots);
++	}
++
++	private static void printInventory(String action, int movedOrRemainder, ToolboxInventory inventory) {
++		String slots = IntStream.range(0, 8).mapToObj(slot -> {
++			var stack = inventory.getStackInSlot(slot);
++			return stack.isEmpty() ? "_" : BuiltInRegistries.ITEM.getKey(stack.getItem()) + "=" + stack.getCount();
++		}).collect(Collectors.joining("|"));
++		System.out.printf("CREATE_TOOLBOX_STORAGE %s,%d,%d,%d,%s%n", action, movedOrRemainder,
++			inventory.getSlots(), ItemHelper.calcRedstoneFromInventory(inventory), slots);
++	}
++}
+--- /dev/null
++++ b/src/main/resources/data/c/tags/item/dyes.json
+@@ -0,0 +1 @@
++{"values":["minecraft:amethyst_shard","minecraft:lapis_lazuli","minecraft:coal","create:blue_toolbox"]}
+--- /dev/null
++++ b/src/main/resources/data/c/tags/item/dyes/white.json
+@@ -0,0 +1 @@
++{"values":["minecraft:red_dye"]}
+--- /dev/null
++++ b/src/main/resources/data/c/tags/item/dyes/blue.json
+@@ -0,0 +1 @@
++{"values":["minecraft:lapis_lazuli"]}
+--- /dev/null
++++ b/src/main/resources/data/c/tags/item/dyes/black.json
+@@ -0,0 +1 @@
++{"values":["minecraft:coal"]}

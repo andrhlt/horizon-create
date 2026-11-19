@@ -1,0 +1,367 @@
+--- a/crates/horizon-world/src/worldgen.rs
++++ b/crates/horizon-world/src/worldgen.rs
+@@ -55,6 +55,7 @@
+ pub mod material_surface;
+ pub mod native_generate;
+ pub mod ore_feature;
++mod create_layered_ore;
+ pub mod overrides;
+ pub mod placement;
+ pub mod projected;
+--- a/crates/horizon-world/src/worldgen/block_feature.rs
++++ b/crates/horizon-world/src/worldgen/block_feature.rs
+@@ -454,8 +454,16 @@
+     depth: usize,
+     remaining: &mut usize,
+ ) -> Result<BlockReplacements, DecodeError> {
+-    let values: Vec<Box<serde_json::value::RawValue>> =
+-        serde_json::from_str(required(object, "targets")?.get())?;
++    decode_target_list(required(object, "targets")?, bindings, depth, remaining)
++}
++
++pub(crate) fn decode_target_list(
++    targets: &serde_json::value::RawValue,
++    bindings: &FeatureBlockBindings<'_>,
++    depth: usize,
++    remaining: &mut usize,
++) -> Result<BlockReplacements, DecodeError> {
++    let values: Vec<Box<serde_json::value::RawValue>> = serde_json::from_str(targets.get())?;
+     if values.len() > 8192 {
+         return Err(DecodeError::Field("replacement targets"));
+     }
+--- a/crates/horizon-world/src/worldgen/feature_graph.rs
++++ b/crates/horizon-world/src/worldgen/feature_graph.rs
+@@ -67,6 +67,7 @@
+     ReplaceBlock(ReplaceBlockFeature),
+     ScatteredOre(ScatteredOreFeature),
+     Ore(super::ore_feature::OreFeature),
++    CreateLayeredOre(super::create_layered_ore::CreateLayeredOre),
+     Tree(Box<super::tree::TreeFeature>),
+     VegetationPatch(Box<super::vegetation::VegetationPatchFeature>),
+     Coral(Box<super::vegetation::CoralFeature>),
+@@ -568,6 +569,15 @@
+                 remaining,
+             )
+             .map(Self::Ore),
++            "create:layered_ore" => super::create_layered_ore::CreateLayeredOre::decode(
++                json,
++                blocks.ok_or_else(|| {
++                    DecodeError::Registry("feature block bindings unavailable".into())
++                })?,
++                depth,
++                remaining,
++            )
++            .map(Self::CreateLayeredOre),
+             "minecraft:scattered_ore" => ScatteredOreFeature::decode(
+                 json,
+                 blocks.ok_or_else(|| {
+@@ -1024,6 +1034,7 @@
+                 .place(world, random, origin)
+                 .map_err(FeatureExecutionError::Basic),
+             Self::Ore(feature) => feature.place(world, random, origin),
++            Self::CreateLayeredOre(feature) => feature.place(world, random, origin),
+             Self::VegetationPatch(feature) => {
+                 feature.place(world, random, origin, &mut |f, w, r, p| {
+                     f.place_in(&mut placer, w, r, p, run)
+--- /dev/null
++++ b/crates/horizon-world/src/worldgen/create_layered_ore.rs
+@@ -0,0 +1,299 @@
++use super::{
++    DecodeError, Object,
++    block_feature::{BlockReplacements, FeatureBlockBindings, decode_target_list},
++    feature_graph::FeatureExecutionError,
++    int_range, number_text,
++    placement::PlacementContext,
++    required,
++};
++use crate::{heightmap::HeightmapType, registry::BlockStateId};
++use horizon_core::{
++    geometry::{Direction, trig},
++    noise::SimplexNoise,
++    random::{InvalidBound, RandomSource},
++};
++use serde_json::value::RawValue;
++
++#[derive(Clone, Debug)]
++struct Layer {
++    targets: Vec<BlockReplacements>,
++    min_size: f32,
++    max_size: f32,
++    weight: i32,
++}
++
++impl Layer {
++    fn decode(
++        json: &RawValue,
++        bindings: &FeatureBlockBindings<'_>,
++        depth: usize,
++        remaining: &mut usize,
++    ) -> Result<Self, DecodeError> {
++        let body: Object = serde_json::from_str(json.get())?;
++        let min_size = int_range(required(&body, "min_size")?, "layer minimum", 1, i32::MAX)?;
++        let max_size = int_range(
++            required(&body, "max_size")?,
++            "layer maximum",
++            min_size,
++            i32::MAX,
++        )?;
++        let groups: Vec<Box<RawValue>> = serde_json::from_str(required(&body, "targets")?.get())?;
++        if groups.is_empty() || groups.len() > 8192 {
++            return Err(DecodeError::Field("layer target group count"));
++        }
++        Ok(Self {
++            targets: groups
++                .iter()
++                .map(|group| decode_target_list(group, bindings, depth, remaining))
++                .collect::<Result<_, _>>()?,
++            min_size: min_size as f32,
++            max_size: max_size as f32,
++            weight: int_range(required(&body, "weight")?, "layer weight", 0, i32::MAX)?,
++        })
++    }
++}
++
++#[derive(Clone, Debug)]
++pub struct CreateLayeredOre {
++    patterns: Vec<Vec<Layer>>,
++    size: i32,
++    discard: f32,
++    air: [BlockStateId; 3],
++}
++
++impl CreateLayeredOre {
++    pub(crate) fn decode(
++        json: &str,
++        bindings: &FeatureBlockBindings<'_>,
++        depth: usize,
++        remaining: &mut usize,
++    ) -> Result<Self, DecodeError> {
++        let body: Object = serde_json::from_str(json)?;
++        let patterns: Vec<Vec<Box<RawValue>>> =
++            serde_json::from_str(required(&body, "layer_patterns")?.get())?;
++        if patterns.len() > 8192 {
++            return Err(DecodeError::Field("ore pattern count"));
++        }
++        let patterns = patterns
++            .iter()
++            .map(|pattern| {
++                if pattern.len() > 8192 {
++                    return Err(DecodeError::Field("ore layer count"));
++                }
++                let layers = pattern
++                    .iter()
++                    .map(|layer| Layer::decode(layer, bindings, depth, remaining))
++                    .collect::<Result<Vec<_>, _>>()?;
++                if layers
++                    .iter()
++                    .try_fold(0i32, |sum, layer| sum.checked_add(layer.weight))
++                    .is_none()
++                {
++                    return Err(DecodeError::Field("total layer weight"));
++                }
++                Ok(layers)
++            })
++            .collect::<Result<_, _>>()?;
++        let discard: f32 = number_text(required(&body, "discard_chance_on_air_exposure")?)?
++            .parse()
++            .map_err(|_| DecodeError::Field("ore air exposure"))?;
++        if !(0.0..=1.0).contains(&discard) {
++            return Err(DecodeError::Field("ore air exposure"));
++        }
++        Ok(Self {
++            patterns,
++            size: int_range(required(&body, "size")?, "layered ore size", 0, 64)?,
++            discard,
++            air: bindings.air,
++        })
++    }
++
++    pub(crate) fn place<W>(
++        &self,
++        world: &mut W,
++        random: &mut impl RandomSource,
++        origin: [i32; 3],
++    ) -> Result<bool, FeatureExecutionError<<W as super::feature::FeatureWorld>::Error>>
++    where
++        W: super::feature::FeatureWorld + PlacementContext,
++    {
++        let [x0, y0, z0] = origin;
++        if self.patterns.is_empty() {
++            return Ok(false);
++        }
++        let pattern = &self.patterns[random.next_int_bound(self.patterns.len() as i32)? as usize];
++        let floor = world
++            .height(HeightmapType::OceanFloorWg, x0, z0)
++            .map_err(FeatureExecutionError::Query)?;
++        if y0 >= floor {
++            return Ok(false);
++        }
++
++        let size = (self.size + 1) as f32;
++        let radius = self.size as f32 * 0.5;
++        let bound = radius.ceil() as i32 - 1;
++        let resolved = resolve_layers(pattern, size, random)?;
++
++        let gy = f64::from(between(random, -1.0, 1.0)).cbrt() as f32;
++        let xz = (1.0 - gy * gy).sqrt();
++        let theta = random.next_float() * std::f32::consts::TAU;
++        let phase = theta * 10430.378_f32;
++        let sine = trig::sine_table();
++        let gx = sine[((phase + 16384.0) as i32 & 65535) as usize] * xz;
++        let gz = sine[(phase as i32 & 65535) as usize] * xz;
++        // The 1.21 sampler consumes its offsets without adding them in getValue.
++        let layers = SimplexNoise::with_skipped_offsets(random, true);
++        let radial = SimplexNoise::with_skipped_offsets(random, true);
++
++        let mut placed = false;
++        for dz_block in -bound..=bound {
++            let dz = dz_block as f32 * (1.0 / radius);
++            if dz * dz > 1.0 {
++                continue;
++            }
++            for dx_block in -bound..=bound {
++                let dx = dx_block as f32 * (1.0 / radius);
++                if dz * dz + dx * dx > 1.0 {
++                    continue;
++                }
++                for dy_block in -bound..=bound {
++                    let dy = dy_block as f32 * (1.0 / radius);
++                    let distance = dz * dz + dx * dx + dy * dy;
++                    let y = y0.wrapping_add(dy_block);
++                    if distance > 1.0
++                        || world
++                            .outside_build_height(y)
++                            .map_err(FeatureExecutionError::Query)?
++                    {
++                        continue;
++                    }
++                    let p = [x0.wrapping_add(dx_block), y, z0.wrapping_add(dz_block)];
++                    let [x, y, z] = p.map(|value| f64::from(value as f32 * 0.125));
++                    let mut ramp = gx * dx + gy * dy + gz * dz;
++                    ramp = (f64::from(ramp) + layers.get3_f64(x, y, z) * f64::from(1.75 / size))
++                        as f32;
++                    let index = resolved.partition_point(|entry| entry.start <= ramp) - 1;
++                    let layer = &resolved[index];
++                    if distance > layer.radial {
++                        continue;
++                    }
++                    let noise = radial.get3_f64(x, y, z) as f32;
++                    let threshold = 0.75 + (1.0 - 0.75) * ((noise + 1.0) / 2.0);
++                    if distance > layer.radial * threshold {
++                        continue;
++                    }
++                    let targets = &layer.layer.targets;
++                    let targets = if targets.len() == 1 {
++                        &targets[0]
++                    } else {
++                        &targets[random.next_int_bound(targets.len() as i32)? as usize]
++                    };
++                    if !world
++                        .ensure_can_write(p)
++                        .map_err(FeatureExecutionError::Query)?
++                    {
++                        continue;
++                    }
++                    let Some(state) = world
++                        .section_block(p)
++                        .map_err(FeatureExecutionError::Query)?
++                    else {
++                        continue;
++                    };
++                    for (rule, target) in targets {
++                        if !rule.test(state, p, random) {
++                            continue;
++                        }
++                        if self.discard > 0.0
++                            && (self.discard >= 1.0 || random.next_float() < self.discard)
++                        {
++                            let mut exposed = false;
++                            for direction in Direction::ALL {
++                                let n = direction.normal();
++                                let neighbor = std::array::from_fn(|i| p[i].wrapping_add(n[i]));
++                                if world
++                                    .section_block(neighbor)
++                                    .map_err(FeatureExecutionError::Query)?
++                                    .is_none_or(|neighbor| self.air.contains(&neighbor))
++                                {
++                                    exposed = true;
++                                    break;
++                                }
++                            }
++                            if exposed {
++                                continue;
++                            }
++                        }
++                        if self.air.contains(target) {
++                            continue;
++                        }
++                        world
++                            .set_section_block(p, *target)
++                            .map_err(FeatureExecutionError::Query)?;
++                        placed = true;
++                        break;
++                    }
++                }
++            }
++        }
++        Ok(placed)
++    }
++}
++
++struct ResolvedLayer<'a> {
++    layer: &'a Layer,
++    start: f32,
++    radial: f32,
++}
++
++fn between(random: &mut impl RandomSource, min: f32, max: f32) -> f32 {
++    random.next_float() * (max - min) + min
++}
++
++fn resolve_layers<'a>(
++    layers: &'a [Layer],
++    size: f32,
++    random: &mut impl RandomSource,
++) -> Result<Vec<ResolvedLayer<'a>>, InvalidBound> {
++    let mut sampled = Vec::new();
++    let mut total = 0.0;
++    let mut previous = None;
++    while total < size {
++        let eligible = || {
++            layers
++                .iter()
++                .enumerate()
++                .filter(|(i, _)| Some(*i) != previous)
++        };
++        let weight = eligible().map(|(_, layer)| layer.weight).sum();
++        let mut roll = random.next_int_bound(weight)?;
++        let (index, layer) = eligible()
++            .find(|(_, layer)| {
++                roll -= layer.weight;
++                roll < 0
++            })
++            .expect("positive layer weight");
++        previous = Some(index);
++        let thickness = between(random, layer.min_size, layer.max_size);
++        sampled.push((layer, thickness));
++        total += thickness;
++    }
++    let mut position = -(total - size) * random.next_float();
++    let mut resolved = Vec::new();
++    for (layer, thickness) in sampled {
++        let start = if resolved.is_empty() {
++            f32::NEG_INFINITY
++        } else {
++            position * (2.0 / size) - 1.0
++        };
++        position += thickness;
++        if position >= 0.0 {
++            resolved.push(ResolvedLayer {
++                layer,
++                start,
++                radial: between(random, 0.5, 1.0),
++            });
++        }
++    }
++    Ok(resolved)
++}

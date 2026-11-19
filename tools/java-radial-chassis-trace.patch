@@ -1,0 +1,218 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..fcbc5142e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestMisc.radialChassis"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..1f5417cc5 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -29,6 +29,199 @@ import net.minecraft.world.level.block.RedstoneLampBlock;
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 35)
++	public static void radialChassisSpin(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var anchor = new BlockPos(8, 194, 24);
++		var bearing = anchor.below();
++		var motor = bearing.below();
++		var radial = com.simibubi.create.AllBlocks.RADIAL_CHASSIS.get();
++		var axle = net.minecraft.core.Direction.UP;
++		var face = net.minecraft.core.Direction.EAST;
++		var axis = net.minecraft.world.level.block.RotatedPillarBlock.AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		level.setChunkForced(0, 1, true);
++		var root = radial.defaultBlockState().setValue(axis, axle.getAxis());
++		root = root.setValue(radial.getGlueableSide(root, face), true);
++		level.setBlockAndUpdate(anchor, root);
++		level.setBlockAndUpdate(anchor.east(), Blocks.BRICKS.defaultBlockState());
++		level.setBlockAndUpdate(bearing, com.simibubi.create.AllBlocks.MECHANICAL_BEARING.getDefaultState().setValue(facing, axle));
++		level.setBlockAndUpdate(motor, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, axle));
++		var source = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motor);
++		source.generatedSpeed.setValue(0);
++		for (int t = 0; t <= 26; t++) {
++			int tick = t;
++			Runnable measure = () -> {
++				var body = (com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity)
++					level.getBlockEntity(bearing);
++				var rotation = body.saveWithoutMetadata(level.registryAccess()).getFloat("Angle");
++				var adhesive = level.getBlockState(anchor).getValues().entrySet().stream()
++					.filter(e -> e.getKey().getName().startsWith("sticky_") && e.getValue().equals(true))
++					.map(e -> e.getKey().getName()).sorted().toList();
++				var attached = java.util.Arrays.stream(net.minecraft.core.Direction.values())
++					.filter(side -> side.getAxis().isHorizontal())
++					.filter(side -> level.getBlockState(anchor.relative(side)).is(Blocks.BRICKS))
++					.map(net.minecraft.core.Direction::getName).sorted().toList();
++				System.out.printf(java.util.Locale.ROOT, "CREATE_RADIAL_SPIN %d,%.3f,%s,%s,%s%n", tick, rotation,
++					body.isRunning(), String.join("|", adhesive), String.join("|", attached));
++				if (tick == 3)
++					source.generatedSpeed.setValue(16);
++				if (tick == 23)
++					source.generatedSpeed.setValue(0);
++				if (tick == 26)
++					helper.succeed();
++			};
++			if (tick == 0)
++				measure.run();
++			else
++				helper.runAfterDelay(tick, measure);
++		}
++	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 60)
++	public static void radialChassis(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var anchor = new BlockPos(8, 192, 40);
++		var radial = com.simibubi.create.AllBlocks.RADIAL_CHASSIS.get();
++		var bearing = com.simibubi.create.AllBlocks.MECHANICAL_BEARING.get();
++		var motor = com.simibubi.create.AllBlocks.CREATIVE_MOTOR.get();
++		var axis = net.minecraft.world.level.block.RotatedPillarBlock.AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var directions = new net.minecraft.core.Direction[] {
++			net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP, net.minecraft.core.Direction.SOUTH
++		};
++		for (int x = 0; x <= 1; x++)
++			for (int z = 2; z <= 3; z++)
++				level.setChunkForced(x, z, true);
++
++		for (int i = 0; i < 6; i++) {
++			int scenario = i;
++			var axle = directions[scenario % 3];
++			var first = directions[(scenario + 1) % 3];
++			var bend = directions[(scenario + 2) % 3];
++			var bearingPos = anchor.relative(axle.getOpposite());
++			var motorPos = bearingPos.relative(axle.getOpposite());
++			var plain = radial.defaultBlockState().setValue(axis, axle.getAxis());
++			var root = plain.setValue(radial.getGlueableSide(plain, first), scenario % 3 != 0 || scenario == 3);
++			var neighbor = plain.setValue(radial.getGlueableSide(plain, bend.getOpposite()), scenario >= 3);
++			var nextPlane = anchor.relative(axle);
++			var build = new java.util.LinkedHashMap<BlockPos, net.minecraft.world.level.block.state.BlockState>();
++			build.put(anchor, root);
++			build.put(nextPlane, neighbor);
++			build.put(nextPlane.relative(axle), plain.setValue(axis, first.getAxis()));
++			for (int length = 1; length <= 9; length++)
++				build.put(anchor.relative(first, length), Blocks.STONE.defaultBlockState());
++			build.put(anchor.relative(bend), Blocks.BRICKS.defaultBlockState());
++			if (scenario <= 3) {
++				build.put(anchor.relative(first).relative(bend), Blocks.OAK_PLANKS.defaultBlockState());
++				build.put(anchor.relative(bend, 2), Blocks.DIRT.defaultBlockState());
++				build.put(anchor.relative(first, 2).relative(bend, 2), Blocks.COBBLESTONE.defaultBlockState());
++			} else {
++				build.put(anchor.relative(first, 8).relative(bend), Blocks.SMOOTH_STONE.defaultBlockState());
++				build.put(anchor.relative(first, 8).relative(bend, 2), Blocks.BRICKS.defaultBlockState());
++				build.put(anchor.relative(first, 8).relative(bend, 3), Blocks.OAK_PLANKS.defaultBlockState());
++			}
++			build.put(nextPlane.relative(bend.getOpposite()), Blocks.OAK_PLANKS.defaultBlockState());
++			build.put(nextPlane.relative(bend.getOpposite()).relative(first), Blocks.BRICKS.defaultBlockState());
++			build.put(nextPlane.relative(first), Blocks.DIRT.defaultBlockState());
++			helper.runAfterDelay(3 + 7 * i, () -> {
++				build.forEach(level::setBlockAndUpdate);
++				level.setBlockAndUpdate(bearingPos, bearing.defaultBlockState().setValue(facing, axle));
++				level.setBlockAndUpdate(motorPos, motor.defaultBlockState().setValue(facing, axle));
++				var source = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motorPos);
++				source.generatedSpeed.setValue(0);
++			});
++			helper.runAfterDelay(5 + 7 * i, () -> {
++				var state = level.getBlockState(anchor);
++				var other = level.getBlockState(nextPlane);
++				System.out.printf("CREATE_RADIAL_CHASSIS %d,0,%s,%s,%s,-%n", scenario, state.getValue(axis),
++					state.getValue(radial.getGlueableSide(state, first)),
++					other.getValue(radial.getGlueableSide(other, bend.getOpposite())));
++				var source = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motorPos);
++				source.generatedSpeed.setValue(16);
++			});
++			helper.runAfterDelay(6 + 7 * i, () -> {
++				var controller = (com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity)
++					level.getBlockEntity(bearingPos);
++				if (controller.getMovedContraption() == null)
++					throw new IllegalStateException("Assembly failed: " + controller.saveWithoutMetadata(level.registryAccess()));
++				var payload = controller.getMovedContraption().getContraption().getBlocks();
++				var records = payload.entrySet().stream().map(entry -> {
++					var p = entry.getKey();
++					var reg = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++					return p.getX() + ":" + p.getY() + ":" + p.getZ() + "=" + reg.getKey(entry.getValue().state().getBlock());
++				}).sorted().toList();
++				System.out.printf("CREATE_RADIAL_CHASSIS %d,1,-,-,-,%s%n", scenario, String.join("|", records));
++				var source = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motorPos);
++				source.generatedSpeed.setValue(0);
++			});
++			helper.runAfterDelay(7 + 7 * i, () -> {
++				var controller = (com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity)
++					level.getBlockEntity(bearingPos);
++				for (var entry : build.entrySet())
++					if (controller.isRunning() || !level.getBlockState(entry.getKey()).equals(entry.getValue()))
++						throw new IllegalStateException("Assembly did not restore " + entry.getKey() + ": " + level.getBlockState(entry.getKey()));
++				var state = level.getBlockState(anchor);
++				var other = level.getBlockState(nextPlane);
++				System.out.printf("CREATE_RADIAL_CHASSIS %d,2,%s,%s,%s,-%n", scenario, state.getValue(axis),
++					state.getValue(radial.getGlueableSide(state, first)),
++					other.getValue(radial.getGlueableSide(other, bend.getOpposite())));
++				build.keySet().forEach(pos -> level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState()));
++				level.setBlockAndUpdate(bearingPos, Blocks.AIR.defaultBlockState());
++				level.setBlockAndUpdate(motorPos, Blocks.AIR.defaultBlockState());
++			});
++		}
++		helper.runAfterDelay(45, helper::succeed);
++	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 15)
++	public static void radialChassisPlacement(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(3, 12, 3));
++		var radial = com.simibubi.create.AllBlocks.RADIAL_CHASSIS;
++		var linear = com.simibubi.create.AllBlocks.LINEAR_CHASSIS;
++		var axis = net.minecraft.world.level.block.RotatedPillarBlock.AXIS;
++		var directions = new net.minecraft.core.Direction[] {
++			net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP, net.minecraft.core.Direction.SOUTH
++		};
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var glue = new net.minecraft.world.item.ItemStack(Items.SLIME_BALL, 2);
++		for (int test = 0; test < directions.length; test++) {
++			var axle = directions[test];
++			var glueFace = directions[(test + 1) % 3];
++			var support = pos.relative(axle.getOpposite());
++			var faceHit = new net.minecraft.world.phys.BlockHitResult(
++				net.minecraft.world.phys.Vec3.atCenterOf(support), axle, support, false);
++			level.setBlockAndUpdate(support, linear.getDefaultState().setValue(axis, glueFace.getAxis()));
++			player.setShiftKeyDown(false);
++			var placed = radial.get().getStateForPlacement(new net.minecraft.world.item.context.BlockPlaceContext(
++				player, hand, radial.asStack(), faceHit));
++			level.setBlockAndUpdate(pos, placed);
++			level.setBlockAndUpdate(support, Blocks.AIR.defaultBlockState());
++			System.out.printf("CREATE_RADIAL_PLACE %d,%s%n", test, placed.getValue(axis));
++			for (int step = 0; step < 4; step++) {
++				var clickSide = step == 0 ? axle : glueFace;
++				var state = level.getBlockState(pos);
++				var hit = new net.minecraft.world.phys.BlockHitResult(
++					net.minecraft.world.phys.Vec3.atCenterOf(pos), clickSide, pos, false);
++				player.setShiftKeyDown(step == 3);
++				var held = step == 3 ? net.minecraft.world.item.ItemStack.EMPTY : glue;
++				player.setItemInHand(hand, held);
++				state.useItemOn(held, level, player, hand, hit);
++				state = level.getBlockState(pos);
++				var properties = state.getValues().entrySet().stream().filter(e -> e.getKey().getName().startsWith("sticky_"))
++					.map(e -> e.getKey().getName() + "=" + e.getValue()).sorted().toList();
++				System.out.printf("CREATE_RADIAL_GLUE %d,%d,%s,%d%n", test, step, String.join("|", properties), glue.getCount());
++			}
++		}
++		var state = radial.getDefaultState();
++		System.out.printf("CREATE_RADIAL_PROPS %.2f,%.2f,%d,%s%n",
++			state.getDestroySpeed(level, pos), radial.get().getExplosionResistance(),
++			state.getMapColor(level, pos).id, state.requiresCorrectToolForDrops());
++		helper.succeed();
++	}
++
+ 	@GameTest(template = "schematicannon", timeoutTicks = FIFTEEN_SECONDS)
+ 	public static void schematicannon(CreateGameTestHelper helper) {
+ 		// load the structure

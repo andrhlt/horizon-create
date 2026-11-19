@@ -1,0 +1,46 @@
+diff --git a/crates/horizon-client/src/game/machines.rs b/crates/horizon-client/src/game/machines.rs
+--- a/crates/horizon-client/src/game/machines.rs
++++ b/crates/horizon-client/src/game/machines.rs
+@@ -1281,6 +1281,23 @@
+         };
+         let front = offset(pos, facing);
+         let face = facing.opposite();
++        let target = [front.0, front.1, front.2];
++        if super::create_creative_crate::accepts_items(self, target) {
++            let source = [pos.0, pos.1, pos.2];
++            self.native_hopper_inventory_search(source, Some(target), None);
++            for slot in 0..hopper.len() {
++                let containers = self.containers();
++                let Some(stack) = containers.get(hopper, slot) else {
++                    continue;
++                };
++                let mut canceled = false;
++                self.native_inventory_move_item(source, target, &stack.item, &mut canceled);
++                if !canceled && self.take_one(hopper, slot).is_some() {
++                    return true;
++                }
++            }
++            return false;
++        }
+         if let Some(target) = c.hopper_insertion_view(front) {
+             self.native_hopper_inventory_search(
+                 [pos.0, pos.1, pos.2],
+@@ -1414,6 +1431,18 @@
+     /// there, from a container entity whose box meets the one around `at`
+     /// (`getSourceContainerOrHandler`). `None` when there is no container.
+     fn suck_from_container(&mut self, above: Pos, at: [f64; 3], hopper: &View) -> Option<bool> {
++        let source = [above.0, above.1, above.2];
++        if super::create_creative_crate::accepts_items(self, source) {
++            let destination = self.container_world_pos(hopper);
++            self.native_hopper_inventory_search(destination, Some(source), None);
++            let Some(mut stack) = super::create_creative_crate::sample(self, source) else {
++                return Some(false);
++            };
++            let mut canceled = false;
++            self.native_inventory_move_item(source, destination, &stack.item, &mut canceled);
++            stack.count = 1;
++            return Some(!canceled && self.add_item(None, hopper, stack, None).is_none());
++        }
+         let c = self.containers();
+         let Some(source) = c.hopper_insertion_view(above) else {
+             let id = self.entity_container_at(at)?;

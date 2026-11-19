@@ -1,0 +1,43 @@
+--- a/crates/horizon-mods/src/content.rs
++++ b/crates/horizon-mods/src/content.rs
+@@ -106,6 +106,8 @@
+     /// `false`: the block occludes nothing, so its neighbours' faces are drawn and light passes
+     /// it (`BlockBehaviour.Properties.noOcclusion`); unset or `true`: as its template.
+     pub occludes: Option<bool>,
++    /// Whether sky light propagates down through this block; unset uses its template.
++    pub skylight_down: Option<bool>,
+     /// The block's pairwise face visibility rule; unset keeps the template's rule.
+     pub face_culling: Option<FaceCulling>,
+ }
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -1342,18 +1342,21 @@
+         if let Some(shape) = p.render_shape {
+             row.set("render_shape", J::Str(shape.name().into()));
+         }
+-        // `noOcclusion`: a block that can't occlude is never a solid render either, and a solid
+-        // render's full light dampening becomes a non-solid block's (`getLightDampening`: 0 when
+-        // skylight passes down, else 1, as for leaves and spawners).
++        // `noOcclusion` clears solid rendering. For a newly non-solid block,
++        // or one declaring how skylight passes, apply its non-solid dampening.
++        let was_solid = matches!(row.get("solid_render"), Some(J::Bool(true)));
+         if p.occludes == Some(false) {
+-            let solid = matches!(row.get("solid_render"), Some(J::Bool(true)));
+-            if solid {
+-                let down = matches!(row.get("skylight_down"), Some(J::Bool(true)));
+-                row.set("dampening", J::Num(i64::from(!down).into()));
+-            }
+             row.set("can_occlude", J::Bool(false));
+             row.set("solid_render", J::Bool(false));
+         }
++        if let Some(down) = p.skylight_down {
++            row.set("skylight_down", J::Bool(down));
++        }
++        let solid = matches!(row.get("solid_render"), Some(J::Bool(true)));
++        if !solid && (was_solid || p.skylight_down.is_some()) {
++            let down = matches!(row.get("skylight_down"), Some(J::Bool(true)));
++            row.set("dampening", J::Num(i64::from(!down).into()));
++        }
+         if p.piston_push_only {
+             row.set("push", J::Str("PUSH".into()));
+         }

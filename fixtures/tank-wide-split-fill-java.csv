@@ -1,0 +1,10 @@
+attempt,filled,amount,fluid,capacity
+1,1000,1000,minecraft:water,8000
+2,1000,2000,minecraft:water,8000
+3,1000,3000,minecraft:water,8000
+4,1000,4000,minecraft:water,8000
+5,1000,5000,minecraft:water,8000
+6,1000,6000,minecraft:water,8000
+7,1000,7000,minecraft:water,8000
+8,1000,8000,minecraft:water,8000
+9,0,8000,minecraft:water,8000

@@ -1,0 +1,90 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..340ee72 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.horizontalBelt"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d..c4ac543 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,71 @@ public class TestProcessing {
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void horizontalBelt(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var shaft = AllBlocks.SHAFT.getDefaultState().setValue(axis, net.minecraft.core.Direction.Axis.Z);
++		var motorState = AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, net.minecraft.core.Direction.SOUTH);
++		BlockPos first = new BlockPos(2, 9, 1);
++		BlockPos end = new BlockPos(5, 9, 1);
++		BlockPos motorPos = first.north();
++		BlockPos depotPos = end.east();
++		level.setBlockAndUpdate(helper.absolutePos(first), shaft);
++		level.setBlockAndUpdate(helper.absolutePos(end), shaft);
++		com.simibubi.create.content.kinetics.belt.item.BeltConnectorItem.createBelts(
++			level, helper.absolutePos(first), helper.absolutePos(end));
++		level.setBlockAndUpdate(helper.absolutePos(motorPos), motorState);
++		level.setBlockAndUpdate(helper.absolutePos(depotPos), AllBlocks.DEPOT.getDefaultState());
++		var motor = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(motorPos);
++		motor.generatedSpeed.setValue(-48);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick() - 5;
++			helper.assertTrue(tick >= 0, "Waiting for belt initialization");
++			var belt = (com.simibubi.create.content.kinetics.belt.BeltBlockEntity) helper.getBlockEntity(first);
++			var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) helper.getBlockEntity(depotPos);
++			if (tick == 0) {
++				var iron = new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++					new ItemStack(Items.IRON_INGOT));
++				iron.beltPosition = iron.prevBeltPosition = .4375f;
++				iron.angle = 180;
++				iron.sideOffset = iron.prevSideOffset = 0;
++				belt.getInventory().addItem(iron);
++				var gold = new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++					new ItemStack(Items.GOLD_INGOT));
++				gold.beltPosition = gold.prevBeltPosition = 1.7375f;
++				gold.angle = 180;
++				gold.sideOffset = gold.prevSideOffset = 0;
++				belt.getInventory().addItem(gold);
++			}
++			var data = belt.getInventory().write(level.registryAccess()).getList("Items", 10);
++			float ironPos = -1;
++			float goldPos = -1;
++			for (int j = 0; j < data.size(); j++) {
++				var item = data.getCompound(j);
++				var id = item.getCompound("Item").getString("id");
++				if (id.equals("minecraft:iron_ingot"))
++					ironPos = item.getFloat("Pos");
++				if (id.equals("minecraft:gold_ingot"))
++					goldPos = item.getFloat("Pos");
++			}
++			var held = depot.getHeldItem();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_BELT %d %d %.7f %.7f %d %d%n",
++				tick, (int) belt.getSpeed(), ironPos, goldPos,
++				held.is(Items.IRON_INGOT) ? held.getCount() : 0,
++				held.is(Items.GOLD_INGOT) ? held.getCount() : 0);
++			if (tick == 17)
++				motor.generatedSpeed.setValue(48);
++			if (tick == 25)
++				motor.generatedSpeed.setValue(-48);
++			if (tick == 53) {
++				helper.assertTrue(held.is(Items.GOLD_INGOT), "Gold should arrive first");
++				depot.getBehaviour(com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE).removeHeldItem();
++			}
++			helper.assertTrue(tick >= 65, "Waiting for both stacks to reach the depot");
++			helper.assertTrue(held.is(Items.IRON_INGOT), "Iron should arrive second");
++		});
++	}
++
+ }

@@ -1,0 +1,60 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.trackCrafting"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -120,6 +120,45 @@
+ 		helper.pullLever(lever);
+ 		ItemStack expected = new ItemStack(AllBlocks.TRACK.get(), 6);
+ 		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			var belt = helper.getBlockEntity(new BlockPos(6, 2, 2)).saveWithoutMetadata(access);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_TRACK %d", helper.getTick());
++			for (int x : new int[] {3, 4}) {
++				var deployer = helper.getBlockEntity(new BlockPos(x, 4, 2)).saveWithoutMetadata(access);
++				var held = deployer.getCompound("HeldItem");
++				System.out.printf(java.util.Locale.ROOT, " %.4f %s %d %d", deployer.getFloat("Speed"),
++					deployer.getString("State"), deployer.getInt("Timer"), held.getInt("count"));
++			}
++			var press = helper.getBlockEntity(new BlockPos(5, 4, 2)).saveWithoutMetadata(access);
++			int tracks = 0;
++			for (int slot = 0; slot < helper.itemStorageAt(output).getSlots(); slot++) {
++				var item = helper.itemStorageAt(output).getStackInSlot(slot);
++				if (item.is(AllBlocks.TRACK.asItem()))
++					tracks += item.getCount();
++			}
++			System.out.printf(java.util.Locale.ROOT, " %.4f %d %d %d ",
++				press.getFloat("Speed"), press.getBoolean("Running") ? 1 : 0, press.getInt("Ticks"), tracks);
++			var items = belt.getCompound("Inventory").getList("Items", 10);
++			var summary = new java.util.ArrayList<String>();
++			for (int i = 0; i < items.size(); i++) {
++				var carried = items.getCompound(i);
++				var item = carried.getCompound("Item");
++				var step = item.getCompound("components").getCompound("create:sequenced_assembly").getInt("step");
++				summary.add(String.format(java.util.Locale.ROOT, "%s/%d/%d/%.7f/%d",
++					item.getString("id"), item.getInt("count"), step, carried.getFloat("Pos"),
++					carried.getBoolean("Locked") ? 1 : 0));
++			}
++			System.out.println(summary.isEmpty() ? "-" : String.join(";", summary));
++			System.out.printf(java.util.Locale.ROOT, "CREATE_TRACK_CHUTES %d", helper.getTick());
++			for (int x : new int[] {3, 4}) {
++				var chute = helper.getBlockEntity(new BlockPos(x, 5, 2)).saveWithoutMetadata(access);
++				var deployer = helper.getBlockEntity(new BlockPos(x, 4, 2)).saveWithoutMetadata(access);
++				System.out.printf(java.util.Locale.ROOT, " %d %.7f %d",
++					chute.getCompound("Item").getInt("count"), chute.getFloat("ItemPosition"),
++					deployer.getCompound("HeldItem").getInt("count"));
++			}
++			System.out.println();
++
+ 			helper.assertContainerContains(output, expected);
+ 			IItemHandler handler = helper.itemStorageAt(output);
+ 			ItemHelper.extract(handler, ItemHelper.sameItemPredicate(expected), 6, false);

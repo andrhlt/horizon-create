@@ -1,0 +1,204 @@
+--- a/build.gradle
++++ b/build.gradle
+@@ -68,6 +68,13 @@
+ 
+         client {
+             client()
++            if (project.hasProperty("parityMovingDeparture")) {
++                gameDirectory = project.file("run/moving-port-client")
++                systemProperty("parity.movingDeparture", "true")
++                systemProperty("neoforge.enableGameTest", "true")
++                programArguments.addAll("--quickPlaySingleplayer",
++                    "MovingPortDepartureReference", "--width", "960", "--height", "540")
++            }
+             if (project.hasProperty("parityMovingPortPreview")) {
+                 def item = project.findProperty("parityMovingPortPreview") == "item"
+                 gameDirectory = project.file("run/moving-port-client")
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		var tests = CreateTestFunction.getTestsFrom(testHolders);
+-		if (!Boolean.getBoolean("parity.movingPortPreview"))
++		if (!Boolean.getBoolean("parity.movingPortPreview") && !Boolean.getBoolean("parity.movingDeparture"))
+ 			return tests;
+ 		return tests.stream().filter(test -> test.testName().equals("TestMisc.scheduledTrainFixedPortLifecycle")).toList();
+ 	}
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -144,7 +144,8 @@
+ 		var casing = com.simibubi.create.AllBlocks.RAILWAY_CASING.asItem();
+ 		var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
+ 		var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
+-		var origin = new BlockPos(9, 112, -8);
++		boolean departure = Boolean.getBoolean("parity.movingDeparture");
++		var origin = departure ? new BlockPos(105, 112, -8) : new BlockPos(9, 112, -8);
+ 		for (int x = -20; x <= 24; x++) {
+ 			var cell = origin.east(x);
+ 			level.setChunkForced(cell.getX() >> 4, cell.getZ() >> 4, true);
+@@ -337,6 +338,10 @@
+ 						t, rawPort.getInt("Timer"), rawPort.getFloat("Distance"));
+ 					traceFixedTrainPortRender(t, transfer, rawPort.getInt("Timer"));
+ 				}
++				if (departure && t == 23) {
++					JavaTrainDepartureProbe.carriage = c.anyAvailableEntity().getUUID();
++					System.out.println("JAVA_TRAIN_DEPART_FIXTURE " + JavaTrainDepartureProbe.carriage);
++				}
+ 				if (t == 27 && Boolean.getBoolean("parity.movingPortPreview")) {
+ 					train.runtime.paused = true;
+ 					level.setBlockAndUpdate(transferInterface.south(), Blocks.REDSTONE_BLOCK.defaultBlockState());
+@@ -348,7 +353,7 @@
+ 					level.setBlockAndUpdate(transferInterface.south(), Blocks.REDSTONE_BLOCK.defaultBlockState());
+ 				if (powerInterruption && t == 64)
+ 					level.setBlockAndUpdate(transferInterface.south(), Blocks.AIR.defaultBlockState());
+-				if (t == 68) {
++				if (!departure && t == 68) {
+ 					helper.assertTrue((filling ? source : stored) > 0 && stored == 2750 - source && cargo.getVersion() > 0,
+ 						"The working pump must transfer water between the fixed and mounted tanks");
+ 					level.setBlockAndUpdate(motorPos, Blocks.AIR.defaultBlockState());
+--- a/src/main/java/com/simibubi/create/content/contraptions/actors/psi/PortableStorageInterfaceMovement.java
++++ b/src/main/java/com/simibubi/create/content/contraptions/actors/psi/PortableStorageInterfaceMovement.java
+@@ -76,14 +76,18 @@
+ 			getAnimation(context).tickChaser();
+ 
+ 		boolean onCarriage = context.contraption instanceof CarriageContraption;
+-		if (onCarriage && context.motion.length() > 1 / 4f)
+-			return;
++		if (onCarriage && context.motion.length() > 1 / 4f) {
++			traceCarriageDeparture(context, false, false);
++			return;
++		}
+ 
+ 		if (context.world.isClientSide) {
+ 			BlockPos pos = BlockPos.containing(context.position);
+ 			boolean found = findInterface(context, pos);
+ 			if (!found)
+ 				reset(context);
++			if (onCarriage)
++				traceCarriageDeparture(context, true, found);
+ 			if (Boolean.getBoolean("parity.movingPortPreview") && onCarriage) {
+ 				var animation = getAnimation(context);
+ 				System.out.printf(java.util.Locale.ROOT, "CREATE_MOVING_PORT_ACTOR %d;%b;%.8f;%.8f;%b%n",
+@@ -126,6 +130,16 @@
+ 		if (context.stall && timerBelow) {
+ 			context.stall = false;
+ 		}
++	}
++
++	private void traceCarriageDeparture(MovementContext context, boolean scans, boolean found) {
++		if (!context.world.isClientSide || !Boolean.getBoolean("parity.movingDeparture") || context.position.x < 60)
++			return;
++		var animation = getAnimation(context);
++		System.out.printf(java.util.Locale.ROOT,
++			"JAVA_TRAIN_DEPART_ACTOR %d;%.9f;%.9f;%.9f;%.9f;%b;%b;%.8f;%.8f;%b%n",
++			context.world.getGameTime(), context.position.x, context.position.y, context.position.z,
++			context.motion.length(), scans, found, animation.getValue(0), animation.getValue(1), animation.settled());
+ 	}
+ 
+ 	protected boolean findInterface(MovementContext context, BlockPos pos) {
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaTrainDepartureProbe.java
+@@ -0,0 +1,102 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import java.util.UUID;
++
++import com.simibubi.create.Create;
++import com.simibubi.create.content.trains.entity.Train;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.Screenshot;
++import net.minecraft.client.gui.components.Button;
++import net.minecraft.client.gui.screens.BackupConfirmScreen;
++import net.minecraft.client.gui.screens.TitleScreen;
++import net.minecraft.core.BlockPos;
++import net.minecraft.world.level.block.Blocks;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import net.neoforged.neoforge.event.tick.ServerTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaTrainDepartureProbe {
++    static volatile UUID carriage;
++    private static final BlockPos PORT = new BlockPos(108, 115, -6);
++    private static boolean opened;
++    private static volatile boolean requested;
++    private static int elapsed;
++    private static int deadline;
++
++    private static boolean enabled() {
++        return Boolean.getBoolean("parity.movingDeparture");
++    }
++
++    private static Train train() {
++        return Create.RAILWAYS.trains.values().stream()
++            .filter(train -> train.carriages.stream().anyMatch(carriage -> {
++                var entity = carriage.anyAvailableEntity();
++                return entity != null && entity.getUUID().equals(JavaTrainDepartureProbe.carriage);
++            }))
++            .findFirst().orElse(null);
++    }
++
++    @SubscribeEvent
++    public static void observe(ServerTickEvent.Post event) {
++        if (!enabled() || !requested)
++            return;
++        var server = event.getServer();
++        var level = server.overworld();
++        var train = train();
++        if (train == null)
++            return;
++        var entity = train.carriages.getFirst().anyAvailableEntity();
++        if (entity == null)
++            return;
++        System.out.printf(java.util.Locale.ROOT, "JAVA_TRAIN_DEPART_AUTH %d;%.9f;%.9f;%.9f;%s;%d;%b%n",
++            level.getGameTime(), entity.getX(), entity.getZ(), train.speed,
++            train.runtime.state, train.runtime.currentEntry, train.runtime.paused);
++    }
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) {
++        if (!enabled())
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.getOverlay() == null && mc.screen instanceof TitleScreen && !opened) {
++            opened = true;
++            mc.createWorldOpenFlows().openWorld("MovingPortDepartureReference", mc::stop);
++        }
++        if (mc.screen instanceof BackupConfirmScreen backup)
++            backup.children().stream().filter(Button.class::isInstance).map(Button.class::cast)
++                .filter(button -> button.getMessage().getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents name
++                    && name.getKey().equals("selectWorld.backupJoinSkipButton")).findFirst().ifPresent(Button::onPress);
++        var server = mc.getSingleplayerServer();
++        if (mc.player == null || mc.level == null || server == null || mc.getOverlay() != null)
++            return;
++        if (!requested) {
++            requested = true;
++            var name = mc.player.getGameProfile().getName();
++            server.execute(() -> {
++                var command = server.createCommandSourceStack().withPermission(4);
++                server.getCommands().performPrefixedCommand(command, "gamemode spectator " + name);
++                server.getCommands().performPrefixedCommand(command, "tp " + name + " 104.5 117.2 -5.7 -84 19");
++                var player = server.getPlayerList().getPlayerByName(name);
++                server.getCommands().performPrefixedCommand(
++                    player.createCommandSourceStack().withPermission(4), "test run testmisc.scheduledtrainfixedportlifecycle");
++                System.out.println("JAVA_TRAIN_DEPART_TEST requested");
++            });
++            mc.options.hideGui = true;
++            return;
++        }
++        if (++deadline >= 320) {
++            mc.stop();
++            return;
++        }
++        if (mc.level.getBlockEntity(PORT) == null)
++            return;
++        elapsed++;
++        if (elapsed == 35 || elapsed == 70 || elapsed == 95 || elapsed == 110 || elapsed == 130)
++            Screenshot.grab(mc.gameDirectory, "train-departure-port-" + elapsed + ".png", mc.getMainRenderTarget(), message -> {});
++        if (elapsed == 240)
++            mc.stop();
++    }
++}

@@ -1,0 +1,64 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -125,6 +125,25 @@
+ 		var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
+ 		var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
+ 		var origin = new BlockPos(9, 112, -8);
++        var relayPos = origin.east(12).south(3);
++        var decoyPos = origin.east(15).south(3);
++        var relayBlock = com.simibubi.create.AllBlocks.REDSTONE_LINK.get();
++        var relayState = relayBlock.defaultBlockState()
++            .setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING,
++                net.minecraft.core.Direction.UP);
++        for (var pos : java.util.List.of(relayPos, decoyPos)) {
++            level.setBlockAndUpdate(pos.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++            level.setBlockAndUpdate(pos, relayState);
++        }
++        helper.runAfterDelay(15, () -> {
++            for (var pos : java.util.List.of(relayPos, decoyPos)) {
++                var link = com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(
++                    level, pos, com.simibubi.create.content.redstone.link.LinkBehaviour.TYPE);
++                link.setFrequency(true, new ItemStack(pos.equals(relayPos) ? Items.QUARTZ : Items.IRON_INGOT));
++                link.setFrequency(false, new ItemStack(pos.equals(relayPos) ? Items.IRON_INGOT : Items.QUARTZ));
++            }
++            level.setBlockAndUpdate(decoyPos.north(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++        });
+ 		for (int x = -20; x <= 24; x++) {
+ 			var cell = origin.east(x);
+ 			level.setChunkForced(cell.getX() >> 4, cell.getZ() >> 4, true);
+@@ -218,7 +237,18 @@
+                 var delay = new com.simibubi.create.content.trains.schedule.condition.ScheduledDelay();
+                 delay.getData().putInt("Value", name.equals("Origin") ? 3 : 5);
+                 delay.getData().putInt("TimeUnit", 0);
+-                entry.conditions.add(java.util.List.of(delay));
++                if (name.equals("Origin")) {
++                    var power = new com.simibubi.create.content.trains.schedule.condition.RedstoneLinkCondition();
++                    var unpowered = new com.simibubi.create.content.trains.schedule.condition.RedstoneLinkCondition();
++                    for (var link : java.util.List.of(power, unpowered)) {
++                        link.setItem(0, new ItemStack(Items.QUARTZ));
++                        link.setItem(1, new ItemStack(Items.IRON_INGOT));
++                    }
++                    unpowered.getData().putInt("Inverted", 1);
++                    entry.conditions.add(java.util.List.of(power, unpowered));
++                } else {
++                    entry.conditions.add(java.util.List.of(delay));
++                }
+                 schedule.entries.add(entry);
+             }
+             var programmed = com.simibubi.create.AllItems.SCHEDULE.asStack();
+@@ -252,6 +282,15 @@
+                     t, train.speed, a, b, d, e, approaching ? 1 : 0, stopped ? 1 : 0,
+                     approaching ? train.navigation.distanceToDestination : 0, atOrigin ? 1 : 0,
+                     train.runtime.state, train.runtime.currentEntry, train.runtime.paused ? 1 : 0, train.runtime.completed ? 1 : 0);
++                int condition = train.runtime.conditionProgress.isEmpty() ? 0 : train.runtime.conditionProgress.getFirst();
++                var relay = (com.simibubi.create.content.redstone.link.RedstoneLinkBlockEntity) level.getBlockEntity(relayPos);
++                var decoy = (com.simibubi.create.content.redstone.link.RedstoneLinkBlockEntity) level.getBlockEntity(decoyPos);
++                System.out.printf(java.util.Locale.ROOT, "CREATE_SCHEDULED_LINK %d;%d;%d;%d%n", t,
++                    relay.getSignal(), decoy.getSignal(), condition);
++                if (t == 32)
++                    level.setBlockAndUpdate(relayPos.north(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++                if (t == 42)
++                    level.setBlockAndUpdate(relayPos.north(), Blocks.AIR.defaultBlockState());
+                 if (t == 145) {
+                     helper.assertTrue(stopped && train.runtime.completed, "Schedule must finish at Terminal");
+                     helper.succeed();

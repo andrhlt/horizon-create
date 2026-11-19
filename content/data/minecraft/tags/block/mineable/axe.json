@@ -1,0 +1,14 @@
+{
+  "replace": false,
+  "values": [
+    "create:gearbox",
+    "create:analog_lever",
+    "create:flywheel",
+    "create:copycat_panel",
+    "create:copycat_step",
+    "create:cardboard_block",
+    "create:bound_cardboard_block",
+    "create:nozzle",
+    "create:turntable"
+  ]
+}

@@ -1,0 +1,32 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..93b2b89 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.shearing"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..196befe 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -67,7 +67,13 @@ public class TestMisc {
+ 		Sheep sheep = helper.getFirstEntity(EntityType.SHEEP, sheepPos);
+ 		sheep.shear(SoundSource.NEUTRAL);
+ 		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			boolean woolPresent = !helper.getLevel().getEntities(EntityType.ITEM,
++				new net.minecraft.world.phys.AABB(helper.absolutePos(sheepPos)).inflate(2),
++				item -> item.getItem().is(Items.WHITE_WOOL)).isEmpty();
++			System.out.printf("CREATE_SHEARING %d,%b,%b%n", tick, sheep.isSheared(), woolPresent);
+ 			helper.assertItemEntityPresent(Items.WHITE_WOOL, sheepPos, 2);
++			helper.assertTrue(tick >= 12, "Capturing wool after shearing");
+ 		});
+ 	}
+ 

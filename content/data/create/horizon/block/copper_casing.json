@@ -1,0 +1,6 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "state_properties": {},
+  "default_state": {}
+}

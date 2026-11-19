@@ -1,0 +1,93 @@
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.metalGirderWrenchPreviewBounds"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,67 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++
++
++
++
++
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 9)
++	public static void metalGirderWrenchPreviewBounds(CreateGameTestHelper helper) {
++		var girder = com.simibubi.create.AllBlocks.METAL_GIRDER;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var xAxis = net.minecraft.core.Direction.Axis.X;
++		var x = com.simibubi.create.content.decoration.girder.GirderBlock.X;
++		var z = com.simibubi.create.content.decoration.girder.GirderBlock.Z;
++		var level = helper.getLevel();
++		var beam = girder.getDefaultState().setValue(axis, xAxis).setValue(x, true);
++		for (int index = 0; index < 4; index++) {
++			var pos = new BlockPos(12, 3, 2 + index * 5);
++			var at = helper.absolutePos(pos);
++			var base = index == 3 ? beam.setValue(z, true) : beam;
++			level.setBlock(at, base, 2 | 16);
++			if (index == 2)
++				level.setBlock(at.above(), beam, 2 | 16);
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			if (tick < 3)
++				helper.fail("Waiting for the chosen preview sample");
++			try {
++				var method = com.simibubi.create.content.decoration.girder.GirderWrenchBehavior.class.getDeclaredMethod(
++					"getDirectionAndAction", net.minecraft.world.phys.BlockHitResult.class,
++					net.minecraft.world.level.Level.class, BlockPos.class);
++				method.setAccessible(true);
++				for (int index = 0; index < 4; index++) {
++					var at = helper.absolutePos(new BlockPos(12, 3, 2 + index * 5));
++					var point = at.getCenter().add(0, index == 1 ? -0.33 : 0.30, -0.25);
++					var hit = new net.minecraft.world.phys.BlockHitResult(point, net.minecraft.core.Direction.NORTH, at, false);
++					var selection = (net.createmod.catnip.data.Pair<?, ?>) method.invoke(null, hit, level, at);
++					if (selection == null) {
++						System.out.printf(java.util.Locale.ROOT, "CREATE_GIRDER_WRENCH_PREVIEW,%d,none,false,0,0,0,0,0,0,0,0%n", index);
++						continue;
++					}
++					var direction = (net.minecraft.core.Direction) selection.getFirst();
++					boolean pair = selection.getSecond().toString().equals("PAIR");
++					var normal = net.minecraft.world.phys.Vec3.atLowerCornerOf(direction.getNormal());
++					var edge = new net.minecraft.world.phys.Vec3(0.5, 0.5, 0.5).add(normal.scale(0.4));
++					var corner1 = edge.add(0.3, 0, 0.3).add(normal.scale(0.1 * (pair ? 4 : 1)));
++					var corner2 = edge.add(-0.3, 0, -0.3).subtract(normal.scale(0.2));
++					var box = new net.minecraft.world.phys.AABB(corner1, corner2);
++					System.out.printf(java.util.Locale.ROOT,
++						"CREATE_GIRDER_WRENCH_PREVIEW,%d,%s,%s,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%d%n",
++						index, direction.getName(), pair, box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ,
++						1 / 32f, 127);
++				}
++			} catch (ReflectiveOperationException err) {
++				throw new IllegalStateException("Cannot inspect original Girder wrench direction", err);
++			}
++		});
++	}
+ }

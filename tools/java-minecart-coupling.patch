@@ -1,0 +1,36 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.couplingProbe")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,23 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++ @GameTest(template = "threshold_switch_pulley", timeoutTicks = 40)
++ public static void couplingProbe(CreateGameTestHelper helper) {
++  var world = helper.getLevel();
++  var a = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  var b = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++  var held = com.simibubi.create.AllItems.MINECART_COUPLING.asStack(2);
++  player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, held);
++  a.setPos(8.5, 170.0625, 24.5); b.setPos(11.5, 170.0625, 24.5);
++  world.addFreshEntity(a); world.addFreshEntity(b);
++  helper.runAtTickTime(5, () -> {
++   boolean linked = com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player, world, a.getId(), b.getId());
++   var ca = a.getData(com.simibubi.create.AllAttachmentTypes.MINECART_CONTROLLER);
++   var cb = b.getData(com.simibubi.create.AllAttachmentTypes.MINECART_CONTROLLER);
++   System.out.printf("COUPLING_PROBE linked=%s,count=%d,leading=%s,connected=%s,length=%.1f\n", linked, held.getCount(), ca.isLeadingCoupling(), cb.isConnectedToCoupling(), ca.getCouplingLength(true));
++   helper.assertTrue(linked && held.getCount() == 1, "coupling failed");
++   helper.succeed();
++  });
++ }
+ }

@@ -1,0 +1,41 @@
+--- a/crates/horizon-world/src/level/mod.rs
++++ b/crates/horizon-world/src/level/mod.rs
+@@ -851,6 +851,12 @@
+     ) -> u8 {
+         0
+     }
++    /// Like remove_block_entity, with the active tick queue for removal effects.
++    fn remove_block_entity_with_ticks(
++        &mut self, pos: BlockPos, old: BlockStateId, side_effects: bool, _ticks: &mut Ticks,
++    ) -> u8 {
++        self.remove_block_entity(pos, old, side_effects)
++    }
+     /// Ensure a new block's optional entity after its onPlace completed, as
+     /// LevelChunk.setBlockState does. The actual state is supplied; an existing
+     /// valid same-block instance must survive. Defaults to no additional factory.
+--- a/crates/horizon-world/src/level/update.rs
++++ b/crates/horizon-world/src/level/update.rs
+@@ -373,7 +373,7 @@
+             } else {
+                 None
+             };
+-            let updates = self.level.remove_block_entity(pos, old, side_effects);
++            let updates = self.level.remove_block_entity_with_ticks(pos, old, side_effects, self.ticks);
+             if let Some(support) = powered_support {
+                 let block = self.block_of(old);
+                 self.update_neighbors_at(pos, block);
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -1815,6 +1815,12 @@
+             .map(|s| s.status == horizon_client::block_entity_anim::ShulkerStatus::Closed)
+     }
+     fn remove_block_entity(&mut self, pos: BlockPos, old: BlockStateId, side_effects: bool) -> u8 {
++        self.remove_entity(pos, old, side_effects)
++    }
++    fn remove_block_entity_with_ticks(
++        &mut self, pos: BlockPos, old: BlockStateId, side_effects: bool,
++        _ticks: &mut horizon_world::level::Ticks,
++    ) -> u8 {
+         self.remove_entity(pos, old, side_effects)
+     }
+     fn load_block_entity(&mut self, pos: BlockPos, mut nbt: horizon_world::nbt::Compound) {

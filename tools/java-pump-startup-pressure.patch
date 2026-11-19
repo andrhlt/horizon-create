@@ -1,0 +1,62 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -364,4 +364,47 @@
+ 			helper.assertContainerContains(depot.east(2), Items.GRASS_BLOCK);
+ 		});
+ 	}
++
++	@GameTest(template = "3_pipe_split")
++	public static void startupPressureSplit(CreateGameTestHelper helper) {
++		startupPressure(helper, "split");
++	}
++
++	@GameTest(template = "3_pipe_combine")
++	public static void startupPressureCombine(CreateGameTestHelper helper) {
++		startupPressure(helper, "combine");
++	}
++
++	private static void startupPressure(CreateGameTestHelper helper, String mode) {
++		var pump = new BlockPos(2, 2, 2);
++		var junction = pump.east();
++		helper.flipBlock(pump);
++		startupPressureSample(helper, mode, 0, pump, junction);
++		for (int tick = 1; tick <= 3; tick++) {
++			int at = tick;
++			helper.runAtTickTime(at, () -> {
++				startupPressureSample(helper, mode, at, pump, junction);
++				if (at == 3)
++					helper.succeed();
++			});
++		}
++	}
++
++	private static void startupPressureSample(CreateGameTestHelper helper, String mode, int tick, BlockPos pump, BlockPos junction) {
++		var registries = helper.getLevel().registryAccess();
++		var entity = helper.getBlockEntity(AllBlockEntityTypes.MECHANICAL_PUMP.get(), pump);
++		var facing = entity.getBlockState().getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING);
++		var pumpData = entity.saveWithoutMetadata(registries);
++		var junctionData = helper.getBlockEntity(junction).saveWithoutMetadata(registries);
++		System.out.printf(java.util.Locale.ROOT, "CREATE_PUMP_STARTUP %s,%d,%s,%.4f,%s,%s,%s,%s,%s,%s%n",
++			mode, tick, facing.getName(), entity.getSpeed(),
++			startupPort(pumpData, "west"), startupPort(pumpData, "east"),
++			startupPort(junctionData, "west"), startupPort(junctionData, "east"),
++			startupPort(junctionData, "north"), startupPort(junctionData, "south"));
++	}
++
++	private static String startupPort(net.minecraft.nbt.CompoundTag data, String face) {
++		var array = data.getCompound(face).getList("Pressure", net.minecraft.nbt.Tag.TAG_FLOAT);
++		return String.format(java.util.Locale.ROOT, "%.4f:%.4f", array.getFloat(0), array.getFloat(1));
++	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestFluids.startupPressure"))
++			.toList();
+ 	}
+ }

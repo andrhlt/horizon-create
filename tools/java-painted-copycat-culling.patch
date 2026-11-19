@@ -1,0 +1,139 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaPaintedCopycatFaceCullingProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaPaintedCopycatFaceCullingProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaPaintedCopycatFaceCullingProbe.java
+@@ -0,0 +1,134 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.content.decoration.copycat.CopycatBlockEntity;
++import com.simibubi.create.content.decoration.copycat.CopycatPanelBlock;
++import com.simibubi.create.content.decoration.copycat.CopycatStepBlock;
++
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++
++import net.minecraft.client.Minecraft;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.core.RegistryAccess;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.nbt.NbtUtils;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.resources.ResourceLocation;
++import net.minecraft.util.RandomSource;
++import net.minecraft.world.level.BlockAndTintGetter;
++import net.minecraft.world.level.ColorResolver;
++import net.minecraft.world.level.block.Block;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.entity.BlockEntity;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.level.lighting.LevelLightEngine;
++import net.minecraft.world.level.material.FluidState;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import net.neoforged.neoforge.client.model.data.ModelData;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaPaintedCopycatFaceCullingProbe {
++    private static boolean done;
++
++    private record Scene(Map<BlockPos, BlockState> blocks, Map<BlockPos, BlockEntity> entities)
++        implements BlockAndTintGetter {
++        public BlockState getBlockState(BlockPos pos) {
++            return blocks.getOrDefault(pos, Blocks.AIR.defaultBlockState());
++        }
++        public BlockEntity getBlockEntity(BlockPos pos) { return entities.get(pos); }
++        public ModelData getModelData(BlockPos pos) {
++            var entity = entities.get(pos);
++            return entity == null ? ModelData.EMPTY : entity.getModelData();
++        }
++        public FluidState getFluidState(BlockPos pos) { return getBlockState(pos).getFluidState(); }
++        public int getHeight() { return 384; }
++        public int getMinBuildHeight() { return -64; }
++        public float getShade(Direction side, boolean shaded) { return 1; }
++        public LevelLightEngine getLightEngine() { return null; }
++        public int getBlockTint(BlockPos pos, ColorResolver resolver) { return -1; }
++    }
++
++    private record Neighbour(String name, BlockState state, BlockState material) {
++        Map<BlockPos, BlockEntity> entities(BlockPos pos) {
++            if (material == null)
++                return Map.of();
++            var copycat = new CopycatBlockEntity(AllBlockEntityTypes.COPYCAT.get(), pos, state);
++            copycat.markVirtual();
++            var tag = new CompoundTag();
++            tag.put("Material", NbtUtils.writeBlockState(material));
++            copycat.handleUpdateTag(tag, RegistryAccess.EMPTY);
++            if (copycat.getMaterial() != material)
++                throw new IllegalStateException("Could not load the measured Copycat material");
++            return Map.of(pos, copycat);
++        }
++    }
++
++    private static BlockState block(String id) {
++        return BuiltInRegistries.BLOCK.get(ResourceLocation.parse(id)).defaultBlockState();
++    }
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) {
++        if (!Boolean.getBoolean("parity.paintedCopycatFaceCulling") || done)
++            return;
++        var minecraft = Minecraft.getInstance();
++        if (minecraft.screen == null || minecraft.getOverlay() != null)
++            return;
++        done = true;
++        try {
++            probe(minecraft);
++        } finally {
++            minecraft.stop();
++        }
++    }
++
++    private static void probe(Minecraft minecraft) {
++        var oak = block("create:oak_window");
++        var birch = block("create:birch_window");
++        var pos = new BlockPos(8, 111, -10);
++        for (var face : List.of(Direction.NORTH, Direction.SOUTH)) {
++            var panelInward = AllBlocks.COPYCAT_PANEL.getDefaultState().setValue(CopycatPanelBlock.FACING, face);
++            var panelOutward = panelInward.setValue(CopycatPanelBlock.FACING, face.getOpposite());
++            var step = AllBlocks.COPYCAT_STEP.getDefaultState().setValue(CopycatStepBlock.FACING, face.getOpposite());
++            var target = pos.relative(face);
++            for (var own : List.of(
++                new Neighbour("panel-inward", panelInward, oak),
++                new Neighbour("panel-outward", panelOutward, oak),
++                new Neighbour("step-outward", step, oak),
++                new Neighbour("step-inward", step.setValue(CopycatStepBlock.FACING, face), oak)
++            )) {
++                var model = minecraft.getBlockRenderer().getBlockModel(own.state());
++                for (var neighbour : List.of(
++                    new Neighbour("air", Blocks.AIR.defaultBlockState(), null),
++                    new Neighbour("oak", oak, null),
++                    new Neighbour("birch", birch, null),
++                    new Neighbour("oak-panel-inward", panelInward, oak),
++                    new Neighbour("oak-panel-outward", panelOutward, oak),
++                    new Neighbour("birch-panel-inward", panelInward, birch),
++                    new Neighbour("oak-step", step, oak)
++                )) {
++                    var entities = new HashMap<BlockPos, BlockEntity>(own.entities(pos));
++                    entities.putAll(neighbour.entities(target));
++                    var scene = new Scene(Map.of(pos, own.state(), target, neighbour.state()), entities);
++                    var data = model.getModelData(scene, pos, own.state(), scene.getModelData(pos));
++                    long n = model.getQuads(own.state(), null, RandomSource.create(own.state().getSeed(pos)), data, null)
++                        .stream().filter(quad -> quad.getDirection() == face).count();
++                    if (Block.shouldRenderFace(own.state(), scene, pos, face, target)) {
++                        n += model.getQuads(own.state(), face, RandomSource.create(own.state().getSeed(pos)), data, null)
++                            .stream().filter(quad -> quad.getDirection() == face).count();
++                    }
++                    System.out.printf("CREATE_PAINTED_COPYCAT_FACE_CULL %s,%s,%s,%d,%s%n",
++                        own.name(), neighbour.name(), face.getName(), n, n > 0);
++                }
++            }
++        }
++        System.out.println("CREATE_PAINTED_COPYCAT_FACE_CULL_DONE");
++    }
++}

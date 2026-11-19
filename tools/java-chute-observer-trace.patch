@@ -1,0 +1,41 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestItems.smartObserverChutes"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+@@ -282,7 +282,25 @@
+ 		BlockPos lever = new BlockPos(1, 5, 2);
+ 		BlockPos output = new BlockPos(1, 5, 3);
+ 		helper.pullLever(lever);
+-		helper.succeedWhen(() -> helper.assertBlockPresent(Blocks.DIAMOND_BLOCK, output));
++		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			var pos = new BlockPos(1, 3, 2);
++			var observer = helper.getBlockEntity(pos).saveWithoutMetadata(access);
++			var piston = helper.getBlockState(new BlockPos(1, 3, 3));
++			var diamond = helper.getBlockState(output);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_CHUTE_OBSERVER %d %d %d",
++				helper.getTick(), observer.getInt("TurnOff"),
++				helper.getBlockState(pos).getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED) ? 1 : 0);
++			for (int y = 5; y >= 3; y--) {
++				var chute = helper.getBlockEntity(new BlockPos(1, y, 1)).saveWithoutMetadata(access);
++				var item = chute.getCompound("Item");
++				System.out.printf(java.util.Locale.ROOT, " %d %.6f", item.getInt("count"), chute.getFloat("ItemPosition"));
++			}
++			System.out.printf(java.util.Locale.ROOT, " %d %s%n",
++				piston.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.EXTENDED) ? 1 : 0,
++				diamond.getBlock().getDescriptionId());
++			helper.assertBlockPresent(Blocks.DIAMOND_BLOCK, output);
++		});
+ 	}
+ 
+ 	@GameTest(template = "smart_observer_counting")

@@ -1,0 +1,15 @@
+--- a/crates/horizon-world/src/level/hooks.rs
++++ b/crates/horizon-world/src/level/hooks.rs
+@@ -305,6 +305,12 @@
+     ) {
+         let b = self.b;
+         let block = b.block(state);
++        if !moved && b.table.name(state) == "create:desk_bell"
++            && b.table.bool(state, b.props.powered)
++        {
++            self.update_neighbors_at(pos, block);
++            self.update_neighbors_at(rel(pos, b.facing(state).opposite()), block);
++        }
+         let chain = &b.data(state).chain;
+         for &class in chain.iter() {
+             match class {

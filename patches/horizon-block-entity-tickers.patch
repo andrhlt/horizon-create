@@ -1,0 +1,15 @@
+diff --git a/crates/horizon-client-render/src/block_entities.rs b/crates/horizon-client-render/src/block_entities.rs
+--- a/crates/horizon-client-render/src/block_entities.rs
++++ b/crates/horizon-client-render/src/block_entities.rs
+@@ -570,6 +570,11 @@
+     /// Returns the slots to tick, in order; check each with `is_live` before
+     /// ticking it, as the ticks before it can free it.
+     pub fn tickers(&mut self, state: impl Fn(Pos) -> u32) -> Arc<Vec<(Pos, u32)>> {
++        // World-load observers can ask for tickers before the game builds
++        // the state table. Leave pending positions for the first real pass.
++        if !self.has_states() {
++            return Arc::clone(&self.tickers);
++        }
+         for (pos, token) in std::mem::take(&mut self.added) {
+             if self.pending.get(&pos) != Some(&token) {
+                 continue;

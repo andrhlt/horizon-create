@@ -1,0 +1,10 @@
+diff --git a/crates/horizon-client/src/game/commands.rs b/crates/horizon-client/src/game/commands.rs
+--- a/crates/horizon-client/src/game/commands.rs
++++ b/crates/horizon-client/src/game/commands.rs
+@@ -2380,5 +2380,6 @@
+             Target::Boat(id) => self.kill_boat(id),
+             Target::Cart(id) => {
++                super::create_minecart_coupling::cart_destroyed(self, id);
+                 self.release_vehicle_container(id);
+                 if let Some(i) = self.carts.iter().position(|c| c.id == id) {
+                     let c = self.carts.remove(i);

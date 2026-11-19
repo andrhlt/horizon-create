@@ -1,0 +1,9 @@
+case,initial_health,cooldown,attack_damage,attack_speed,damage,sprinting,vx,vy,vz,sounds
+pig,10.000000,1.000000,6.000000,5.000000,0,false,0.120000,0.050000,0.060000,create:cardboard_bonk|PLAYERS|0.75|1.85
+zombie,20.000000,1.000000,6.000000,5.000000,0,false,0.120000,0.050000,0.060000,create:cardboard_bonk|PLAYERS|0.75|1.85
+sprint,10.000000,1.000000,6.000000,5.000000,0,false,0.120000,0.050000,0.060000,create:cardboard_bonk|PLAYERS|0.75|1.85
+sprint_uncharged,10.000000,0.125000,6.000000,5.000000,0,false,0.120000,0.050000,0.060000,create:cardboard_bonk|PLAYERS|0.75|1.85
+enchant,10.000000,1.000000,6.000000,5.000000,0,false,0.120000,0.050000,0.060000,create:cardboard_bonk|PLAYERS|0.75|1.85
+enchant_sprint,10.000000,1.000000,6.000000,5.000000,0,false,0.120000,0.050000,0.060000,create:cardboard_bonk|PLAYERS|0.75|1.85
+spider,16.000000,1.000000,6.000000,5.000000,0,false,0.200000,0.050000,0.100000,
+spider_wood,16.000000,1.000000,4.000000,1.600000,1,false,0.200000,0.050000,0.100000,

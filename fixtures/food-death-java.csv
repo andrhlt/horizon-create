@@ -1,0 +1,7 @@
+food,stage,count,use_remaining,hunger,saturation
+sweet_roll,before,1,24,10,0.000000000
+sweet_roll,respawn,1,0,20,5.000000000
+chocolate_glazed_berries,before,1,24,10,0.000000000
+chocolate_glazed_berries,respawn,1,0,20,5.000000000
+honeyed_apple,before,1,24,10,0.000000000
+honeyed_apple,respawn,1,0,20,5.000000000

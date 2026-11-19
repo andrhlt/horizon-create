@@ -1,0 +1,60 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.couplingProbe")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,47 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++ @GameTest(template = "threshold_switch_pulley", timeoutTicks = 80)
++ public static void couplingProbe(CreateGameTestHelper helper) {
++  var world = helper.getLevel();
++  world.getEntitiesOfClass(net.minecraft.world.entity.vehicle.AbstractMinecart.class, new net.minecraft.world.phys.AABB(0, 160, 16, 30, 180, 32)).forEach(cart -> cart.discard());
++  for (int x = 4; x <= 24; x++) {
++   world.setBlockAndUpdate(new BlockPos(x, 169, 24), Blocks.STONE.defaultBlockState());
++   world.setBlockAndUpdate(new BlockPos(x, 170, 24), Blocks.RAIL.defaultBlockState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.RAIL_SHAPE, net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST));
++  }
++  var a = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  var b = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  var c = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  var d = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  var e = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  for (int x = 4; x <= 24; x++) {
++   world.setBlockAndUpdate(new BlockPos(x, 169, 28), Blocks.STONE.defaultBlockState());
++   world.setBlockAndUpdate(new BlockPos(x, 170, 28), Blocks.RAIL.defaultBlockState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.RAIL_SHAPE, net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST));
++  }
++  d.setUUID(java.util.UUID.fromString("00000000-0000-0000-0000-000000000004"));
++  e.setUUID(java.util.UUID.fromString("00000000-0000-0000-0000-000000000005"));
++  d.setPos(8.5, 170.0625, 28.5); e.setPos(11.5, 170.0625, 28.5);
++  world.addFreshEntity(d); world.addFreshEntity(e);
++  var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++  player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, com.simibubi.create.AllItems.MINECART_COUPLING.asStack(5));
++  a.setUUID(java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"));
++  b.setUUID(java.util.UUID.fromString("00000000-0000-0000-0000-000000000002"));
++  c.setUUID(java.util.UUID.fromString("00000000-0000-0000-0000-000000000003"));
++  a.setPos(8.5, 170.0625, 24.5); b.setPos(11.5, 170.0625, 24.5); c.setPos(14.5, 170.0625, 24.5);
++  world.addFreshEntity(a); world.addFreshEntity(b); world.addFreshEntity(c);
++  helper.runAtTickTime(5, () -> {
++   boolean first = com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player, world, a.getId(), b.getId());
++   boolean second = com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player, world, b.getId(), c.getId());
++   boolean separate = com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player, world, d.getId(), e.getId());
++   helper.assertTrue(first && second && separate, "chain coupling failed"); a.setDeltaMovement(0.1, 0, 0);
++   System.out.printf(java.util.Locale.ROOT, "COUPLING_CHAIN_MOTION 0,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n", a.getX(), a.getDeltaMovement().x, b.getX(), b.getDeltaMovement().x, c.getX(), c.getDeltaMovement().x);
++  });
++  for (int t=6; t<=25; t++) {
++   final int tick=t;
++   helper.runAtTickTime(t, () -> {
++    System.out.printf(java.util.Locale.ROOT, "COUPLING_CHAIN_MOTION %d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n", tick-5, a.getX(), a.getDeltaMovement().x, b.getX(), b.getDeltaMovement().x, c.getX(), c.getDeltaMovement().x);
++    if (tick == 25) helper.succeed();
++   });
++  }
++ }
+ }

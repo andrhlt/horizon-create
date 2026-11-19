@@ -1,0 +1,111 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,94 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void depotWeightedEjectorObstacle(CreateGameTestHelper helper) {
++		traceEjectorRelease(helper, true);
++	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void depotWeightedEjectorAir(CreateGameTestHelper helper) {
++		traceEjectorRelease(helper, false);
++	}
++
++	private static void traceEjectorRelease(CreateGameTestHelper helper, boolean obstacle) {
++		var level = helper.getLevel();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var south = net.minecraft.core.Direction.SOUTH;
++		// The GameTest grid is randomly placed millions of blocks from the origin,
++		// where EntityLauncher's absolute float centers can lose half a block.
++		var at = new BlockPos(5, 105, obstacle ? -11 : -43);
++		var powerPos = at.west();
++		var motorPos = at.north();
++		var depotPos = at.east(4);
++		var chunk = new net.minecraft.world.level.ChunkPos(at);
++		level.setChunkForced(chunk.x, chunk.z, true);
++		level.getChunk(chunk.x, chunk.z);
++		for (int x = -1; x <= 5; x++)
++			for (int z = -2; z <= 2; z++) {
++				level.setBlockAndUpdate(at.offset(x, -1, z),
++					net.minecraft.world.level.block.Blocks.SMOOTH_STONE.defaultBlockState());
++				for (int y = 0; y < 7; y++)
++					level.removeBlock(at.offset(x, y, z), false);
++			}
++		level.setBlockAndUpdate(powerPos,
++			net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState());
++		level.setBlockAndUpdate(at, AllBlocks.WEIGHTED_EJECTOR.getDefaultState().setValue(horizontal, east));
++		if (obstacle) {
++			level.setBlockAndUpdate(depotPos, AllBlocks.DEPOT.getDefaultState());
++			level.setBlockAndUpdate(at.east(2).above(3),
++				net.minecraft.world.level.block.Blocks.SMOOTH_STONE.defaultBlockState());
++		}
++		level.setBlockAndUpdate(motorPos,
++			AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, south));
++		((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motorPos))
++			.generatedSpeed.setValue(128);
++		var ejector = (com.simibubi.create.content.logistics.depot.EjectorBlockEntity) level.getBlockEntity(at);
++		ejector.setTarget(4, 0);
++		var region = new net.minecraft.world.phys.AABB(at).inflate(10);
++		level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, region)
++			.forEach(net.minecraft.world.entity.Entity::discard);
++		var input = ejector.getBehaviour(com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE);
++		var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) level.getBlockEntity(depotPos);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			if (tick == 12) {
++				helper.assertTrue(ejector.getState().name().equals("CHARGED"), "Ejector must be charged");
++				var stack = new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++					new ItemStack(Items.IRON_INGOT, 3));
++				stack.beltPosition = .5f;
++				input.setHeldItem(stack);
++				level.removeBlock(powerPos, false);
++			}
++			if (tick == (obstacle ? 16 : 34)) {
++				// The released entity's ID offsets its vanilla four-tick grounded movement.
++				int lastId;
++				do {
++					lastId = new net.minecraft.world.entity.item.ItemEntity(level, at.getX(), at.getY(), at.getZ(),
++						new ItemStack(Items.GOLD_INGOT)).getId();
++				} while ((lastId + 1) % 4 != 3);
++			}
++			var saved = ejector.saveWithoutMetadata(level.registryAccess());
++			var flight = saved.getList("LaunchedItems", net.minecraft.nbt.Tag.TAG_COMPOUND);
++			var held = depot == null ? ItemStack.EMPTY : depot.getHeldItem();
++			var items = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, region,
++				item -> item.getItem().is(Items.IRON_INGOT));
++			var loose = items.isEmpty() ? null : items.getFirst();
++			var age = flight.isEmpty() ? -1 : flight.getCompound(0).getInt("Location");
++			var motion = loose == null ? net.minecraft.world.phys.Vec3.ZERO : loose.getDeltaMovement();
++			System.out.printf(java.util.Locale.ROOT,
++				 "CREATE_EJECTOR_%s %d,%d,%d,%d,%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f%n",
++				obstacle ? "OBSTACLE" : "AIR", tick, age, held.getCount(), loose == null ? 0 : loose.getItem().getCount(), loose == null ? -1 : loose.getId() % 4,
++				loose == null ? 0 : loose.getX() - at.getX(), loose == null ? 0 : loose.getY() - at.getY(),
++				loose == null ? 0 : loose.getZ() - at.getZ(), motion.x, motion.y, motion.z, saved.getFloat("EarlyTargetTime"));
++			helper.assertTrue(tick >= (obstacle ? 42 : 60) && held.isEmpty() && items.size() == 1 && loose.getItem().getCount() == 3,
++				obstacle ? "The obstacle must stop the launch and release all three ingots before the Depot."
++					: "An Ejector aimed at air must release all three ingots.");
++			level.setChunkForced(chunk.x, chunk.z, false);
++		});
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.depotWeightedEjectorObstacle")
++				|| test.testName().equals("TestProcessing.depotWeightedEjectorAir")).toList();
+ 	}
+ }

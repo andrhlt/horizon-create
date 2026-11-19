@@ -1,0 +1,17 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -183,10 +183,10 @@
+ 				.setValue(com.simibubi.create.content.contraptions.actors.trainControls.ControlsBlock.FACING,
+ 					net.minecraft.core.Direction.EAST);
+ 			level.setBlockAndUpdate(origin.east().above(3), controls);
+-            var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.WHITE).get().defaultBlockState();
+-            level.setBlockAndUpdate(origin.east(2).above(3), seat);
+-            level.setBlockAndUpdate(origin.east(3).above(3), seat);
+-            level.setBlockAndUpdate(origin.east(4).above(3), seat);
++            var seats = com.simibubi.create.AllBlocks.SEATS;
++            level.setBlockAndUpdate(origin.east(2).above(3), seats.get(net.minecraft.world.item.DyeColor.RED).getDefaultState());
++            level.setBlockAndUpdate(origin.east(3).above(3), seats.get(net.minecraft.world.item.DyeColor.BLUE).getDefaultState());
++            level.setBlockAndUpdate(origin.east(4).above(3), seats.get(net.minecraft.world.item.DyeColor.GREEN).getDefaultState());
+ 			var area = com.simibubi.create.content.contraptions.glue.SuperGlueEntity.span(origin.east().above(), origin.east(4).above(3));
+ 			level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, area));
+ 			station.assemble(player.getUUID());

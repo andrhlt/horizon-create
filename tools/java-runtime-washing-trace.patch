@@ -1,0 +1,71 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,68 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TWENTY_SECONDS)
++	public static void runtimeWashing(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var motorState = AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(
++			net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING,
++			net.minecraft.core.Direction.EAST);
++		var fanState = AllBlocks.ENCASED_FAN.getDefaultState().setValue(
++			net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING,
++			net.minecraft.core.Direction.EAST);
++		var waterPath =
++			net.minecraft.world.level.block.Blocks.OAK_LEAVES.defaultBlockState()
++				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED, true)
++				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.PERSISTENT, true);
++		var inputs = new net.minecraft.world.item.Item[] {Items.BLUE_CONCRETE_POWDER, Items.RED_CONCRETE_POWDER};
++		var outputs = new net.minecraft.world.item.Item[] {Items.BLUE_CONCRETE, Items.RED_CONCRETE};
++		for (int i = 0; i < inputs.length; i++) {
++			int z = 1 + i * 4;
++			BlockPos motor = new BlockPos(1, 11, z);
++			level.setBlockAndUpdate(helper.absolutePos(motor), motorState);
++			level.setBlockAndUpdate(helper.absolutePos(new BlockPos(2, 11, z)), fanState);
++			var floor = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++			level.setBlockAndUpdate(helper.absolutePos(new BlockPos(3, 10, z)), floor);
++			level.setBlockAndUpdate(helper.absolutePos(new BlockPos(3, 11, z - 1)), floor);
++			level.setBlockAndUpdate(helper.absolutePos(new BlockPos(3, 11, z + 1)), floor);
++			level.setBlockAndUpdate(helper.absolutePos(new BlockPos(4, 11, z)),
++				net.minecraft.world.level.block.Blocks.OAK_SIGN.defaultBlockState());
++			level.setBlockAndUpdate(helper.absolutePos(new BlockPos(3, 11, z)), waterPath);
++			level.setBlockAndUpdate(helper.absolutePos(new BlockPos(4, 10, z)), AllBlocks.DEPOT.getDefaultState());
++			setFanMotor(helper, motor, 256);
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick() - 5;
++			helper.assertTrue(tick >= 0, "Waiting for fan initialization");
++			for (int i = 0; i < inputs.length; i++) {
++				int z = 1 + i * 4;
++				var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) 
++					helper.getBlockEntity(new BlockPos(4, 10, z));
++				if (tick == 0)
++					depot.setHeldItem(new ItemStack(inputs[i]));
++				var fan = (com.simibubi.create.content.kinetics.fan.EncasedFanBlockEntity)
++					helper.getBlockEntity(new BlockPos(2, 11, z));
++				var nbt = depot.saveWithoutMetadata(level.registryAccess()).getCompound("HeldItem");
++				var stack = depot.getHeldItem();
++				var kind = nbt.getString("FanProcessingType");
++				System.out.printf("CREATE_RUNTIME_WASHING %d %d %d %d %d %s %d%n",
++					tick, i, (int) fan.getSpeed(), stack.is(inputs[i]) ? stack.getCount() : 0,
++					stack.is(outputs[i]) ? stack.getCount() : 0, kind.isEmpty() ? "_" : kind,
++					nbt.getInt("FanProcessingTime"));
++				if (tick == 60)
++					setFanMotor(helper, new BlockPos(1, 11, z), 0);
++				if (tick == 68)
++					setFanMotor(helper, new BlockPos(1, 11, z), 256);
++				if (tick >= 174)
++					helper.assertTrue(stack.is(outputs[i]), "Missing fan recipe output in lane " + i);
++			}
++			helper.assertTrue(tick >= 174, "Waiting for washed concrete");
++		});
++	}
++
++	private static void setFanMotor(CreateGameTestHelper helper, BlockPos pos, int speed) {
++		var motor = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(pos);
++		motor.generatedSpeed.setValue(speed);
++	}
++
+ }

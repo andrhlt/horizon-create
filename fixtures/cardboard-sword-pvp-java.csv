@@ -1,0 +1,9 @@
+case,pvp,health_before,health_after,vx,vy,vz,slow,riding,sprinting,actor_vx,actor_vy,actor_vz,packets,packet_yaw,packet_strength,sound
+plain,true,20.000000,20.000000,0.000000,0.400000,1.000000,false,false,false,0.120000,0.050000,0.060000,1,0.000000,2.000000,create:cardboard_bonk|PLAYERS|0.75|1.85
+base_knockback,true,20.000000,20.000000,0.000000,0.400000,2.000000,false,false,false,0.120000,0.050000,0.060000,1,0.000000,4.000000,create:cardboard_bonk|PLAYERS|0.75|1.85
+pvp_disabled,false,20.000000,20.000000,0.000000,0.400000,1.000000,false,false,false,0.120000,0.050000,0.060000,1,0.000000,2.000000,create:cardboard_bonk|PLAYERS|0.75|1.85
+knockback_sprint,true,20.000000,20.000000,0.000000,0.400000,2.500000,false,false,false,0.120000,0.050000,0.060000,1,0.000000,5.000000,create:cardboard_bonk|PLAYERS|0.75|1.85
+mounted,true,20.000000,20.000000,0.000000,0.000000,1.000000,false,false,false,0.120000,0.050000,0.060000,1,0.000000,2.000000,create:cardboard_bonk|PLAYERS|0.75|1.85
+mounted_grounded,true,20.000000,20.000000,0.000000,0.400000,1.000000,false,false,false,0.120000,0.050000,0.060000,1,0.000000,2.000000,create:cardboard_bonk|PLAYERS|0.75|1.85
+creative_victim,true,20.000000,20.000000,0.000000,0.400000,1.000000,false,false,false,0.120000,0.050000,0.060000,1,0.000000,2.000000,create:cardboard_bonk|PLAYERS|0.75|1.85
+wood,true,20.000000,16.000000,0.000000,0.000000,0.000000,false,false,false,0.200000,0.050000,0.100000,0,0.000000,0.000000,

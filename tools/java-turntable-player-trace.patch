@@ -1,0 +1,173 @@
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TurntablePlayerProbe.java
+@@ -0,0 +1,124 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import java.util.Locale;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.kinetics.turntable.TurntableBlockEntity;
++import com.simibubi.create.content.kinetics.turntable.TurntableHandler;
++
++import net.minecraft.client.DeltaTracker;
++import net.minecraft.client.Minecraft;
++import net.minecraft.core.BlockPos;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.phys.Vec3;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class TurntablePlayerProbe {
++	private static boolean finished;
++
++	private record Frame(float realtime, float partial) implements DeltaTracker {
++		@Override
++		public float getGameTimeDeltaTicks() {
++			return realtime;
++		}
++
++		@Override
++		public float getGameTimeDeltaPartialTick(boolean ignoreFrozenGame) {
++			return partial;
++		}
++
++		@Override
++		public float getRealtimeDeltaTicks() {
++			return realtime;
++		}
++	}
++
++	@SubscribeEvent
++	public static void tick(ClientTickEvent.Post event) {
++		if (!Boolean.getBoolean("parity.turntablePlayer") || finished)
++			return;
++		var mc = Minecraft.getInstance();
++		if (mc.level == null || mc.player == null || mc.getOverlay() != null || mc.screen != null
++			|| mc.isPaused() || !mc.player.onGround())
++			return;
++		finished = true;
++		if (org.lwjgl.glfw.GLFW.glfwGetWindowAttrib(mc.getWindow().getWindow(), org.lwjgl.glfw.GLFW.GLFW_VISIBLE)
++			!= org.lwjgl.glfw.GLFW.GLFW_FALSE)
++			throw new IllegalStateException("Run this parity probe with earlyWindowControl disabled");
++		try {
++			probe(mc);
++		} finally {
++			mc.stop();
++		}
++	}
++
++	private static void probe(Minecraft mc) {
++		var table = mc.player.blockPosition().above(5);
++		var block = AllBlocks.TURNTABLE.get();
++		var state = block.defaultBlockState();
++		if (!mc.level.setBlock(table, state, 3, 0))
++			throw new IllegalStateException("Could not place client Turntable in the loaded chunk");
++		var be = (TurntableBlockEntity) mc.level.getBlockEntity(table);
++		if (be == null)
++			throw new IllegalStateException("Client Turntable block entity missing");
++		var player = mc.player;
++		float[][] frames = {
++			{16, 20, 0f, 0f, .32f, .40f, 1},
++			{-16, 20, 0f, 0f, .32f, .80f, 1},
++			{32, 20, .25f, 0f, .34f, .50f, 1},
++			{32, 20, .325f, 0f, .34f, .50f, 1},
++			{32, 20, .375f, .2f, .34f, .50f, 1},
++			{32, 20, .5f, 0f, .34f, .50f, 1},
++			{16, 35, .125f, .125f, .5f, 1f, 1},
++			{16, 20, 0f, 0f, .32f, 0f, 1},
++			{16, 20, 0f, 0f, 0f, 1f, 1},
++			{0, 20, 0f, 0f, .26f, .90f, 1},
++			{16, 20, 0f, 0f, .26f, .90f, 0}
++		};
++		for (int i = 0; i < frames.length; i++) {
++			float[] row = frames[i];
++			be.setSpeed(row[0]);
++			mc.level.tickRateManager().setTickRate(row[1]);
++			player.setPos(table.getX() + .5 + row[2], table.getY() + .5, table.getZ() + .5 + row[3]);
++			player.setOnGround(row[6] != 0);
++			player.mainSupportingBlockPos = java.util.Optional.of(table);
++			player.setYRot(90);
++			player.yBodyRot = 50;
++			TurntableHandler.gameRenderFrame(new Frame(row[4], row[5]));
++			System.out.printf(Locale.ROOT,
++				"CREATE_TURNTABLE_PLAYER_FRAME %d,%.4f,%.4f,%.9f,%.9f,%.8f,%.8f,%b,%.8f,%.8f%n",
++				i, row[0], row[1], row[2], row[3], row[4], row[5], player.onGround(),
++				player.getYRot(), player.yBodyRot);
++		}
++
++		mc.level.setBlock(table.east(), Blocks.AIR.defaultBlockState(), 3, 0);
++		float[][] edges = {
++			{16, .515f, 0f, 0f, 1},
++			{-32, .515f, .125f, 0f, 1},
++			{256, .515f, .125f, 0f, 1},
++			{-256, .515f, .125f, 0f, 1},
++			{16, .49f, 0f, 0f, 1},
++			{16, .515f, 0f, .1f, 1},
++			{16, .515f, 0f, 0f, 0},
++			{0, .515f, 0f, 0f, 1}
++		};
++		for (int i = 0; i < edges.length; i++) {
++			float[] row = edges[i];
++			be.setSpeed(row[0]);
++			player.setPos(table.getX() + .5 + row[1], table.getY() + .5, table.getZ() + .5 + row[2]);
++			player.setOnGround(row[4] != 0);
++			player.setDeltaMovement(new Vec3(.025, row[3], -.025));
++			player.hurtMarked = false;
++			block.entityInside(state, mc.level, table, player);
++			var velocity = player.getDeltaMovement();
++			System.out.printf(Locale.ROOT,
++				"CREATE_TURNTABLE_PLAYER_EDGE %d,%.4f,%.9f,%.9f,%.9f,%b,%.12f,%.12f,%.12f,%b%n",
++				i, row[0], row[1], row[2], row[3], player.onGround(), velocity.x, velocity.y, velocity.z,
++				player.hurtMarked);
++		}
++	}
++}
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/client/TurntableHiddenWindowMixin.java
+@@ -0,0 +1,19 @@
++package com.simibubi.create.foundation.mixin.client;
++
++import org.lwjgl.glfw.GLFW;
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.Inject;
++import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
++
++import com.mojang.blaze3d.platform.Window;
++
++@Mixin(Window.class)
++public class TurntableHiddenWindowMixin {
++	@Inject(method = "<init>", at = @At(value = "INVOKE", target =
++		"Lnet/neoforged/fml/loading/ImmediateWindowHandler;setupMinecraftWindow(Ljava/util/function/IntSupplier;Ljava/util/function/IntSupplier;Ljava/util/function/Supplier;Ljava/util/function/LongSupplier;)J"))
++	private void hideTurntableProbeWindow(CallbackInfo ci) {
++		if (Boolean.getBoolean("parity.turntablePlayer"))
++			GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
++	}
++}
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -62,6 +62,7 @@
+     "accessor.TimerAccessor",
+     "client.BlockDestructionProgressMixin",
+     "client.CameraMixin",
++    "client.TurntableHiddenWindowMixin",
+     "client.EntityContraptionInteractionMixin",
+     "client.GameRendererMixin",
+     "client.HeavyBootsOnPlayerMixin",
+--- a/build.gradle
++++ b/build.gradle
+@@ -68,6 +68,11 @@
+ 
+         client {
+             client()
++            if (project.hasProperty("parityTurntablePlayer")) {
++                gameDirectory = project.file("run/turntable-player")
++                systemProperty("parity.turntablePlayer", "true")
++                programArguments.addAll("--quickPlaySingleplayer", "TurntablePlayerReference", "--width", "640", "--height", "360")
++            }
+         }
+ 
+         server {

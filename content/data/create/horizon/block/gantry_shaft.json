@@ -1,0 +1,11 @@
+{
+  "template": "minecraft:iron_block",
+  "item": true,
+  "properties": {"occludes": false},
+  "state_properties": {
+    "facing": {"type": "enum", "values": ["down", "up", "north", "south", "west", "east"]},
+    "part": {"type": "enum", "values": ["start", "middle", "end", "single"]},
+    "powered": {"type": "boolean"}
+  },
+  "default_state": {"facing": "north", "part": "single", "powered": "false"}
+}

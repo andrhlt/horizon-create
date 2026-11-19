@@ -1,0 +1,6 @@
+dye,input,recipe,output,count,retained_uuid,retained_inventory,retained_name,added_tags
+minecraft:amethyst_shard,create:blue_toolbox,create:crafting/curiosities/toolbox_dyeing,create:brown_toolbox,1,true,true,true,dyes
+minecraft:lapis_lazuli,create:blue_toolbox,create:crafting/curiosities/toolbox_dyeing,create:blue_toolbox,1,true,true,true,dyes;dyes/blue
+minecraft:coal,create:blue_toolbox,create:crafting/curiosities/toolbox_dyeing,create:brown_toolbox,1,true,true,true,dyes;dyes/black
+minecraft:red_dye,create:blue_toolbox,create:crafting/curiosities/toolbox_dyeing,create:red_toolbox,1,true,true,true,dyes/white
+create:blue_toolbox,create:brown_toolbox,,,0,,,,dyes

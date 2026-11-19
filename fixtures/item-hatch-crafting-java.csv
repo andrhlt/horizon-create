@@ -1,0 +1,2 @@
+recipe,width,height,inputs,output,count
+create:crafting/logistics/item_hatch,2,1,create:andesite_alloy|minecraft:iron_trapdoor,create:item_hatch,1

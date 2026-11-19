@@ -1,0 +1,2 @@
+recipe,width,height,slots,output,count,remainder
+crafting/curiosities/brown_toolbox,3,3,"_,create:cogwheel,_,create:golden_sheet,minecraft:chest,create:golden_sheet,_,minecraft:leather,_",create:brown_toolbox,1,""

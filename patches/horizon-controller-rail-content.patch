@@ -1,0 +1,41 @@
+diff --git a/crates/horizon-mods/src/content.rs b/crates/horizon-mods/src/content.rs
+--- a/crates/horizon-mods/src/content.rs
++++ b/crates/horizon-mods/src/content.rs
+@@ -87,6 +87,9 @@
+     pub friction: Option<f32>,
+     /// A `MapColor` id, 0 to 61.
+     pub map_color: Option<u8>,
++    /// A straight rail with the normal rail support, placement and shape rules.
++    #[serde(default)]
++    pub straight_rail: bool,
+     /// A vanilla block whose sounds this block uses.
+     pub sounds: Option<String>,
+     /// Which states tick randomly, whatever the template does (`isRandomlyTicking`).
+diff --git a/crates/horizon-client/src/mod_content.rs b/crates/horizon-client/src/mod_content.rs
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -1552,6 +1552,10 @@
+                                 .unwrap_or(J::Obj(Default::default()));
+                             fields.set("connectsTo", J::Str(tag.clone()));
+                             v.set("fields", fields);
++                        }
++                        if b.decl.properties.straight_rail {
++                            let chain = ["BaseRailBlock", "Block"].map(|name| J::Str(name.into()));
++                            v.set("class", J::Arr(chain.into()));
+                         }
+                         blocks.push(v);
+                     }
+diff --git a/crates/horizon-client-render/src/mesher.rs b/crates/horizon-client-render/src/mesher.rs
+--- a/crates/horizon-client-render/src/mesher.rs
++++ b/crates/horizon-client-render/src/mesher.rs
+@@ -900,7 +900,9 @@
+                 "water_cauldron" => ([Tint::Water; 2], 1),
+                 // Their in-world colour is the particle-only source's -1.
+                 "water" | "bubble_column" => ([Tint::None; 2], 1),
+-                "redstone_wire" => ([Tint::Redstone(prop("power")); 2], 1),
++                "redstone_wire" | "create:controller_rail" => {
++                    ([Tint::Redstone(prop("power")); 2], 1)
++                }
+                 "attached_melon_stem" | "attached_pumpkin_stem" => {
+                     ([Tint::Constant(0xE0_C71C); 2], 1)
+                 }

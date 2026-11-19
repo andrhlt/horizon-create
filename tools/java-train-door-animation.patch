@@ -1,0 +1,38 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..119e720 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.trainDoorAnimationOracle")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..8c4cd6b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,21 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 100)
++	public static void trainDoorAnimationOracle(CreateGameTestHelper helper) {
++		var animation = net.createmod.catnip.animation.LerpedFloat.linear().startWithValue(1);
++		for (int i = 0; i < 18; i++) {
++			boolean open = i >= 9;
++			boolean wasSettled = animation.settled();
++			animation.chase(open ? 1 : 0, .15f, net.createmod.catnip.animation.LerpedFloat.Chaser.LINEAR);
++			animation.tickChaser();
++			float value = animation.getValue();
++			float slide = value * value * 13 / 16f;
++			float normal = net.minecraft.util.Mth.clamp(value * 10, 0, 1) / 32f;
++			boolean closeCue = !wasSettled && animation.settled() && !open;
++			System.out.printf(java.util.Locale.ROOT, "CREATE_TRAIN_DOOR_ANIMATION,%d,%b,%.9f,%.9f,%.9f,%b%n", i, open, value, slide, normal, closeCue);
++		}
++		helper.succeed();
++	}
+ }

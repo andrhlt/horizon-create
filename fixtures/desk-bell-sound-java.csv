@@ -1,0 +1,4 @@
+tick,sound,category,x,y,z,volume,pitch
+3,create:desk_bell,4,0.5,0.5,0.5,1.00000000,1.00000000
+12,create:desk_bell,4,0.5,0.5,0.5,1.00000000,1.00000000
+40,create:desk_bell,4,0.5,0.5,0.5,1.00000000,1.00000000

@@ -1,0 +1,46 @@
+{
+  "template": "minecraft:oak_planks",
+  "item": true,
+  "properties": {
+    "map_color": 34,
+    "occludes": false
+  },
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "south",
+        "west",
+        "east"
+      ]
+    }
+  },
+  "default_state": {
+    "facing": "north"
+  },
+  "shapes": {
+    "default": [
+      [
+        0.0625,
+        0,
+        0.0625,
+        0.9375,
+        1.1875,
+        0.9375
+      ]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [
+        0.0625,
+        0,
+        0.0625,
+        0.9375,
+        1.1875,
+        0.9375
+      ]
+    ]
+  }
+}

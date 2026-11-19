@@ -1,0 +1,66 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..f0ca466 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.attributeFilterColor"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..cbdb41f 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,47 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void attributeFilterColor(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var registries = level.registryAccess();
++		var blue = net.minecraft.world.item.DyeColor.BLUE;
++		var red = net.minecraft.world.item.DyeColor.RED;
++		var fireworkColor = new net.minecraft.world.item.component.FireworkExplosion(
++			net.minecraft.world.item.component.FireworkExplosion.Shape.SMALL_BALL,
++			it.unimi.dsi.fastutil.ints.IntList.of(blue.getFireworkColor()),
++			it.unimi.dsi.fastutil.ints.IntList.of(red.getFireworkColor()), false, false);
++		var rocket = new ItemStack(Items.FIREWORK_ROCKET);
++		rocket.set(net.minecraft.core.component.DataComponents.FIREWORKS,
++			new net.minecraft.world.item.component.Fireworks(1, java.util.List.of(fireworkColor)));
++		var star = new ItemStack(Items.FIREWORK_STAR);
++		star.set(net.minecraft.core.component.DataComponents.FIREWORK_EXPLOSION, fireworkColor);
++		var dyedArmor = new ItemStack(Items.LEATHER_HELMET);
++		dyedArmor.set(net.minecraft.core.component.DataComponents.DYED_COLOR,
++			new net.minecraft.world.item.component.DyedItemColor(blue.getTextureDiffuseColor(), true));
++		var blueSeat = new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
++			net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", "blue_seat")));
++		var examples = java.util.List.of(new ItemStack(Items.BLUE_DYE), new ItemStack(Items.BLUE_WOOL),
++			new ItemStack(Items.BLUE_BED), new ItemStack(Items.BLUE_BANNER), new ItemStack(Items.BLUE_STAINED_GLASS),
++			new ItemStack(Items.LIGHT_BLUE_WOOL), new ItemStack(Items.LIGHT_GRAY_TERRACOTTA),
++			new ItemStack(Items.REDSTONE), new ItemStack(Items.RED_WOOL), dyedArmor, blueSeat,
++			rocket, star, new ItemStack(Items.FIREWORK_ROCKET));
++		int index = 0;
++		for (var color : java.util.List.of(blue, red, net.minecraft.world.item.DyeColor.LIGHT_BLUE)) {
++			var attribute = new com.simibubi.create.content.logistics.item.filter.attribute.attributes.ColorAttribute(color);
++			var data = com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.saveStatic(attribute, registries);
++			var filter = com.simibubi.create.AllItems.ATTRIBUTE_FILTER.asStack();
++			filter.set(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES,
++				java.util.List.of(new com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute.ItemAttributeEntry(attribute, false)));
++			var matcher = com.simibubi.create.content.logistics.filter.FilterItemStack.of(filter);
++			for (var sample : examples) {
++				System.out.printf("ATTRIBUTE_COLOR,%d,%s,%s,%s,%b%n", index++, color.getName(),
++					java.util.HexFormat.of().formatHex(data.getCompound("attribute").toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++					java.util.HexFormat.of().formatHex(sample.save(registries).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)),
++					matcher.test(level, sample, false));
++			}
++		}
++		helper.succeed();
++	}
+ }

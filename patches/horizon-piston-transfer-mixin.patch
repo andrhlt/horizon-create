@@ -1,0 +1,14 @@
+diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -1654,7 +1654,9 @@
+             return None;
+         }
+         let previous = self.world.block(pos.x, pos.y, pos.z);
+-        self.world.set(pos.x, pos.y, pos.z, state).ok()?;
++        if self.world.set(pos.x, pos.y, pos.z, state).is_err() {
++            return None;
++        }
+         Some(previous)
+     }
+     fn is_loaded(&self, pos: BlockPos) -> bool {

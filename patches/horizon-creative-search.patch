@@ -1,0 +1,184 @@
+diff --git a/crates/horizon-client/src/mod_content.rs b/crates/horizon-client/src/mod_content.rs
+index 30f7c46e84..21a46957ef 100644
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -1832,6 +1832,31 @@ impl<'a> Plan<'a> {
+             tabs.push(row);
+         }
+         if let Some(search) = search {
++            // A mod that declares search contents controls its own namespace;
++            // mods without that metadata retain the default of all their items.
++            let explicit: BTreeSet<&str> = self
++                .tabs
++                .iter()
++                .filter(|tab| tab.search_items.is_some())
++                .filter_map(|tab| tab.id.split_once(':').map(|(namespace, _)| namespace))
++                .collect();
++            let allowed: BTreeSet<&str> = self
++                .tabs
++                .iter()
++                .filter_map(|tab| tab.search_items.as_ref())
++                .flatten()
++                .map(String::as_str)
++                .collect();
++            let new: Vec<&str> = new
++                .into_iter()
++                .filter(|id| {
++                    let namespace = id
++                        .split_once(':')
++                        .map(|(namespace, _)| namespace)
++                        .unwrap_or("");
++                    !explicit.contains(namespace) || allowed.contains(id)
++                })
++                .collect();
+             let name = |id: &str| {
+                 let (ns, path) = id.split_once(':').unwrap_or(("", id));
+                 ["item", "block"]
+diff --git a/crates/horizon-client/src/mod_content_tests.rs b/crates/horizon-client/src/mod_content_tests.rs
+index 7d5ecf9d69..821a4a0465 100644
+--- a/crates/horizon-client/src/mod_content_tests.rs
++++ b/crates/horizon-client/src/mod_content_tests.rs
+@@ -470,6 +470,7 @@ fn creative_tabs_keep_vanilla_items_missing_from_search() {
+         id: "test:restricted".into(),
+         title: "Restricted".into(),
+         icon: "minecraft:barrier".into(),
++        search_items: None,
+         items: [
+             "minecraft:barrier",
+             "minecraft:command_block",
+@@ -5266,3 +5267,68 @@ fn worldgen_entry_reads_both_feature_folders() {
+         None
+     );
+ }
++
++#[test]
++fn creative_search_honors_explicit_membership_per_mod() {
++    let tabs = [
++        CreativeTab {
++            id: "create:base".into(),
++            title: "Base".into(),
++            icon: "create:shown".into(),
++            items: vec!["create:shown".into()],
++            search_items: Some(vec!["create:shown".into(), "create:search_only".into()]),
++        },
++        CreativeTab {
++            id: "other:tab".into(),
++            title: "Other".into(),
++            icon: "other:item".into(),
++            items: vec![],
++            search_items: None,
++        },
++    ];
++    let item = |id: &str| NewItem {
++        rename: Rename::new("minecraft:stick", id),
++        max_stack_size: None,
++        rarity: None,
++        components: vec![],
++        crafting_remainder: None,
++        wall_block: None,
++        place_block: None,
++    };
++    let plan = Plan {
++        blocks: vec![],
++        items: [
++            "create:shown",
++            "create:search_only",
++            "create:hidden",
++            "other:item",
++        ]
++        .map(item)
++        .into(),
++        vanilla_items: BTreeSet::new(),
++        effects: vec![],
++        fluids: vec![],
++        entity_types: vec![],
++        menu_types: vec![],
++        states: 0,
++        defaults: BTreeMap::new(),
++        sounds: BTreeMap::new(),
++        tabs: tabs.iter().collect(),
++        names: BTreeMap::new(),
++    };
++    let mut doc: J =
++        serde_json::from_str(r#"{"tabs":[{"type":"SEARCH","items":[],"lines":[],"tags":[]}]}"#)
++            .unwrap();
++    plan.creative_tabs(&mut doc).unwrap();
++    let doc: serde_json::Value = serde_json::to_value(doc).unwrap();
++    assert_eq!(
++        doc["tabs"][0]["items"],
++        serde_json::json!([
++            "{count:1,id:\"create:shown\"}",
++            "{count:1,id:\"create:search_only\"}",
++            "{count:1,id:\"other:item\"}"
++        ])
++    );
++    assert_eq!(doc["tabs"][0]["lines"].as_array().unwrap().len(), 3);
++    assert_eq!(doc["tabs"][0]["tags"].as_array().unwrap().len(), 3);
++}
+diff --git a/crates/horizon-mods/src/content.rs b/crates/horizon-mods/src/content.rs
+index 047f385c29..4e4afce204 100644
+--- a/crates/horizon-mods/src/content.rs
++++ b/crates/horizon-mods/src/content.rs
+@@ -366,6 +366,7 @@ struct CreativeTabFile {
+     title: String,
+     icon: String,
+     items: Vec<String>,
++    search_items: Option<Vec<String>>,
+ }
+ 
+ /// A creative inventory tab the mod adds (`data/<id>/horizon/creative_tab/`):
+@@ -378,6 +379,7 @@ pub struct CreativeTab {
+     pub title: String,
+     pub icon: String,
+     pub items: Vec<String>,
++    pub search_items: Option<Vec<String>>,
+ }
+ 
+ #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+@@ -1041,7 +1043,13 @@ impl Content {
+                 s.split_once(':')
+                     .is_some_and(|(n, p)| !n.is_empty() && !p.is_empty())
+             };
+-            if !id_like(&file.icon) || !file.items.iter().all(|i| id_like(i)) {
++            if !id_like(&file.icon)
++                || !file.items.iter().all(|i| id_like(i))
++                || !file
++                    .search_items
++                    .as_ref()
++                    .is_none_or(|items| items.iter().all(|i| id_like(i)))
++            {
+                 return Err(format!(
+                     "{name}: icon and items are item ids (namespace:path)"
+                 ));
+@@ -1051,6 +1059,7 @@ impl Content {
+                 title: file.title,
+                 icon: file.icon,
+                 items: file.items,
++                search_items: file.search_items,
+             });
+         }
+         for (kind, name) in types {
+@@ -2618,6 +2627,7 @@ capabilities = ["registries"]
+                 title: "Ruby Gems".into(),
+                 icon: "ruby:ruby".into(),
+                 items: vec!["ruby:ruby".into(), "minecraft:diamond".into()],
++                search_items: None,
+             }]
+         );
+         let e = tab(r#"{"title": "Gems", "icon": "ruby", "items": []}"#).unwrap_err();
+diff --git a/docs/mods.md b/docs/mods.md
+index c9f126049f..794cabfaba 100644
+--- a/docs/mods.md
++++ b/docs/mods.md
+@@ -328,7 +328,10 @@ buttons above the inventory turn the pages. The title is a lang key or English
+ text: `"title": "itemGroup.ruby"` uses that key from the mod's lang files, and a
+ lang file's `itemGroup.<mod id>.<file name>` (`creative_tab/gems.json` →
+ `itemGroup.ruby.gems`) translates any title. A mod's items join the search tab
+-under their names.
++under their names. A tab may set `"search_items"` to the item IDs that its mod
++contributes to search. If any tab of a mod declares this field, the union of its
++tabs’ `search_items` replaces the default of all items in that mod’s namespace.
++Items can be search-only; unknown IDs are ignored.
+ 
+ A component type no vanilla item has is refused, so a misspelt one fails
+ the load instead of doing nothing. Behaviour the game ties to a vanilla

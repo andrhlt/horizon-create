@@ -1,0 +1,23 @@
+{
+  "template": "minecraft:iron_block",
+  "properties": {
+    "waterloggable": true,
+    "occludes": false
+  },
+  "state_properties": {
+    "axis": {
+      "type": "enum",
+      "values": [
+        "x",
+        "z"
+      ]
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "axis": "z",
+    "waterlogged": "false"
+  }
+}

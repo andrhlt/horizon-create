@@ -1,0 +1,275 @@
+diff --git a/crates/horizon-client-render/src/chunk.rs b/crates/horizon-client-render/src/chunk.rs
+--- a/crates/horizon-client-render/src/chunk.rs
++++ b/crates/horizon-client-render/src/chunk.rs
+@@ -3,7 +3,7 @@
+ //! (copy-on-write through `Arc::make_mut`).
+ use horizon_core::paletted::{PalettedContainer, Strategy};
+ use horizon_world::nbt::{Compound, Tag};
+-use horizon_world::registry::BlockStateId;
++use horizon_world::registry::{BlockRegistry, BlockStateId};
+ use std::sync::atomic::{AtomicI16, AtomicU64, Ordering};
+ use std::sync::{Arc, OnceLock};
+ 
+@@ -604,6 +604,33 @@
+             + self.column_bytes
+     }
+ }
++pub const COPYCAT_PANEL: &str = "create:copycat_panel";
++
++pub fn copycat_panel_material(
++    registry: &BlockRegistry,
++    state: BlockStateId,
++    entity: Option<&block_entity::BlockEntity>,
++) -> Option<BlockStateId> {
++    let Some(block_entity::BlockEntity::Mod(copycat)) = entity else {
++        return None;
++    };
++    if copycat.id != "create:copycat" || registry.state(state)?.name != COPYCAT_PANEL {
++        return None;
++    }
++    let tag = copycat.nbt.get(&"Material".into())?;
++    // Create stores legacy block-state names even in a modern chunk.
++    let material = if let Some(name) = tag.get("Name") {
++        let mut state = Compound::from([("id".into(), name.clone())]);
++        if let Some(properties) = tag.get("Properties") {
++            state.insert("properties".into(), properties.clone());
++        }
++        registry.saved_state_id(&Tag::Compound(state))?
++    } else {
++        registry.saved_state_id(tag)?
++    };
++    (registry.state(material)?.name != "create:copycat_base").then_some(material)
++}
++
+ #[derive(Clone)]
+ pub struct Chunk {
+     pub x: i32,
+@@ -627,6 +654,8 @@
+     pub generated: bool,
+     /// Block entities read from a save, moved into the world on arrival.
+     pub block_entities: Vec<((i32, i32, i32), block_entity::BlockEntity)>,
++    /// The copied materials a chunk's Copycat Panels show to the connected-texture mesher.
++    pub(crate) copycat_panels: Option<Arc<crate::fast_hash::FxHashMap<(i32, i32, i32), BlockStateId>>>,
+     /// `CustomName` of the container block entities (shown as the screen title).
+     pub block_names: Vec<((i32, i32, i32), Tag)>,
+     /// Generation postprocessing marks (ProtoChunk.postProcessing) as world
+@@ -664,6 +693,7 @@
+             fresh: false,
+             generated: false,
+             block_entities: Vec::new(),
++            copycat_panels: None,
+             block_names: Vec::new(),
+             structure_refs: Vec::new(),
+             structure_starts: Vec::new(),
+diff --git a/crates/horizon-client-render/src/world.rs b/crates/horizon-client-render/src/world.rs
+--- a/crates/horizon-client-render/src/world.rs
++++ b/crates/horizon-client-render/src/world.rs
+@@ -338,6 +338,39 @@
+     pub fn top_y(&self) -> i32 {
+         self.layout().max_y()
+     }
++    /// Publish a Copycat material change to the worker snapshot and remesh bordering sections.
++    pub fn set_copycat_panel_material(&mut self, pos: (i32, i32, i32), material: Option<BlockStateId>) {
++        let (x, y, z) = pos;
++        let Some(chunk) = self.chunks.get_mut(&(x >> 4, z >> 4)) else {
++            return;
++        };
++        let Some(sy) = chunk.section_index(y).map(|sy| sy as i32) else {
++            return;
++        };
++        let sections = chunk.sections.len() as i32;
++        if chunk.copycat_panels.as_ref().and_then(|panels| panels.get(&pos)).copied() == material {
++            return;
++        }
++        let panels = &mut Arc::make_mut(chunk).copycat_panels;
++        if let Some(material) = material {
++            Arc::make_mut(panels.get_or_insert_with(Default::default)).insert(pos, material);
++        } else if let Some(entries) = panels {
++            Arc::make_mut(entries).remove(&pos);
++            if entries.is_empty() {
++                *panels = None;
++            }
++        }
++        for cz in ((z - 1) >> 4)..=((z + 1) >> 4) {
++            for cx in ((x - 1) >> 4)..=((x + 1) >> 4) {
++                let first = (sy - i32::from(y & 15 == 0)).max(0);
++                let last = (sy + i32::from(y & 15 == 15)).min(sections - 1);
++                for section in first..=last {
++                    self.dirty_sections.insert((cx, section, cz));
++                }
++            }
++        }
++    }
++
+     /// Resident storage write; marks the touched sections (and neighbours on
+     /// section borders) for remeshing and the surrounding chunks for relighting.
+     /// Neighbour updates, drops and block entities belong to the gameplay layer.
+diff --git a/crates/horizon-client-render/src/mesher.rs b/crates/horizon-client-render/src/mesher.rs
+--- a/crates/horizon-client-render/src/mesher.rs
++++ b/crates/horizon-client-render/src/mesher.rs
+@@ -1236,6 +1236,7 @@
+ struct Padded {
+     blocks: Vec<u32>,
+     light: Vec<u8>,
++    copycat_panels: crate::fast_hash::FxHashMap<usize, BlockStateId>,
+ }
+ impl Padded {
+     #[cfg(test)]
+@@ -1249,6 +1250,20 @@
+         self.light.resize(P * P * P, 0);
+         let (blocks, light) = (&mut self.blocks, &mut self.light);
+         let base_y = region[1][1].map_or(MIN_Y, Chunk::min_y) + sy * 16;
++        self.copycat_panels.clear();
++        if let Some(center) = region[1][1] {
++            for chunk in region.iter().flatten().flatten() {
++                let Some(panels) = &chunk.copycat_panels else {
++                    continue;
++                };
++                for (&(x, y, z), &material) in panels.iter() {
++                    let local = [x - center.x * 16, y - base_y, z - center.z * 16];
++                    if local.iter().all(|v| (-B..16 + B).contains(v)) {
++                        self.copycat_panels.insert(pi(local[0], local[1], local[2]), material);
++                    }
++                }
++            }
++        }
+         // The section itself is unpacked in one pass and copied row by row;
+         // the border cells of the neighbouring sections are read in runs, from
+         // sections found once per layer.
+@@ -2212,14 +2227,46 @@
+                 count += 1;
+             }
+         };
+-        let neighbour = |n: [i32; 3]| pad.blocks[(cell as isize + step_index(n)) as usize];
++        let neighbour_index = |n: [i32; 3]| (cell as isize + step_index(n)) as usize;
++        let raw_neighbour = |n| pad.blocks[neighbour_index(n)];
++        let neighbour = |offset: [i32; 3]| {
++            let index = neighbour_index(offset);
++            let raw = pad.blocks[index];
++            let Some(&material) = pad.copycat_panels.get(&index) else {
++                return raw;
++            };
++            let Some(state) = self.assets.registry.state(BlockStateId(raw)) else {
++                return raw;
++            };
++            if state.name != crate::chunk::COPYCAT_PANEL {
++                return raw;
++            }
++            let face = Direction::ALL[q.facing as usize];
++            let normal = face.normal();
++            // The outer blocker check queries the opposite face of a Panel.
++            let blocking = (0..3).any(|axis| offset[axis] * normal[axis] != 0);
++            let exposed = if blocking { face } else { face.opposite() };
++            let facing = match exposed {
++                Direction::Down => "down",
++                Direction::Up => "up",
++                Direction::North => "north",
++                Direction::South => "south",
++                Direction::West => "west",
++                Direction::East => "east",
++            };
++            if state.properties.get("facing").is_some_and(|value| value == facing) {
++                material.0
++            } else {
++                raw
++            }
++        };
+         let fused = face.fusion.and_then(|rule| {
+             fusion.pick(
+                 rule,
+                 id,
+                 CtmFace::ALL[q.facing as usize],
+                 q.tint_index,
+-                neighbour,
++                raw_neighbour,
+                 |s| {
+                     self.tables
+                         .info
+diff --git a/crates/horizon-client-render/src/mesher/visibility_tests.rs b/crates/horizon-client-render/src/mesher/visibility_tests.rs
+--- a/crates/horizon-client-render/src/mesher/visibility_tests.rs
++++ b/crates/horizon-client-render/src/mesher/visibility_tests.rs
+@@ -104,7 +104,7 @@
+     // Multiple opaque and non-opaque state IDs, plus an opaque padding border.
+     let mut pad = Padded {
+         blocks: vec![1; P * P * P],
+-        light: Vec::new(),
++        ..Default::default()
+     };
+     for y in 0..16 {
+         for z in 0..16 {
+diff --git a/crates/horizon-client-render/src/mesher/leaf_culling.rs b/crates/horizon-client-render/src/mesher/leaf_culling.rs
+--- a/crates/horizon-client-render/src/mesher/leaf_culling.rs
++++ b/crates/horizon-client-render/src/mesher/leaf_culling.rs
+@@ -370,6 +370,7 @@
+                 })
+                 .collect(),
+             light: vec![0; P * P * P],
++            ..Default::default()
+         }
+     }
+ 
+diff --git a/crates/horizon-client-render/src/streaming.rs b/crates/horizon-client-render/src/streaming.rs
+--- a/crates/horizon-client-render/src/streaming.rs
++++ b/crates/horizon-client-render/src/streaming.rs
+@@ -1422,6 +1422,17 @@
+         if chunk.fresh {
+             world.modified.insert(key);
+         }
++        if !chunk.block_entities.is_empty() {
++            let registry = self.shared.context.read().unwrap().assets.registry;
++            let panels = chunk.block_entities.iter().filter_map(|&(pos, ref entity)| {
++                let state = chunk.block(pos.0 & 15, pos.1, pos.2 & 15);
++                crate::chunk::copycat_panel_material(registry, state, Some(entity))
++                    .map(|material| (pos, material))
++            }).collect::<FxHashMap<_, _>>();
++            if !panels.is_empty() {
++                chunk.copycat_panels = Some(Arc::new(panels));
++            }
++        }
+         world
+             .block_entities
+             .load_chunk(std::mem::take(&mut chunk.block_entities));
+diff --git a/crates/horizon-client/src/game/native_hooks.rs b/crates/horizon-client/src/game/native_hooks.rs
+--- a/crates/horizon-client/src/game/native_hooks.rs
++++ b/crates/horizon-client/src/game/native_hooks.rs
+@@ -10880,6 +10880,15 @@
+             log.push((pos[0], pos[1], pos[2]));
+         }
+     }
++    pub(super) fn refresh_copycat_panel_material(&mut self, [x, y, z]: [i32; 3]) {
++        let key = (x, y, z);
++        let entity = self.world.block_entities.get(&key);
++        let material = horizon_client::chunk::copycat_panel_material(
++            self.pack.assets.registry, self.world.block(x, y, z), entity,
++        );
++        self.world.set_copycat_panel_material(key, material);
++    }
++
+     /// Playing, with nothing over the world: keys and zoom apply.
+     pub(super) fn native_playing(&self) -> bool {
+         self.screen == Screen::Playing
+diff --git a/crates/horizon-client/src/game/remote.rs b/crates/horizon-client/src/game/remote.rs
+--- a/crates/horizon-client/src/game/remote.rs
++++ b/crates/horizon-client/src/game/remote.rs
+@@ -2520,6 +2520,9 @@
+         if let Some(BlockEntity::Mod(m)) = self.world.block_entities.get_mut(&key) {
+             if *self.res.facts().get(block).name == *name {
+                 m.merge_update_tag(fields);
++                if m.id == "create:copycat" {
++                    self.refresh_copycat_panel_material(pos);
++                }
+             }
+             return;
+         }
+@@ -2604,6 +2607,11 @@
+         // LevelChunk.setBlockState: another block's block entity goes, even
+         // one of the same type (a mod's blocks may share one).
+         let other_block = previous.is_some_and(|p| self.res.facts().get(p).name != name);
++        if other_block && previous.is_some_and(|p| {
++            self.res.facts().get(p).name.as_ref() == horizon_client::chunk::COPYCAT_PANEL
++        }) {
++            self.world.set_copycat_panel_material(pos, None);
++        }
+         self.ensure_stateful_entity_table();
+         // State-aware factories decide creation only. A valid same-block
+         // instance survives even when the new state would create none.

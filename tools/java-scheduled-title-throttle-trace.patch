@@ -1,0 +1,41 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -211,6 +211,18 @@
+             var schedule = new com.simibubi.create.content.trains.schedule.Schedule();
+             schedule.cyclic = false;
+             for (String name : java.util.List.of("Origin", "Terminal")) {
++                if (name.equals("Terminal")) {
++                    var titleEntry = new com.simibubi.create.content.trains.schedule.ScheduleEntry();
++                    var title = new com.simibubi.create.content.trains.schedule.destination.ChangeTitleInstruction();
++                    title.getData().putString("Text", "Night freight");
++                    titleEntry.instruction = title;
++                    schedule.entries.add(titleEntry);
++                    var throttleEntry = new com.simibubi.create.content.trains.schedule.ScheduleEntry();
++                    var throttle = new com.simibubi.create.content.trains.schedule.destination.ChangeThrottleInstruction();
++                    throttle.getData().putInt("Value", 10);
++                    throttleEntry.instruction = throttle;
++                    schedule.entries.add(throttleEntry);
++                }
+                 var entry = new com.simibubi.create.content.trains.schedule.ScheduleEntry();
+                 var instruction = new com.simibubi.create.content.trains.schedule.destination.DestinationInstruction();
+                 instruction.getData().putString("Text", name);
+@@ -231,7 +243,7 @@
+             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(click);
+             helper.assertTrue(click.isCanceled() && train.runtime.getSchedule() != null, "Conductor must accept the schedule");
+         });
+-        for (int tick = 23; tick <= 145; tick++) {
++        for (int tick = 23; tick <= 205; tick++) {
+ 			int t = tick;
+ 			helper.runAfterDelay(t, () -> {
+ 				var railway = com.simibubi.create.Create.RAILWAYS;
+@@ -252,7 +264,9 @@
+                     t, train.speed, a, b, d, e, approaching ? 1 : 0, stopped ? 1 : 0,
+                     approaching ? train.navigation.distanceToDestination : 0, atOrigin ? 1 : 0,
+                     train.runtime.state, train.runtime.currentEntry, train.runtime.paused ? 1 : 0, train.runtime.completed ? 1 : 0);
+-                if (t == 145) {
++                System.out.printf(java.util.Locale.ROOT, "CREATE_SCHEDULED_TITLE_THROTTLE %d;%s;%.9f%n",
++                    t, train.runtime.currentTitle, train.throttle);
++                if (t == 205) {
+                     helper.assertTrue(stopped && train.runtime.completed, "Schedule must finish at Terminal");
+                     helper.succeed();
+                 }

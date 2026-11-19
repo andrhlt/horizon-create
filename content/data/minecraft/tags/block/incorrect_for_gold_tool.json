@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "create:zinc_ore",
+    "create:deepslate_zinc_ore",
+    "create:raw_zinc_block",
+    "create:zinc_block"
+  ]
+}

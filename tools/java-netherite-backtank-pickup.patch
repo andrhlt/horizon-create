@@ -1,0 +1,70 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..8232db4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.netheriteBacktankPickup")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..c4b8107 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -29,6 +29,53 @@ import net.minecraft.world.level.block.RedstoneLampBlock;
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 80)
++	public static void netheriteBacktankPickup(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var support = helper.absolutePos(new BlockPos(2, 14, 2));
++		var at = support.above();
++		var direction = net.minecraft.core.Direction.UP;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var chest = net.minecraft.world.entity.EquipmentSlot.CHEST;
++		var air = com.simibubi.create.AllDataComponents.BACKTANK_AIR;
++		var tankItem = com.simibubi.create.AllItems.NETHERITE_BACKTANK.get();
++		var tankBlock = com.simibubi.create.AllBlocks.NETHERITE_BACKTANK.get();
++		var name = net.minecraft.network.chat.Component.literal("Dive Supply");
++		var tank = new ItemStack(tankItem);
++		tank.set(air, 284);
++		tank.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, name);
++		world.setBlockAndUpdate(support, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++		world.setBlockAndUpdate(at, net.minecraft.world.level.block.Blocks.WATER.defaultBlockState());
++		player.setPos(at.getX() + .5, at.getY(), at.getZ() + 3.5);
++		player.setYRot(180);
++		player.setItemInHand(hand, tank);
++		var placement = new net.minecraft.world.phys.BlockHitResult(support.getCenter().relative(direction, .5), direction, support, false);
++		tank.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, placement));
++		var placed = world.getBlockState(at);
++		helper.assertTrue(placed.is(tankBlock), "Tank was not placed");
++		var entity = (com.simibubi.create.content.equipment.armor.BacktankBlockEntity) world.getBlockEntity(at);
++		var clone = tankBlock.getCloneItemStack(world, at, placed);
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var wet = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		System.out.printf("CREATE_BACKTANK_PICKUP place,%s,%s,%s,%d,%s,%d,%d%n",
++			net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(placed.getBlock()),
++			placed.getValue(facing), placed.getValue(wet), entity.getAirLevel(),
++			clone.getHoverName().getString(), tank.getCount(), player.getItemBySlot(chest).getCount());
++		var pickup = new net.minecraft.world.phys.BlockHitResult(at.getCenter(), net.minecraft.core.Direction.SOUTH, at, false);
++		player.setItemInHand(hand, ItemStack.EMPTY);
++		placed.useItemOn(ItemStack.EMPTY, world, player, hand, pickup);
++		var equipped = player.getItemBySlot(chest);
++		var restored = world.getBlockState(at);
++		System.out.printf("CREATE_BACKTANK_PICKUP pickup,%s,-,%s,%d,%s,%d,%d%n",
++			net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(restored.getBlock()),
++			restored.getFluidState().isSource(), equipped.getOrDefault(air, -1),
++			equipped.getHoverName().getString(), player.getItemInHand(hand).getCount(), equipped.getCount());
++		helper.assertTrue(equipped.is(tankItem) && equipped.getOrDefault(air, -1) == 284, "Backtank charge or armor slot");
++		helper.assertTrue(restored.getFluidState().isSource(), "Source water was not restored");
++		helper.succeed();
++	}
+ 	@GameTest(template = "schematicannon", timeoutTicks = FIFTEEN_SECONDS)
+ 	public static void schematicannon(CreateGameTestHelper helper) {
+ 		// load the structure

@@ -1,0 +1,102 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..668cb7a62 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.createLatches"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..653fd661b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,70 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 75)
++	public static void createLatches(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var toggleAt = helper.absolutePos(new BlockPos(2, 20, 2));
++		var latchAt = toggleAt.south(6);
++		var toggle = com.simibubi.create.AllBlocks.POWERED_TOGGLE_LATCH.get();
++		var latch = com.simibubi.create.AllBlocks.POWERED_LATCH.get();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var power = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWER;
++		var north = net.minecraft.core.Direction.NORTH;
++		var east = net.minecraft.core.Direction.EAST;
++		for (var at : java.util.List.of(toggleAt, latchAt)) {
++			for (var support : java.util.List.of(at, at.west(), at.east(), at.south()))
++				level.setBlockAndUpdate(support.below(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++			var block = at.equals(toggleAt) ? toggle : latch;
++			level.setBlockAndUpdate(at, block.defaultBlockState().setValue(facing, east));
++			level.setBlockAndUpdate(at.west(), net.minecraft.world.level.block.Blocks.REDSTONE_WIRE.defaultBlockState());
++			var placed = level.getBlockState(at);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_LATCH_MATERIAL %s,%.1f,%.1f,%d,%b,%s%n",
++				net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block), placed.getDestroySpeed(level, at),
++				block.getExplosionResistance(), placed.getMapColor(level, at).id, placed.requiresCorrectToolForDrops(),
++				net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.getKey(placed.getSoundType().getPlaceSound()));
++		}
++		var redstone = net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState();
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		for (int tick = 0; tick < 41; tick++) {
++			int sample = tick;
++			helper.runAtTickTime(sample + 1, () -> {
++				if (sample == 3 || sample == 7 || sample == 10 || sample == 19 || sample == 35) {
++					var input = sample == 3 || sample == 10 || sample == 35 ? redstone : air;
++					level.setBlockAndUpdate(toggleAt.east(), input);
++					level.setBlockAndUpdate(latchAt.east(), input);
++					if (sample == 35) {
++						level.setBlockAndUpdate(toggleAt.east(), air);
++						level.setBlockAndUpdate(latchAt.east(), air);
++					}
++				}
++				if (sample == 12 || sample == 16 || sample == 22 || sample == 26)
++					level.setBlockAndUpdate(latchAt.south(), sample == 12 || sample == 22 ? redstone : air);
++				String usedToggle = "_";
++				String usedLatch = "_";
++				if (sample == 14 || sample == 24 || sample == 28 || sample == 32) {
++					player.setShiftKeyDown(sample == 32);
++					var empty = net.minecraft.world.item.ItemStack.EMPTY;
++					var target = new net.minecraft.world.phys.BlockHitResult(toggleAt.getCenter(), north, toggleAt, false);
++					usedToggle = level.getBlockState(toggleAt).useItemOn(empty, level, player, hand, target).name();
++					target = new net.minecraft.world.phys.BlockHitResult(latchAt.getCenter(), north, latchAt, false);
++					usedLatch = level.getBlockState(latchAt).useItemOn(empty, level, player, hand, target).name();
++				}
++				var a = level.getBlockState(toggleAt);
++				var b = level.getBlockState(latchAt);
++				var rear = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++				var side = com.simibubi.create.content.redstone.diodes.PoweredLatchBlock.POWERED_SIDE;
++				var output = com.simibubi.create.content.redstone.diodes.ToggleLatchBlock.POWERING;
++				System.out.printf(java.util.Locale.ROOT, "CREATE_LATCH %d,%b,%b,%d,%b,%b,%b,%d,%s,%s%n", sample,
++					a.getValue(rear), a.getValue(output), level.getBlockState(toggleAt.west()).getValue(power),
++					b.getValue(rear), b.getValue(side), b.getValue(output), level.getBlockState(latchAt.west()).getValue(power),
++					usedToggle, usedLatch);
++				if (sample == 40)
++					helper.succeed();
++			});
++		}
++	}
+ }

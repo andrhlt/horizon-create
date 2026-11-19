@@ -1,0 +1,7 @@
+{
+  "template": "minecraft:bell",
+  "item": true,
+  "properties": {
+    "map_color": 30
+  }
+}

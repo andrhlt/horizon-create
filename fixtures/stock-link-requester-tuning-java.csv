@@ -1,0 +1,3 @@
+tick,action,handled,held_count,foil,matches_frequency,type
+3,tune,true,1,true,true,create:redstone_requester
+4,place,true,0,false,true,create:redstone_requester

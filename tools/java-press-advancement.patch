@@ -1,0 +1,104 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,88 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void pressAdvancementOwner(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var up = net.minecraft.core.Direction.UP;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var owner = pressFixturePlayer(helper, "PressOwner");
++		var operator = pressFixturePlayer(helper, "PressOperator");
++		var pressAdvancement = level.getServer().getAdvancements().get(
++			com.simibubi.create.Create.asResource("mechanical_press"));
++		BlockPos pressPos = new BlockPos(2, 11, 1);
++		BlockPos motorPos = pressPos.west();
++		BlockPos depotPos = pressPos.below(2);
++		level.setBlockAndUpdate(helper.absolutePos(motorPos),
++			AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east));
++		((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(motorPos))
++			.generatedSpeed.setValue(128);
++		level.setBlockAndUpdate(helper.absolutePos(depotPos), AllBlocks.DEPOT.getDefaultState());
++
++		var motorAt = helper.absolutePos(motorPos);
++		var depotAt = helper.absolutePos(depotPos);
++		var pressAt = helper.absolutePos(pressPos);
++		owner.moveTo(pressAt.getX() + 2.5, pressAt.getY(), pressAt.getZ() + .5, 90, 0);
++		var pressItem = AllBlocks.MECHANICAL_PRESS.asStack();
++		owner.setItemInHand(hand, pressItem);
++		var supportHit = new net.minecraft.world.phys.BlockHitResult(
++			motorAt.getCenter().relative(east, .5), east, motorAt, false);
++		var placement = pressItem.useOn(new net.minecraft.world.item.context.UseOnContext(owner, hand, supportHit));
++		helper.assertTrue(placement.consumesAction(), "The owner must place the press by item use");
++		owner.moveTo(pressAt.getX() + 64.5, pressAt.getY(), pressAt.getZ() + .5, 90, 0);
++
++		var press = (com.simibubi.create.content.kinetics.press.MechanicalPressBlockEntity) helper.getBlockEntity(pressPos);
++		var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) helper.getBlockEntity(depotPos);
++		operator.moveTo(depotAt.getX() + .5, depotAt.getY(), depotAt.getZ() + 2.5, 180, 0);
++
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick() - 5;
++			helper.assertTrue(tick >= 0, "Waiting for the press to initialize");
++			if (tick == 0) {
++				var ingot = new ItemStack(Items.IRON_INGOT);
++				operator.setItemInHand(hand, ingot);
++				var inputHit = new net.minecraft.world.phys.BlockHitResult(
++					depotAt.getCenter().relative(up, .5), up, depotAt, false);
++				level.getBlockState(depotAt).useItemOn(ingot, level, operator, hand, inputHit);
++				helper.assertTrue(depot.getHeldItem().is(Items.IRON_INGOT), "The operator must load the Depot");
++			}
++			var behaviour = press.getPressingBehaviour();
++			var held = depot.getHeldItem();
++			var ownerDone = owner.getAdvancements().getOrStartProgress(pressAdvancement).isDone();
++			var operatorDone = operator.getAdvancements().getOrStartProgress(pressAdvancement).isDone();
++			var ownerTag = press.saveWithoutMetadata(level.registryAccess());
++			boolean owns = ownerTag.hasUUID("Owner") && ownerTag.getUUID("Owner").equals(owner.getUUID());
++			var facingName = press.getBlockState().getValue(
++				net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING).getName();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_PRESS_OWNER %d,%s,%d,%d,%s,%s,%s,%s%n",
++				tick, facingName, (int) press.getSpeed(), behaviour.runningTicks, owns,
++				held.is(AllItems.IRON_SHEET.get()), ownerDone, operatorDone);
++			helper.assertTrue(tick >= 32, "Waiting for the ownership trace");
++			helper.assertTrue(owns && ownerDone && !operatorDone,
++				"Only the player who placed the press should earn Bonk!");
++		});
++	}
++
++	private static net.minecraft.server.level.ServerPlayer pressFixturePlayer(CreateGameTestHelper helper, String name) {
++		var server = helper.getLevel().getServer();
++		var profile = new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), name);
++		var cookie = net.minecraft.server.network.CommonListenerCookie.createInitial(profile, false);
++		var player = new net.minecraft.server.level.ServerPlayer(server, helper.getLevel(),
++			cookie.gameProfile(), cookie.clientInformation());
++		var connection = new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
++		new io.netty.channel.embedded.EmbeddedChannel(connection);
++		new net.minecraft.server.network.ServerGamePacketListenerImpl(server, connection, player, cookie) {
++			@Override
++			public void send(net.minecraft.network.protocol.Packet<?> packet,
++				net.minecraft.network.PacketSendListener callback) {}
++		};
++		helper.getLevel().addNewPlayer(player);
++		player.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
++		player.getAbilities().flying = true;
++		player.onUpdateAbilities();
++		return player;
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.pressAdvancementOwner")).toList();
+ 	}
+ }

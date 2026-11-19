@@ -1,0 +1,187 @@
+diff --git a/src/main/java/com/simibubi/create/AllKeys.java b/src/main/java/com/simibubi/create/AllKeys.java
+--- a/src/main/java/com/simibubi/create/AllKeys.java
++++ b/src/main/java/com/simibubi/create/AllKeys.java
+@@ -120,6 +120,9 @@
+ 	}
+ 
+ 	public static boolean shiftDown() {
++		// The client parity probe supplies a Shift input without changing OS focus.
++		if (Boolean.getBoolean("parity.schedulePassengerCount.shift"))
++			return true;
+ 		return isKeyDown(SHIFT_MODIFIER.keybind.getKey().getValue());
+ 	}
+ 
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaSchedulePassengerCountProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaSchedulePassengerCountProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaSchedulePassengerCountProbe.java
+@@ -0,0 +1,169 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.trains.schedule.ScheduleScreen;
++import com.simibubi.create.content.trains.schedule.condition.PlayerPassengerCondition;
++import com.simibubi.create.foundation.gui.widget.ScrollInput;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.function.Consumer;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.gui.components.events.GuiEventListener;
++import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaSchedulePassengerCountProbe {
++    private static boolean supplied;
++    private static int phase;
++    private static int elapsed;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.schedulePassengerCount"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.getOverlay() != null)
++            return;
++        if (!supplied) {
++            var server = mc.getSingleplayerServer();
++            var playerId = mc.player.getUUID();
++            server.execute(() -> server.getPlayerList().getPlayer(playerId)
++                .setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, AllItems.SCHEDULE.asStack()));
++            supplied = true;
++        }
++        if (!AllItems.SCHEDULE.isIn(mc.player.getMainHandItem()) || ++elapsed < 8)
++            return;
++        if (mc.screen == null) {
++            switch (phase) {
++                case 0 -> use(mc);
++                case 6 -> {
++                    captureItem(mc, "DEFAULT");
++                    use(mc);
++                }
++                case 9 -> {
++                    captureItem(mc, "SHIFT");
++                    use(mc);
++                }
++                case 12 -> {
++                    captureItem(mc, "UPPER");
++                    use(mc);
++                }
++                case 15 -> {
++                    captureItem(mc, "LOWER");
++                    System.out.println("CREATE_PASSENGER_EDITOR_DONE");
++                    mc.stop();
++                }
++                default -> { return; }
++            }
++        } else if (mc.screen instanceof ScheduleScreen screen) {
++            switch (phase) {
++                case 1 -> click(screen, 52, 31);
++                case 2 -> {
++                    click(screen, 111, 94);
++                    for (char c : "Waiting Station".toCharArray())
++                        screen.charTyped(c, 0);
++                    click(screen, 233, 94);
++                }
++                case 3 -> {
++                    click(screen, 65, 60);
++                    for (int i=0; i < 5; i++)
++                        scroll(screen, 130, 72, -1, false);
++                }
++                case 4 -> {
++                    require(screen, 0, 0);
++                    click(screen, 233, 94);
++                }
++                case 5, 8, 11, 14 -> click(screen, 222, 204);
++                case 7 -> {
++                    click(screen, 65, 60);
++                    require(screen, 0, 0);
++                    scroll(screen, 85, 94, 1, false);
++                    require(screen, 1, 0);
++                    scroll(screen, 149, 94, -1, false);
++                    scroll(screen, 85, 94, 1, true);
++                    require(screen, 5, 1);
++                    click(screen, 233, 94);
++                }
++                case 10 -> {
++                    click(screen, 65, 60);
++                    require(screen, 5, 1);
++                    for (int i=0; i < 5; i++)
++                        scroll(screen, 85, 94, 1, true);
++                    require(screen, 20, 1);
++                    click(screen, 233, 94);
++                }
++                case 13 -> {
++                    click(screen, 65, 60);
++                    require(screen, 20, 1);
++                    for (int i=0; i < 5; i++)
++                        scroll(screen, 85, 94, -1, true);
++                    scroll(screen, 149, 94, 1, false);
++                    require(screen, 0, 0);
++                    click(screen, 233, 94);
++                }
++                default -> { return; }
++            }
++        } else
++            return;
++        phase++;
++        elapsed = 0;
++    }
++
++    private static void require(ScheduleScreen screen, int count, int exact) throws ReflectiveOperationException {
++        var field = ScheduleScreen.class.getDeclaredField("editingCondition");
++        field.setAccessible(true);
++        var value = field.get(screen);
++        if (!(value instanceof PlayerPassengerCondition))
++            throw new AssertionError("Expected Players Seated, got " + value);
++        var subwidgets = ScheduleScreen.class.getDeclaredField("editorSubWidgets");
++        subwidgets.setAccessible(true);
++        var overlay = subwidgets.get(screen);
++        var forEach = overlay.getClass().getDeclaredMethod("forEach", Consumer.class);
++        forEach.setAccessible(true);
++        var actual = new ArrayList<Integer>();
++        Consumer<GuiEventListener> observe = widget -> {
++            if (widget instanceof ScrollInput input)
++                actual.add(input.getState());
++        };
++        forEach.invoke(overlay, observe);
++        if (!actual.equals(List.of(count, exact)))
++            throw new AssertionError("Expected Players Seated [" + count + ", " + exact + "], got " + actual);
++    }
++
++    private static void captureItem(Minecraft mc, String name) {
++        System.out.println("CREATE_PASSENGER_EDITOR_" + name + " " +
++            mc.player.getMainHandItem().get(AllDataComponents.TRAIN_SCHEDULE));
++    }
++
++    private static void use(Minecraft mc) throws ReflectiveOperationException {
++        var method = Minecraft.class.getDeclaredMethod("startUseItem");
++        method.setAccessible(true);
++        method.invoke(mc);
++    }
++
++    private static void click(ScheduleScreen screen, int dx, int dy) throws ReflectiveOperationException {
++        screen.mouseClicked(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, 0);
++    }
++
++    private static void scroll(ScheduleScreen screen, int dx, int dy, double delta, boolean shift)
++        throws ReflectiveOperationException {
++        try {
++            if (shift)
++                System.setProperty("parity.schedulePassengerCount.shift", "true");
++            screen.mouseScrolled(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, 0, delta);
++        } finally {
++            System.clearProperty("parity.schedulePassengerCount.shift");
++        }
++    }
++
++    private static int origin(ScheduleScreen screen, String fieldName) throws ReflectiveOperationException {
++        var field = AbstractContainerScreen.class.getDeclaredField(fieldName);
++        field.setAccessible(true);
++        return (int) field.get(screen);
++    }
++}

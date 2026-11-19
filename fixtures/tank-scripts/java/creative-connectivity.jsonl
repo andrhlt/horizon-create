@@ -1,0 +1,13 @@
+{"type":"configure","tick":4,"pos":[0,2,0]}
+{"type":"probe","label":"before-bridge","tick":4,"pos":[0,0,0],"block":"create:creative_fluid_tank","controller":[0,0,0],"capacity":8000,"fluid":"minecraft:empty","amount":0,"components":null}
+{"type":"probe","label":"before-bridge","tick":4,"pos":[0,1,0],"block":"minecraft:air","controller":null,"capacity":0,"fluid":"minecraft:empty","amount":0,"components":null}
+{"type":"probe","label":"before-bridge","tick":4,"pos":[0,2,0],"block":"create:creative_fluid_tank","controller":[0,2,0],"capacity":8000,"fluid":"minecraft:water","amount":8000,"components":null}
+{"type":"probe","label":"connected","tick":8,"pos":[0,0,0],"block":"create:creative_fluid_tank","controller":[0,0,0],"capacity":24000,"fluid":"minecraft:water","amount":24000,"components":null}
+{"type":"probe","label":"connected","tick":8,"pos":[0,1,0],"block":"create:creative_fluid_tank","controller":[0,0,0],"capacity":24000,"fluid":"minecraft:water","amount":24000,"components":null}
+{"type":"probe","label":"connected","tick":8,"pos":[0,2,0],"block":"create:creative_fluid_tank","controller":[0,0,0],"capacity":24000,"fluid":"minecraft:water","amount":24000,"components":null}
+{"type":"probe","label":"removed","tick":8,"pos":[0,0,0],"block":"create:creative_fluid_tank","controller":[0,0,0],"capacity":8000,"fluid":"minecraft:water","amount":24000,"components":null}
+{"type":"probe","label":"removed","tick":8,"pos":[0,1,0],"block":"minecraft:air","controller":null,"capacity":0,"fluid":"minecraft:empty","amount":0,"components":null}
+{"type":"probe","label":"removed","tick":8,"pos":[0,2,0],"block":"create:creative_fluid_tank","controller":[0,2,0],"capacity":8000,"fluid":"minecraft:water","amount":8000,"components":null}
+{"type":"probe","label":"split","tick":12,"pos":[0,0,0],"block":"create:creative_fluid_tank","controller":[0,0,0],"capacity":8000,"fluid":"minecraft:water","amount":24000,"components":null}
+{"type":"probe","label":"split","tick":12,"pos":[0,1,0],"block":"minecraft:air","controller":null,"capacity":0,"fluid":"minecraft:empty","amount":0,"components":null}
+{"type":"probe","label":"split","tick":12,"pos":[0,2,0],"block":"create:creative_fluid_tank","controller":[0,2,0],"capacity":8000,"fluid":"minecraft:water","amount":8000,"components":null}

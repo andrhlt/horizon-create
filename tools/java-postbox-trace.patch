@@ -1,0 +1,102 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,87 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void postboxParity(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var recipes = level.getRecipeManager();
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var blocks = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var type = net.minecraft.world.item.crafting.RecipeType.CRAFTING;
++		var at = helper.absolutePos(new BlockPos(2, 12, 2));
++		var floor = at.below();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var open = net.minecraft.world.level.block.state.properties.BlockStateProperties.OPEN;
++		var waterlogged = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var up = net.minecraft.core.Direction.UP;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
++		player.setPos(at.getX() + .5, at.getY(), at.getZ() - 2.0);
++		var hit = new net.minecraft.world.phys.BlockHitResult(floor.getCenter().relative(up, .5), up, floor, false);
++		var white = AllBlocks.PACKAGE_POSTBOXES.get(net.minecraft.world.item.DyeColor.WHITE).get();
++		var black = AllBlocks.PACKAGE_POSTBOXES.get(net.minecraft.world.item.DyeColor.BLACK).get();
++		var barrel = net.minecraft.world.item.Items.BARREL.getDefaultInstance();
++		var alloy = com.simibubi.create.AllItems.ANDESITE_ALLOY.asStack();
++		var stone = net.minecraft.world.item.Items.STONE.getDefaultInstance();
++		var box = items.get(net.minecraft.resources.ResourceLocation.parse("create:cardboard_package_12x10")).getDefaultInstance();
++		level.setBlockAndUpdate(floor, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++
++		for (var dye : net.minecraft.world.item.DyeColor.values()) {
++			var name = dye.getSerializedName();
++			var block = AllBlocks.PACKAGE_POSTBOXES.get(dye).get();
++			var state = block.defaultBlockState();
++			var dyeStack = net.minecraft.world.item.DyeItem.byColor(dye).getDefaultInstance();
++			var source = (block == white ? black : white).asItem().getDefaultInstance();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_POSTBOX_DEFAULTS %s,%s,%s,%b,%b,%.2f,%.2f,%d%n",
++				name, blocks.getKey(block), state.getValue(facing).getSerializedName(), state.getValue(open),
++				state.getValue(waterlogged), state.getDestroySpeed(level, at), block.getExplosionResistance(),
++				state.getMapColor(level, at).id);
++			var direct = net.minecraft.world.item.crafting.CraftingInput.of(1, 3, java.util.List.of(dyeStack, barrel, alloy));
++			var recolor = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(dyeStack, source));
++			for (var input : java.util.List.of(direct, recolor)) {
++				var recipe = recipes.getRecipeFor(type, input, level).orElseThrow();
++				var result = recipe.value().assemble(input, level.registryAccess());
++				helper.assertTrue(result.is(block.asItem()), "Wrong Postbox crafting output for " + name);
++				String ingredients = input.items().stream().map(item -> items.getKey(item.getItem()).toString())
++					.collect(java.util.stream.Collectors.joining("|"));
++				System.out.printf(java.util.Locale.ROOT, "CREATE_POSTBOX_CRAFTING %s,%s,%s,%d,%d,%s,%s,%d%n",
++					name, input == direct ? "direct" : "recolor", recipe.id(), input.width(), input.height(), ingredients,
++					items.getKey(result.getItem()), result.getCount());
++			}
++		}
++
++		var stack = white.asItem().getDefaultInstance();
++		player.setItemInHand(hand, stack);
++		for (boolean wet : new boolean[] {false, true}) {
++			for (int yaw : new int[] {0, 90, 180, 270}) {
++				level.setBlockAndUpdate(at, (wet ? net.minecraft.world.level.block.Blocks.WATER :
++					net.minecraft.world.level.block.Blocks.AIR).defaultBlockState());
++				player.setYRot(yaw);
++				var context = new net.minecraft.world.item.context.BlockPlaceContext(player, hand, stack, hit);
++				var state = white.getStateForPlacement(context);
++				var shape = state.getShape(level, at).bounds();
++				System.out.printf(java.util.Locale.ROOT, "CREATE_POSTBOX_PLACEMENT %d,%b,%s,%b,%b,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f%n",
++					yaw, wet, state.getValue(facing).getSerializedName(), state.getValue(open), state.getValue(waterlogged),
++					shape.minX, shape.minY, shape.minZ, shape.maxX, shape.maxY, shape.maxZ);
++			}
++		}
++		level.setBlockAndUpdate(at, white.defaultBlockState());
++		var boxEntity = (com.simibubi.create.content.logistics.packagePort.postbox.PostboxBlockEntity) level.getBlockEntity(at);
++		var fills = new int[] {0, 1, 9, 18, 0};
++		for (int i = 0; i < fills.length; i++) {
++			int filled = fills[i];
++			int tick = i + 2;
++			helper.runAtTickTime(tick, () -> {
++				for (int slot = 0; slot < boxEntity.inventory.getSlots(); slot++)
++					boxEntity.inventory.setStackInSlot(slot, slot < filled ? box.copy() : net.minecraft.world.item.ItemStack.EMPTY);
++				int signal = level.getBlockState(at).getAnalogOutputSignal(level, at);
++				System.out.printf(java.util.Locale.ROOT, "CREATE_POSTBOX_INVENTORY %d,%d,%d,%d,%b,%b%n",
++					helper.getTick(), filled, signal, boxEntity.inventory.getSlots(),
++					boxEntity.inventory.isItemValid(0, box), boxEntity.inventory.isItemValid(0, stone));
++				if (tick == fills.length + 1)
++					helper.succeed();
++			});
++		}
++	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.postboxParity"))
++			.toList();
+ 	}
+ }

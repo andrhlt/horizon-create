@@ -1,0 +1,121 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..4d9f0f681 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.valveActivationTransport"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..f63833124 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,89 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++
++
++
++
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 38)
++	public static void valveActivationTransport(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var wet = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var east = net.minecraft.core.Direction.EAST;
++		var west = net.minecraft.core.Direction.WEST;
++		var level = helper.getLevel();
++		for (int index = 0; index < 2; index++) {
++			var turned = index == 0 ? east : west;
++			var pos = new BlockPos(12, 3, 2 + index * 7);
++			var rear = pos.relative(turned.getOpposite());
++			var large = rear.relative(turned.getOpposite());
++			var small = large.above().south();
++			helper.setBlock(pos, com.simibubi.create.AllBlocks.COPPER_VALVE_HANDLE.getDefaultState()
++				.setValue(facing, turned).setValue(wet, true));
++			helper.setBlock(rear, com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis()));
++			helper.setBlock(large, com.simibubi.create.AllBlocks.LARGE_COGWHEEL.getDefaultState().setValue(axis, east.getAxis()));
++			helper.setBlock(small, com.simibubi.create.AllBlocks.COGWHEEL.getDefaultState().setValue(axis, east.getAxis()));
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int index = 0; index < 2; index++) {
++				var turned = index == 0 ? east : west;
++				var pos = new BlockPos(12, 3, 2 + index * 7);
++				var reverse = index == 1;
++				var rear = pos.relative(turned.getOpposite());
++				var large = rear.relative(turned.getOpposite());
++				var small = large.above().south();
++				var handle = helper.getBlockEntity(AllBlockEntityTypes.VALVE_HANDLE.get(), pos);
++				var shaft = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), rear);
++				var bigGear = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), large);
++				var smallGear = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), small);
++				if (tick == 1)
++					handle.angleInput.setValue(index == 0 ? -137 : 95);
++				if (tick == 2)
++					handle.activate(reverse);
++				var data = handle.saveWithoutMetadata(level.registryAccess());
++				System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_ACTION_TICK,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f%n",
++					tick, index, data.getInt("InUse"), handle.cooldown, handle.getSpeed(),
++					shaft.getSpeed(), bigGear.getSpeed(), smallGear.getSpeed(), data.getCompound("Network").getFloat("Capacity"));
++			}
++			if (tick == 22 || tick == 23) {
++				for (int index = 0; index < 3; index++) {
++					var probe = new BlockPos(12, 3, 16 + index * 4);
++					var at = helper.absolutePos(probe);
++					var variant = index == 2
++						? com.simibubi.create.AllBlocks.DYED_VALVE_HANDLES.get(net.minecraft.world.item.DyeColor.WHITE)
++						: com.simibubi.create.AllBlocks.COPPER_VALVE_HANDLE;
++					var side = index == 2 ? net.minecraft.core.Direction.SOUTH : east;
++					var support = probe.relative(side.getOpposite());
++					var front = probe.relative(side);
++					if (tick == 22) {
++						helper.setBlock(support, Blocks.STONE.defaultBlockState());
++						helper.setBlock(front, Blocks.STONE.defaultBlockState());
++						helper.setBlock(probe, variant.getDefaultState().setValue(facing, side).setValue(wet, index != 0));
++					} else {
++						helper.setBlock(front, Blocks.AIR.defaultBlockState());
++						var frontOnly = level.getBlockState(at);
++						helper.setBlock(support, Blocks.AIR.defaultBlockState());
++						var state = level.getBlockState(at);
++						var volume = new net.minecraft.world.phys.AABB(at).inflate(0.7);
++						var count = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, volume)
++							.stream().filter(item -> item.getItem().is(variant.asItem()))
++							.mapToInt(item -> item.getItem().getCount()).sum();
++						System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE_SUPPORT_REMOVAL,%d,%d,%s,%s,%d,%d%n", tick, index,
++							net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(frontOnly.getBlock()),
++							net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()), state.getFluidState().getAmount(), count);
++					}
++				}
++			}
++			if (tick < 23)
++				helper.fail("Waiting for the complete valve release and support trace");
++		});
++	}
+ }

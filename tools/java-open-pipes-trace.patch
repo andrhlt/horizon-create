@@ -1,0 +1,37 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..b6ab205 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.openPipes"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+index 4102b83..7984d7b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -326,6 +326,18 @@ public class TestFluids {
+ 		MutableBoolean stage1 = new MutableBoolean(true);
+ 
+ 		helper.succeedWhen(() -> {
++			var registry = helper.getLevel().registryAccess();
++			var tanks = java.util.stream.Stream.of(new BlockPos(2, 3, 1), new BlockPos(2, 3, 3),
++					new BlockPos(4, 5, 1), new BlockPos(4, 5, 3))
++				.map(pos -> helper.getBlockEntity(pos).saveWithoutMetadata(registry).getCompound("TankContent")
++					.getCompound("Fluid").getInt("amount"))
++				.map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
++			var effectsApplied = secondZombie.getActiveEffects().stream()
++				.map(effect -> effect.getEffect().getRegisteredName() + "=" + effect.getDuration())
++				.sorted().collect(java.util.stream.Collectors.joining("|"));
++			System.out.printf("CREATE_OPEN_PIPES %d,%d,%b,%b,%s,%s%n", helper.getTick(),
++				helper.getLevel().getGameTime() % 5, stage1.booleanValue(),
++				firstZombie.isOnFire(), effectsApplied, tanks);
+ 			if (stage1.booleanValue()) {
+ 				helper.assertTrue(firstZombie.isOnFire(), "not ignited");
+ 				helper.assertFalse(secondZombie.getActiveEffects().isEmpty(), "no effects");

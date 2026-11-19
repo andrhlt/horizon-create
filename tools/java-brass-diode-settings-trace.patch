@@ -1,0 +1,55 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..9f5a427 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.brassDiodeSettings"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..d9cdfdc 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,36 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 16)
++	public static void brassDiodeSettings(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var timer = com.simibubi.create.AllBlocks.PULSE_TIMER.get();
++		var type = com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE;
++		var inputs = new int[][] {{0, 1}, {0, 17}, {1, 3}, {1, 5}, {2, 1}, {2, 3}, {2, 60}, {0, 7}};
++		helper.runAtTickTime(4, () -> {
++			world.setBlockAndUpdate(at.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++			world.setBlockAndUpdate(at, timer.defaultBlockState());
++			var be = (com.simibubi.create.content.redstone.diodes.BrassDiodeBlockEntity) world.getBlockEntity(at);
++			var timings = (com.simibubi.create.content.redstone.diodes.BrassDiodeScrollValueBehaviour) be.getBehaviour(type);
++			for (int index = 0; index < inputs.length; index++) {
++				var nbt = be.saveWithoutMetadata(world.registryAccess());
++				int start = 19 + index;
++				nbt.putInt("State", start);
++				be.loadWithComponents(nbt, world.registryAccess());
++				int row = inputs[index][0], value = inputs[index][1];
++				var selected = new com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBehaviour.ValueSettings(row, value);
++				timings.setValueSettings(player, selected, false);
++				var effective = timings.getValueSettings();
++				var result = be.saveWithoutMetadata(world.registryAccess());
++				System.out.printf("CREATE_DIODE_SETTING %d,%d,%d,%d,%d,%d,%d,%s%n", row, value, start,
++					result.getInt("ScrollValue"), result.getInt("State"), effective.row(), effective.value(),
++					timings.formatSettings(selected).getString());
++			}
++			helper.succeed();
++		});
++	}
++
+ }

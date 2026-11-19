@@ -1,0 +1,41 @@
+{
+  "template": "minecraft:stone",
+  "item": false,
+  "state_properties": {
+    "axis": {
+      "type": "enum",
+      "values": [
+        "x",
+        "y",
+        "z"
+      ]
+    },
+    "alt": {
+      "type": "boolean"
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "axis": "x",
+    "alt": "false",
+    "waterlogged": "false"
+  },
+  "properties": {
+    "waterloggable": true,
+    "occludes": false
+  },
+  "shapes": {
+    "default": [
+      [
+        0.25,
+        0.25,
+        0.25,
+        0.75,
+        0.75,
+        0.75
+      ]
+    ]
+  }
+}

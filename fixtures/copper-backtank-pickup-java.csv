@@ -1,0 +1,3 @@
+phase,block,facing,water,air,name,held,chest
+place,create:copper_backtank,south,true,284,Dive Supply,0,0
+pickup,minecraft:water,-,true,284,Dive Supply,0,1

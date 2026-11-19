@@ -1,0 +1,100 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..7f4cba94c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.metalLadderControls"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..a8d2865cc 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1,5 +1,13 @@
+ package com.simibubi.create.infrastructure.gametest.tests;
+ 
++import net.minecraft.core.Direction;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.item.context.UseOnContext;
++import net.minecraft.world.level.GameType;
++import net.minecraft.world.level.block.LadderBlock;
++import net.minecraft.world.phys.BlockHitResult;
++import net.minecraft.world.phys.Vec3;
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
+ import com.simibubi.create.AllBlockEntityTypes;
+@@ -115,4 +123,67 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void metalLadderControls(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(1, 1, 1)).above(51);
++		var registry = BuiltInRegistries.BLOCK;
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var actor = helper.makeMockPlayer(GameType.SURVIVAL);
++		var wrench = com.simibubi.create.AllItems.WRENCH.asStack();
++		var materials = java.util.List.of("andesite", "brass", "copper");
++		for (int i = 0; i < materials.size(); i++) {
++			var material = materials.get(i);
++			var at = origin.east(i * 5);
++			var ladder = registry.get(com.simibubi.create.Create.asResource(material + "_ladder"));
++			var north = ladder.defaultBlockState().setValue(LadderBlock.FACING, Direction.NORTH);
++			var stack = ladder.asItem().getDefaultInstance();
++			actor.getInventory().clearContent();
++			actor.setItemInHand(InteractionHand.MAIN_HAND, wrench);
++			level.setBlockAndUpdate(at.south(), stone);
++			level.setBlockAndUpdate(at, north);
++			for (int tick = 1; tick <= 5; tick++) {
++				var face = switch (tick) {
++					case 1 -> Direction.NORTH;
++					case 5 -> Direction.EAST;
++					default -> Direction.UP;
++				};
++				if (tick == 3)
++					level.setBlockAndUpdate(at.west(), stone);
++				if (tick == 4)
++					level.removeBlock(at.south(), false);
++				var result = "_";
++				if (tick != 4) {
++					actor.setPos(at.getX() + .5, at.getY() + 1.0, at.getZ() - 2.0);
++					actor.setShiftKeyDown(tick == 5);
++					var hit = new BlockHitResult(at.getCenter().relative(face, .5), face, at, false);
++					result = wrench.useOn(new UseOnContext(actor, InteractionHand.MAIN_HAND, hit)).toString();
++				}
++				var block = level.getBlockState(at);
++				var facing = block.hasProperty(LadderBlock.FACING) ? block.getValue(LadderBlock.FACING).getName() : "_";
++				System.out.printf("CREATE_LADDER_WRENCH %s,%d,%s,%s,%s,%d%n", material, tick,
++					registry.getKey(block.getBlock()), facing, result, actor.getInventory().countItem(stack.getItem()));
++			}
++			actor.setShiftKeyDown(false);
++			var feet = at.east(1);
++			level.setBlockAndUpdate(feet.below(), stone);
++			for (int rung = 0; rung < 5; rung++) {
++				level.setBlockAndUpdate(feet.above(rung).south(), stone);
++				level.setBlockAndUpdate(feet.above(rung), north);
++			}
++			actor.setPos(feet.getX() + 0.5, feet.getY(), feet.getZ() + 0.50);
++			actor.setYRot(0);
++			actor.setXRot(0);
++			actor.setDeltaMovement(Vec3.ZERO);
++			actor.setOnGround(true);
++			actor.travel(Vec3.ZERO);
++			for (int tick = 0; tick <= 12; tick++) {
++				System.out.printf(java.util.Locale.ROOT, "CREATE_LADDER_CLIMB %s,%d,%b,%.9f,%.9f%n",
++					material, tick, actor.onClimbable(), actor.getY() - feet.getY(), actor.getDeltaMovement().y);
++				actor.travel(new Vec3(0, 0, 1));
++			}
++		}
++		helper.succeed();
++	}
+ }

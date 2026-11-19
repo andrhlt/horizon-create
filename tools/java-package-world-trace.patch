@@ -1,0 +1,189 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..fabfe5b30 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageWorld"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..d39336c7d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,170 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 50)
++	public static void packageWorld(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var center = helper.absolutePos(new BlockPos(2, 4, 2));
++		var anchor = net.minecraft.world.phys.Vec3.atCenterOf(center);
++		var bounds = new net.minecraft.world.phys.AABB(center).inflate(24);
++		var type = com.simibubi.create.AllEntityTypes.PACKAGE.get();
++		var styles = com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES;
++		var address = com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS;
++		player.setPos(anchor.x - 2, center.getY() + 1, anchor.z - 2);
++		player.setYRot(0);
++		player.setXRot(0);
++		player.setShiftKeyDown(false);
++		player.getInventory().clearContent();
++		player.getInventory().selected = 0;
++		world.setBlockAndUpdate(center, Blocks.STONE.defaultBlockState());
++
++		for (var mode : java.util.List.of(net.minecraft.world.level.GameType.SURVIVAL, net.minecraft.world.level.GameType.CREATIVE)) {
++			player.gameMode.changeGameModeForPlayer(mode);
++			for (int style : new int[]{0, 4, 13}) {
++				for (var face : net.minecraft.core.Direction.values()) {
++					var hit = new net.minecraft.world.phys.BlockHitResult(
++						anchor.add(face.getStepX() * .5, face.getStepY() * .5, face.getStepZ() * .5),
++						face, center, false);
++					var box = new ItemStack(styles.get(style));
++					box.set(address, "Fixture Address");
++					var cargo = net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
++					cargo.set(0, new ItemStack(Items.STONE, 3));
++					box.set(com.simibubi.create.AllDataComponents.PACKAGE_CONTENTS,
++						net.minecraft.world.item.component.ItemContainerContents.fromItems(cargo));
++					player.setItemInHand(hand, box);
++					var result = player.gameMode.useItemOn(player, world, box, hand, hit);
++					var matches = world.getEntities(type, bounds, entity -> true);
++					var placed = matches.getFirst();
++					var at = placed.position().subtract(anchor);
++					var held = player.getItemInHand(hand).getCount();
++					box = new ItemStack(styles.get(style));
++					player.setItemInHand(hand, box);
++					var overlapPoint = face.getStepY() == 0
++						? hit.getLocation().subtract(0, .4, 0)
++						: hit.getLocation().subtract(.45, 0, 0);
++					var overlap = new net.minecraft.world.phys.BlockHitResult(overlapPoint, face, center, false);
++					var repeat = player.gameMode.useItemOn(player, world, box, hand, overlap);
++					System.out.printf(java.util.Locale.ROOT, "PACKAGE_PLACE,%s,%d,%s,%s,%d,%s,%.9f,%.9f,%.9f,%.9f,%.9f,%s,%s,%d,%d%n",
++						mode, style, face, result, held, placed.getBox().getItem(),
++						at.x, at.y, at.z, placed.getBbWidth(), placed.getBbHeight(), placed.getAddress(), repeat,
++						player.getItemInHand(hand).getCount(), world.getEntities(type, bounds, entity -> true).size());
++					player.setItemInHand(hand, ItemStack.EMPTY);
++					var pickup = player.interactOn(placed, hand);
++					if (!pickup.consumesAction() || !placed.isRemoved() || !ItemStack.matches(placed.getBox(), player.getItemInHand(hand)))
++						throw new AssertionError("Package pickup changed the original stack for " + mode + " " + style + " " + face);
++				}
++			}
++		}
++		player.setPos(anchor.x + 3, center.getY() + 3, anchor.z);
++		player.setYRot(0);
++		player.setXRot(0);
++		for (var mode : java.util.List.of(net.minecraft.world.level.GameType.SURVIVAL, net.minecraft.world.level.GameType.CREATIVE)) {
++			player.gameMode.changeGameModeForPlayer(mode);
++			for (int heldTicks : new int[]{0, 2, 3, 4, 8, 20, 40}) {
++				var box = new ItemStack(styles.get(0));
++				box.set(address, "Fixture Address");
++				player.setItemInHand(hand, box);
++				player.gameMode.useItem(player, world, box, hand);
++				java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listener = event -> {
++					if (event.getLevel() != world || event.getSound() == null || event.isCanceled()
++						|| !event.getSound().value().getLocation().toString().equals("minecraft:entity.snowball.throw"))
++						return;
++					var origin = event.getPosition();
++					System.out.printf(java.util.Locale.ROOT,
++						"PACKAGE_THROW_SOUND,%s,%d,%s,%d,%.6f,%.6f,%.6f,%.6f,%.6f%n",
++						mode, heldTicks, event.getSound().value().getLocation(), event.getSource().ordinal(),
++						origin.x - player.getX(), origin.y - player.getY(), origin.z - player.getZ(),
++						event.getNewVolume(), event.getNewPitch());
++				};
++				var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
++				bus.addListener(net.neoforged.bus.api.EventPriority.LOWEST, listener);
++				try {
++					box.releaseUsing(world, player, box.getUseDuration(player) - heldTicks);
++				} finally {
++					bus.unregister(listener);
++				}
++				player.stopUsingItem();
++				var matches = world.getEntities(type, bounds, entity -> true);
++				var placed = matches.isEmpty() ? null : matches.getFirst();
++				var at = placed == null ? net.minecraft.world.phys.Vec3.ZERO : placed.position().subtract(player.position());
++				var velocity = placed == null ? net.minecraft.world.phys.Vec3.ZERO : placed.getDeltaMovement();
++				System.out.printf(java.util.Locale.ROOT, "PACKAGE_THROW,%s,%d,%d,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%s%n",
++					mode, heldTicks, player.getItemInHand(hand).getCount(), matches.size(), at.x, at.y, at.z,
++					velocity.x, velocity.y, velocity.z, placed == null ? "" : placed.getAddress());
++				matches.forEach(entity -> entity.discard());
++			}
++		}
++
++		player.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var box = new ItemStack(styles.get(0));
++		player.setItemInHand(hand, box);
++		player.gameMode.useItem(player, world, box, hand);
++		box.releaseUsing(world, player, box.getUseDuration(player) - 20);
++		player.stopUsingItem();
++		var tossed = world.getEntities(type, bounds, entity -> true).getFirst();
++		for (int tick = 0; tick <= 12; tick++) {
++			var at = tossed.position().subtract(anchor);
++			var v = tossed.getDeltaMovement();
++			System.out.printf(java.util.Locale.ROOT, "PACKAGE_FLIGHT,%d,%d,%.6f,%.6f,%.6f,%.9f,%.9f,%.9f,%b%n",
++				tick, tossed.tickCount, at.x, at.y, at.z, v.x, v.y, v.z, tossed.onGround());
++			if (tick < 12)
++				world.tickNonPassenger(tossed);
++		}
++		tossed.discard();
++
++		// NeoForge cancels the raw item spawn and queues the transformed entity.
++		var dropAt = anchor.add(7, 8, -7);
++		var rawMotion = new net.minecraft.world.phys.Vec3(0.125, 0.2, -0.05);
++		var replacements = new java.util.HashMap<Integer, com.simibubi.create.content.logistics.box.PackageEntity>();
++		var arrival = new java.util.HashMap<Integer, String>();
++		boolean[] rawAdded = new boolean[4];
++		java.util.function.Consumer<net.neoforged.neoforge.event.entity.EntityJoinLevelEvent> listener = event -> {
++			if (event.getLevel() != world || !(event.getEntity() instanceof com.simibubi.create.content.logistics.box.PackageEntity replacement))
++				return;
++			String label = replacement.getAddress();
++			if (label == null || !label.startsWith("Drop Fixture "))
++				return;
++			int test = Integer.parseInt(label.substring("Drop Fixture ".length()));
++			var relative = replacement.position().subtract(dropAt.add(test * 2, 0, 0));
++			var velocity = replacement.getDeltaMovement();
++			boolean snapped = test == 2 && replacement.getYRot() % 90 == 0;
++			replacements.put(test, replacement);
++			arrival.put(test, String.format(java.util.Locale.ROOT, "%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%b,%s",
++				relative.x, relative.y, relative.z, velocity.x, velocity.y, velocity.z, snapped,
++				net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(replacement.getBox().getItem())));
++		};
++		var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
++		bus.addListener(net.neoforged.bus.api.EventPriority.LOWEST, listener);
++		for (int test = 0; test < 4; test++) {
++			boolean chute = test == 2;
++			var at = dropAt.add(test * 2, 0, 0);
++			var foundBlock = net.minecraft.core.BlockPos.containing(at.x, at.y + .5, at.z);
++			world.setBlockAndUpdate(foundBlock, chute ? com.simibubi.create.AllBlocks.CHUTE.get().defaultBlockState() : Blocks.AIR.defaultBlockState());
++			var droppedStack = new ItemStack(styles.get(test == 1 ? 4 : 0));
++			droppedStack.set(address, "Drop Fixture " + test);
++			var raw = new net.minecraft.world.entity.item.ItemEntity(world, at.x, at.y, at.z, droppedStack);
++			raw.setDeltaMovement(rawMotion);
++			if (test == 3)
++				raw.setPickUpDelay(32767);
++			rawAdded[test] = world.addFreshEntity(raw);
++		}
++		helper.runAfterDelay(4, () -> {
++			bus.unregister(listener);
++			if (replacements.size() != 4)
++				throw new IllegalStateException("Expected four queued Package replacements, got " + replacements.size());
++			for (int test = 0; test < 4; test++) {
++				var replacement = replacements.get(test);
++				if (test == 3 && !replacement.isRemoved())
++					world.tickNonPassenger(replacement);
++				System.out.printf(java.util.Locale.ROOT, "PACKAGE_DROP,%d,%b,%b,%b,%s,%s%n",
++					test, rawAdded[test], test == 3, test == 2, arrival.get(test),
++					replacement.isRemoved() ? "discarded" : replacement.getAddress());
++				replacement.discard();
++			}
++			helper.succeed();
++		});
++	}
+ }

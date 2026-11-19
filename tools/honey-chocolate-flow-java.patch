@@ -1,0 +1,54 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -407,6 +407,51 @@
+ 		var array = data.getCompound(face).getList("Pressure", net.minecraft.nbt.Tag.TAG_FLOAT);
+ 		return String.format(java.util.Locale.ROOT, "%.4f:%.4f", array.getFloat(0), array.getFloat(1));
+ 	}
++
++	@GameTest(template = "3_pipe_split", timeoutTicks = 240)
++	public static void honeyChocolateFlowOracle(CreateGameTestHelper helper) {
++		var fluids = List.of(
++				new FlowOracleFluid("honey", com.simibubi.create.AllFluids.HONEY.getSource()),
++				new FlowOracleFluid("chocolate", com.simibubi.create.AllFluids.CHOCOLATE.getSource()));
++		int[] sampleTicks = {0, 24, 25, 26, 49, 50, 51, 74, 75, 76, 99, 100};
++		runFluidFlowPhase(helper, fluids.get(0), 0, sampleTicks);
++		helper.runAtTickTime(101, () -> runFluidFlowPhase(helper, fluids.get(1), 101, sampleTicks));
++		helper.runAtTickTime(201, helper::succeed);
++	}
++
++	private static void runFluidFlowPhase(CreateGameTestHelper helper, FlowOracleFluid fluid, int start, int[] sampleTicks) {
++		var level = helper.getLevel();
++		var source = new BlockPos(1, 2, 2);
++		for (int x = 0; x < 5; x++)
++			level.setBlock(source.east(x), Blocks.AIR.defaultBlockState(), 3);
++		for (int x = 0; x < 5; x++)
++			level.setBlock(source.offset(x, -1, 0), Blocks.STONE.defaultBlockState(), 3);
++		for (int x = 0; x < 5; x++) {
++			level.setBlock(source.offset(x, 0, -1), Blocks.STONE.defaultBlockState(), 3);
++			level.setBlock(source.offset(x, 0, 1), Blocks.STONE.defaultBlockState(), 3);
++		}
++		level.setBlock(source.west(), Blocks.STONE.defaultBlockState(), 3);
++		level.setBlock(source, fluid.source().defaultFluidState().createLegacyBlock(), 3);
++		for (int tick : sampleTicks) {
++			Runnable sample = () -> {
++				for (int x = 0; x < 5; x++) {
++					var pos = source.east(x);
++					var state = level.getBlockState(pos);
++					var fluidState = state.getFluidState();
++					System.out.printf(java.util.Locale.ROOT,
++						"CREATE_FLUID_FLOW,%s,%d,%d,%s,%s,%s,%d,%b%n",
++						fluid.name(), tick, x, BuiltInRegistries.BLOCK.getKey(state.getBlock()), state,
++						BuiltInRegistries.FLUID.getKey(fluidState.getType()), fluidState.getAmount(), fluidState.isSource());
++				}
++			};
++			if (tick == 0)
++				sample.run();
++			else
++				helper.runAtTickTime(start + tick, sample);
++		}
++	}
++
++	private record FlowOracleFluid(String name, net.minecraft.world.level.material.Fluid source) {}
+ 
+ 	@GameTest(template = "3_pipe_split", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
+ 	public static void encasedPipeDrainFitting(CreateGameTestHelper helper) {

@@ -1,0 +1,44 @@
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5639,6 +5639,11 @@
+                     Some("minecraft:enchanted_golden_apple") => &[("regeneration", 400, 1), ("absorption", 2400, 3), ("resistance", 6000, 0), ("fire_resistance", 6000, 0)],
+                     _ => &[],
+                 };
++                let stew_effects = p.item.as_ref()
++                    .filter(|item| item.item.as_ref() == "minecraft:suspicious_stew")
++                    .and_then(|item| item.extra.as_ref())
++                    .map(|data| data.stew_effects.clone())
++                    .unwrap_or_default();
+                 let mut sticky_attached = false;
+                 let mut stew_drop = cannon_ammo.is_some()
+                     && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:suspicious_stew")
+@@ -5678,6 +5683,17 @@
+                                     let new = !m.has_effect(effect);
+                                     m.add_effect(effect, duration, amplifier);
+                                     self.mod_effect_added(effect, Some(id as i32), amplifier, new);
++                                }
++                            }
++                            for (effect, duration) in &stew_effects {
++                                let tags = &self.res.stations().enchantments.entity_tags;
++                                if let Some(m) = self.mobs.iter_mut().find(|m| m.id == id)
++                                    && super::potions::mob_can_be_affected(tags, &m.kind.id, effect)
++                                    && let Some(name) = super::potions::mob_effect_id(effect.trim_start_matches("minecraft:"))
++                                {
++                                    let new = !m.has_effect(name);
++                                    m.add_effect(name, *duration, 0);
++                                    self.mod_effect_added(name, Some(id as i32), 0, new);
+                                 }
+                             }
+                             let cure_started = if apple == Some("minecraft:golden_apple") {
+@@ -5750,6 +5766,11 @@
+                             }
+                             for &(effect, duration, amplifier) in effects {
+                                 self.add_player_effect(horizon_client::effects::EffectInstance::new(effect, duration, amplifier));
++                            }
++                            for (effect, duration) in &stew_effects {
++                                if let Some(name) = super::potions::mob_effect_id(effect.trim_start_matches("minecraft:")) {
++                                    self.add_player_effect(horizon_client::effects::EffectInstance::new(name.trim_start_matches("minecraft:"), *duration, 0));
++                                }
+                             }
+                             if p.item.as_ref().is_some_and(|item| horizon_client::projectiles::create_cannon_sticky(item.item.as_ref()))
+                                 && let Some(player) = self.player.as_ref().filter(|player| !player.health.dead_or_dying())

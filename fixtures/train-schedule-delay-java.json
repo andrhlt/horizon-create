@@ -1,0 +1,98 @@
+{
+  "initial": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "edited": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 2,
+                "Value": 8
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "boundary": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 0,
+                "Value": 120
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "lower_bound": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 0
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  }
+}

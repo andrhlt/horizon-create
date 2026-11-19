@@ -1,0 +1,80 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -938,4 +938,66 @@
+ 			shape.minX, shape.minY, shape.minZ, shape.maxX, shape.maxY, shape.maxZ);
+ 	}
+ 
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stockLinkPackager(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var storage = helper.absolutePos(new BlockPos(2, 14, 2));
++		var packager = storage.east();
++		var link = packager.above();
++		var signal = link.above();
++		var packagerSignal = packager.east();
++		var items = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_INGOT, 12);
++		var defaultLink = com.simibubi.create.AllBlocks.STOCK_LINK.getDefaultState();
++		var linkType = com.simibubi.create.AllBlockEntityTypes.PACKAGER_LINK.get();
++		var packagerState = com.simibubi.create.AllBlocks.PACKAGER.getDefaultState()
++			.setValue(net.minecraft.world.level.block.DirectionalBlock.FACING, net.minecraft.core.Direction.EAST);
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var output = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWER;
++		var linked = com.simibubi.create.content.logistics.packager.PackagerBlock.LINKED;
++		var powered = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++		System.out.printf("CREATE_STOCK_LINK_DEFAULT %s%n", defaultLink);
++		for (int tick = 2; tick <= 27; tick++) {
++			final int at = tick;
++			helper.runAtTickTime(tick, () -> {
++				switch (at) {
++				case 2 -> {
++					level.setBlockAndUpdate(storage, net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState());
++					((net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(storage)).setItem(0, items);
++					level.setBlockAndUpdate(packager, packagerState);
++				}
++				case 3 -> level.setBlockAndUpdate(link,
++					defaultLink.setValue(com.simibubi.create.content.logistics.packagerLink.PackagerLinkBlock.FACE,
++						net.minecraft.world.level.block.state.properties.AttachFace.FLOOR));
++				case 5, 14 -> level.setBlockAndUpdate(packagerSignal,
++					net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState());
++				case 6 -> {
++					level.setBlockAndUpdate(packagerSignal, air);
++					var target = net.minecraft.world.level.block.Blocks.TARGET;
++					level.scheduleTick(signal, target, 99);
++					level.setBlockAndUpdate(signal, target.defaultBlockState().setValue(output, 7));
++				}
++				case 8 -> level.setBlockAndUpdate(signal, net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState());
++				case 10 -> level.setBlockAndUpdate(signal, air);
++				case 12 -> level.setBlockAndUpdate(link, air);
++				case 15 -> level.setBlockAndUpdate(packagerSignal, air);
++				default -> {}
++				}
++				var entity = level.getBlockEntity(link, linkType).orElse(null);
++				var linkState = level.getBlockState(link);
++				var storageEntity = (net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(storage);
++				var packagerEntity = (com.simibubi.create.content.logistics.packager.PackagerBlockEntity) level.getBlockEntity(packager);
++				System.out.printf("CREATE_STOCK_LINK_PACKAGER %d,%b,%b,%b,%d,%b,%d,%b,%d,%b%n", at,
++					level.getBlockState(packager).getValue(linked), entity != null,
++					linkState.getOptionalValue(powered).orElse(false),
++					entity == null ? -1 : entity.behaviour.redstonePower, entity != null && entity.getPackager() != null,
++					entity == null ? -1 : entity.fetchSummaryFromPackager(null).getCountOf(items),
++					level.getBlockState(packager).getValue(powered), storageEntity.getItem(0).getCount(),
++					!packagerEntity.heldBox.isEmpty());
++				if (at == 27)
++					helper.succeed();
++			});
++		}
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().startsWith("TestMisc.chainConveyorStockLink"))
++			.filter(test -> test.testName().startsWith("TestMisc.stockLinkPackager"))
+ 			.toList();
+ 	}
+ }

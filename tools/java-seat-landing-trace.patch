@@ -1,0 +1,88 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..7cdefa3fa 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.seatLanding"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..13ed4f725 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,56 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++    public static void seatLanding(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var at = helper.absolutePos(new BlockPos(2, 12, 2));
++        var block = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.RED).get();
++        var state = block.defaultBlockState();
++        level.setBlockAndUpdate(at, state);
++        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++        var pig = net.minecraft.world.entity.EntityType.PIG.create(level);
++        var shulker = net.minecraft.world.entity.EntityType.SHULKER.create(level);
++        var item = new net.minecraft.world.entity.item.ItemEntity(level, 0, 0, 0,
++            net.minecraft.world.item.Items.IRON_INGOT.getDefaultInstance());
++        for (var name : java.util.List.of("player", "crouched_player", "item", "pig", "shulker")) {
++            var entity = switch (name) {
++                case "player", "crouched_player" -> player;
++                case "item" -> item;
++                case "pig" -> pig;
++                default -> shulker;
++            };
++            entity.setPos(at.getX() + .5, at.getY() + .2, at.getZ() + .5);
++            player.setShiftKeyDown(name.equals("crouched_player"));
++            entity.setDeltaMovement(0.125, -.5, -.25);
++            block.updateEntityAfterFallOn(level, entity);
++            var velocity = entity.getDeltaMovement();
++            System.out.printf(java.util.Locale.ROOT, "CREATE_SEAT_LANDING %s,%.9f,%.9f,%.9f,%b%n",
++                name, velocity.x, velocity.y, velocity.z, entity.isPassenger());
++            if (entity.getVehicle() != null)
++                entity.getVehicle().discard();
++        }
++        float prior = pig.getHealth();
++        block.fallOn(level, state, at, pig, 9.0f);
++        System.out.printf(java.util.Locale.ROOT, "CREATE_SEAT_FALL_DAMAGE %.1f,%.1f%n", prior, pig.getHealth());
++        for (var kind : java.util.List.of("stone", "seat", "crouched-seat")) {
++            var actor = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++            level.setBlockAndUpdate(at.below(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++            level.setBlockAndUpdate(at, kind.equals("stone")
++                ? net.minecraft.world.level.block.Blocks.STONE.defaultBlockState() : state);
++            actor.setPos(at.getX() + .5, at.getY() + 9.25, at.getZ() + .5);
++            actor.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
++            actor.setOnGround(false);
++            actor.setShiftKeyDown(kind.equals("crouched-seat"));
++            for (int tick = 0; tick < 37; tick++) {
++                System.out.printf(java.util.Locale.ROOT, "CREATE_SEAT_FALL_TICK %s,%d,%.9f,%.9f,%.1f,%b%n",
++                    kind, tick, actor.getY() - at.getY(), actor.getDeltaMovement().y,
++                    actor.getHealth(), actor.onGround());
++                actor.travel(net.minecraft.world.phys.Vec3.ZERO);
++            }
++        }
++        helper.succeed();
++    }
++
+ }

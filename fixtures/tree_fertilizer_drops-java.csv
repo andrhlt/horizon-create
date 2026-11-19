@@ -1,0 +1,17 @@
+scenario,seed,tick,item,count,entity_count
+drop_stone,9,0,minecraft:oak_sapling,1,2
+drop_stone,9,0,minecraft:cobblestone,1,2
+drop_stone,9,1,minecraft:oak_sapling,1,2
+drop_stone,9,1,minecraft:cobblestone,1,2
+drop_stone,9,2,minecraft:oak_sapling,1,2
+drop_stone,9,2,minecraft:cobblestone,1,2
+drop_stone,9,3,minecraft:oak_sapling,1,2
+drop_stone,9,3,minecraft:cobblestone,1,2
+drop_planks,9,0,minecraft:oak_sapling,1,2
+drop_planks,9,0,minecraft:oak_planks,1,2
+drop_planks,9,1,minecraft:oak_sapling,1,2
+drop_planks,9,1,minecraft:oak_planks,1,2
+drop_planks,9,2,minecraft:oak_sapling,1,2
+drop_planks,9,2,minecraft:oak_planks,1,2
+drop_planks,9,3,minecraft:oak_sapling,1,2
+drop_planks,9,3,minecraft:oak_planks,1,2

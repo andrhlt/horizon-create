@@ -1,0 +1,62 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestContraptions.redstoneContacts"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -94,12 +94,42 @@
+ 		helper.succeedWhen(() -> helper.assertBlockPresent(Blocks.FARMLAND, dirt));
+ 	}
+ 
+-	@GameTest(template = "redstone_contacts")
++	@GameTest(template = "redstone_contacts", timeoutTicks = 125)
+ 	public static void redstoneContacts(CreateGameTestHelper helper) {
+-		BlockPos end = new BlockPos(5, 10, 1);
+-		BlockPos lever = new BlockPos(1, 3, 2);
+-		helper.pullLever(lever);
+-		helper.succeedWhen(() -> helper.assertBlockPresent(Blocks.DIAMOND_BLOCK, end));
++		var level = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 3, 1));
++		var lever = new BlockPos(1, 3, 2);
++		var contactYs = java.util.List.of(4, 6, 8);
++		var range = new net.minecraft.world.phys.AABB(origin).inflate(12);
++		helper.pullLever(lever);
++		for (int tick = 0; tick <= 110; tick++) {
++			int t = tick;
++			Runnable sample = () -> {
++				var moving = level.getEntitiesOfClass(
++					com.simibubi.create.content.contraptions.gantry.GantryContraptionEntity.class, range);
++				double height = moving.isEmpty() ? 999.0 : moving.getFirst().getY() - origin.getY();
++				var row = new java.util.StringJoiner(" ").add("CREATE_CONTACTS").add(Integer.toString(t))
++					.add(String.format(java.util.Locale.ROOT, "%.7f", height));
++				for (var y : contactYs) {
++					var state = helper.getBlockState(new BlockPos(4, y, 1));
++					row.add(Boolean.toString(state.getOptionalValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED).orElse(false)));
++				}
++				int diamond = 0;
++				for (int y = 2; y <= 13; y++)
++					if (helper.getBlockState(new BlockPos(5, y, 1)).is(Blocks.DIAMOND_BLOCK))
++						diamond = y;
++				row.add(Integer.toString(diamond));
++				System.out.println(row);
++				if (t == 110) {
++					helper.assertBlockPresent(Blocks.DIAMOND_BLOCK, new BlockPos(5, 10, 1));
++					helper.succeed();
++				}
++			};
++			if (t == 0)
++				sample.run();
++			else
++				helper.runAfterDelay(t, sample);
++		}
+ 	}
+ 
+ 	@GameTest(template = "controls", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)

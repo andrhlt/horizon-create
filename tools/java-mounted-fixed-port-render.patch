@@ -1,0 +1,168 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -387,7 +387,16 @@
+ 		var psi = (com.simibubi.create.content.contraptions.actors.psi.PortableStorageInterfaceBlockEntity)
+ 			level.getBlockEntity(port);
+ 		var meter = (net.minecraft.world.level.block.entity.ComparatorBlockEntity) level.getBlockEntity(comparator);
+-		int raw = psi.saveWithoutMetadata(level.registryAccess()).getInt("Timer");
++		var psiSaved = psi.saveWithoutMetadata(level.registryAccess());
++		int raw = psiSaved.getInt("Timer");
++		if (Boolean.getBoolean("parity.mountedComparatorIdle")) {
++			var values = psi.parityRenderState();
++			var outline = psi.getBlockState().getShape(level, port).bounds();
++			System.out.printf(java.util.Locale.ROOT,
++				"BEARING_FIXED_VISUAL %d;%d;%.8f;%.8f;%.8f;%.8f;%.8f;%b;%.6f;%.6f;%.6f;%.6f;%.6f;%.6f%n",
++				helper.getTick(), raw, psiSaved.getFloat("Distance"), values[0], values[1], values[2], values[3],
++				values[4] == 1, outline.minX, outline.minY, outline.minZ, outline.maxX, outline.maxY, outline.maxZ);
++		}
+ 		int direct = psi.getBlockState().getAnalogOutputSignal(level, port);
+ 		int dust = level.getBlockState(wire).getValue(net.minecraft.world.level.block.RedStoneWireBlock.POWER);
+ 		System.out.printf("MOUNTED_PORT_COMPARATOR %d;%d;%b;%d;%d;%d%n",
+--- a/src/main/java/com/simibubi/create/content/contraptions/actors/psi/PortableStorageInterfaceBlockEntity.java
++++ b/src/main/java/com/simibubi/create/content/contraptions/actors/psi/PortableStorageInterfaceBlockEntity.java
+@@ -172,6 +172,13 @@
+ 		return transferTimer >= ANIMATION && transferTimer <= timeUnit + ANIMATION;
+ 	}
+ 
++	public double[] parityRenderState() {
++		return new double[] {
++			connectionAnimation.getValue(0), connectionAnimation.getValue(1),
++			getExtensionDistance(0), getExtensionDistance(1), isConnected() ? 1 : 0
++		};
++	}
++
+ 	float getExtensionDistance(float partialTicks) {
+ 		return (float) (Math.pow(connectionAnimation.getValue(partialTicks), 2) * distance / 2);
+ 	}
+--- a/build.gradle
++++ b/build.gradle
+@@ -68,6 +68,11 @@
+ 
+         client {
+             client()
++            if (project.hasProperty("parityBearingPortClient")) {
++                gameDirectory = project.file("run/bearing-port-client")
++                systemProperty("parity.bearingPortClient", "true")
++                programArguments.addAll("--quickPlaySingleplayer", "BearingPortDelivery", "--width", "960", "--height", "540")
++            }
+         }
+ 
+         server {
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaBearingPortRenderProbe.java
+@@ -0,0 +1,94 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import java.util.Locale;
++
++import com.simibubi.create.content.contraptions.actors.psi.PortableStorageInterfaceBlockEntity;
++
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.Screenshot;
++import net.minecraft.client.gui.components.Button;
++import net.minecraft.client.gui.screens.BackupConfirmScreen;
++import net.minecraft.client.gui.screens.TitleScreen;
++import net.minecraft.core.BlockPos;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.network.chat.contents.TranslatableContents;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import net.neoforged.neoforge.event.tick.ServerTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaBearingPortRenderProbe {
++	private static final BlockPos PORT = new BlockPos(7, 122, -10);
++	private static boolean opened;
++	private static boolean teleported;
++	private static int ticks;
++	private static int previousTimer;
++	public static volatile long lastServerTick = -1;
++
++	@SubscribeEvent
++	public static void observeAuthority(ServerTickEvent.Post event) {
++		if (!Boolean.getBoolean("parity.bearingPortClient") || !teleported)
++			return;
++		var level = event.getServer().overworld();
++		lastServerTick = level.getGameTime();
++		if (!(level.getBlockEntity(PORT) instanceof PortableStorageInterfaceBlockEntity psi))
++			return;
++		var values = psi.parityRenderState();
++		var data = psi.saveWithoutMetadata(level.registryAccess());
++		System.out.printf(Locale.ROOT, "JAVA_PSI_AUTH %d;%d;%d;%.8f;%.8f;%b%n",
++			System.nanoTime(), lastServerTick, data.getInt("Timer"), values[2], values[3], values[4] == 1);
++	}
++
++	@SubscribeEvent
++	public static void tick(ClientTickEvent.Post event) {
++		if (!Boolean.getBoolean("parity.bearingPortClient"))
++			return;
++		var mc = Minecraft.getInstance();
++		if (!opened && mc.getOverlay() == null && mc.screen instanceof TitleScreen) {
++			opened = true;
++			mc.createWorldOpenFlows().openWorld("BearingPortDelivery", mc::stop);
++		}
++		if (mc.screen instanceof BackupConfirmScreen backup)
++			backup.children().stream().filter(Button.class::isInstance).map(Button.class::cast)
++				.filter(child -> child.getMessage().getContents() instanceof TranslatableContents text
++					&& text.getKey().equals("selectWorld.backupJoinSkipButton")).findFirst().ifPresent(Button::onPress);
++		var server = mc.getSingleplayerServer();
++		if (server == null || mc.player == null || mc.level == null || mc.getOverlay() != null)
++			return;
++		if (!teleported) {
++			teleported = true;
++			String who = mc.player.getGameProfile().getName();
++			server.execute(() -> {
++				var src = server.createCommandSourceStack().withPermission(4);
++				server.getCommands().performPrefixedCommand(src, "gamemode spectator " + who);
++				server.getCommands().performPrefixedCommand(src, "tp " + who + " 6.3 123.6 -13 -7 35");
++				server.getCommands().performPrefixedCommand(src, "place template create:gametest/contraptions/mounted_item_extract 3 120 -12");
++				server.getCommands().performPrefixedCommand(src, "setblock 7 120 -10 minecraft:redstone_block");
++				server.getCommands().performPrefixedCommand(src, "setblock 7 121 -10 minecraft:hopper[facing=north,enabled=false]");
++			});
++			mc.options.hideGui = true;
++		}
++		if (++ticks == 20) {
++			server.execute(() -> server.getCommands().performPrefixedCommand(
++				server.createCommandSourceStack().withPermission(4), "setblock 4 124 -11 minecraft:lever[face=wall,facing=north,powered=false]"));
++		}
++		if (ticks > 165) {
++			mc.stop();
++			return;
++		}
++		if (!(mc.level.getBlockEntity(PORT) instanceof PortableStorageInterfaceBlockEntity psi))
++			return;
++		var endpoints = psi.parityRenderState();
++		CompoundTag saved = psi.saveWithoutMetadata(mc.level.registryAccess());
++		int timer = saved.getInt("Timer");
++		System.out.printf(Locale.ROOT, "JAVA_BEARING_PORT_CLIENT %d;%d;%.8f;%.8f;%.8f;%.8f;%b%n",
++			mc.level.getGameTime(), timer, saved.getFloat("Distance"),
++			endpoints[2], endpoints[3], endpoints[3] * .5 + .375, endpoints[4] == 1);
++		if ((timer == 8 || timer == 2 || timer == 0) && timer != previousTimer) {
++			Screenshot.grab(mc.gameDirectory, "bearing-port-delivery-" + ticks + "-timer-" + timer + ".png", mc.getMainRenderTarget(), message -> {});
++		}
++		previousTimer = timer;
++	}
++}
+--- a/src/main/java/com/simibubi/create/content/contraptions/actors/psi/PSIVisual.java
++++ b/src/main/java/com/simibubi/create/content/contraptions/actors/psi/PSIVisual.java
+@@ -28,7 +28,17 @@
+ 
+ 	@Override
+ 	public void beginFrame(DynamicVisual.Context ctx) {
+-		instance.beginFrame(blockEntity.getExtensionDistance(ctx.partialTick()));
++		float offset = blockEntity.getExtensionDistance(ctx.partialTick());
++		instance.beginFrame(offset);
++		var pos = blockEntity.getBlockPos();
++		if (Boolean.getBoolean("parity.bearingPortClient") && pos.getX() == 7 && pos.getY() == 122 && pos.getZ() == -10) {
++			var values = blockEntity.parityRenderState();
++			System.out.printf(java.util.Locale.ROOT,
++				"JAVA_PSI_DRAW %d;%d;%d;%.8f;%.8f;%.8f;%b%n", System.nanoTime(),
++				blockEntity.getLevel().getGameTime(),
++				com.simibubi.create.infrastructure.gametest.tests.JavaBearingPortRenderProbe.lastServerTick,
++				values[2], values[3], offset, isLit());
++		}
+ 	}
+ 
+ 	@Override

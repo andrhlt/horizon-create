@@ -1,0 +1,3 @@
+block,ingredient,recipe,count,map_color
+create:industrial_iron_block,minecraft:iron_ingot,create:industrial_iron_block_from_ingots_iron_stonecutting,2,21
+create:weathered_iron_block,minecraft:iron_ingot,create:weathered_iron_block_from_ingots_iron_stonecutting,2,21

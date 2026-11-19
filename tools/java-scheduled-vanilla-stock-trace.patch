@@ -1,0 +1,18 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -195,8 +195,13 @@
+             var chestPos = origin.east(3).above(3);
+             var storageName = System.getenv("CREATE_TRAIN_STOCK_STORAGE");
+             var vaultStorage = "vault".equals(storageName);
+-            var storage = vaultStorage ? com.simibubi.create.AllBlocks.ITEM_VAULT.get()
+-                : "barrel".equals(storageName) ? Blocks.BARREL : Blocks.CHEST;
++            var storage = switch (java.util.Objects.toString(storageName, "")) {
++                case "vault" -> com.simibubi.create.AllBlocks.ITEM_VAULT.get();
++                case "barrel" -> Blocks.BARREL;
++                case "trapped_chest" -> Blocks.TRAPPED_CHEST;
++                case "purple_shulker_box" -> Blocks.PURPLE_SHULKER_BOX;
++                default -> Blocks.CHEST;
++            };
+             if (!"empty".equals(storageName))
+                 level.setBlockAndUpdate(chestPos, storage.defaultBlockState());
+             if ("empty".equals(storageName)) {

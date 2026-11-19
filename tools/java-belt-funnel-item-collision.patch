@@ -1,0 +1,59 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,43 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void beltFunnelItemCollision(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = new BlockPos(8, 172, -12);
++		var chunk = new net.minecraft.world.level.ChunkPos(pos);
++		level.setChunkForced(chunk.x, chunk.z, true);
++		level.getChunk(chunk.x, chunk.z);
++		var north = net.minecraft.core.Direction.NORTH;
++		var block = AllBlocks.BRASS_BELT_FUNNEL.getDefaultState()
++			.setValue(com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.HORIZONTAL_FACING, north)
++			.setValue(com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.SHAPE,
++				com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape.PULLING);
++		var ticks = new net.minecraft.world.entity.item.ItemEntity[2];
++		for (int x = -1; x <= 1; x++)
++			for (int z = -1; z <= 1; z++)
++				level.setBlockAndUpdate(pos.offset(x, -2, z), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++		level.setBlockAndUpdate(pos.below(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
++		level.setBlockAndUpdate(pos, block);
++		helper.succeedWhen(() -> {
++			long t = helper.getTick() - 4;
++			helper.assertTrue(t >= 0, "Waiting for the Funnel collision rig");
++			if (t == 0) {
++				for (int i = 0; i < 2; i++) {
++					var stack = new ItemStack(i == 0 ? Items.IRON_INGOT : Items.GOLD_INGOT);
++					ticks[i] = new net.minecraft.world.entity.item.ItemEntity(level, pos.getX() + .5,
++						pos.getY() + 1.65, pos.getZ() + (i == 0 ? .50 : .91), stack);
++					ticks[i].setDeltaMovement(0, 0, 0);
++					ticks[i].setPickUpDelay(32767);
++					helper.assertTrue(level.addFreshEntity(ticks[i]), "The probe item must spawn in the world");
++				}
++			}
++			System.out.printf(java.util.Locale.ROOT, "CREATE_FUNNEL_ITEM_COLLISION %d,%.9f,%s,%.9f,%s%n",
++				t, ticks[0].getY() - pos.getY(), ticks[0].onGround(), ticks[1].getY() - pos.getY(), ticks[1].onGround());
++			helper.assertTrue(t >= 24, "Waiting for both ingots to land");
++			level.setChunkForced(chunk.x, chunk.z, false);
++			helper.assertTrue(ticks[0].onGround() && ticks[1].onGround(), "Both ingots should land");
++		});
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.beltFunnelItemCollision")).toList();
+ 	}
+ }

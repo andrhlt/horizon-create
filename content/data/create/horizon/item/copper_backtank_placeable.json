@@ -1,0 +1,4 @@
+{
+  "template": "minecraft:copper_block",
+  "place_block": "create:copper_backtank"
+}

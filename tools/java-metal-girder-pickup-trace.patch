@@ -1,0 +1,109 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..eb8e87d32 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.metalGirderShaftPickupAndDrops"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..5761ad95e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,77 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 18)
++	public static void metalGirderShaftPickupAndDrops(CreateGameTestHelper helper) {
++		var girder = com.simibubi.create.AllBlocks.METAL_GIRDER;
++		var encased = com.simibubi.create.AllBlocks.METAL_GIRDER_ENCASED_SHAFT;
++		var shaft = com.simibubi.create.AllBlocks.SHAFT;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var horizontalAxis = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var waterlogged = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var east = net.minecraft.core.Direction.EAST;
++		var up = net.minecraft.core.Direction.UP;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var heldGirder = new int[3];
++		var heldShaft = new int[3];
++		for (int index = 0; index < 3; index++) {
++			var pos = new BlockPos(12, 3, 2 + 5 * index);
++			var source = pos.west();
++			helper.setBlock(source, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east));
++			helper.setBlock(pos.east(), shaft.getDefaultState().setValue(axis, east.getAxis()));
++			helper.setBlock(pos, encased.getDefaultState().setValue(horizontalAxis, east.getAxis()).setValue(waterlogged, index == 1));
++			helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), source).generatedSpeed.setValue(32);
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int index = 0; index < 3; index++) {
++				var pos = new BlockPos(12, 3, 2 + 5 * index);
++				var at = helper.absolutePos(pos);
++				var state = helper.getBlockState(pos);
++				var output = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), pos.east());
++				var items = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
++					new net.minecraft.world.phys.AABB(at).inflate(1.5));
++				int droppedGirder = 0;
++				int droppedShaft = 0;
++				for (var item : items) {
++					var stack = item.getItem();
++					if (stack.is(girder.asItem()))
++						droppedGirder += stack.getCount();
++					if (stack.is(shaft.asItem()))
++						droppedShaft += stack.getCount();
++				}
++				String block = encased.has(state) ? "encased" : state.isAir() ? "air"
++					: state.is(net.minecraft.world.level.block.Blocks.WATER) ? "water" : "unexpected";
++				System.out.printf(java.util.Locale.ROOT,
++					"CREATE_GIRDER_PICKUP,%d,%d,%s,%d,%d,%d,%d,%.4f%n",
++					tick, index, block, heldGirder[index], heldShaft[index],
++					droppedGirder, droppedShaft, output.getSpeed());
++				if (tick == 3) {
++					if (index == 2) {
++						level.destroyBlock(at, true);
++						continue;
++					}
++					player.setPos(at.getX(), at.getY(), at.getZ() - 2);
++					player.setShiftKeyDown(true);
++					player.getInventory().clearContent();
++					var wrench = com.simibubi.create.AllItems.WRENCH.asStack();
++					player.setItemInHand(hand, wrench);
++					var hit = new net.minecraft.world.phys.BlockHitResult(at.getCenter().relative(up, 0.4), up, at, false);
++					wrench.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++					heldGirder[index] = player.getInventory().countItem(girder.asItem());
++					heldShaft[index] = player.getInventory().countItem(shaft.asItem());
++					player.setShiftKeyDown(false);
++				}
++			}
++			if (tick < 8)
++				helper.fail("Waiting for the complete girder pickup and drops trace");
++		});
++	}
+ }

@@ -1,0 +1,179 @@
+diff --git a/crates/horizon-world/src/lib.rs b/crates/horizon-world/src/lib.rs
+--- a/crates/horizon-world/src/lib.rs
++++ b/crates/horizon-world/src/lib.rs
+@@ -19,6 +19,13 @@
+ pub mod block_state_properties;
+ pub mod block_support;
+ pub mod block_survival;
++
++pub fn create_metal_scaffolding(name: &str) -> bool {
++    matches!(
++        name,
++        "create:andesite_scaffolding" | "create:brass_scaffolding" | "create:copper_scaffolding"
++    )
++}
+ pub mod blocking_item_damage;
+ pub mod blocking_rules;
+ pub mod bundle_weight;
+diff --git a/crates/horizon-world/src/block_survival.rs b/crates/horizon-world/src/block_survival.rs
+--- a/crates/horizon-world/src/block_survival.rs
++++ b/crates/horizon-world/src/block_survival.rs
+@@ -889,6 +889,9 @@
+                                 .get("vertical_direction")))
+             }
+             Rule::Scaffolding => {
++                if crate::create_metal_scaffolding(&self.registry.state(state).unwrap().name) {
++                    return Ok(true);
++                }
+                 let below = relative(position, Direction::Down);
+                 let neighbor = self.read(world, below)?;
+                 let mut distance = if let Some(distance) = self
+diff --git a/crates/horizon-world/src/level/survive.rs b/crates/horizon-world/src/level/survive.rs
+--- a/crates/horizon-world/src/level/survive.rs
++++ b/crates/horizon-world/src/level/survive.rs
+@@ -285,7 +285,10 @@
+                 let below = below(pos);
+                 self.sturdy(below, Direction::Up) || b.is_block(self.state(below), n.hopper)
+             }
+-            Class::Scaffolding => self.scaffolding_distance(pos) < 7,
++            Class::Scaffolding => {
++                crate::create_metal_scaffolding(b.table.name(state))
++                    || self.scaffolding_distance(pos) < 7
++            }
+             Class::SeaPickle => {
+                 let below = below(pos);
+                 self.may_place_on(state, self.state(below), below)
+diff --git a/crates/horizon-world/src/level/place.rs b/crates/horizon-world/src/level/place.rs
+--- a/crates/horizon-world/src/level/place.rs
++++ b/crates/horizon-world/src/level/place.rs
+@@ -1099,7 +1099,11 @@
+                 Some(self.wire_connection_state(cross, pos))
+             }
+             Class::Scaffolding => {
+                 let distance = self.scaffolding_distance(pos);
+-                let bottom = self.scaffolding_is_bottom(pos, distance);
++                let bottom = if crate::create_metal_scaffolding(table.name(default)) {
++                    distance > 0 && !b.is_block(self.below_state(pos), block)
++                } else {
++                    self.scaffolding_is_bottom(pos, distance)
++                };
+                 let water = self.fluid_at(pos).kind() == crate::fluid::FluidKind::Water;
+                 let state = table.set_bool(default, p.waterlogged, water);
+@@ -1695,7 +1696,8 @@
+         let b = self.b;
+         let pos = ctx.pos;
+         if !b.is_block(self.state(pos), block) {
+-            return if self.scaffolding_distance(pos) == 7 {
++            let metal = crate::create_metal_scaffolding(b.table.name(b.default_of(block)));
++            return if !metal && self.scaffolding_distance(pos) == 7 {
+                 None
+             } else {
+                 Some(ctx.clone())
+diff --git a/crates/horizon-world/src/level/shapes.rs b/crates/horizon-world/src/level/shapes.rs
+--- a/crates/horizon-world/src/level/shapes.rs
++++ b/crates/horizon-world/src/level/shapes.rs
+@@ -708,7 +708,14 @@
+             }
+             Class::Scaffolding => {
+                 self.waterlogged_tick(state, pos);
+-                self.schedule_tick(pos, block, 1);
++                if crate::create_metal_scaffolding(table.name(state)) {
++                    if dir == Direction::Down {
++                        let bottom = !b.is_block(nstate, block) && !b.is_face_sturdy(nstate, Direction::Up);
++                        return Some(table.set_bool(state, p.bottom, bottom));
++                    }
++                } else {
++                    self.schedule_tick(pos, block, 1);
++                }
+                 state
+             }
+             Class::Seagrass => {
+diff --git a/crates/horizon-world/src/level/tick.rs b/crates/horizon-world/src/level/tick.rs
+--- a/crates/horizon-world/src/level/tick.rs
++++ b/crates/horizon-world/src/level/tick.rs
+@@ -595,6 +595,9 @@
+     }
+     fn scaffolding_tick(&mut self, pos: BlockPos, state: BlockStateId) {
+         let b = self.b;
++        if crate::create_metal_scaffolding(b.table.name(state)) {
++            return;
++        }
+         let distance = self.scaffolding_distance(pos);
+         let bottom = self.scaffolding_is_bottom(pos, distance);
+         let next = b.table.set_bool(
+diff --git a/crates/horizon-world/src/block_collision.rs b/crates/horizon-world/src/block_collision.rs
+--- a/crates/horizon-world/src/block_collision.rs
++++ b/crates/horizon-world/src/block_collision.rs
+@@ -257,10 +257,12 @@
+ pub struct ScaffoldingCollision {
+     supported: bool,
+     bottom: bool,
++    metal: bool,
+ }
+ impl ScaffoldingCollision {
+     pub fn from_state(state: &crate::chunk::BlockState) -> io::Result<Option<Self>> {
+-        if state.name != "minecraft:scaffolding" {
++        let metal = crate::create_metal_scaffolding(&state.name);
++        if state.name != "minecraft:scaffolding" && !metal {
+             return Ok(None);
+         }
+         let distance = state
+@@ -277,6 +279,7 @@
+         Ok(Some(Self {
+             supported: distance == 0,
+             bottom,
++            metal,
+         }))
+     }
+ 
+@@ -286,6 +289,12 @@
+         position: horizon_core::position::BlockPos,
+     ) -> VoxelShape {
+         use std::sync::OnceLock;
++        if self.metal && self.bottom {
++            static HALF: OnceLock<VoxelShape> = OnceLock::new();
++            return HALF
++                .get_or_init(|| VoxelShape::from_box(Aabb::new(Vec3::new(0.0, 0.5, 0.0), Vec3::new(1.0, 1.0, 1.0))).expect("bounded metal scaffold bottom"))
++                .clone();
++        }
+         if context.is_placement() {
+             return VoxelShape::empty();
+         }
+diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -3409,6 +3409,13 @@
+     /// grows with the lid (`ShulkerBoxBlockEntity.getBoundingBox`).
+     fn context_outline(&self, pos: [i32; 3], state: BlockStateId) -> Option<[f64; 6]> {
+         let name = &self.res.facts().get(state).name;
++        if horizon_world::create_metal_scaffolding(name) {
++            let bottom = self.pack.assets.registry.state(state)
++                .and_then(|state| state.properties.get("bottom"))
++                .is_some_and(|bottom| bottom == "true");
++            return (!bottom && self.held().is_some_and(|stack| *stack.item == **name))
++                .then_some([0.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
++        }
+         if matches!(&**name, "minecraft:light" | "minecraft:scaffolding") {
+             return self
+                 .held()
+diff --git a/crates/horizon-client/src/motion.rs b/crates/horizon-client/src/motion.rs
+--- a/crates/horizon-client/src/motion.rs
++++ b/crates/horizon-client/src/motion.rs
+@@ -2817,13 +2817,13 @@
+         Ok(())
+     }
+     fn in_scaffolding(&mut self) -> Result<bool> {
+-        Ok(self
++        let state = self
+             .assets
+             .registry
+             .state(self.block(BlockPos::containing(self.player.position)))
+-            .unwrap()
+-            .name
+-            == "minecraft:scaffolding")
++            .unwrap();
++        Ok(state.name == "minecraft:scaffolding"
++            || horizon_world::create_metal_scaffolding(&state.name))
+     }
+     fn suppressing_ladder_slide(&mut self) -> Result<bool> {
+         Ok(self.player.shift_key_down && !(self.player.client_side && self.player.flying))

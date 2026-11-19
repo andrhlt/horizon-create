@@ -1,0 +1,9 @@
+material,tick,half,sound,volume,pitch
+brass_door,3,2,minecraft:block.iron_door.open,1.0000000,0.9211382
+copper_door,3,2,minecraft:block.iron_door.open,1.0000000,0.9909261
+brass_door,9,2,minecraft:block.iron_door.open,1.0000000,0.9541767
+copper_door,9,2,minecraft:block.iron_door.open,1.0000000,0.9624116
+brass_door,26,0,minecraft:block.iron_door.close,0.5000000,1.0000000
+brass_door,26,2,minecraft:block.iron_door.close,0.5000000,1.0000000
+copper_door,26,0,minecraft:block.iron_door.close,0.5000000,1.0000000
+copper_door,26,2,minecraft:block.iron_door.close,0.5000000,1.0000000

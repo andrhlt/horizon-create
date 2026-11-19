@@ -1,0 +1,15 @@
+{
+  "copy": {
+    "canceled": true,
+    "snapshots": [
+      "{components:{\"create:clipboard_content\":{copied_values:{Frequencies:{First:{components:{\"minecraft:custom_name\":'\"Workshop\"'},count:1,id:\"minecraft:red_dye\"},Last:{}}},pages:[],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+    ]
+  },
+  "paste": {
+    "canceled": true,
+    "snapshots": [
+      "{First:{count:1,id:\"minecraft:iron_ingot\"},Last:{count:1,id:\"minecraft:gold_ingot\"}}",
+      "{First:{components:{\"minecraft:custom_name\":'\"Workshop\"'},count:1,id:\"minecraft:red_dye\"},Last:{}}"
+    ]
+  }
+}

@@ -1,0 +1,58 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.foodsUse"))
++            .toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,43 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 50)
++    public static void foodsUse(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        String[] names = {"bar_of_chocolate", "sweet_roll"};
++        for (int food = 0; food < 1; food++) {
++            String name = names[food];
++            for (String scenario : java.util.List.of("normal", "same", "different", "different_repeat", "same_repeat")) for (int boundary = 0; boundary < 32; boundary++) {
++                var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++                    new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "FoodTester"));
++                player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
++                player.getFoodData().setFoodLevel(10);
++                player.getFoodData().setSaturation(0);
++                var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
++                    net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", name));
++                String next = !scenario.startsWith("different") ? name : names[(food + 1) % names.length];
++                var replacement = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
++                    net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", next));
++                player.getInventory().setItem(0, new net.minecraft.world.item.ItemStack(item));
++                player.getInventory().selected = 0;
++                player.getMainHandItem().use(world, player, hand);
++                for (int tick = 0; tick < 38; tick++) {
++                    if (tick > 0) player.doTick();
++                    if (tick == boundary && !scenario.equals("normal")) player.getInventory().setItem(0, new net.minecraft.world.item.ItemStack(replacement, 2));
++                    if ((tick == 32 && scenario.equals("same_repeat"))
++                            || (tick == boundary + 1 && scenario.equals("different_repeat")))
++                        player.getMainHandItem().use(world, player, hand);
++                    var held = player.getInventory().getItem(0);
++                    System.out.printf(java.util.Locale.ROOT,
++                        "CREATE_CHOCOLATE_BAR_REPLACE,%s,%s,%d,%d,%s,%d,%d,%d,%.9f%n", name, scenario, boundary, tick,
++                        net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(held.getItem()), held.getCount(),
++                        player.getUseItemRemainingTicks(), player.getFoodData().getFoodLevel(),
++                        player.getFoodData().getSaturationLevel());
++                }
++            }
++        }
++        helper.succeed();
++    }
+ }

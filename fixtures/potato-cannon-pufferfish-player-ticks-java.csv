@@ -1,0 +1,5 @@
+tick,health,poison_duration,poison_amplifier,hunger_duration,hunger_amplifier,nausea_duration,nausea_amplifier
+1,16.000000000,1199,1,299,2,299,0
+2,16.000000000,1198,1,298,2,298,0
+3,16.000000000,1197,1,297,2,297,0
+4,16.000000000,1196,1,296,2,296,0

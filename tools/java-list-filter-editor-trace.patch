@@ -1,0 +1,81 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..a1616f3 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.listFilterMenu"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..14385f8 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,62 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void listFilterMenu(CreateGameTestHelper helper) {
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(helper.getLevel());
++		var inventory = player.getInventory();
++		var filter = com.simibubi.create.AllItems.FILTER.asStack(1);
++		inventory.clearContent();
++		inventory.selected = 0;
++		inventory.setItem(0, filter);
++		inventory.setItem(1, new ItemStack(Items.STONE, 5));
++		inventory.setItem(2, new ItemStack(Items.OAK_PLANKS, 4));
++		var menu = com.simibubi.create.content.logistics.filter.FilterMenu.create(1, inventory, filter);
++		player.containerMenu = menu;
++		var quick = net.minecraft.world.inventory.ClickType.QUICK_MOVE;
++		var left = net.minecraft.world.inventory.ClickType.PICKUP;
++		listFilterMenuState("open", menu, player, filter);
++		menu.clicked(28, 0, quick, player);
++		listFilterMenuState("copy", menu, player, filter);
++		menu.clicked(28, 0, quick, player);
++		listFilterMenuState("duplicate", menu, player, filter);
++		menu.clicked(29, 0, left, player);
++		menu.clicked(37, 0, left, player);
++		listFilterMenuState("cursor_copy", menu, player, filter);
++		menu.clicked(27, 0, left, player);
++		listFilterMenuState("holder", menu, player, filter);
++		menu.clicked(29, 0, left, player);
++		menu.clicked(37, 0, left, player);
++		listFilterMenuState("clear_second", menu, player, filter);
++		var black = com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.BLACKLIST;
++		var respect = com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.RESPECT_DATA;
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(black).handle(player);
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(respect).handle(player);
++		menu.removed(player);
++		listFilterMenuState("save", menu, player, filter);
++		menu = com.simibubi.create.content.logistics.filter.FilterMenu.create(2, inventory, filter);
++		player.containerMenu = menu;
++		listFilterMenuState("reopen", menu, player, filter);
++		menu.clicked(36, 0, left, player);
++		var white = com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.WHITELIST;
++		var ignore = com.simibubi.create.content.logistics.filter.FilterScreenPacket.Option.IGNORE_DATA;
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(white).handle(player);
++		new com.simibubi.create.content.logistics.filter.FilterScreenPacket(ignore).handle(player);
++		menu.removed(player);
++		listFilterMenuState("reset", menu, player, filter);
++		player.containerMenu = player.inventoryMenu;
++		helper.succeed();
++	}
++
++	private static void listFilterMenuState(String action, com.simibubi.create.content.logistics.filter.FilterMenu menu,
++		net.minecraft.server.level.ServerPlayer player, ItemStack filter) {
++		var inventory = player.getInventory();
++		var list = com.simibubi.create.AllDataComponents.FILTER_ITEMS;
++		var black = com.simibubi.create.AllDataComponents.FILTER_ITEMS_BLACKLIST;
++		var respect = com.simibubi.create.AllDataComponents.FILTER_ITEMS_RESPECT_NBT;
++		System.out.printf("LIST_FILTER_MENU,%s,%d,%d,%d,%d,%d,%d,%d,%b,%b,%s,%s%n", action,
++			menu.ghostInventory.getSlots(), menu.ghostInventory.getStackInSlot(0).getCount(), menu.ghostInventory.getStackInSlot(1).getCount(),
++			inventory.getItem(0).getCount(), inventory.getItem(1).getCount(), inventory.getItem(2).getCount(), menu.getCarried().getCount(),
++			menu.stillValid(player), filter.has(list), filter.get(black), filter.get(respect));
++	}
+ }

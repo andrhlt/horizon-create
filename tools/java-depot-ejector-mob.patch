@@ -1,0 +1,91 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().matches("TestProcessing.weightedEjector(Offset|Flat)?MobLaunch")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,75 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void weightedEjectorMobLaunch(CreateGameTestHelper helper) {
++		weightedEjectorMobLaunch(helper, false, false);
++	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void weightedEjectorOffsetMobLaunch(CreateGameTestHelper helper) {
++		weightedEjectorMobLaunch(helper, true, false);
++	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void weightedEjectorFlatMobLaunch(CreateGameTestHelper helper) {
++		weightedEjectorMobLaunch(helper, false, true);
++	}
++
++	private static void weightedEjectorMobLaunch(CreateGameTestHelper helper, boolean offset, boolean flat) {
++		var level = helper.getLevel();
++		var at = new BlockPos(5, 104, flat ? -43 : offset ? -27 : -11);
++		var chunk = new net.minecraft.world.level.ChunkPos(at);
++		level.setChunkForced(chunk.x, chunk.z, true);
++		level.getChunk(chunk.x, chunk.z);
++		for (int x = -2; x <= 9; x++)
++			for (int z = -2; z <= 2; z++) {
++				level.setBlockAndUpdate(at.offset(x, -1, z),
++					net.minecraft.world.level.block.Blocks.SMOOTH_STONE.defaultBlockState());
++				for (int y = 0; y < 9; y++)
++					level.removeBlock(at.offset(x, y, z), false);
++			}
++		if (!flat) {
++			for (int x = 3; x <= 8; x++)
++				for (int z = -1; z <= 1; z++)
++					for (int y = 0; y <= 2; y++)
++						level.setBlockAndUpdate(at.offset(x, y, z),
++							net.minecraft.world.level.block.Blocks.SMOOTH_STONE.defaultBlockState());
++		}
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var south = net.minecraft.core.Direction.SOUTH;
++		level.setBlockAndUpdate(at, AllBlocks.WEIGHTED_EJECTOR.getDefaultState().setValue(horizontal, east));
++		level.setBlockAndUpdate(at.north(), AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, south));
++		((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(at.north()))
++			.generatedSpeed.setValue(128);
++		var ejector = (com.simibubi.create.content.logistics.depot.EjectorBlockEntity) level.getBlockEntity(at);
++		ejector.setTarget(4, 0);
++		level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class,
++			new net.minecraft.world.phys.AABB(at).inflate(12)).forEach(net.minecraft.world.entity.Entity::discard);
++		var mob = net.minecraft.world.entity.EntityType.PIG.create(level);
++		mob.removeAllGoals(goal -> true);
++		mob.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED).setBaseValue(0);
++		mob.setSilent(true);
++		mob.moveTo(at.getX() + (offset ? .875 : .5), at.getY() + 2.5, at.getZ() + .5, 0, 0);
++		mob.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			helper.assertTrue(tick >= 1, "Waiting for the measured ticks");
++			if (tick == 12)
++				level.addFreshEntity(mob);
++			var pos = mob.position();
++			var velocity = mob.getDeltaMovement();
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_EJECTOR_MOB_%s %d,%s,%b,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%b,%.2f%n",
++				flat ? "FLAT" : offset ? "OFFSET" : "CENTER", tick, ejector.getState(), tick >= 12, pos.x-at.getX(), pos.y-at.getY(), pos.z-at.getZ(),
++				velocity.x, velocity.y, velocity.z, mob.onGround(), mob.getHealth());
++			helper.assertTrue(tick >= 64 && pos.x > at.getX()+3 && mob.onGround(),
++				"The pig must travel along the original machine’s launch arc and land.");
++			mob.discard();
++			level.setChunkForced(chunk.x, chunk.z, false);
++		});
++	}
+ }

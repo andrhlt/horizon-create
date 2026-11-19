@@ -1,0 +1,28 @@
+diff --git a/crates/horizon-client/src/game/native_world_draw.rs b/crates/horizon-client/src/game/native_world_draw.rs
+--- a/crates/horizon-client/src/game/native_world_draw.rs
++++ b/crates/horizon-client/src/game/native_world_draw.rs
+@@ -127,18 +127,16 @@
+         partial: f32,
+         out: &mut Vec<Vertex>,
+     ) {
+-        if !horizon_client::gfx::native_render::world_drawn_hooked()
+-            && crate::mod_api::mods().is_empty()
+-        {
+-            return;
+-        }
+         let mut draw = NativeWorldDraw::new(camera.to_array(), partial, self.world.game_time);
+-        // NONE keeps these quads out of shader-pack entity programs.
+-        self.mark_stage(out.len(), "NONE");
+         self.native_world_submit(&mut draw);
+         self.resolve_inline_profiles(&draw.profiles);
+         self.map_patches.extend(draw.patches);
+-        out.extend(draw.draw.into_vertices());
++        let vertices = draw.draw.into_vertices();
++        if !vertices.is_empty() {
++            // NONE keeps these quads out of shader-pack entity programs.
++            self.mark_stage(out.len(), "NONE");
++            out.extend(vertices);
++        }
+     }
+     /// Normal, depth-tested atlas quad under the current pose. UVs use 16
+     /// texels per sprite side; color is [red, green, blue, alpha]. No model

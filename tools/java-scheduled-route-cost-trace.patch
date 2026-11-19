@@ -1,0 +1,110 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -205,11 +205,51 @@
+ 				.setValue(com.simibubi.create.content.contraptions.actors.trainControls.ControlsBlock.FACING,
+ 					net.minecraft.core.Direction.EAST);
+ 			level.setBlockAndUpdate(origin.east().above(3), controls);
++            var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.WHITE).get()
++                .defaultBlockState();
++            level.setBlockAndUpdate(origin.east(2).above(3), seat);
+ 			var area = com.simibubi.create.content.contraptions.glue.SuperGlueEntity.span(origin.east().above(), origin.east(4).above(3));
+ 			level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, area));
+ 			station.assemble(player.getUUID());
++            helper.assertTrue(station.exitAssemblyMode(), "Station must leave assembly mode");
+ 		});
+-		for (int tick = 13; tick <= 220; tick++) {
++		helper.runAfterDelay(22, () -> {
++            var train = com.simibubi.create.Create.RAILWAYS.trains.values().stream()
++                .filter(candidate -> candidate.owner.equals(player.getUUID())).findFirst().orElseThrow();
++            var car = train.carriages.getFirst().anyAvailableEntity();
++            var contraption = (com.simibubi.create.content.trains.entity.CarriageContraption) car.getContraption();
++            var driver = EntityType.VILLAGER.create(level);
++            driver.setNoAi(true);
++            var at = car.position();
++            driver.setPos(at.x, at.y + 2, at.z);
++            level.addFreshEntity(driver);
++            car.addSittingPassenger(driver, contraption.getSeats().indexOf(new BlockPos(1, 2, 0)));
++            helper.assertTrue(driver.getRootVehicle() == car, "Expected seated conductor");
++            var curved = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(arrival);
++            var straight = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(otherStation);
++            curved.getStation().name = "Depot Curve";
++            straight.getStation().name = "Depot Straight";
++            var schedule = new com.simibubi.create.content.trains.schedule.Schedule();
++            schedule.cyclic = false;
++            var entry = new com.simibubi.create.content.trains.schedule.ScheduleEntry();
++            var go = new com.simibubi.create.content.trains.schedule.destination.DestinationInstruction();
++            go.getData().putString("Text", "Depot *");
++            entry.instruction = go;
++            var wait = new com.simibubi.create.content.trains.schedule.condition.ScheduledDelay();
++            wait.getData().putInt("Value", 5);
++            wait.getData().putInt("TimeUnit", 0);
++            entry.conditions.add(java.util.List.of(wait));
++            schedule.entries.add(entry);
++            var programmed = com.simibubi.create.AllItems.SCHEDULE.asStack();
++            programmed.set(com.simibubi.create.AllDataComponents.TRAIN_SCHEDULE, schedule.write(level.registryAccess()));
++            player.setItemInHand(hand, programmed);
++            player.setPos(at.x + 1, at.y + 1, at.z);
++            var click = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.EntityInteractSpecific(
++                player, hand, driver, net.minecraft.world.phys.Vec3.ZERO);
++            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(click);
++            helper.assertTrue(click.isCanceled() && train.runtime.getSchedule() != null, "Conductor must accept schedule");
++        });
++        for (int tick = 23; tick <= 220; tick++) {
+ 			int t = tick;
+ 			helper.runAfterDelay(t, () -> {
+ 				var railway = com.simibubi.create.Create.RAILWAYS;
+@@ -224,45 +264,17 @@
+ 				for (var wheel : wheels) {
+ 					var point = wheel.getPosition(train.graph).subtract(origin.getX(), origin.getY(), origin.getZ());
+ 					output.append(String.format(java.util.Locale.ROOT, " %.9f %.9f %.9f", point.x, point.y, point.z));
+-				}
+-                var station = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(otherStation);
+-                var global = station.getStation();
+-                if (t == 42) {
+-                    for (var pos : java.util.List.of(arrival, otherStation)) {
+-                        var candidate = ((com.simibubi.create.content.trains.station.StationBlockEntity)
+-                            level.getBlockEntity(pos)).getStation();
+-                        var first = train.graph.locateNode(candidate.edgeLocation.getFirst());
+-                        var last = train.graph.locateNode(candidate.edgeLocation.getSecond());
+-                        var edge = train.graph.getConnectionsFrom(first).get(last);
+-                        System.out.printf(java.util.Locale.ROOT, "CREATE_NEAREST_EDGE %s;%.9f;%.9f%n",
+-                            pos, edge.getLength(), candidate.getLocationOn(edge));
+-                    }
+-                }
+-                boolean approaching = global != null && train.navigation.destination == global;
+-                boolean stopped = global != null && train.getCurrentStation() == global;
+-                output.append(String.format(java.util.Locale.ROOT, " %d %d %.9f",
+-                    approaching ? 1 : 0, stopped ? 1 : 0, approaching ? train.navigation.distanceToDestination : 0));
+-                System.out.println(output);
+-				if (t >= 24 && t < 220) {
+-					var entity = c.anyAvailableEntity();
+-					helper.assertTrue(entity != null, "Assembled carriage entity was not available");
+-					var controls = new BlockPos(0, 2, 0);
+-					var at = entity.toGlobalVector(net.minecraft.world.phys.Vec3.atCenterOf(controls), 0);
+-					player.setPos(at.x, at.y, at.z + 1.5);
+-					if (t == 24)
+-						helper.assertTrue(entity.startControlling(controls, player), "Player could not take controls");
+-					var keys = t < 42 ? java.util.List.of(0) : java.util.List.of(4);
+-					helper.assertTrue(entity.control(controls, keys, player), "Train control was refused at " + t);
+ 				}
++                var curve = ((com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(arrival)).getStation();
++                var straight = ((com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(otherStation)).getStation();
++                int target = train.navigation.destination == curve ? 1 : train.navigation.destination == straight ? 2 : 0;
++                int reached = train.getCurrentStation() == curve ? 1 : train.getCurrentStation() == straight ? 2 : 0;
++                output.append(String.format(java.util.Locale.ROOT, " %d %d %.9f %s %d %d",
++                    target, reached, target == 0 ? 0 : train.navigation.distanceToDestination, train.runtime.state,
++                    train.runtime.currentEntry, train.runtime.completed ? 1 : 0));
++                System.out.println(output.toString().replace("CREATE_NEAREST_STATION", "CREATE_SCHEDULED_ROUTE_COST"));
+                 if (t == 220) {
+-                    helper.assertTrue(stopped, "Expected the driver to reach the opposing straight branch station");
+-                    helper.assertTrue(station.tryDisassembleTrain(null), "Unable to disassemble at the curved destination");
+-                    var front = level.getBlockState(otherRail.east().above());
+-                    var rear = level.getBlockState(otherRail.east(4).above());
+-                    var rotated = level.getBlockState(otherRail.east().above(3));
+-                    System.out.println("CREATE_NEAREST_STATION_BLOCKS " + front + ";" + rear + ";" + rotated);
+-                    helper.assertTrue(com.simibubi.create.AllBlocks.SMALL_BOGEY.has(front)
+-                        && com.simibubi.create.AllBlocks.SMALL_BOGEY.has(rear), "The stopped train restored at the wrong position");
++                    helper.assertTrue(reached > 0 && train.runtime.completed, "Train must complete at a matching depot");
+                     helper.succeed();
+                 }
+ 			});

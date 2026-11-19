@@ -1,0 +1,5 @@
+tick,action,categories,groups
+2,loaded,2,_
+3,part,2,_
+4,completed,2,iron_ingot:12+gold_ingot:3|copper_ingot:6|andesite:2
+5,reordered,2,iron_ingot:12+copper_ingot:6|gold_ingot:3|andesite:2

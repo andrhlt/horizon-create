@@ -1,0 +1,17 @@
+dye,block,bright_rgb,dark_rgb,same_geometry
+white,create:white_nixie_tube,edeae5,bbb6b0,true
+orange,create:nixie_tube,ee9246,d94927,true
+magenta,create:magenta_nixie_tube,f062b0,c04488,true
+light_blue,create:light_blue_nixie_tube,69ced2,508aa5,true
+yellow,create:yellow_nixie_tube,e6d756,e9ac29,true
+lime,create:lime_nixie_tube,a3df55,4fb16f,true
+pink,create:pink_nixie_tube,d5a8cb,b86b95,true
+gray,create:gray_nixie_tube,5d666f,313538,true
+light_gray,create:light_gray_nixie_tube,95969b,707070,true
+cyan,create:cyan_nixie_tube,3eabb4,3c7872,true
+purple,create:purple_nixie_tube,9f54ae,63366c,true
+blue,create:blue_nixie_tube,5391e1,504b90,true
+brown,create:brown_nixie_tube,ac855c,68533e,true
+green,create:green_nixie_tube,208a46,1d6045,true
+red,create:red_nixie_tube,b13937,632737,true
+black,create:black_nixie_tube,45403b,21201f,true

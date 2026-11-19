@@ -1,0 +1,90 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..3727b48d7 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.windmillFacings"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..53e800eff 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,71 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "shearing", timeoutTicks = 60)
++    public static void windmillFacings(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var directions = net.minecraft.core.Direction.values();
++        var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++        var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++        var windmill = com.simibubi.create.AllBlocks.WINDMILL_BEARING;
++        var canvas = com.simibubi.create.AllBlocks.SAIL;
++        var shaft = com.simibubi.create.AllBlocks.SHAFT;
++        var mills = new java.util.ArrayList<BlockPos>();
++        var sails = new java.util.ArrayList<java.util.List<BlockPos>>();
++        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        for (int i = 0; i < directions.length; i++) {
++            var face = directions[i];
++            var pos = helper.absolutePos(new BlockPos(2 + i % 2 * 10, 12, 1 + i / 2 * 12));
++            var blade = pos.relative(face);
++            var first = face.getAxis().isVertical() ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.UP;
++            var second = face.getAxis() == net.minecraft.core.Direction.Axis.Z ? net.minecraft.core.Direction.EAST :
++                net.minecraft.core.Direction.SOUTH;
++            var positions = new java.util.ArrayList<BlockPos>();
++            level.setChunkForced(pos.getX() >> 4, pos.getZ() >> 4, true);
++            level.setBlockAndUpdate(pos, windmill.getDefaultState().setValue(facing, face));
++            level.setBlockAndUpdate(pos.relative(face.getOpposite()), shaft.getDefaultState().setValue(axis, face.getAxis()));
++            for (int j = 0; j < 8; j++) {
++                var cell = blade.relative(first, j / 4).relative(second, j % 4);
++                level.setChunkForced(cell.getX() >> 4, cell.getZ() >> 4, true);
++                level.setBlockAndUpdate(cell, canvas.getDefaultState().setValue(facing, face));
++                positions.add(cell);
++            }
++            mills.add(pos);
++            sails.add(positions);
++        }
++        for (int j = 0; j <= 14; j++) {
++            int tick = j;
++            helper.runAtTickTime(tick + 4, () -> {
++                for (int i = 0; i < directions.length; i++) {
++                    var face = directions[i];
++                    var pos = mills.get(i);
++                    var be = (com.simibubi.create.content.contraptions.bearing.WindmillBearingBlockEntity) level.getBlockEntity(pos);
++                    if (tick == 1 || tick == 11) {
++                        var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter(), face, pos, false);
++                        level.getBlockState(pos).useItemOn(ItemStack.EMPTY, level, player, hand, hit);
++                    }
++                    if (tick == 7)
++                        be.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE)
++                            .setValue(1);
++                    var data = be.saveWithoutMetadata(level.registryAccess());
++                    var network = data.getCompound("Network");
++                    var source = (com.simibubi.create.content.kinetics.base.KineticBlockEntity)
++                        level.getBlockEntity(pos.relative(face.getOpposite()));
++                    var entity = be.getMovedContraption();
++                    var captured = entity == null ? 0 :
++                        ((com.simibubi.create.content.contraptions.bearing.BearingContraption) entity.getContraption()).getSailBlocks();
++                    var present = sails.get(i).stream().filter(cell -> canvas.has(level.getBlockState(cell))).count();
++                    System.out.printf(java.util.Locale.ROOT,
++                        "CREATE_WINDMILL_FACING %d;%s;%s;%.8f;%.8f;%.8f;%.8f;%.1f;%.1f;%d;%d%n",
++                        tick, face.getName(), data.getBoolean("Running"), be.getGeneratedSpeed(), be.getSpeed(),
++                        source.getSpeed(), data.getFloat("Angle"), network.getFloat("Stress"), network.getFloat("Capacity"),
++                        captured, present);
++                }
++                if (tick == 14)
++                    helper.succeed();
++            });
++        }
++    }
+ }

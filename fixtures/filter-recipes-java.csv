@@ -1,0 +1,6 @@
+0,create:crafting/materials/brass_nugget_from_decompacting,create:brass_nugget,9,false,false,false,0
+1,create:crafting/materials/brass_ingot_from_compacting,create:brass_ingot,1,false,false,false,0
+2,create:crafting/kinetics/attribute_filter,create:attribute_filter,1,false,false,false,0
+3,create:crafting/kinetics/package_filter,create:package_filter,1,false,false,false,0
+4,create:crafting/appliances/attribute_filter_clear,create:attribute_filter,1,false,false,false,0
+5,create:crafting/appliances/package_filter_clear,create:package_filter,1,false,false,false,0

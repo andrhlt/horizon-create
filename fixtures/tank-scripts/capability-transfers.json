@@ -1,0 +1,293 @@
+{
+  "include_components": true,
+  "actions": [
+    {
+      "op": "place",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "fill",
+      "fluid": "create:potion",
+      "amount": 9000,
+      "components": {
+        "minecraft:potion_contents": {
+          "potion": "minecraft:healing"
+        },
+        "create:potion_fluid_bottle_type": "regular"
+      },
+      "simulate": true,
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "simulated-fill",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "simulated-fill-next-tick",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "fill",
+      "fluid": "create:potion",
+      "amount": 9000,
+      "components": {
+        "minecraft:potion_contents": {
+          "potion": "minecraft:healing"
+        },
+        "create:potion_fluid_bottle_type": "regular"
+      },
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "filled",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "filled-next-tick",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "fill",
+      "fluid": "create:potion",
+      "amount": 1000,
+      "components": {
+        "minecraft:potion_contents": {
+          "potion": "minecraft:strength"
+        },
+        "create:potion_fluid_bottle_type": "regular"
+      },
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "incompatible",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "incompatible-next-tick",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "drain",
+      "amount": 1000,
+      "simulate": true,
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "simulated-drain",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "simulated-drain-next-tick",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "drain",
+      "fluid": "minecraft:water",
+      "amount": 1000,
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "wrong-variant-drain",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "wrong-variant-drain-next-tick",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "drain",
+      "fluid": "create:potion",
+      "components": {
+        "minecraft:potion_contents": {
+          "potion": "minecraft:healing"
+        },
+        "create:potion_fluid_bottle_type": "regular"
+      },
+      "amount": 1000,
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "exact-variant-drain",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "exact-variant-drain-next-tick",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "drain",
+      "amount": 9000,
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "emptied",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "emptied-next-tick",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  ]
+}

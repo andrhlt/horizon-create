@@ -1,0 +1,88 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -868,4 +868,74 @@
+ 		return stats.start().add(stats.end().subtract(stats.start()).normalize().scale(Math.min(stats.chainLength(), position)));
+ 	}
+ 
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void chainConveyorStockLink(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var origin = helper.absolutePos(new BlockPos(2, 14, 2));
++		var directions = net.minecraft.core.Direction.values();
++		var blocks = com.simibubi.create.AllBlocks.STOCK_LINK;
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var signal = net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState();
++		var water = net.minecraft.world.level.block.Blocks.WATER.defaultBlockState();
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		helper.runAtTickTime(2, () -> {
++			for (int i = 0; i < directions.length; i++) {
++				var outward = directions[i];
++				var pos = origin.south(i * 4);
++				var support = pos.relative(outward.getOpposite());
++				level.setBlockAndUpdate(support, signal);
++				level.setBlockAndUpdate(pos, i % 2 == 0 ? water : air);
++				player.setYRot(0);
++				player.setPos(pos.getX() + .5, pos.getY(), pos.getZ() - 2.5);
++				player.setItemInHand(hand, blocks.asStack());
++				var held = player.getItemInHand(hand);
++				var hit = new net.minecraft.world.phys.BlockHitResult(
++					support.getCenter().relative(outward, .5), outward, support, false);
++				var result = held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++				helper.assertTrue(result.consumesAction() && held.isEmpty(), "Placed Stock Link on " + outward);
++				stockLinkRow(helper, outward, pos, "placed");
++			}
++		});
++		helper.runAtTickTime(3, () -> {
++			for (int i = 0; i < directions.length; i++) {
++				var outward = directions[i];
++				var pos = origin.south(i * 4);
++				level.setBlockAndUpdate(pos.relative(outward), signal);
++				stockLinkRow(helper, outward, pos, "powered");
++			}
++		});
++		helper.runAtTickTime(4, () -> {
++			for (int i = 0; i < directions.length; i++) {
++				var outward = directions[i];
++				var pos = origin.south(i * 4);
++				level.setBlockAndUpdate(pos.relative(outward), air);
++				stockLinkRow(helper, outward, pos, "unpowered");
++			}
++		});
++		helper.runAtTickTime(5, () -> {
++			for (int i = 0; i < directions.length; i++) {
++				var outward = directions[i];
++				var pos = origin.south(i * 4);
++				level.setBlockAndUpdate(pos.relative(outward.getOpposite()), air);
++				stockLinkRow(helper, outward, pos, "unsupported");
++			}
++			helper.succeed();
++		});
++	}
++
++	private static void stockLinkRow(CreateGameTestHelper helper, net.minecraft.core.Direction outward,
++		BlockPos pos, String phase) {
++		var level = helper.getLevel();
++		var state = level.getBlockState(pos);
++		helper.assertTrue(com.simibubi.create.AllBlocks.STOCK_LINK.has(state), "Stock Link remains at " + pos);
++		var shape = state.getShape(level, pos).bounds();
++		System.out.printf(java.util.Locale.ROOT,
++			"CREATE_STOCK_LINK %d,%s,%s,%s,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f%n",
++			helper.getTick(), outward.getName(), phase, state,
++			shape.minX, shape.minY, shape.minZ, shape.maxX, shape.maxY, shape.maxZ);
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().startsWith("TestMisc.chainConveyorClipboardFunnel"))
++			.filter(test -> test.testName().startsWith("TestMisc.chainConveyorStockLink"))
+ 			.toList();
+ 	}
+ }

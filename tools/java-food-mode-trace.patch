@@ -1,0 +1,52 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.foodsUse"))
++            .toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,37 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 50)
++    public static void foodsUse(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        for (String name : java.util.List.of("sweet_roll", "chocolate_glazed_berries", "honeyed_apple")) {
++            for (String scenario : java.util.List.of("creative", "creative_repeat32", "creative_repeat33", "creative_repeat34", "creative_repeat35", "full")) {
++                var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++                    new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "FoodTester"));
++                player.setGameMode(scenario.startsWith("creative") ? net.minecraft.world.level.GameType.CREATIVE : net.minecraft.world.level.GameType.SURVIVAL);
++                player.getFoodData().setFoodLevel(scenario.startsWith("creative") ? 10 : 20);
++                player.getFoodData().setSaturation(scenario.startsWith("creative") ? 0 : 5);
++                var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
++                    net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", name));
++                player.getInventory().setItem(0, new net.minecraft.world.item.ItemStack(item));
++                player.getInventory().selected = 0;
++                var action = player.getMainHandItem().use(world, player, hand);
++                System.out.printf("CREATE_FOOD_MODE_ACTION,%s,%s,%s,%s%n", name, scenario, action.getResult(), player.isUsingItem());
++                for (int tick = 0; tick < 36; tick++) {
++                    if (tick > 0) player.doTick();
++                    if (scenario.startsWith("creative_repeat") && tick == Integer.parseInt(scenario.substring("creative_repeat".length())))
++                        player.getMainHandItem().use(world, player, hand);
++                    var held = player.getInventory().getItem(0);
++                    System.out.printf(java.util.Locale.ROOT,
++                        "CREATE_FOOD_MODE,%s,%s,%d,%s,%d,%d,%d,%.9f%n", name, scenario, tick,
++                        net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(held.getItem()), held.getCount(),
++                        player.getUseItemRemainingTicks(), player.getFoodData().getFoodLevel(),
++                        player.getFoodData().getSaturationLevel());
++                }
++            }
++        }
++        helper.succeed();
++    }
+ }

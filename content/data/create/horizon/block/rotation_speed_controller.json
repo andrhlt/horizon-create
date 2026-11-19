@@ -1,0 +1,16 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "state_properties": {
+    "axis": {"type": "enum", "values": ["x", "z"]}
+  },
+  "default_state": {"axis": "z"},
+  "properties": {"occludes": false},
+  "shapes": {
+    "default": [
+      [0, 0, 0, 1, 0.25, 1],
+      [0.0625, 0.0625, 0.0625, 0.9375, 0.8125, 0.9375],
+      [0, 0.5, 0, 1, 0.875, 1]
+    ]
+  }
+}

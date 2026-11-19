@@ -1,0 +1,86 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.weightedEjectorStoppedBelt")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,70 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void weightedEjectorStoppedBelt(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var south = net.minecraft.core.Direction.SOUTH;
++		var at = new BlockPos(5, 104, -11);
++		var start = at.east(4);
++		var end = start.east(3);
++		var chunk = new net.minecraft.world.level.ChunkPos(at);
++		level.setChunkForced(chunk.x, chunk.z, true);
++		level.getChunk(chunk.x, chunk.z);
++		for (int x = -1; x <= 9; x++)
++			for (int z = -2; z <= 2; z++) {
++				level.setBlockAndUpdate(at.offset(x, -1, z),
++					net.minecraft.world.level.block.Blocks.SMOOTH_STONE.defaultBlockState());
++				for (int y = 0; y < 7; y++)
++					level.removeBlock(at.offset(x, y, z), false);
++		}
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var shaft = AllBlocks.SHAFT.getDefaultState().setValue(axis, net.minecraft.core.Direction.Axis.Z);
++		level.setBlockAndUpdate(start, shaft);
++		level.setBlockAndUpdate(end, shaft);
++		com.simibubi.create.content.kinetics.belt.item.BeltConnectorItem.createBelts(level, start, end);
++		level.setBlockAndUpdate(at, AllBlocks.WEIGHTED_EJECTOR.getDefaultState().setValue(horizontal, east));
++		level.setBlockAndUpdate(at.north(), AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, south));
++		((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(at.north()))
++			.generatedSpeed.setValue(128);
++		var ejector = (com.simibubi.create.content.logistics.depot.EjectorBlockEntity) level.getBlockEntity(at);
++		var input = ejector.getBehaviour(com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE);
++		ejector.setTarget(4, 0);
++		var region = new net.minecraft.world.phys.AABB(at).inflate(10);
++		level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, region)
++			.forEach(net.minecraft.world.entity.Entity::discard);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var belt = (com.simibubi.create.content.kinetics.belt.BeltBlockEntity) level.getBlockEntity(start);
++			helper.assertTrue(tick >= 1 && belt.getInventory() != null, "Waiting for the Belt to initialize");
++			if (tick == 12) {
++				var stack = new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++					new ItemStack(Items.IRON_INGOT, 3));
++				input.setCenteredHeldItem(stack);
++			}
++			var saved = ejector.saveWithoutMetadata(level.registryAccess());
++			var flight = saved.getList("LaunchedItems", net.minecraft.nbt.Tag.TAG_COMPOUND);
++			var age = flight.isEmpty() ? -1 : flight.getCompound(0).getInt("Location");
++			var cargo = belt.getInventory().write(level.registryAccess()).getList("Items", net.minecraft.nbt.Tag.TAG_COMPOUND);
++			var first = cargo.getCompound(0);
++			int count = first.getCompound("Item").getInt("count");
++			int loose = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, region,
++						it -> it.getItem().is(Items.IRON_INGOT)).stream().mapToInt(it -> it.getItem().getCount()).sum();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_EJECTOR_STOPPED_BELT %d,%s,%d,%d,%d,%d,%.7f,%d%n",
++				tick, ejector.getState(), input.getHeldItemStack().getCount(), age, (int) belt.getSpeed(),
++				count, first.getFloat("Pos"), loose);
++			if (tick == 24) {
++				level.setBlockAndUpdate(start.north(), AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, south));
++				((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(start.north()))
++					.generatedSpeed.setValue(-48);
++			}
++			helper.assertTrue(tick >= 63 && count == 3 && loose == 0,
++				"The starting Belt must receive three ingots without spilling a loose item.");
++			level.setChunkForced(chunk.x, chunk.z, false);
++		});
++	}
++
+ }

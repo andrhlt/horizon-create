@@ -1,0 +1,63 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..159de0f 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.cardboardDisguise"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..31af91e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,44 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 45)
++	public static void cardboardDisguise(CreateGameTestHelper helper) {
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		player.onAddedToLevel();
++		var start = helper.absolutePos(new BlockPos(1, 2, 1)).above(12);
++		helper.getLevel().setBlockAndUpdate(start.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++		player.setPos(start.getX() + 0.5, start.getY(), start.getZ() + 0.5);
++		var pieces = java.util.Map.of(
++			net.minecraft.world.entity.EquipmentSlot.HEAD, com.simibubi.create.AllItems.CARDBOARD_HELMET.asStack(),
++			net.minecraft.world.entity.EquipmentSlot.CHEST, com.simibubi.create.AllItems.CARDBOARD_CHESTPLATE.asStack(),
++			net.minecraft.world.entity.EquipmentSlot.LEGS, com.simibubi.create.AllItems.CARDBOARD_LEGGINGS.asStack(),
++			net.minecraft.world.entity.EquipmentSlot.FEET, com.simibubi.create.AllItems.CARDBOARD_BOOTS.asStack()
++		);
++		var boots = net.minecraft.world.entity.EquipmentSlot.FEET;
++		helper.runAtTickTime(4, () -> pieces.forEach((slot, stack) -> {
++			if (slot != boots) player.setItemSlot(slot, stack);
++		}));
++		helper.runAtTickTime(7, () -> player.setShiftKeyDown(true));
++		helper.runAtTickTime(10, () -> player.setItemSlot(boots, pieces.get(boots)));
++		helper.runAtTickTime(15, () -> player.setItemSlot(boots, ItemStack.EMPTY));
++		helper.runAtTickTime(20, () -> player.setItemSlot(boots, pieces.get(boots)));
++		helper.runAtTickTime(25, () -> player.setShiftKeyDown(false));
++		for (int i = 4; i <= 30; i++) {
++			final int tick = i;
++			helper.runAtTickTime(tick, () -> {
++				player.tick();
++				var box = player.getBoundingBox();
++				System.out.printf(java.util.Locale.ROOT,
++					"CREATE_CARDBOARD_STEALTH %d,%s,%.4f,%.4f,%.4f,%.4f,%b%n", tick - 4,
++					player.getPose(), box.getXsize(), box.getYsize(), player.getEyeHeight(),
++					player.getVisibilityPercent(null),
++					com.simibubi.create.content.equipment.armor.CardboardArmorHandler.testForStealth(player));
++				if (tick == 30) {
++					player.onRemovedFromLevel();
++					helper.succeed();
++				}
++			});
++		}
++	}
+ }

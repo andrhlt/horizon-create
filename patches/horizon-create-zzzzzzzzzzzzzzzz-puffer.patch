@@ -1,0 +1,29 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -33,7 +33,7 @@
+ }
+ 
+ pub fn create_cannon_sticky(item: &str) -> bool {
+-    matches!(item, "minecraft:pumpkin_pie" | "minecraft:cake" | "minecraft:cod" | "minecraft:cooked_cod" | "minecraft:salmon" | "minecraft:cooked_salmon" | "minecraft:tropical_fish")
++    matches!(item, "minecraft:pumpkin_pie" | "minecraft:cake" | "minecraft:cod" | "minecraft:cooked_cod" | "minecraft:salmon" | "minecraft:cooked_salmon" | "minecraft:tropical_fish" | "minecraft:pufferfish")
+ }
+ 
+ pub fn create_cannon_ammo(item: &str) -> Option<CreateCannonAmmo> {
+@@ -44,6 +44,7 @@
+         "minecraft:melon" => (0.95, 20, 8.0, 2.0),
+         "minecraft:pumpkin_pie" => (1.1, 15, 7.0, 0.05),
+         "minecraft:cake" => (1.1, 15, 8.0, 0.1),
++        "minecraft:pufferfish" => (1.1, 10, 4.0, 0.4),
+         "minecraft:cod" | "minecraft:cooked_cod" | "minecraft:salmon" | "minecraft:cooked_salmon" | "minecraft:tropical_fish" => (1.3, 10, 4.0, 0.6),
+         "minecraft:pumpkin" => (0.95, 15, 6.0, 2.0),
+         "create:honeyed_apple" => (1.35, 15, 6.0, 0.1),
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5631,6 +5631,7 @@
+                     && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:baked_potato");
+                 let apple = p.item.as_ref().map(|item| item.item.as_ref());
+                 let effects: &[(&str, i32, i32)] = match apple {
++                    Some("minecraft:pufferfish") => &[("poison", 1200, 1), ("hunger", 300, 2), ("nausea", 300, 0)],
+                     Some("minecraft:golden_apple") => &[("regeneration", 100, 1), ("absorption", 2400, 0)],
+                     Some("minecraft:enchanted_golden_apple") => &[("regeneration", 400, 1), ("absorption", 2400, 3), ("resistance", 6000, 0), ("fire_resistance", 6000, 0)],
+                     _ => &[],

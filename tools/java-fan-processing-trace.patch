@@ -1,0 +1,78 @@
+diff --git a/src/main/java/com/simibubi/create/foundation/recipe/RecipeApplier.java b/src/main/java/com/simibubi/create/foundation/recipe/RecipeApplier.java
+index f4e0cb7..00d42bd 100644
+--- a/src/main/java/com/simibubi/create/foundation/recipe/RecipeApplier.java
++++ b/src/main/java/com/simibubi/create/foundation/recipe/RecipeApplier.java
+@@ -14,6 +14,7 @@ import net.minecraft.world.item.crafting.Recipe;
+ import net.minecraft.world.level.Level;
+ 
+ public class RecipeApplier {
++	public static net.minecraft.util.RandomSource fanFixtureRandom;
+ 	public static void applyRecipeOn(ItemEntity entity, Recipe<?> recipe, boolean returnProcessingRemainder) {
+ 		List<ItemStack> stacks = applyRecipeOn(entity.level(), entity.getItem(), recipe, returnProcessingRemainder);
+ 		if (stacks.isEmpty()) {
+@@ -36,7 +37,7 @@ public class RecipeApplier {
+ 			for (int i = 0; i < stackIn.getCount(); i++) {
+ 				List<ProcessingOutput> outputs =
+ 					pr instanceof ManualApplicationRecipe mar ? mar.getRollableResults() : pr.getRollableResults();
+-				for (ItemStack stack : pr.rollResults(outputs, level.random)) {
++				for (ItemStack stack : pr.rollResults(outputs, fanFixtureRandom == null ? level.random : fanFixtureRandom)) {
+ 					for (ItemStack previouslyRolled : stacks) {
+ 						if (stack.isEmpty())
+ 							continue;
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..30b76c3 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestItems.fanProcessing"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+index 71d028a..42146cb 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+@@ -422,6 +422,7 @@ public class TestItems {
+ 
+ 	@GameTest(template = "fan_processing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
+ 	public static void fanProcessing(CreateGameTestHelper helper) {
++		com.simibubi.create.foundation.recipe.RecipeApplier.fanFixtureRandom = net.minecraft.util.RandomSource.create(4096L);
+ 		// why does the redstone explode
+ 		BlockPos.betweenClosed(new BlockPos(2, 7, 3), new BlockPos(11, 7, 3)).forEach(
+ 			pos -> helper.setBlock(pos, Blocks.REDSTONE_WIRE)
+@@ -432,6 +433,30 @@ public class TestItems {
+ 			new BlockPos(9, 2, 1), new BlockPos(11, 2, 1)
+ 		);
+ 		helper.succeedWhen(() -> {
++			var level = helper.getLevel();
++			var access = level.registryAccess();
++			long tick = helper.getTick();
++			for (int i = 0; i < 5; i++) {
++				int x = 3 + i * 2;
++				BlockPos upper = new BlockPos(x, 5, 3);
++				BlockPos lower = new BlockPos(x, 3, 3);
++				var upperNbt = helper.getBlockEntity(upper).saveWithoutMetadata(access);
++				var lowerNbt = helper.getBlockEntity(lower).saveWithoutMetadata(access);
++				var stack = lowerNbt.getCompound("Item");
++				System.out.printf("CREATE_FAN_WORLD %d %d %d %d %s %d %d %d%n", tick, i,
++					helper.getTotalItems(upper.above()), upperNbt.getCompound("Item").getInt("count"),
++					stack.getString("id").isEmpty() ? "_" : stack.getString("id"),
++					stack.getInt("count"), helper.getTotalItems(lower.below()),
++					helper.getBlockState(lamps.get(i)).getValue(RedstoneLampBlock.LIT) ? 1 : 0);
++				var box = new net.minecraft.world.phys.AABB(helper.absolutePos(lower)).expandTowards(0, 2, 0);
++				for (var item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, box)) {
++					var processing = item.getPersistentData().getCompound("CreateData").getCompound("Processing");
++					var label = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item.getItem().getItem());
++					System.out.printf(java.util.Locale.ROOT, "CREATE_FAN_ITEM %d %d %s %d %.6f %.6f %d%n",
++						tick, i, label, item.getItem().getCount(), item.getX() - box.minX, item.getY() - box.minY,
++						processing.contains("Time") ? processing.getInt("Time") : -2);
++				}
++			}
+ 			for (BlockPos lamp : lamps) {
+ 				helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, true);
+ 			}

@@ -1,0 +1,3 @@
+case,result,ammo_remaining,damage,cooldown,x,y,z,vx,vy,vz,item
+empty,PASS,,0,,,,,,,,
+potato,SUCCESS,2,1,true,-0.750000000,1.469999999,1.500000000,0.124844044,0.000000000,2.496880847,minecraft:potato

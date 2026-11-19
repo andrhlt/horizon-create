@@ -1,0 +1,115 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..b5c3f24 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.stockpileSwitchFilter"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..b84f5d8 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,96 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 36)
++	public static void stockpileSwitchFilter(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var mount = com.simibubi.create.content.redstone.DirectedDirectionalBlock.TARGET;
++		var world = helper.getLevel();
++		var stockpile = com.simibubi.create.AllBlocks.THRESHOLD_SWITCH.get();
++		var type = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++		var player = new net.minecraft.server.level.ServerPlayer(world.getServer(), world,
++			new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "StockpileFilter"),
++			net.minecraft.server.level.ClientInformation.createDefault());
++		var directions = net.minecraft.core.Direction.values();
++		for (int i = 0; i < directions.length; i++) {
++			var direction = directions[i];
++			var attachment = direction == net.minecraft.core.Direction.UP ? net.minecraft.world.level.block.state.properties.AttachFace.CEILING
++				: direction == net.minecraft.core.Direction.DOWN ? net.minecraft.world.level.block.state.properties.AttachFace.FLOOR
++				: net.minecraft.world.level.block.state.properties.AttachFace.WALL;
++			var horizontal = direction.getAxis().isVertical() ? net.minecraft.core.Direction.SOUTH : direction;
++			var local = new BlockPos(9 + 3 * i, 8, 4);
++			var absolute = helper.absolutePos(local);
++			helper.setBlock(local, stockpile.defaultBlockState().setValue(facing, horizontal).setValue(mount, attachment));
++			var filter = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), local).getBehaviour(type);
++			for (var click : directions) {
++				for (boolean center : new boolean[] {true, false}) {
++					filter.setFilter(ItemStack.EMPTY);
++					player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.STONE, 3));
++					boolean claimed = stockpileFilterClick(player, absolute, click, center);
++					if (center && claimed) {
++						var box = (com.simibubi.create.foundation.blockEntity.behaviour.ValueBoxTransform.Sided) filter.getSlotPositioning();
++						var offset = box.fromSide(click).getLocalOffset(world, absolute, world.getBlockState(absolute));
++						float yaw = net.createmod.catnip.math.AngleHelper.horizontalAngle(click) + 180;
++						float pitch = click == net.minecraft.core.Direction.UP ? 90 : click == net.minecraft.core.Direction.DOWN ? 270 : 0;
++						float roll = click == net.minecraft.core.Direction.UP
++							? -net.createmod.catnip.math.AngleHelper.horizontalAngle(horizontal) + 180 : 0;
++						System.out.printf("STOCKPILE_FILTER_TRANSFORM,%s,%s,%.6f,%.6f,%.6f,%.1f,%.1f,%.1f,%.5f%n",
++							direction.getName(), click.getName(), offset.x, offset.y, offset.z, yaw, pitch, roll, box.getScale());
++					}
++					System.out.printf("STOCKPILE_FILTER_POSE,%s,%s,%b,%b,%d,%d%n",
++						direction.getName(), click.getName(), center, claimed, filter.getFilter().getCount(), player.getMainHandItem().getCount());
++				}
++			}
++		}
++		var items = new BlockPos(12, 7, 9);
++		var fluids = new BlockPos(16, 7, 9);
++		helper.setBlock(items.south(), Blocks.BARREL);
++		var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) world.getBlockEntity(helper.absolutePos(items.south()));
++		barrel.setItem(0, new ItemStack(Items.STONE, 32));
++		barrel.setItem(1, new ItemStack(Items.OAK_PLANKS, 32));
++		helper.setBlock(fluids.south(), com.simibubi.create.AllBlocks.FLUID_TANK.get());
++		var tank = (com.simibubi.create.content.fluids.tank.FluidTankBlockEntity) world.getBlockEntity(helper.absolutePos(fluids.south()));
++		tank.getTankInventory().fill(new net.neoforged.neoforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.WATER, 2000),
++			net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
++		for (var local : new BlockPos[] {items, fluids}) {
++			helper.setBlock(local, stockpile.defaultBlockState().setValue(facing, net.minecraft.core.Direction.SOUTH));
++			var be = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), local);
++			be.offWhenBelow = local == items ? 16 : 500;
++			be.onWhenAbove = local == items ? 48 : 1500;
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int index = 0; index < 2; index++) {
++				var local = index == 0 ? items : fluids;
++				var be = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), local);
++				if (tick == 4 || tick == 8 || tick == 13 || tick == 17) {
++					ItemStack selected = tick == 13 ? ItemStack.EMPTY : index == 0
++						? new ItemStack(tick == 8 ? Items.IRON_INGOT : Items.STONE, 3)
++						: new ItemStack(tick == 8 ? Items.WATER_BUCKET : Items.LAVA_BUCKET);
++					player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, selected);
++					boolean accepted = stockpileFilterClick(player, helper.absolutePos(local), net.minecraft.core.Direction.NORTH, tick != 17);
++					if (accepted != (tick != 17))
++						helper.fail("Original filter hit disagreed with the selected point");
++				}
++				var selected = be.getBehaviour(type).getFilter();
++				String item = selected.isEmpty() ? "-" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(selected.getItem()).toString();
++				System.out.printf("STOCKPILE_FILTER_TICK,%d,%d,%s,%d,%d,%b,%b,%d%n", tick, index, item,
++					selected.getCount(), be.getStockLevel(), be.getState(), be.isPowered(),
++					world.getBlockState(helper.absolutePos(local)).getValue(com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlock.LEVEL));
++			}
++			helper.assertTrue(tick == 23, "sampling filter changes");
++		});
++	}
++
++	private static boolean stockpileFilterClick(net.minecraft.world.entity.player.Player player, BlockPos pos,
++		net.minecraft.core.Direction face, boolean center) {
++		var point = pos.getCenter().relative(face, 0.46);
++		if (!center)
++			point = point.relative(face.getAxis().isVertical() ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.UP, 0.31);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var hit = new net.minecraft.world.phys.BlockHitResult(point, face, pos, false);
++		var event = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock(player, hand, pos, hit);
++		com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsInputHandler.onBlockActivated(event);
++		return event.isCanceled();
++	}
+ }

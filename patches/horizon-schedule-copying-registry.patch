@@ -1,0 +1,12 @@
+--- a/crates/horizon-client/src/crafting.rs
++++ b/crates/horizon-client/src/crafting.rs
+@@ -1332,7 +1332,8 @@
+ fn custom_type(v: &Value) -> Option<&str> {
+     v["type"]
+         .as_str()
+-        .filter(|t| t.contains(':') && !t.starts_with("minecraft:"))
++        // This Create serializer is handled by the shared crafting table.
++        .filter(|t| t.contains(':') && !t.starts_with("minecraft:") && *t != "create:item_copying")
+ }
+ pub struct Recipes {
+     pub crafting: Vec<(String, Recipe)>,

@@ -1,0 +1,1 @@
+[{Modifier:"FORWARD_FAST",Type:"TURN_ANGLE",Value:45},{Modifier:"FORWARD",Type:"DELAY",Value:4},{Modifier:"FORWARD",Type:"AWAIT",Value:-1},{Modifier:"BACK_FAST",Type:"TURN_DISTANCE",Value:1},{Modifier:"FORWARD",Type:"END",Value:1}]

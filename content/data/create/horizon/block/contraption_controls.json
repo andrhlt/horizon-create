@@ -1,0 +1,12 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {"waterloggable": true, "occludes": false},
+  "state_properties": {
+    "facing": {"type": "enum", "values": ["north", "south", "west", "east"]},
+    "open": {"type": "boolean"},
+    "virtual": {"type": "boolean"},
+    "waterlogged": {"type": "boolean"}
+  },
+  "default_state": {"facing": "north", "open": "false", "virtual": "false", "waterlogged": "false"}
+}

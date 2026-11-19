@@ -1,0 +1,38 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -38,6 +38,7 @@
+         "minecraft:baked_potato" => (1.25, 15, 5.0, 0.5),
+         "minecraft:poisonous_potato" => (1.25, 15, 5.0, 0.05),
+         "minecraft:melon" => (0.95, 20, 8.0, 2.0),
++        "minecraft:pumpkin" => (0.95, 15, 6.0, 2.0),
+         "create:honeyed_apple" => (1.35, 15, 6.0, 0.1),
+         "minecraft:golden_apple" | "minecraft:enchanted_golden_apple" => (1.45, 100, 1.0, 0.05),
+         "minecraft:carrot" => (1.45, 12, 4.0, 0.3),
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5701,13 +5701,14 @@
+                     }
+                     Hit::Block { pos, at, face }
+                         if t.id == "create:potato_projectile"
+-                            && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:melon") =>
++                            && p.item.as_ref().is_some_and(|item| matches!(item.item.as_ref(), "minecraft:melon" | "minecraft:pumpkin")) =>
+                     {
++                        let block_name = p.item.as_ref().unwrap().item.as_ref();
+                         let place = [pos[0] + face[0], pos[1] + face[1], pos[2] + face[2]];
+                         let current = self.world.block(place[0], place[1], place[2]);
+                         if self.world.chunks.contains_key(&(pos[0] >> 4, pos[2] >> 4))
+                             && self.res.facts().get(current).replaceable
+-                            && let Some(state) = self.pack.assets.registry.default_state("minecraft:melon")
++                            && let Some(state) = self.pack.assets.registry.default_state(block_name)
+                         {
+                             let block_pos = BlockPos::new(place[0], place[1], place[2]);
+                             if face == [0, 1, 0] {
+@@ -5727,7 +5728,7 @@
+                                     state, start_pos, position: location, previous: location, velocity: Vec3::ZERO,
+                                     age: 1, no_gravity: false, portal: Default::default(), drop_item: true,
+                                     fall_distance: 0.0, on_ground: false, stuck: Vec3::ZERO,
+-                                    damage: horizon_client::falling_block::Damage::falling("minecraft:melon"),
++                                    damage: horizon_client::falling_block::Damage::falling(block_name),
+                                     saved: None,
+                                 });
+                             }

@@ -1,0 +1,13 @@
+initial,supports,shape,backwards
+north_south,false,east_west,false
+north_south,true,east_west,false
+east_west,false,north_south,true
+east_west,true,north_south,true
+ascending_east,false,ascending_east,false
+ascending_east,true,ascending_south,true
+ascending_west,false,ascending_west,false
+ascending_west,true,ascending_north,true
+ascending_north,false,ascending_north,false
+ascending_north,true,ascending_east,false
+ascending_south,false,ascending_south,false
+ascending_south,true,ascending_west,false

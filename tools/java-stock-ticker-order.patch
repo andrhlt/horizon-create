@@ -1,0 +1,87 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1436,4 +1436,73 @@
+ 		}
+ 	}
+ 
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stockTickerOrder(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(4, 16, 4));
++		var bin = at.east(4);
++		var machine = bin.east();
++		var iron = net.minecraft.world.item.Items.IRON_INGOT.getDefaultInstance();
++		var copper = net.minecraft.world.item.Items.COPPER_INGOT.getDefaultInstance();
++		var frequency = new java.util.UUID(548, 113);
++		var packageSummary = (java.util.function.Function<net.minecraft.world.item.ItemStack, String>) box -> {
++			if (box.isEmpty())
++				return "_:0:0";
++			var contents = com.simibubi.create.content.logistics.box.PackageItem.getContents(box);
++			int irons = 0, coppers = 0;
++			for (int slot = 0; slot < contents.getSlots(); slot++) {
++				var stack = contents.getStackInSlot(slot);
++				if (stack.is(iron.getItem()))
++					irons += stack.getCount();
++				if (stack.is(copper.getItem()))
++					coppers += stack.getCount();
++			}
++			return com.simibubi.create.content.logistics.box.PackageItem.getAddress(box) + ":" + irons + ":" + coppers;
++		};
++		helper.runAtTickTime(2, () -> {
++			level.setBlockAndUpdate(at, AllBlocks.STOCK_TICKER.getDefaultState());
++			level.getBlockEntity(at, com.simibubi.create.AllBlockEntityTypes.STOCK_TICKER.get())
++				.orElseThrow().behaviour.freqId = frequency;
++			level.setBlockAndUpdate(bin, net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState());
++			var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(bin);
++			barrel.setItem(0, iron.copyWithCount(11));
++			barrel.setItem(1, copper.copyWithCount(4));
++			level.setBlockAndUpdate(machine, AllBlocks.PACKAGER.getDefaultState()
++				.setValue(net.minecraft.world.level.block.DirectionalBlock.FACING, net.minecraft.core.Direction.EAST));
++			level.setBlockAndUpdate(machine.above(), AllBlocks.STOCK_LINK.getDefaultState());
++			level.getBlockEntity(machine.above(), com.simibubi.create.AllBlockEntityTypes.PACKAGER_LINK.get())
++				.orElseThrow().behaviour.freqId = frequency;
++		});
++		for (int tick = 4; tick <= 9; tick++) {
++			final int atTick = tick;
++			helper.runAtTickTime(tick, () -> {
++				var ticker = level.getBlockEntity(at, com.simibubi.create.AllBlockEntityTypes.STOCK_TICKER.get()).orElseThrow();
++				var packager = (com.simibubi.create.content.logistics.packager.PackagerBlockEntity) level.getBlockEntity(machine);
++				var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(bin);
++				if (atTick == 5)
++					barrel.setItem(0, iron.copyWithCount(4));
++				boolean accepted = false;
++				if (atTick == 4 || atTick == 6) {
++					var order = new java.util.ArrayList<com.simibubi.create.content.logistics.BigItemStack>();
++					order.add(new com.simibubi.create.content.logistics.BigItemStack(iron, atTick == 4 ? 2 : 9));
++					if (atTick == 4)
++						order.add(new com.simibubi.create.content.logistics.BigItemStack(copper, 3));
++					accepted = ticker.broadcastPackageRequest(
++						com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour.RequestType.PLAYER,
++						com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts.simple(order),
++						null, atTick == 4 ? "Warehouse" : "Smelting");
++				}
++				var queued = packager.queuedExitingPackages.isEmpty()
++					? net.minecraft.world.item.ItemStack.EMPTY : packager.queuedExitingPackages.get(0).stack;
++				var previous = ticker.saveWithoutMetadata(level.registryAccess()).getString("PreviousAddress");
++				System.out.printf("CREATE_TICKER_ORDER %d,%b,%s,%s,%s,%d,%d,%d%n", atTick, accepted, previous,
++					packageSummary.apply(packager.heldBox), packageSummary.apply(queued),
++					barrel.getItem(0).getCount(), barrel.getItem(1).getCount(), packager.animationTicks);
++				if (atTick == 9)
++					helper.succeed();
++			});
++		}
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().equals("TestMisc.stockTickerTuning"))
++			.filter(test -> test.testName().equals("TestMisc.stockTickerOrder"))
+ 			.toList();
+ 	}
+ }

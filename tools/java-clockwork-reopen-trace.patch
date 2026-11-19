@@ -1,0 +1,114 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..a54e73acb 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().startsWith("TestMisc.clockworkReopen"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..960fa3242 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,95 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 400)
++    public static void clockworkReopen(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var outer = helper.absolutePos(new BlockPos(1, 2, 1));
++        int sectionX = (outer.getX() >> 4) + 36, sectionZ = outer.getZ() >> 4;
++        var mill = new BlockPos(sectionX * 16 + 4, outer.getY() + 20, sectionZ * 16 + 3);
++        var east = net.minecraft.core.Direction.EAST;
++        var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++        var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        java.util.function.Supplier<com.simibubi.create.content.contraptions.bearing.ClockworkBearingBlockEntity> entity =
++            () -> (com.simibubi.create.content.contraptions.bearing.ClockworkBearingBlockEntity) level.getBlockEntity(mill);
++        Runnable click = () -> {
++            var hit = new net.minecraft.world.phys.BlockHitResult(
++                net.minecraft.world.phys.Vec3.atCenterOf(mill), east, mill, false);
++            level.getBlockState(mill).useItemOn(net.minecraft.world.item.ItemStack.EMPTY, level, player, hand, hit);
++        };
++        java.util.function.Supplier<java.util.Set<java.util.UUID>> hands = () -> {
++            var bearing = entity.get();
++            if (bearing == null)
++                return java.util.Set.of();
++            var entities = level.getEntitiesOfClass(
++                com.simibubi.create.content.contraptions.ControlledContraptionEntity.class,
++                new net.minecraft.world.phys.AABB(mill).inflate(4), bearing::isAttachedTo);
++            return entities.stream().map(e -> e.getUUID()).collect(java.util.stream.Collectors.toSet());
++        };
++        java.util.function.Consumer<String> observe = phase -> {
++            var be = entity.get();
++            var data = be.saveWithoutMetadata(level.registryAccess());
++            var network = data.getCompound("Network");
++            int present = 0;
++            for (int arm = 1; arm <= 2; arm++)
++                for (int height = 0; height < 2; height++)
++                    if (!level.getBlockState(mill.east(arm).above(height)).isAir())
++                        present++;
++            System.out.printf(java.util.Locale.ROOT,
++                "CREATE_CLOCKWORK_REOPEN %s;%s;%.8f;%.8f;%.8f;%.1f;%.1f;%d;%d%n",
++                phase, data.getBoolean("Running"), data.getFloat("HourAngle"), data.getFloat("MinuteAngle"),
++                be.getSpeed(), network.getFloat("Stress"), network.getFloat("Capacity"), hands.get().size(), present);
++        };
++        level.setChunkForced(sectionX, sectionZ, true);
++        helper.runAtTickTime(4, () -> {
++            level.setDayTime(2580);
++            level.setBlockAndUpdate(mill,
++                com.simibubi.create.AllBlocks.CLOCKWORK_BEARING.getDefaultState().setValue(facing, east));
++            for (int arm = 1; arm <= 2; arm++) {
++                var at = mill.east(arm);
++                var material = arm == 1 ? Blocks.OAK_PLANKS : Blocks.STONE;
++                level.setBlockAndUpdate(at, material.defaultBlockState());
++                level.setBlockAndUpdate(at.above(), material.defaultBlockState());
++                var corner = net.minecraft.world.phys.Vec3.atLowerCornerOf(at);
++                level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level,
++                    new net.minecraft.world.phys.AABB(corner, corner.add(1, 2, 1))));
++            }
++            level.setBlockAndUpdate(mill.west(),
++                com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east));
++        });
++        var uuid = new java.util.concurrent.atomic.AtomicReference<java.util.Set<java.util.UUID>>();
++        var state = new java.util.concurrent.atomic.AtomicInteger();
++        helper.succeedWhen(() -> {
++            long tick = helper.getTick();
++            if (state.get() == 0) {
++                helper.assertTrue(tick >= 12 && entity.get() != null && hands.get().size() == 2,
++                    "Wait for assembly to settle");
++                observe.accept("before");
++                uuid.set(hands.get());
++                level.getChunkSource().save(true);
++                level.setChunkForced(sectionX, sectionZ, false);
++                state.set(1);
++            }
++            if (state.get() == 1) {
++                helper.assertTrue(level.getChunkSource().getChunkNow(sectionX, sectionZ) == null,
++                    "Wait for the Clockwork Bearing chunk to unload");
++                level.setChunkForced(sectionX, sectionZ, true);
++                state.set(2);
++                helper.assertTrue(false, "Wait for the Clockwork Bearing chunk to reload");
++            }
++            helper.assertTrue(level.getChunkSource().getChunkNow(sectionX, sectionZ) != null && entity.get() != null
++                && hands.get().size() == 2, "Wait for the saved assembly to reattach");
++            helper.assertTrue(uuid.get().equals(hands.get()),
++                "The reloaded Clockwork Bearing must still own its original contraption");
++            observe.accept("reopened");
++            click.run();
++            observe.accept("stopped");
++            helper.assertTrue(level.getBlockState(mill.east().above()).is(Blocks.OAK_PLANKS)
++                && level.getBlockState(mill.east(2).above()).is(Blocks.STONE), "Stopped arms did not restore");
++            helper.succeed();
++        });
++    }
+ }

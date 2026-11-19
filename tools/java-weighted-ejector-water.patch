@@ -1,0 +1,97 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.weightedEjectorPlacement"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,80 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 30)
++	public static void weightedEjectorPlacement(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var water = Blocks.WATER.defaultBlockState();
++		var liquidLevel = net.minecraft.world.level.block.LiquidBlock.LEVEL;
++		var wet = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var target = helper.absolutePos(new BlockPos(2, 7, 2));
++		var dispenserPos = target.west();
++		var powerPos = dispenserPos.above();
++		helper.runAtTickTime(1, () -> {
++			world.setBlockAndUpdate(target, Blocks.AIR.defaultBlockState());
++			world.setBlockAndUpdate(dispenserPos, Blocks.AIR.defaultBlockState());
++			world.setBlockAndUpdate(powerPos, Blocks.AIR.defaultBlockState());
++			world.setBlockAndUpdate(target.below(), Blocks.STONE.defaultBlockState());
++			for (var side : new BlockPos[] {target.north(), target.east(), target.south()}) {
++				world.setBlockAndUpdate(side, Blocks.AIR.defaultBlockState());
++				world.setBlockAndUpdate(side.below(), Blocks.AIR.defaultBlockState());
++			}
++			world.setBlockAndUpdate(target, com.simibubi.create.AllBlocks.WEIGHTED_EJECTOR.getDefaultState());
++			world.setBlockAndUpdate(dispenserPos, Blocks.DISPENSER.defaultBlockState()
++				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING,
++					net.minecraft.core.Direction.EAST));
++			var dispenser = (net.minecraft.world.level.block.entity.DispenserBlockEntity) world.getBlockEntity(dispenserPos);
++			dispenser.setItem(0, new ItemStack(Items.WATER_BUCKET));
++		});
++		helper.runAtTickTime(3, () -> {
++			for (int yaw = 0; yaw < 360; yaw += 90) {
++				player.setYRot(yaw);
++				for (int sample = 0; sample < 3; sample++) {
++					var stack = com.simibubi.create.AllBlocks.WEIGHTED_EJECTOR.asStack();
++					player.setItemInHand(hand, stack);
++					var at = helper.absolutePos(new BlockPos(yaw / 30, 7, 5 + sample * 3));
++					world.setBlockAndUpdate(at, Blocks.AIR.defaultBlockState());
++					world.setBlockAndUpdate(at.below(), Blocks.STONE.defaultBlockState());
++					if (sample != 0)
++						world.setBlockAndUpdate(at, water.setValue(liquidLevel, sample == 1 ? 0 : 2));
++					var hit = new net.minecraft.world.phys.BlockHitResult(
++						net.minecraft.world.phys.Vec3.atCenterOf(at.below()),
++						net.minecraft.core.Direction.UP, at.below(), false);
++					var result = stack.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++					helper.assertTrue(result.consumesAction(), "weighted ejector placement failed");
++					var state = world.getBlockState(at);
++					System.out.printf("CANONICAL_EJECTOR %d,%d,%s,%s,%s%n",
++						yaw, sample, registry.getKey(state.getBlock()), state.getValue(facing), state.getValue(wet));
++				}
++			}
++		});
++		helper.succeedWhen(() -> {
++			var tick = helper.getTick() - 3;
++			if (tick < 0)
++				helper.fail("waiting for dispenser");
++			var state = world.getBlockState(target);
++			var dispenser = (net.minecraft.world.level.block.entity.DispenserBlockEntity) world.getBlockEntity(dispenserPos);
++			var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(dispenser.getItem(0).getItem());
++			var east = world.getBlockState(target.east());
++			System.out.printf("CANONICAL_EJECTOR_BUCKET %d,%s,%s,%s,%s,%s%n",
++				tick, registry.getKey(state.getBlock()), state.getValue(wet), item,
++				registry.getKey(east.getBlock()), east.hasProperty(liquidLevel) ? east.getValue(liquidLevel) : "absent");
++			if (tick == 0) {
++				world.setBlockAndUpdate(powerPos, Blocks.REDSTONE_BLOCK.defaultBlockState());
++			} else if (tick == 6) {
++				world.setBlockAndUpdate(powerPos, Blocks.AIR.defaultBlockState());
++				dispenser.setItem(0, new ItemStack(Items.BUCKET));
++				world.setBlockAndUpdate(powerPos, Blocks.REDSTONE_BLOCK.defaultBlockState());
++			}
++			if (tick < 12)
++				helper.fail("waiting for dispenser");
++		});
++	}
++
+ }

@@ -1,0 +1,36 @@
+diff --git a/crates/horizon-mods/src/content.rs b/crates/horizon-mods/src/content.rs
+--- a/crates/horizon-mods/src/content.rs
++++ b/crates/horizon-mods/src/content.rs
+@@ -95,6 +95,8 @@
+     pub straight_rail: bool,
+     /// A vanilla block whose sounds this block uses.
+     pub sounds: Option<String>,
++    /// A vanilla trapdoor whose open and close events this block uses.
++    pub trapdoor_sound_source: Option<String>,
+     /// Which states tick randomly, whatever the template does (`isRandomlyTicking`).
+     pub random_ticks: Option<RandomTicks>,
+     /// How much of the landing distance this block absorbs.
+diff --git a/crates/horizon-client/src/mod_content.rs b/crates/horizon-client/src/mod_content.rs
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -1546,6 +1546,20 @@
+                             && let Some(name) = v.at("fields/type/name")
+                         {
+                             *name = J::Str(wood.clone());
++                        }
++                        if let Some(source) = &b.decl.properties.trapdoor_sound_source {
++                            let set = blocks.iter()
++                                .find(|block| matches!(block.get("name"), Some(J::Str(name)) if name == source))
++                                .and_then(|block| block.get("fields"))
++                                .and_then(|fields| fields.get("type"))
++                                .ok_or_else(|| format!("{}: unknown trapdoor sound source {source}", b.decl.id))?;
++                            let target = v.at("fields/type")
++                                .ok_or_else(|| format!("{}: expected a trapdoor template", b.decl.id))?;
++                            for event in ["trapdoorOpen", "trapdoorClose"] {
++                                let sound = set.get(event).cloned()
++                                    .ok_or_else(|| format!("{}: missing {event} on {source}", b.decl.id))?;
++                                target.set(event, sound);
++                            }
+                         }
+                         // A connecting block: the chorus plant's PipeBlock
+                         // without its rules, joining the declared tag.

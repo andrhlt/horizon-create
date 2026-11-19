@@ -1,0 +1,67 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaBearingPortRenderProbe.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaBearingPortRenderProbe.java
+@@ -33,6 +33,12 @@
+ 			return;
+ 		var level = event.getServer().overworld();
+ 		lastServerTick = level.getGameTime();
++		var volume = new net.minecraft.world.phys.AABB(2, 115, -18, 16, 132, -3);
++		for (var actor : level.getEntitiesOfClass(
++			com.simibubi.create.content.contraptions.ControlledContraptionEntity.class, volume)) {
++			System.out.printf(Locale.ROOT,"JAVA_MOVING_PSI_AUTH %d;%d;%.8f;%b%n",
++				System.nanoTime(), lastServerTick, actor.getAngle(1), actor.isStalled());
++		}
+ 		if (!(level.getBlockEntity(PORT) instanceof PortableStorageInterfaceBlockEntity psi))
+ 			return;
+ 		var values = psi.parityRenderState();
+@@ -48,7 +54,7 @@
+ 		var mc = Minecraft.getInstance();
+ 		if (!opened && mc.getOverlay() == null && mc.screen instanceof TitleScreen) {
+ 			opened = true;
+-			mc.createWorldOpenFlows().openWorld("BearingPortDelivery", mc::stop);
++			mc.createWorldOpenFlows().openWorld("BearingPortActorReference", mc::stop);
+ 		}
+ 		if (mc.screen instanceof BackupConfirmScreen backup)
+ 			backup.children().stream().filter(Button.class::isInstance).map(Button.class::cast)
+@@ -87,7 +93,7 @@
+ 			mc.level.getGameTime(), timer, saved.getFloat("Distance"),
+ 			endpoints[2], endpoints[3], endpoints[3] * .5 + .375, endpoints[4] == 1);
+ 		if ((timer == 8 || timer == 2 || timer == 0) && timer != previousTimer) {
+-			Screenshot.grab(mc.gameDirectory, "bearing-port-delivery-" + ticks + "-timer-" + timer + ".png", mc.getMainRenderTarget(), message -> {});
++			Screenshot.grab(mc.gameDirectory, "bearing-port-actor-" + ticks + "-timer-" + timer + ".png", mc.getMainRenderTarget(), message -> {});
+ 		}
+ 		previousTimer = timer;
+ 	}
+--- a/src/main/java/com/simibubi/create/content/contraptions/actors/psi/PortableStorageInterfaceMovement.java
++++ b/src/main/java/com/simibubi/create/content/contraptions/actors/psi/PortableStorageInterfaceMovement.java
+@@ -81,8 +81,19 @@
+ 
+ 		if (context.world.isClientSide) {
+ 			BlockPos pos = BlockPos.containing(context.position);
+-			if (!findInterface(context, pos))
++			boolean found = findInterface(context, pos);
++			if (!found)
+ 				reset(context);
++			if (Boolean.getBoolean("parity.bearingPortClient") && !onCarriage
++				&& context.contraption.entity instanceof com.simibubi.create.content.contraptions.ControlledContraptionEntity actor
++				&& context.position.y > 110) {
++				var animation = getAnimation(context);
++				System.out.printf(java.util.Locale.ROOT,
++					"JAVA_MOVING_PSI_CLIENT %d;%d;%d;%.8f;%b;%b;%.8f;%.8f;%b%n", System.nanoTime(),
++					context.world.getGameTime(),
++					com.simibubi.create.infrastructure.gametest.tests.JavaBearingPortRenderProbe.lastServerTick,
++					actor.getAngle(1), actor.isStalled(), found, animation.getValue(0), animation.getValue(1), animation.settled());
++			}
+ 			return;
+ 		}
+ 
+--- a/build.gradle
++++ b/build.gradle
+@@ -71,7 +71,7 @@
+             if (project.hasProperty("parityBearingPortClient")) {
+                 gameDirectory = project.file("run/bearing-port-client")
+                 systemProperty("parity.bearingPortClient", "true")
+-                programArguments.addAll("--quickPlaySingleplayer", "BearingPortDelivery", "--width", "960", "--height", "540")
++                programArguments.addAll("--quickPlaySingleplayer", "BearingPortActorReference", "--width", "960", "--height", "540")
+             }
+         }
+ 

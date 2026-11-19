@@ -1,0 +1,126 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "state_properties": {
+    "shape": {
+      "type": "enum",
+      "values": [
+        "north_south",
+        "east_west",
+        "ascending_east",
+        "ascending_west",
+        "ascending_north",
+        "ascending_south"
+      ]
+    },
+    "power": {
+      "type": "enum",
+      "values": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15"
+      ]
+    },
+    "backwards": {
+      "type": "boolean"
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "shape": "north_south",
+    "power": "0",
+    "backwards": "false",
+    "waterlogged": "false"
+  },
+  "properties": {
+    "hardness": 0.7,
+    "explosion_resistance": 0.7,
+    "occludes": false,
+    "waterloggable": true,
+    "straight_rail": true,
+    "sounds": "minecraft:powered_rail"
+  },
+  "shapes": {
+    "property": "shape",
+    "values": {
+      "north_south": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.125,
+          1
+        ]
+      ],
+      "east_west": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.125,
+          1
+        ]
+      ],
+      "ascending_east": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.5,
+          1
+        ]
+      ],
+      "ascending_west": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.5,
+          1
+        ]
+      ],
+      "ascending_north": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.5,
+          1
+        ]
+      ],
+      "ascending_south": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.5,
+          1
+        ]
+      ]
+    }
+  },
+  "collision_shapes": {
+    "default": []
+  }
+}

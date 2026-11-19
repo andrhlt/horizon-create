@@ -1,0 +1,27 @@
+{
+  "template": "minecraft:oak_planks",
+  "item": true,
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "down",
+        "up",
+        "north",
+        "south",
+        "west",
+        "east"
+      ]
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "facing": "north",
+    "waterlogged": "false"
+  },
+  "properties": {
+    "occludes": false
+  }
+}

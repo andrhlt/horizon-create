@@ -1,0 +1,13 @@
+diff --git a/crates/horizon-client/src/mobs/ai/air.rs b/crates/horizon-client/src/mobs/ai/air.rs
+--- a/crates/horizon-client/src/mobs/ai/air.rs
++++ b/crates/horizon-client/src/mobs/ai/air.rs
+@@ -60,7 +60,8 @@
+             consume: if keeps_its_air(m) { 0 } else { 1 },
+             refill: if drowns || held { 0 } else { 4 },
+         };
+-        let breath = breathe(m.id, &m.kind.id, vanilla);
++        let mut breath = breathe(m.id, &m.kind.id, vanilla);
++        crate::mobs::create_diving::breathe_underwater(m, w, &mut breath);
+         if let Some(drowning) = drown(m.id, &m.kind.id, &mut m.air, breath, true) {
+             events.push(MobEvent::Drown {
+                 mob: m.id,

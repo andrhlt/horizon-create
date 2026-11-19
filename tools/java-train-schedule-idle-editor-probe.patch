@@ -1,0 +1,119 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleIdleEditorProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleIdleEditorProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleIdleEditorProbe.java
+@@ -0,0 +1,114 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.trains.schedule.ScheduleScreen;
++import com.simibubi.create.content.trains.schedule.condition.IdleCargoCondition;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaScheduleIdleEditorProbe {
++    private static boolean supplied;
++    private static int phase;
++    private static int elapsed;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.scheduleIdleEditor"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.getOverlay() != null)
++            return;
++        if (!supplied) {
++            var server = mc.getSingleplayerServer();
++            var playerId = mc.player.getUUID();
++            server.execute(() -> server.getPlayerList().getPlayer(playerId)
++                .setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, AllItems.SCHEDULE.asStack()));
++            supplied = true;
++        }
++        if (!AllItems.SCHEDULE.isIn(mc.player.getMainHandItem()) || ++elapsed < 8)
++            return;
++        if (mc.screen == null) {
++            if (phase == 6)
++                capture(mc, "DEFAULT");
++            if (phase == 10)
++                capture(mc, "EDITED");
++            if (phase != 0 && phase != 6 && phase != 10)
++                return;
++            var method = Minecraft.class.getDeclaredMethod("startUseItem");
++            method.setAccessible(true);
++            method.invoke(mc);
++        } else if (mc.screen instanceof ScheduleScreen screen) {
++            switch (phase) {
++                case 1 -> click(screen, 52, 31);
++                case 2 -> {
++                    click(screen, 111, 94);
++                    for (char c : "Waiting Station".toCharArray())
++                        screen.charTyped(c, 0);
++                    click(screen, 233, 94);
++                }
++                case 3 -> {
++                    click(screen, 65, 60);
++                    for (int i=0; i<6; i++)
++                        scroll(screen, 130, 72, -1);
++                }
++                case 4 -> {
++                    requireCondition(screen, 5, 1);
++                    click(screen, 233, 94);
++                }
++                case 5, 9 -> click(screen, 222, 204);
++                case 7 -> {
++                    click(screen, 65, 60);
++                    requireCondition(screen, 5, 1);
++                    for (int i=0; i<3; i++)
++                        scroll(screen, 85, 94, 1);
++                    scroll(screen, 150, 94, 1);
++                }
++                case 8 -> click(screen, 233, 94);
++                case 11 -> {
++                    click(screen, 65, 60);
++                    requireCondition(screen, 8, 0);
++                    System.out.println("CREATE_IDLE_EDITOR_DONE");
++                    mc.stop();
++                }
++                default -> { return; }
++            }
++        } else
++            return;
++        phase++;
++        elapsed = 0;
++    }
++
++    private static void capture(Minecraft mc, String name) {
++        System.out.println("CREATE_IDLE_EDITOR_" + name + " " +
++            mc.player.getMainHandItem().get(AllDataComponents.TRAIN_SCHEDULE));
++    }
++
++    private static void requireCondition(ScheduleScreen screen, int amount, int unit) throws ReflectiveOperationException {
++        var field = ScheduleScreen.class.getDeclaredField("editingCondition");
++        field.setAccessible(true);
++        var actual = field.get(screen);
++        if (!(actual instanceof IdleCargoCondition condition) ||
++            condition.getValue() != amount || condition.getUnit().ordinal() != unit)
++            throw new AssertionError("Expected Cargo Inactivity " + amount + "/" + unit + ", got " + actual);
++    }
++
++    private static void click(ScheduleScreen screen, int dx, int dy) throws ReflectiveOperationException {
++        screen.mouseClicked(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, 0);
++    }
++
++    private static void scroll(ScheduleScreen screen, int dx, int dy, double delta) throws ReflectiveOperationException {
++        screen.mouseScrolled(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, 0, delta);
++    }
++
++    private static int origin(ScheduleScreen screen, String fieldName) throws ReflectiveOperationException {
++        var field = AbstractContainerScreen.class.getDeclaredField(fieldName);
++        field.setAccessible(true);
++        return (int) field.get(screen);
++    }
++}

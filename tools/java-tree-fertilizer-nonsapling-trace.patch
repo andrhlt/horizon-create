@@ -1,0 +1,120 @@
+diff --git a/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java b/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java
+index 7c714b9..a8002e0 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java
++++ b/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java
+@@ -40,6 +40,8 @@ public class TreeFertilizerItem extends Item {
+ 
+ 			BlockPos saplingPos = context.getClickedPos();
+ 			TreesDreamWorld world = new TreesDreamWorld((ServerLevel) context.getLevel(), saplingPos);
++			// Fixture-only seed: repeat the same vanilla tree across obstruction cases.
++			world.getRandom().setSeed(Long.getLong("parity.tree.seed", 8675309L));
+ 
+ 			for (BlockPos pos : BlockPos.betweenClosed(-1, 0, -1, 1, 0, 1)) {
+ 				if (context.getLevel()
+@@ -51,6 +53,8 @@ public class TreeFertilizerItem extends Item {
+ 			bonemealableBlock.performBonemeal(world, world.getRandom(), BlockPos.ZERO.above(10),
+ 					withStage(state, 1));
+ 
++            for (BlockPos p : world.blocksAdded.keySet())
++                System.out.printf("CREATE_ACACIA_DREAM,%s,%d,%d,%d%n", System.getProperty("parity.tree.seed"), p.getX(), p.getY() - 10, p.getZ());
+ 			for (BlockPos pos : world.blocksAdded.keySet()) {
+ 				BlockPos actualPos = pos.offset(saplingPos).below(10);
+ 				BlockState newState = world.blocksAdded.get(pos);
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..0383f25 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.treeFertilizerSpecies"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..bca286d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,79 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 100)
++    public static void treeFertilizerSpecies(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var origin = new BlockPos(10, 170, 22);
++        level.getGameRules().getRule(net.minecraft.world.level.GameRules.RULE_RANDOMTICKING).set(0, level.getServer());
++        for (int cx = -1; cx <= 1; cx++) for (int cz = 0; cz <= 2; cz++) level.setChunkForced(cx, cz, true);
++        var player = helper.makeMockPlayer(Boolean.parseBoolean(System.getenv().getOrDefault("TREE_FIXTURE_CREATIVE", "false")) ? net.minecraft.world.level.GameType.CREATIVE : net.minecraft.world.level.GameType.SURVIVAL);
++        var item = com.simibubi.create.AllItems.TREE_FERTILIZER.get();
++        var hand = "offhand".equals(System.getenv().getOrDefault("TREE_FIXTURE_HAND", "mainhand")) ? net.minecraft.world.InteractionHand.OFF_HAND : net.minecraft.world.InteractionHand.MAIN_HAND;
++        for (int seed = Integer.parseInt(System.getenv().getOrDefault("ACACIA_FIXTURE_SEED", "1")); seed <= Integer.parseInt(System.getenv().getOrDefault("ACACIA_FIXTURE_SEED", "1")); seed++) {
++            final int fixtureSeed = seed;
++            final int tick = 4;
++            helper.runAtTickTime(tick, () -> {
++                System.setProperty("parity.tree.seed", Integer.toString(fixtureSeed));
++                for (BlockPos delta : BlockPos.betweenClosed(-12, -1, -12, 12, 24, 12))
++                    level.setBlock(origin.offset(delta), delta.getY() == -1 ? Blocks.DIRT.defaultBlockState() : Blocks.AIR.defaultBlockState(), 2);
++                var scenario = System.getenv().getOrDefault("ACACIA_FIXTURE_ENV", "clear");
++                if (scenario.equals("barriers")) {
++                    level.setBlock(origin.offset(0, 2, 0), Blocks.BEDROCK.defaultBlockState(), 2);
++                    level.setBlock(origin.offset(1, 4, 0), Blocks.STONE.defaultBlockState(), 2);
++                    level.setBlock(origin.offset(-2, 6, 0), Blocks.STONE.defaultBlockState(), 2);
++                    level.setBlock(origin.offset(2, 6, -2), Blocks.BEDROCK.defaultBlockState(), 2);
++                } else if (scenario.equals("canopy")) {
++                    level.setBlock(origin.offset(0, 2, 0), Blocks.BEDROCK.defaultBlockState(), 2);
++                    level.setBlock(origin.offset(0, 3, 0), Blocks.STONE.defaultBlockState(), 2);
++                    level.setBlock(origin.offset(-2, 7, -3), Blocks.STONE.defaultBlockState(), 2);
++                    level.setBlock(origin.offset(2, 7, -2), Blocks.BEDROCK.defaultBlockState(), 2);
++                } else if (scenario.equals("coarse")) {
++                    level.setBlock(origin.below(), Blocks.COARSE_DIRT.defaultBlockState(), 2);
++                } else if (scenario.equals("grass")) {
++                    level.setBlock(origin.below(), Blocks.GRASS_BLOCK.defaultBlockState(), 2);
++                } else if (scenario.equals("podzol")) {
++                    level.setBlock(origin.below(), Blocks.PODZOL.defaultBlockState(), 2);
++                } else if (scenario.equals("mud")) {
++                    level.setBlock(origin.below(), Blocks.MUD.defaultBlockState(), 2);
++                } else if (scenario.equals("mycelium")) {
++                    level.setBlock(origin.below(), Blocks.MYCELIUM.defaultBlockState(), 2);
++                } else if (scenario.equals("moss")) {
++                    level.setBlock(origin.below(), Blocks.MOSS_BLOCK.defaultBlockState(), 2);
++                } else if (scenario.equals("muddy_roots")) {
++                    level.setBlock(origin.below(), Blocks.MUDDY_MANGROVE_ROOTS.defaultBlockState(), 2);
++                }
++                var species = System.getenv().getOrDefault("TREE_FIXTURE_SPECIES", "acacia");
++                var sapling = switch (species) { case "birch" -> Blocks.BIRCH_SAPLING; case "cherry" -> Blocks.CHERRY_SAPLING; case "oak" -> Blocks.OAK_SAPLING; case "brown_mushroom" -> Blocks.BROWN_MUSHROOM; case "red_mushroom" -> Blocks.RED_MUSHROOM; case "crimson_fungus" -> Blocks.CRIMSON_FUNGUS; case "warped_fungus" -> Blocks.WARPED_FUNGUS; case "bamboo_sapling" -> Blocks.BAMBOO_SAPLING; default -> Blocks.ACACIA_SAPLING; };
++                if (species.equals("crimson_fungus")) level.setBlock(origin.below(), Blocks.CRIMSON_NYLIUM.defaultBlockState(), 2);
++                if (species.equals("warped_fungus")) level.setBlock(origin.below(), Blocks.WARPED_NYLIUM.defaultBlockState(), 2);
++                level.setBlockAndUpdate(origin, sapling.defaultBlockState());
++                System.out.printf("CREATE_NONTARGET_INITIAL,%s,%s,%s%n", species, level.getBlockState(origin), level.getBlockState(origin.below()));
++                var stack = new ItemStack(item, 2);
++                player.setItemInHand(hand, stack);
++                if (Boolean.parseBoolean(System.getenv().getOrDefault("TREE_FIXTURE_BOTH", "false")))
++                    player.setItemInHand(net.minecraft.world.InteractionHand.OFF_HAND, new ItemStack(item, 3));
++                var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(origin), net.minecraft.core.Direction.UP, origin, false);
++                var result = item.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++                System.out.printf("CREATE_HAND_COUNTS,%d,%d%n", player.getMainHandItem().getCount(), player.getOffhandItem().getCount());
++                System.out.printf("CREATE_FERTILIZER_VARIANTS,%s,%d,%s,%d,%s%n", scenario, fixtureSeed, result, stack.getCount(), level.getBlockState(origin.below()));
++                captureAcacia(level, origin, fixtureSeed, 0);
++            });
++            for (int dt = 1; dt <= 3; dt++) {
++                final int sample = dt;
++                helper.runAtTickTime(tick + dt, () -> captureAcacia(level, origin, fixtureSeed, sample));
++            }
++        }
++        helper.runAtTickTime(8, helper::succeed);
++    }
++
++    private static void captureAcacia(net.minecraft.server.level.ServerLevel level, BlockPos origin, int seed, int tick) {
++        System.out.printf("CREATE_ACACIA_SOIL,%d,%d,%s%n", seed, tick, level.getBlockState(origin.below()));
++        for (BlockPos delta : BlockPos.betweenClosed(-12, 0, -12, 12, 24, 12)) {
++            var state = level.getBlockState(origin.offset(delta));
++            if (!state.isAir())
++                System.out.printf("CREATE_ACACIA_BLOCK,%d,%d,%d,%d,%d,%s%n", seed, tick, delta.getX(), delta.getY(), delta.getZ(), state);
++        }
++    }
+ }

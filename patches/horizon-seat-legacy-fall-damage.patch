@@ -1,0 +1,127 @@
+--- a/crates/horizon-client/src/game/commands.rs
++++ b/crates/horizon-client/src/game/commands.rs
+@@ -1603,6 +1603,7 @@
+                     p.position = v;
+                     p.velocity = Vec3::new(0.0, 0.0, 0.0);
+                     p.fall_distance = 0.0;
++                    p.ejector_fall = false;
+                     p.ground.on_ground = false;
+                 }
+                 self.previous_position = v;
+--- a/crates/horizon-client/src/landing.rs
++++ b/crates/horizon-client/src/landing.rs
+@@ -639,6 +639,14 @@
+     source: LandingDamage,
+     contact: Option<(BlockStateId, BlockPos, f64)>,
+ }
++impl FallCall<'_, '_, '_, '_> {
++    fn legacy_bounce(&self) -> Result<bool> {
++        let Some((state, _, _)) = self.contact else {
++            return Ok(false);
++        };
++        Ok(self.world.resources.blocks.get(state)?.coefficients.legacy_bounce_restitution.is_some())
++    }
++}
+ impl LivingFallWorld for FallCall<'_, '_, '_, '_> {
+     type Error = Box<dyn std::error::Error>;
+     type Sound = SceneSound;
+@@ -669,6 +677,9 @@
+         self.world
+             .player
+             .attribute("minecraft:fall_damage_multiplier")
++    }
++    fn legacy_fall_damage(&self) -> Result<bool> {
++        Ok(self.world.player.ejector_fall || self.legacy_bounce()?)
+     }
+     fn modify_fall_damage(&mut self, _distance: f64, damage: f32) -> Result<f32> {
+         Ok(self.contact.map_or(damage, |(state, position, distance)| {
+@@ -691,13 +702,20 @@
+             amount,
+         });
+         let resources = self.world.health;
+-        self.world.player.hurt(
++        let legacy = self.legacy_bounce()?;
++        let velocity_dirty = self.world.player.health.sync_velocity;
++        let result = self.world.player.hurt(
+             resources,
+             self.world.scene.health_rules,
+             resources.landing_source(self.source),
+             amount,
+-        )?;
+-        Ok(())
++        );
++        if legacy {
++            // Legacy fall damage has no knockback. Keep any pending impulse
++            // from another source without overwriting a locally predicted bounce.
++            self.world.player.health.sync_velocity = velocity_dirty;
++        }
++        result.map(|_| ())
+     }
+ }
+ #[cfg(test)]
+--- a/crates/horizon-client/src/motion/body.rs
++++ b/crates/horizon-client/src/motion/body.rs
+@@ -28,6 +28,7 @@
+             collision: CollisionFlags::default(),
+             history: MovementHistory::default(),
+             fall_distance: 0.0,
++            ejector_fall: false,
+             block_landing: None,
+             stuck_multiplier: Vec3::ZERO,
+             piston: Default::default(),
+--- a/crates/horizon-client/src/motion.rs
++++ b/crates/horizon-client/src/motion.rs
+@@ -300,6 +300,8 @@
+     pub collision: CollisionFlags,
+     pub history: MovementHistory,
+     pub fall_distance: f64,
++    /// Use Java Create's fall rule for the first landing after Ejector takeoff.
++    pub ejector_fall: bool,
+     /// The block fallOn currently running, consumed by its damage call.
+     pub(crate) block_landing: Option<(BlockStateId, BlockPos, f64)>,
+     pub stuck_multiplier: Vec3,
+@@ -2439,7 +2441,20 @@
+             state,
+             position,
+         });
+-        horizon_world::living_landing::check_living_fall_damage(self, dy, grounded, state, position)
++        // Legacy landing checks damage using distance accumulated while airborne.
++        let coefficients = &self.resources.blocks.get(state)?.coefficients;
++        let fall_dy = if grounded
++            && (self.player.ejector_fall || coefficients.legacy_bounce_restitution.is_some())
++        {
++            0.0
++        } else {
++            dy
++        };
++        let result = horizon_world::living_landing::check_living_fall_damage(self, fall_dy, grounded, state, position);
++        if grounded || self.player.fluids.was_touching_water || self.player.is_in_lava() || self.player.flying {
++            self.player.ejector_fall = false;
++        }
++        result
+     }
+     fn removed(&mut self) -> Result<bool> {
+         Ok(false)
+--- a/crates/horizon-world/src/living_fall.rs
++++ b/crates/horizon-world/src/living_fall.rs
+@@ -56,6 +56,9 @@
+     ) -> Result<(), Self::Error>;
+     fn safe_fall_distance(&mut self) -> Result<f64, Self::Error>;
+     fn fall_damage_multiplier(&mut self) -> Result<f64, Self::Error>;
++    fn legacy_fall_damage(&self) -> Result<bool, Self::Error> {
++        Ok(false)
++    }
+     /// A host may adjust a mod block's landing damage before sounds and hurt.
+     fn modify_fall_damage(&mut self, _distance: f64, damage: f32) -> Result<f32, Self::Error> {
+         Ok(damage)
+@@ -74,6 +77,10 @@
+ ) -> Result<i32, W::Error> {
+     if world.immune_to_fall_damage()? {
+         return Ok(0);
++    }
++    if world.legacy_fall_damage()? {
++        let power = (distance - world.safe_fall_distance()?) as f32;
++        return Ok((power * multiplier * world.fall_damage_multiplier()? as f32).ceil() as i32);
+     }
+     let power = distance + 1.0e-6 - world.safe_fall_distance()?;
+     Ok((power * f64::from(multiplier) * world.fall_damage_multiplier()?).floor() as i32)

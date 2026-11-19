@@ -1,0 +1,48 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -213,7 +213,26 @@
+ 			station.assemble(player.getUUID());
+             helper.assertTrue(station.exitAssemblyMode(), "Station must leave assembly mode");
+ 		});
+-		helper.runAfterDelay(22, () -> {
++		helper.runAfterDelay(16, () -> {
++            var signalRail = origin.offset(-13, 0, -14);
++            var signalPos = signalRail.east(3);
++            var signal = com.simibubi.create.AllBlocks.TRACK_SIGNAL;
++            var signalItem = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) signal.asItem();
++            var support = signalPos.below();
++            level.setBlockAndUpdate(signalPos, Blocks.AIR.defaultBlockState());
++            level.setBlockAndUpdate(signalPos.above(), Blocks.AIR.defaultBlockState());
++            level.setBlockAndUpdate(support, Blocks.SMOOTH_STONE.defaultBlockState());
++            player.setItemInHand(hand, new ItemStack(signalItem));
++            player.setYRot(180);
++            player.setXRot(20);
++            player.setPos(signalRail.getX() + .5, signalRail.getY() + 1, signalRail.getZ() + .5);
++            clickTrackForAssembly(signalItem, player, signalRail);
++            player.setPos(support.getX() + .5, support.getY() + 1, support.getZ() + .5);
++            clickTrackForAssembly(signalItem, player, support);
++            helper.assertTrue(signal.has(level.getBlockState(signalPos)), "Expected a northbound entry signal");
++            level.setBlockAndUpdate(signalPos.above(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++        });
++        helper.runAfterDelay(42, () -> {
+             var train = com.simibubi.create.Create.RAILWAYS.trains.values().stream()
+                 .filter(candidate -> candidate.owner.equals(player.getUUID())).findFirst().orElseThrow();
+             var car = train.carriages.getFirst().anyAvailableEntity();
+@@ -249,7 +268,7 @@
+             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(click);
+             helper.assertTrue(click.isCanceled() && train.runtime.getSchedule() != null, "Conductor must accept schedule");
+         });
+-        for (int tick = 23; tick <= 220; tick++) {
++        for (int tick = 43; tick <= 240; tick++) {
+ 			int t = tick;
+ 			helper.runAfterDelay(t, () -> {
+ 				var railway = com.simibubi.create.Create.RAILWAYS;
+@@ -273,7 +292,7 @@
+                     target, reached, target == 0 ? 0 : train.navigation.distanceToDestination, train.runtime.state,
+                     train.runtime.currentEntry, train.runtime.completed ? 1 : 0));
+                 System.out.println(output.toString().replace("CREATE_NEAREST_STATION", "CREATE_SCHEDULED_ROUTE_COST"));
+-                if (t == 220) {
++                if (t == 240) {
+                     helper.assertTrue(reached > 0 && train.runtime.completed, "Train must complete at a matching depot");
+                     helper.succeed();
+                 }

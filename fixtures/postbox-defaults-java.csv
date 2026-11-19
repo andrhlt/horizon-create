@@ -1,0 +1,17 @@
+color,id,facing,open,waterlogged,hardness,resistance,map_color
+white,create:white_postbox,north,false,false,2.00,2.00,8
+orange,create:orange_postbox,north,false,false,2.00,2.00,15
+magenta,create:magenta_postbox,north,false,false,2.00,2.00,16
+light_blue,create:light_blue_postbox,north,false,false,2.00,2.00,17
+yellow,create:yellow_postbox,north,false,false,2.00,2.00,18
+lime,create:lime_postbox,north,false,false,2.00,2.00,19
+pink,create:pink_postbox,north,false,false,2.00,2.00,20
+gray,create:gray_postbox,north,false,false,2.00,2.00,21
+light_gray,create:light_gray_postbox,north,false,false,2.00,2.00,22
+cyan,create:cyan_postbox,north,false,false,2.00,2.00,23
+purple,create:purple_postbox,north,false,false,2.00,2.00,24
+blue,create:blue_postbox,north,false,false,2.00,2.00,25
+brown,create:brown_postbox,north,false,false,2.00,2.00,26
+green,create:green_postbox,north,false,false,2.00,2.00,27
+red,create:red_postbox,north,false,false,2.00,2.00,28
+black,create:black_postbox,north,false,false,2.00,2.00,29

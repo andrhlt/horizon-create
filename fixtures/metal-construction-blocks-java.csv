@@ -1,0 +1,4 @@
+block,hardness,resistance,map_color,requires_tool,wooden_pickaxe,place_sound,result,after,picked_up
+create:andesite_alloy_block,1.50,6.00,11,true,true,minecraft:block.stone.place,PASS,create:andesite_alloy_block,0
+create:industrial_iron_block,3.00,6.00,21,true,true,minecraft:block.netherite_block.place,SUCCESS,minecraft:air,1
+create:weathered_iron_block,3.00,6.00,21,true,true,minecraft:block.netherite_block.place,SUCCESS,minecraft:air,1

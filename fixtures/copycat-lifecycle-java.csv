@@ -1,0 +1,9 @@
+tick,wrapper,scenario,observation,state,count_or_drops,offhand
+4,"Block{create:copycat_panel}[facing=up,waterlogged=false]",survival-break,placed,Block{minecraft:oak_log}[axis=x],1,2
+4,"Block{create:copycat_panel}[facing=up,waterlogged=false]",survival-break,removed,Block{minecraft:air},create:copycat_panel=1|minecraft:oak_log=1,
+4,"Block{create:copycat_panel}[facing=up,waterlogged=false]",creative-break,placed,Block{minecraft:oak_log}[axis=x],1,2
+4,"Block{create:copycat_panel}[facing=up,waterlogged=false]",creative-break,removed,Block{minecraft:air},,
+4,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]",survival-break,placed,Block{minecraft:oak_log}[axis=x],1,2
+4,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]",survival-break,removed,Block{minecraft:air},create:copycat_step=1|minecraft:oak_log=1,
+4,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]",creative-break,placed,Block{minecraft:oak_log}[axis=x],1,2
+4,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]",creative-break,removed,Block{minecraft:air},,

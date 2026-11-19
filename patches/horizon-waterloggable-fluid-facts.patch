@@ -1,0 +1,33 @@
+diff --git a/crates/horizon-client/src/mod_content.rs b/crates/horizon-client/src/mod_content.rs
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -1485,6 +1485,29 @@
+             "creative-inventory.json" => self.creative_tabs(doc)?,
+             "block-behaviours.json" => {
+                 states(doc, "states", false, false)?;
++                let Some(J::Arr(rows)) = doc.at("states") else {
++                    return Err("no block behaviour states".into());
++                };
++                for b in self.blocks.iter().filter(|b| b.decl.properties.waterloggable) {
++                    for (id, (_, combination)) in (b.rename.first..).zip(b.state_combinations()) {
++                        let Some((_, value)) = combination.iter().find(|(name, _)| name == "waterlogged")
++                        else {
++                            continue;
++                        };
++                        let Some(J::Arr(row)) = rows.get_mut(id as usize) else {
++                            return Err("invalid block behaviour state".into());
++                        };
++                        let fluid = if value == "true" {
++                            horizon_world::fluid::FluidKind::Water
++                        } else {
++                            horizon_world::fluid::FluidKind::Empty
++                        };
++                        // Exported state rows keep fluid kind, amount, and falling after flags.
++                        row[2] = J::Num((fluid.index() as i64).into());
++                        row[3] = J::Num((if value == "true" { 8_i64 } else { 0 }).into());
++                        row[4] = J::Bool(false);
++                    }
++                }
+                 let Some(J::Arr(blocks)) = doc.at("blocks") else {
+                     return Err("no blocks".into());
+                 };

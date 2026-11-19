@@ -1,0 +1,89 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.metalLadders"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,74 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void metalLadders(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(1, 1, 1)).above(49);
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var variants = java.util.List.of("andesite", "brass", "copper");
++		var ingredients = java.util.List.of("create:andesite_alloy", "create:brass_ingot", "minecraft:copper_ingot");
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var north = net.minecraft.core.Direction.NORTH;
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var held = new java.util.ArrayList<ItemStack>();
++		for (int i = 0; i < variants.size(); i++) {
++			var material = variants.get(i);
++			var id = com.simibubi.create.Create.asResource(material + "_ladder");
++			var input = new net.minecraft.world.item.crafting.SingleRecipeInput(new ItemStack(items.get(
++				net.minecraft.resources.ResourceLocation.parse(ingredients.get(i)))));
++			var matches = level.getRecipeManager().getRecipesFor(net.minecraft.world.item.crafting.RecipeType.STONECUTTING, input, level);
++			var recipe = matches.stream().filter(r -> r.id().toString().contains(material + "_ladder_from_")).findFirst().orElseThrow();
++			var output = recipe.value().assemble(input, level.registryAccess());
++			var at = origin.east(i * 4);
++			var initial = registry.get(id).defaultBlockState();
++			System.out.printf("CREATE_METAL_LADDER_RECIPE %s,%s,%s,%d,%d%n", id, ingredients.get(i), recipe.id(),
++				output.getCount(), initial.getMapColor(level, at).id);
++			held.add(new ItemStack(items.get(id), 5));
++			level.setBlockAndUpdate(at.south(), stone);
++		}
++		for (int i = 1; i <= 7; i++) {
++			int tick = i;
++			helper.runAtTickTime(tick + 1, () -> {
++				for (int index = 0; index < variants.size(); index++) {
++					var at = origin.east(index * 4);
++					var stack = held.get(index);
++					player.setItemInHand(hand, stack);
++					player.setPos(at.getX() + .5, at.getY(), at.getZ() - 2.0);
++					player.setYRot(0);
++					player.setXRot(tick == 4 ? -40 : 40);
++					var click = tick == 1 ? at.south() : at;
++					var hit = new net.minecraft.world.phys.BlockHitResult(click.getCenter().relative(north, .5), north, click, false);
++					switch (tick) {
++					case 1 -> stack.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++					case 2, 3, 4 -> {
++						if (tick == 4)
++							level.setBlockAndUpdate(at.above().south(), stone);
++						level.getBlockState(at).useItemOn(stack, level, player, hand, hit);
++					}
++					case 5 -> level.removeBlock(at.south(), false);
++					case 6 -> {
++						var bottom = at.below(2);
++						var source = net.minecraft.world.level.material.Fluids.WATER.getSource(false);
++						((net.minecraft.world.level.block.SimpleWaterloggedBlock) level.getBlockState(bottom).getBlock())
++							.placeLiquid(level, bottom, level.getBlockState(bottom), source);
++					}
++					case 7 -> level.removeBlock(at.above().south(), false);
++					}
++					for (int offset = -2; offset <= 1; offset++) {
++						var state = level.getBlockState(at.above(offset));
++						var facing = state.hasProperty(net.minecraft.world.level.block.LadderBlock.FACING)
++							? state.getValue(net.minecraft.world.level.block.LadderBlock.FACING).getName() : "_";
++						System.out.printf("CREATE_METAL_LADDER_STATE %d,%s,%d,%s,%s,%b,%d%n",
++							tick, variants.get(index), offset, registry.getKey(state.getBlock()), facing, state.getFluidState().isSource(), stack.getCount());
++					}
++				}
++				if (tick == 7)
++					helper.succeed();
++			});
++		}
++	}
+ }

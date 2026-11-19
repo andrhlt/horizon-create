@@ -1,0 +1,96 @@
+--- a/crates/horizon-client/src/mobs/ai.rs
++++ b/crates/horizon-client/src/mobs/ai.rs
+@@ -688,6 +688,7 @@
+     if m.species() == Species::Strider {
+         super::strider::pre_tick(m, w, events);
+     }
++    package_player_contact(m, w, events);
+     let was_on_fire = base_tick(m, w, events);
+     // LivingEntity.tick ends with currentImpulseContextResetGraceTime--.
+     if m.impulse_grace_time > 0 {
+@@ -1770,7 +1771,52 @@
+         if v.y.abs() < 0.003 { 0.0 } else { v.y },
+         if v.z.abs() < 0.003 { 0.0 } else { v.z },
+     );
++}
++/// Player-origin pushes precede the Package's own travel and contact phase.
++fn package_player_contact(m: &mut Mob, w: &MobWorld, events: &mut Vec<MobEvent>) {
++    if m.kind.id != "create:package" || m.removed || m.rider.is_some() {
++        return;
++    }
++    let Some(player) = &w.player else { return };
++    let bounds = m.bounds();
++    if !player.alive
++        || player.spectator
++        || !player.bounds.intersects(bounds)
++        || !crate::scoreboard::pushable_by(w.teams.of(Who::Player), w.teams.of(Who::Mob(m.id)), true)
++    {
++        return;
++    }
++    events.push(MobEvent::ClearPackageTossedBy { target: m.id });
++    if player.bounds.min_position().y > bounds.min_position().y {
++        return;
++    }
++    let Some(impulse) = living_push_impulse(m.position, player.position) else { return };
++    m.velocity = Vec3::new(m.velocity.x + impulse.x, m.velocity.y, m.velocity.z + impulse.z);
++    if !player.remote {
++        events.push(MobEvent::Push {
++            target: Who::Player,
++            velocity: [-impulse.x, 0.0, -impulse.z],
++        });
++    }
++}
++
++fn living_push_impulse(pusher: Vec3, receiver: Vec3) -> Option<Vec3> {
++    let (mut x, mut z) = (pusher.x - receiver.x, pusher.z - receiver.z);
++    let distance = x.abs().max(z.abs());
++    if distance < f64::from(0.01_f32) {
++        return None;
++    }
++    let root = distance.sqrt();
++    let factor = (1.0 / root).min(1.0);
++    x /= root;
++    z /= root;
++    x *= factor;
++    z *= factor;
++    x *= f64::from(0.05_f32);
++    z *= f64::from(0.05_f32);
++    Some(Vec3::new(x, 0.0, z))
+ }
++
+ /// LivingEntity.pushEntities: every pushable entity overlapping the box is
+ /// pushed apart from this one (`doPush(e)` = `e.push(this)`); pushes of other
+ /// mobs are `Push` events their tick picks up.
+@@ -1860,29 +1906,15 @@
+             continue;
+         }
+         // Entity.push(Entity) with `this` the other entity.
+-        let (mut xa, mut za) = (m.position.x - at.x, m.position.z - at.z);
+-        let mut dd = xa.abs().max(za.abs());
+-        if dd < f64::from(0.01_f32) {
+-            continue;
+-        }
+-        dd = dd.sqrt();
+-        xa /= dd;
+-        za /= dd;
+-        let pow = (1.0 / dd).min(1.0);
+-        xa *= pow;
+-        za *= pow;
+-        xa *= f64::from(0.05_f32);
+-        za *= f64::from(0.05_f32);
+-        // A guest's server-side push never reaches its client (ServerPlayer
+-        // motion is synced only when hurt): its client pushes it itself.
++        let Some(impulse) = living_push_impulse(m.position, at) else { continue };
+         if !vehicle && (who != Who::Player || w.player.as_ref().is_none_or(|p| !p.remote)) {
+             events.push(MobEvent::Push {
+                 target: who,
+-                velocity: [-xa, 0.0, -za],
++                velocity: [-impulse.x, 0.0, -impulse.z],
+             });
+         }
+         if self_pushable {
+-            m.velocity = Vec3::new(m.velocity.x + xa, m.velocity.y, m.velocity.z + za);
++            m.velocity = Vec3::new(m.velocity.x + impulse.x, m.velocity.y, m.velocity.z + impulse.z);
+         }
+     }
+ }

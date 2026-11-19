@@ -1,0 +1,112 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..aa892a1cc 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,10 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> java.util.Set.of("TestContraptions.rollerFilling",
++                "TestContraptions.rollerPavingAndClearing").contains(test.testName()))
++            .sorted(java.util.Comparator.comparing(TestFunction::testName))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+index e74ff27e4..464c49b7c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -204,6 +204,7 @@ public class TestContraptions {
+ 		List<BlockPos> tracks = BlockPos.betweenClosedStream(new BlockPos(1, 4, 2), new BlockPos(4, 4, 2)).toList();
+ 		helper.pullLever(lever);
+ 		helper.succeedWhen(() -> {
++			traceRoller(helper, "roller_filling");
+ 			helper.assertSecondsPassed(4);
+ 			existing.forEach(pos -> helper.assertBlockPresent(AllBlocks.RAILWAY_CASING.get(), pos));
+ 			filled.forEach(pos -> helper.assertBlockPresent(AllBlocks.ANDESITE_CASING.get(), pos));
+@@ -220,6 +221,7 @@ public class TestContraptions {
+ 		BlockPos cleared = new BlockPos(2, 3, 1);
+ 		helper.pullLever(lever);
+ 		helper.succeedWhen(() -> {
++			traceRoller(helper, "roller_paving_and_clearing");
+ 			helper.assertSecondsPassed(9);
+ 			paved.forEach(pos -> helper.assertBlockPresent(AllBlocks.ANDESITE_CASING.get(), pos));
+ 			helper.assertBlockPresent(Blocks.AIR, cleared);
+@@ -278,4 +280,40 @@ public class TestContraptions {
+ 			helper.assertBlockProperty(vaultLamp, RedstoneLampBlock.LIT, true);
+ 		});
+ 	}
++	private static void traceRoller(CreateGameTestHelper helper, String fixture) {
++		var origin = helper.absolutePos(new BlockPos(0, 1, 0));
++		var level = helper.getLevel();
++		var box = new net.minecraft.world.phys.AABB(origin).expandTowards(9, 9, 4);
++		var entities = level.getEntitiesOfClass(
++			com.simibubi.create.content.contraptions.AbstractContraptionEntity.class, box);
++		var motion = entities.stream().map(entity -> String.format(java.util.Locale.ROOT, "%.9f:%.9f:%.9f",
++			entity.getX() - origin.getX(), entity.getY() - origin.getY(), entity.getZ() - origin.getZ()))
++			.sorted().collect(java.util.stream.Collectors.joining("|"));
++		long cargo = 0;
++		if (!entities.isEmpty()) {
++			var items = entities.getFirst().getContraption().getStorage().getAllItems();
++			cargo = java.util.stream.IntStream.range(0, items.getSlots())
++				.map(slot -> items.getStackInSlot(slot).is(AllBlocks.ANDESITE_CASING.asItem())
++					? items.getStackInSlot(slot).getCount() : 0).sum();
++		} else {
++			for (int x = 0; x <= 8; x++)
++				for (int y = 2; y <= 5; y++)
++					for (int z = 1; z <= 3; z++) {
++						var at = origin.offset(x, y, z);
++						if (level.getBlockState(at).is(Blocks.BARREL))
++							cargo += helper.getItemContent(new BlockPos(x, y + 1, z))
++								.getLong(AllBlocks.ANDESITE_CASING.asItem());
++					}
++		}
++		var blocks = new java.util.ArrayList<String>();
++		for (int x = 1; x <= 4; x++)
++			for (int y = 1; y <= 4; y++)
++				for (int z = 1; z <= 3; z++) {
++					var block = level.getBlockState(origin.offset(x, y, z)).getBlock();
++					blocks.add(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).toString());
++				}
++		System.out.printf("ROLLER_TRACE %s,%d,%d,%d:%d:%d,%s,%d,%s%n", fixture, helper.getTick(),
++			level.getGameTime() % 20, origin.getX(), origin.getY(), origin.getZ(), motion, cargo, String.join("|", blocks));
++	}
++
+ }
+diff --git a/src/main/resources/create.mixins.json b/src/main/resources/create.mixins.json
+index b5ea0067a..ffadfeb68 100644
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -6,6 +6,7 @@
+   "plugin": "com.simibubi.create.foundation.mixin.CreateMixinPlugin",
+   "compatibilityLevel": "JAVA_21",
+   "mixins": [
++    "ParityGameTestOriginMixin",
+     "ArmorTrimMixin",
+     "BeehiveBlockMixin",
+     "BlockItemMixin",
+diff --git a/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+new file mode 100644
+index 000000000..a1ca98568
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+@@ -0,0 +1,17 @@
++package com.simibubi.create.foundation.mixin;
++
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.ModifyArg;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.gametest.framework.GameTestServer;
++
++@Mixin(GameTestServer.class)
++public class ParityGameTestOriginMixin {
++    @ModifyArg(method = "startTests", at = @At(value = "INVOKE",
++        target = "Lnet/minecraft/gametest/framework/StructureGridSpawner;<init>(Lnet/minecraft/core/BlockPos;IZ)V"), index = 0)
++    private BlockPos parityOrigin(BlockPos vanillaOrigin) {
++        return new BlockPos(3, vanillaOrigin.getY(), -12);
++    }
++}

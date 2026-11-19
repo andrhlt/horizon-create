@@ -1,0 +1,48 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..4ded967 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.potatoCannon")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..6dda39d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,29 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
+-}
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void potatoCannon(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 24, 2));
++		helper.runAtTickTime(2, () -> {
++			for (int air : new int[]{0, 1, 4, 100, 900, 950}) {
++				var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++					new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "CannonTank"));
++				player.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++				player.setPos(origin.getX() + .5, origin.getY(), origin.getZ() + .5);
++				var cannon = com.simibubi.create.AllItems.POTATO_CANNON.asStack();
++				var tank = com.simibubi.create.AllItems.COPPER_BACKTANK.asStack();
++				tank.set(com.simibubi.create.AllDataComponents.BACKTANK_AIR, air);
++				player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, tank);
++				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, cannon);
++				player.getInventory().setItem(1, new ItemStack(Items.POTATO, 3));
++				var result = cannon.use(world, player, net.minecraft.world.InteractionHand.MAIN_HAND);
++				System.out.printf("CANNON_TANK,%d,%s,%d,%d,%d,%b%n", air, result.getResult(),
++					tank.getOrDefault(com.simibubi.create.AllDataComponents.BACKTANK_AIR, 0), cannon.getDamageValue(),
++					player.getInventory().getItem(1).getCount(), player.getCooldowns().isOnCooldown(cannon.getItem()));
++			}
++			helper.succeed();
++		});
++	}
++
++}
+\ No newline at end of file

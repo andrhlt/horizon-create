@@ -1,0 +1,54 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -67,7 +67,9 @@
+ #[cold]
+ #[inline(never)]
+ pub fn thrown_by_item(item: &str) -> Option<&'static ThrownType> {
+-    thrown_types().iter().find(|t| t.item == item)
++    thrown_types()
++        .iter()
++        .find(|t| t.item == item && t.id != "create:potato_projectile")
+ }
+ 
+ #[derive(Clone, Debug, PartialEq)]
+@@ -1559,6 +1561,10 @@
+             | ProjectileKind::WindCharge
+             | ProjectileKind::BreezeWindCharge => {
+                 self.apply_hurting_inertia(water);
++            }
++            ProjectileKind::Thrown(t) if t.id == "create:potato_projectile" => {
++                self.velocity.y -= 0.05;
++                self.velocity = self.velocity.scale(f64::from(0.99_f32));
+             }
+             // Arrows and tridents tick with `arrows::tick`.
+             ProjectileKind::Arrow { .. } | ProjectileKind::Trident => {}
+@@ -1685,6 +1691,13 @@
+             );
+         }
+         self.position = to;
++        // PotatoProjectileEntity applies its drag before AbstractHurtingProjectile
++        // moves, then the latter adds acceleration along the current motion.
++        if matches!(self.kind, ProjectileKind::Thrown(t) if t.id == "create:potato_projectile") {
++            self.velocity = self
++                .velocity
++                .add_vector(self.velocity.normalize().scale(self.acceleration));
++        }
+         // Fireballs ease towards the motion (`ProjectileUtil.rotateTowardsMovement`);
+         // wind charges still face their motion at once; the thrown kinds turned
+         // in `tick` above.
+@@ -1729,7 +1742,14 @@
+                 "minecraft:experience_bottle",
+                 1,
+             )),
+-            ProjectileKind::Thrown(t) => Some(crate::items::ItemStack::new(t.item, 1)),
++            ProjectileKind::Thrown(t) => Some(crate::items::ItemStack::new(
++                if t.id == "create:potato_projectile" {
++                    "minecraft:potato"
++                } else {
++                    t.item
++                },
++                1,
++            )),
+             _ => None,
+         }
+     }

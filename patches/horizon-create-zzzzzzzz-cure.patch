@@ -1,0 +1,33 @@
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5629,6 +5629,21 @@
+                                 }
+                             }
+                             let apple = p.item.as_ref().map(|item| item.item.as_ref());
++                            let cure_started = if apple == Some("minecraft:golden_apple") {
++                                if let Some(m) = self.mobs.iter_mut().find(|m| m.id == id)
++                                    && m.kind.id == "minecraft:zombie_villager"
++                                    && m.has_effect("minecraft:weakness")
++                                {
++                                    let time = horizon_client::mobs::zombie_villager::WAIT_MIN
++                                        + m.random.next_int_bound(horizon_client::mobs::zombie_villager::WAIT_SPREAD).unwrap_or(0);
++                                    let mut events = Vec::new();
++                                    horizon_client::mobs::zombie_villager::start_converting(
++                                        m, Some([-1106062372, 668158354, -1936234818, 1409108421]), time, &mut events,
++                                    );
++                                    let _ = self.handle_mob_events(events);
++                                    true
++                                } else { false }
++                            } else { false };
+                             let effects: &[(&str, i32, i32)] = match apple {
+                                 Some("minecraft:golden_apple") => &[("regeneration", 100, 1), ("absorption", 2400, 0)],
+                                 Some("minecraft:enchanted_golden_apple") => &[("regeneration", 400, 1), ("absorption", 2400, 3), ("resistance", 6000, 0), ("fire_resistance", 6000, 0)],
+@@ -5637,7 +5652,7 @@
+                             for &(effect, duration, amplifier) in effects {
+                                 let tags = &self.res.stations().enchantments.entity_tags;
+                                 if let Some(m) = self.mobs.iter_mut().find(|m| m.id == id)
+-                                    && !(apple == Some("minecraft:golden_apple") && m.kind.id == "minecraft:zombie_villager" && m.has_effect("minecraft:weakness"))
++                                    && !cure_started
+                                     && super::potions::mob_can_be_affected(tags, &m.kind.id, effect)
+                                     && let Some(name) = super::potions::mob_effect_id(effect)
+                                 {

@@ -1,0 +1,152 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaChassisPreviewProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaChassisPreviewProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaChassisPreviewProbe.java
+@@ -0,0 +1,147 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import java.util.Map;
++import java.util.Locale;
++
++import com.mojang.datafixers.util.Pair;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.contraptions.chassis.ChassisBlockEntity;
++import com.simibubi.create.content.contraptions.chassis.ChassisRangeDisplay;
++import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsScreen;
++import net.createmod.catnip.outliner.Outliner;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.MouseHandler;
++import net.minecraft.core.BlockPos;
++import net.minecraft.world.phys.BlockHitResult;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import org.lwjgl.glfw.GLFW;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaChassisPreviewProbe {
++	private static int phase;
++	private static int elapsed;
++	private static int priorTimer = -1;
++	private static final BlockPos CHASSIS = new BlockPos(8, 96, 40);
++
++	private static int timer() throws ReflectiveOperationException {
++		var entries = ChassisRangeDisplay.class.getDeclaredField("entries");
++		entries.setAccessible(true);
++		var entry = ((Map<?, ?>) entries.get(null)).get(CHASSIS);
++		if (entry == null)
++			return -1;
++		var timer = entry.getClass().getDeclaredField("timer");
++		timer.setAccessible(true);
++		return timer.getInt(entry);
++	}
++
++	private static void record(ChassisBlockEntity chassis, String action, int elapsed, int timer) throws ReflectiveOperationException {
++		var positions = chassis.getIncludedBlockPositions(null, true).stream().map(pos -> pos.subtract(CHASSIS))
++			.map(pos -> pos.getX() + ":" + pos.getY() + ":" + pos.getZ()).sorted().toList();
++		int remaining = -99;
++		int faces = 0;
++		int edges = 0;
++		var entry = Outliner.getInstance().getOutlines().get(Pair.of(CHASSIS, 1));
++		if (entry != null) {
++			remaining = entry.getTicksTillRemoval();
++			var shape = entry.getOutline();
++			var field = shape.getClass().getDeclaredField("cluster");
++			field.setAccessible(true);
++			var cluster = field.get(shape);
++			var visibleFaces = cluster.getClass().getDeclaredField("visibleFaces");
++			visibleFaces.setAccessible(true);
++			faces = ((Map<?, ?>) visibleFaces.get(cluster)).size();
++			var visibleEdges = cluster.getClass().getDeclaredField("visibleEdges");
++			visibleEdges.setAccessible(true);
++			edges = ((java.util.Set<?>) visibleEdges.get(cluster)).size();
++		}
++		System.out.printf(Locale.ROOT, "CREATE_CHASSIS_PREVIEW %s,%d,%d,%d,%d,%d,%d,%d,%s%n",
++			action, elapsed, timer, remaining, faces, edges, chassis.getRange(), chassis.currentlySelectedRange,
++			String.join("|", positions));
++
++	}
++
++	@SubscribeEvent
++	public static void tick(ClientTickEvent.Post ignored) throws ReflectiveOperationException {
++		if (!Boolean.getBoolean("parity.chassisPreview") || phase == 8)
++			return;
++		var mc = Minecraft.getInstance();
++		if (mc.player == null || mc.level == null
++			|| !(mc.level.getBlockEntity(CHASSIS) instanceof ChassisBlockEntity chassis))
++			return;
++		var hold = AllItems.WRENCH.isIn(mc.player.getMainHandItem());
++		var over = mc.hitResult instanceof BlockHitResult hit && hit.getBlockPos().equals(CHASSIS);
++		var current = timer();
++		if (phase == 0 && hold && over && current == 200) {
++			record(chassis, "wrench", 0, current);
++			var use = Minecraft.class.getDeclaredMethod("startUseItem");
++			use.setAccessible(true);
++			mc.options.keyUse.setDown(true);
++			use.invoke(mc);
++			phase = 1;
++			return;
++		}
++		if (phase == 1 && mc.screen instanceof ValueSettingsScreen) {
++			System.out.println("CREATE_CHASSIS_PREVIEW_SCREEN");
++			phase = 2;
++		}
++		if (phase == 2 && mc.screen instanceof ValueSettingsScreen menu && chassis.currentlySelectedRange != 2) {
++			var point = menu.getCoordinateOfValue(0, 1);
++			var window = mc.getWindow();
++			double x = (double) point.x * window.getScreenWidth() / window.getGuiScaledWidth();
++			double y = (double) point.y * window.getScreenHeight() / window.getGuiScaledHeight();
++			var move = MouseHandler.class.getDeclaredMethod("onMove", long.class, double.class, double.class);
++			move.setAccessible(true);
++			GLFW.glfwSetCursorPos(window.getWindow(), x, y);
++			move.invoke(mc.mouseHandler, window.getWindow(), x, y);
++			return;
++		}
++		if (phase == 2 && mc.screen instanceof ValueSettingsScreen menu && chassis.currentlySelectedRange == 2) {
++			record(chassis, "hover", 0, current);
++			var point = menu.getCoordinateOfValue(0, 1);
++			menu.mouseReleased(point.x, point.y, GLFW.GLFW_MOUSE_BUTTON_RIGHT);
++			mc.options.keyUse.setDown(false);
++			phase = 3;
++			return;
++		}
++		if (phase == 3 && chassis.getRange() == 2 && mc.screen == null && over && current == 200) {
++			record(chassis, "commit", 0, current);
++			mc.player.setYRot(0);
++			phase = 4;
++			return;
++		}
++		if (phase == 4 && !over && current > 0 && current < 200) {
++			record(chassis, "away", elapsed++, current);
++			if (elapsed == 3) {
++				phase = 5;
++				elapsed = 0;
++				System.out.println("CREATE_CHASSIS_PREVIEW_REMOVE_WRENCH");
++			}
++			return;
++		}
++		if (phase == 5 && !hold && current == 20) {
++			record(chassis, "stowed", elapsed++, current);
++			phase = 6;
++			priorTimer = current;
++			return;
++		}
++		if (phase == 6 && !hold && current != priorTimer) {
++			record(chassis, "stowed", elapsed++, current);
++			priorTimer = current;
++			if (current < 0) {
++				phase = 7;
++				elapsed = 0;
++				return;
++			}
++		}
++		if (phase == 7) {
++			record(chassis, "fade", elapsed++, current);
++			if (elapsed == 10) {
++				phase = 8;
++				System.out.println("CREATE_CHASSIS_PREVIEW_DONE");
++			}
++		}
++	}
++}

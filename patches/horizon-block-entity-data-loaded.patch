@@ -1,0 +1,25 @@
+--- a/crates/horizon-client/src/game/commands/data.rs
++++ b/crates/horizon-client/src/game/commands/data.rs
+@@ -855,6 +855,7 @@
+         self.update_spawner_display(key);
+         self.command_block_loaded(key, was_auto);
+         self.world.modified.insert((pos[0] >> 4, pos[2] >> 4));
++        self.native_block_entity_data_loaded(pos);
+         true
+     }
+     pub(in crate::game) fn data_block_name(&self, p: [i32; 3]) -> String {
+--- a/crates/horizon-client/src/game/native_hooks.rs
++++ b/crates/horizon-client/src/game/native_hooks.rs
+@@ -10831,6 +10831,12 @@
+         });
+         true
+     }
++    /// Called after an explicit block entity data load succeeds.
++    #[inline(never)]
++    pub(super) fn native_block_entity_data_loaded(&mut self, pos: [i32; 3]) {
++        let _ = pos;
++    }
++
+     /// Runs `change` on the mod block entity at `pos` (a generator charging
+     /// the machine beside it) and returns what it returns; none for any
+     /// other block entity, and for the one ticking now, which is out of the

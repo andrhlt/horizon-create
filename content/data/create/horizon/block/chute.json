@@ -1,0 +1,35 @@
+{
+  "properties": {"waterloggable": true},
+  "template": "minecraft:stone",
+  "item": true,
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "down",
+        "up",
+        "north",
+        "south",
+        "west",
+        "east"
+      ]
+    },
+    "shape": {
+      "type": "enum",
+      "values": [
+        "normal",
+        "window",
+        "intersection",
+        "encased"
+      ]
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "facing": "down",
+    "shape": "normal",
+    "waterlogged": "false"
+  }
+}

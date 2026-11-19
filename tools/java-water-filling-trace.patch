@@ -1,0 +1,54 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.waterFillingBottle"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -133,7 +133,38 @@
+ 		BlockPos output = new BlockPos(2, 2, 4);
+ 		ItemStack expected = PotionContents.createItemStack(Items.POTION, Potions.WATER);
+ 		helper.pullLever(lever);
+-		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
++		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			var belt = helper.getBlockEntity(new BlockPos(2,2,3)).saveWithoutMetadata(access);
++			var pump = helper.getBlockEntity(new BlockPos(4,3,3)).saveWithoutMetadata(access);
++			var spout = helper.getBlockEntity(new BlockPos(2,4,1)).saveWithoutMetadata(access);
++			var ejector = helper.getBlockEntity(new BlockPos(2,2,1)).saveWithoutMetadata(access);
++			var chute = helper.getBlockEntity(new BlockPos(2,3,4)).saveWithoutMetadata(access);
++			var fluid = spout.getList("Tanks", 10).getCompound(0).getCompound("TankContent").getCompound("Fluid");
++			int barrel = 0;
++			var storage = helper.itemStorageAt(output);
++			for (int slot = 0; slot < storage.getSlots(); slot++)
++				if (ItemStack.isSameItemSameComponents(storage.getStackInSlot(slot), expected))
++					barrel += storage.getStackInSlot(slot).getCount();
++			var lid = ejector.getCompound("Lid");
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_BOTTLE %d %.4f %.4f %d %d %.4f %s %.7f %d %d %.7f %d ",
++				helper.getTick(), belt.getFloat("Speed"), pump.getFloat("Speed"),
++				fluid.getInt("amount"), spout.getInt("ProcessingTicks"), ejector.getFloat("Speed"),
++				ejector.getString("State"), lid.getFloat("Value"), ejector.getList("LaunchedItems",10).size(),
++				chute.getCompound("Item").getInt("count"), chute.getFloat("ItemPosition"), barrel);
++			var carried = belt.getCompound("Inventory").getList("Items",10);
++			var summary = new java.util.ArrayList<String>();
++			for (int i = 0; i < carried.size(); i++) {
++				var entry = carried.getCompound(i);
++				var item = entry.getCompound("Item");
++				if (!item.isEmpty())
++					summary.add(String.format(java.util.Locale.ROOT, "%s/%d/%.7f",
++						item.getString("id"), item.getInt("count"), entry.getFloat("Pos")));
++			}
++			System.out.println(summary.isEmpty() ? "-" : String.join(";", summary));
++			helper.assertContainerContains(output, expected);
++		});
+ 	}
+ 
+ 	@GameTest(template = "wheat_milling")

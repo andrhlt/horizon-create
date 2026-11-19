@@ -1,0 +1,181 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -364,4 +364,166 @@
+ 			helper.assertContainerContains(depot.east(2), Items.GRASS_BLOCK);
+ 		});
+ 	}
++
++	@GameTest(template = "3_pipe_split", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void encasedPipeTransfer(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var pipe = helper.absolutePos(new BlockPos(3, 2, 2));
++		var pump = new BlockPos(2, 2, 2);
++		helper.flipBlock(pump);
++		captureEncasedPipeTransfer(helper, pipe, pump, 0, "sample");
++		for (int tick = 1; tick <= 100; tick++) {
++			int at = tick;
++			helper.runAtTickTime(at, () -> {
++				captureEncasedPipeTransfer(helper, pipe, pump, at, "sample");
++				if (at == 24 || at == 48) {
++					var hit = new net.minecraft.world.phys.BlockHitResult(pipe.getCenter(),
++						net.minecraft.core.Direction.UP, pipe, false);
++					var tool = at == 24 ? com.simibubi.create.AllBlocks.COPPER_CASING.asStack() : com.simibubi.create.AllItems.WRENCH.asStack();
++					player.setPos(pipe.getX() + .5, pipe.getY(), pipe.getZ() - 2);
++					player.setItemInHand(hand, tool);
++					var result = at == 24
++						? level.getBlockState(pipe).useItemOn(tool, level, player, hand, hit).toString()
++						: tool.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit)).toString();
++					String kind = at == 24 ? "encase" : "uncase";
++					var expected = at == 24 ? com.simibubi.create.AllBlocks.ENCASED_FLUID_PIPE.get() : com.simibubi.create.AllBlocks.FLUID_PIPE.get();
++					helper.assertTrue(level.getBlockState(pipe).is(expected), "Live " + kind + " failed: " + result);
++					captureEncasedPipeTransfer(helper, pipe, pump, at, kind);
++				}
++				if (at == 100)
++					helper.succeed();
++			});
++		}
++	}
++
++	private static void captureEncasedPipeTransfer(CreateGameTestHelper helper, BlockPos pipe, BlockPos pump, int tick, String phase) {
++		var level = helper.getLevel();
++		var state = level.getBlockState(pipe);
++		var entity = level.getBlockEntity(pipe);
++		var data = entity.saveWithoutMetadata(level.registryAccess());
++		var interfaces = java.util.Arrays.stream(net.minecraft.core.Direction.values()).map(face -> {
++			var nbt = data.getCompound(face.getName());
++			var pressure = nbt.getList("Pressure", net.minecraft.nbt.Tag.TAG_FLOAT);
++			var flow = nbt.getCompound("Flow");
++			var fluid = flow.getCompound("Fluid");
++			if (nbt.isEmpty())
++				return face.getName() + ":_";
++			return String.format(java.util.Locale.ROOT, "%s:%.4f:%.4f:%s:%s:%s",
++				face.getName(), pressure.getFloat(0), pressure.getFloat(1), fluid.getString("id"),
++				flow.contains("In") ? Boolean.toString(flow.getBoolean("In")) : "_",
++				flow.contains("Progress") ? "partial" : "complete");
++		}).collect(java.util.stream.Collectors.joining("|"));
++		var rpm = ((com.simibubi.create.content.kinetics.base.KineticBlockEntity) helper.getBlockEntity(pump)).getSpeed();
++		System.out.printf(java.util.Locale.ROOT, "CREATE_ENCASED_PIPE_TRANSFER %d,%s,%s,%s,%.4f,%d,%d,%d,%d,%s%n",
++			tick, phase, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()),
++			encasedPipeFaces(state), rpm,
++			helper.getTankContents(new BlockPos(1, 2, 2)).getAmount(),
++			helper.getTankContents(new BlockPos(5, 2, 1)).getAmount(),
++			helper.getTankContents(new BlockPos(5, 2, 2)).getAmount(),
++			helper.getTankContents(new BlockPos(5, 2, 3)).getAmount(), interfaces);
++	}
++
++	@GameTest(template = "3_pipe_split", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void encasedPipeState(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var pipe = com.simibubi.create.AllBlocks.FLUID_PIPE.get();
++		var glass = com.simibubi.create.AllBlocks.GLASS_FLUID_PIPE.get();
++		var variant = com.simibubi.create.AllBlocks.ENCASED_FLUID_PIPE.get();
++		var original = variant.defaultBlockState();
++		var anchor = helper.absolutePos(new BlockPos(2, 12, 2));
++		var blockRegistry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var itemRegistry = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++			System.out.printf(java.util.Locale.ROOT, "CREATE_ENCASED_PIPE_DEFAULT %s,%s,%s,%.4f,%.4f,%d,%b,%b,%s,%s,%b%n",
++			blockRegistry.getKey(variant), encasedPipeFaces(original), itemRegistry.getKey(variant.asItem()),
++			original.getDestroySpeed(level, anchor), variant.getExplosionResistance(), original.getMapColor(level, anchor).id,
++			original.isCollisionShapeFullBlock(level, anchor), original.getOcclusionShape(level, anchor).isEmpty(),
++			encasedPipeBoxes(original.getShape(level, anchor)), encasedPipeBoxes(original.getCollisionShape(level, anchor)),
++			original.hasBlockEntity());
++
++		var dirs = net.minecraft.core.Direction.values();
++		var masks = new int[] {48, 36, 56, 12, 3};
++		var cases = new String[] {"straight", "elbow", "junction", "wet", "glass"};
++		for (int i = 0; i < cases.length; i++) {
++			var pos = anchor.east(i * 3);
++			var base = i == 4
++				? glass.defaultBlockState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS,
++						net.minecraft.core.Direction.Axis.Y)
++				: pipe.defaultBlockState();
++			if (i != 4)
++				for (int j = 0; j < dirs.length; j++)
++					base = base.setValue(net.minecraft.world.level.block.PipeBlock.PROPERTY_BY_DIRECTION.get(dirs[j]),
++						(masks[i] & 1 << j) != 0);
++			if (i == 3)
++				base = base.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED, true);
++			level.setBlock(pos, base, 18);
++			player.setPos(pos.getX() + .5, pos.getY(), pos.getZ() - 2);
++			var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter(), net.minecraft.core.Direction.UP, pos, false);
++			var wrong = com.simibubi.create.AllBlocks.ANDESITE_CASING.asStack();
++			var rejected = base.useItemOn(wrong, level, player, hand, hit);
++			captureEncasedPipeState(helper, cases[i], "wrong_casing", pos, wrong, rejected.toString());
++			var casing = new net.minecraft.world.item.ItemStack(com.simibubi.create.AllBlocks.COPPER_CASING.get().asItem(), 5);
++			player.setItemInHand(hand, casing);
++			var result = base.useItemOn(casing, level, player, hand, hit);
++			helper.assertTrue(level.getBlockState(pos).is(variant), "Copper Casing did not encase " + cases[i]);
++			captureEncasedPipeState(helper, cases[i], "encase", pos, casing, result.toString());
++			if (i == 0) {
++				level.setBlockAndUpdate(pos.north(), pipe.getAxisState(net.minecraft.core.Direction.Axis.Z));
++				captureEncasedPipeState(helper, cases[i], "add_north_pipe", pos, casing, "-");
++			}
++			var wrencher = com.simibubi.create.AllItems.WRENCH.asStack();
++			player.setItemInHand(hand, wrencher);
++			var wrenchResult = wrencher.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			helper.assertTrue(level.getBlockState(pos).is(pipe), "Wrench did not remove casing " + cases[i]);
++			captureEncasedPipeState(helper, cases[i], "uncase", pos, wrencher, wrenchResult.toString());
++			level.setBlock(pos, base, 18);
++			base.useItemOn(casing, level, player, hand, hit);
++			int before = player.getInventory().countItem(pipe.asItem());
++			player.setShiftKeyDown(true);
++			var picked = wrencher.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			player.setShiftKeyDown(false);
++			int after = player.getInventory().countItem(pipe.asItem());
++			System.out.printf(java.util.Locale.ROOT, "CREATE_ENCASED_PIPE_PICKUP %s,%s,%s,%d,%d%n", cases[i], picked,
++				blockRegistry.getKey(level.getBlockState(pos).getBlock()), after - before, casing.getCount());
++		}
++		helper.succeed();
++	}
++
++	private static void captureEncasedPipeState(CreateGameTestHelper helper, String name, String action, BlockPos pos,
++			net.minecraft.world.item.ItemStack held, String result) {
++		var level = helper.getLevel();
++		var state = level.getBlockState(pos);
++		var block = state.getBlock();
++		var id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block);
++		var be = level.getBlockEntity(pos);
++		var type = be == null ? "-" : net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(be.getType());
++		var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter(), net.minecraft.core.Direction.UP, pos, false);
++		var clone = block.getCloneItemStack(state, hit, level, pos, helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE));
++		var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(clone.getItem());
++		System.out.printf(java.util.Locale.ROOT, "CREATE_ENCASED_PIPE_STATE %s,%s,%s,%s,%s,%s,%s,%d,%s%n",
++			name, action, id, encasedPipeFaces(state),
++			state.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED)
++				? state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED) : "-",
++			type, item, held.getCount(), result);
++	}
++
++	private static String encasedPipeFaces(net.minecraft.world.level.block.state.BlockState state) {
++		var properties = net.minecraft.world.level.block.PipeBlock.PROPERTY_BY_DIRECTION;
++		if (state.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS)) {
++			var axis = state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS);
++			return axis.getName();
++		}
++		return java.util.Arrays.stream(net.minecraft.core.Direction.values())
++			.map(face -> state.hasProperty(properties.get(face)) && state.getValue(properties.get(face)) ? "1" : "0")
++			.collect(java.util.stream.Collectors.joining());
++	}
++
++	private static String encasedPipeBoxes(net.minecraft.world.phys.shapes.VoxelShape shape) {
++		return shape.toAabbs().stream().map(box -> String.format(java.util.Locale.ROOT,
++			"%.4f:%.4f:%.4f:%.4f:%.4f:%.4f", box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ))
++			.collect(java.util.stream.Collectors.joining("|"));
++	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestFluids.encasedPipe"))
++			.toList();
+ 	}
+ }

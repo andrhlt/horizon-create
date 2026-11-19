@@ -1,0 +1,30 @@
+{
+  "interactions": {
+    "board_right": {
+      "canceled": true,
+      "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"Sort brass\"}]],previously_opened_page:0,read_only:1b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+      "after": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"Sort brass\"},{checked:1b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:1b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+    },
+    "board_left_duplicate": {
+      "canceled": true,
+      "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"Sort brass\"},{checked:1b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:1b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+      "after": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"Sort brass\"},{checked:1b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:1b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+    },
+    "diode_right": {
+      "canceled": true,
+      "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"Sort brass\"},{checked:1b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:1b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+      "after": "{components:{\"create:clipboard_content\":{copied_values:{Block:{Inverted:1b},Timings:{Row:1,Value:3}},pages:[[{checked:0b,icon:{},item_amount:0,text:\"Sort brass\"},{checked:1b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:1b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+    }
+  },
+  "diode": {
+    "before": {
+      "interval": 9,
+      "inverted": false
+    },
+    "after": {
+      "interval": 60,
+      "inverted": true,
+      "canceled": true
+    }
+  }
+}

@@ -1,0 +1,7 @@
+tank,capacity,initial_air,hand,result,air,damage,ammo,cooldown
+create:copper_backtank,1,1250,MAIN_HAND,SUCCESS,1196,0,2,true
+create:copper_backtank,3,1799,MAIN_HAND,SUCCESS,1795,0,2,true
+create:netherite_backtank,0,0,MAIN_HAND,SUCCESS,0,1,2,true
+create:netherite_backtank,0,950,MAIN_HAND,SUCCESS,896,0,2,true
+create:netherite_backtank,2,1550,MAIN_HAND,SUCCESS,1496,0,2,true
+create:netherite_backtank,0,100,OFF_HAND,SUCCESS,96,0,2,true

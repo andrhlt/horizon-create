@@ -1,0 +1,4 @@
+case,block,plain,charged,charge
+0,minecraft:air,1,1,1
+1,minecraft:glowstone,2,0,0
+2,minecraft:stone,2,0,0

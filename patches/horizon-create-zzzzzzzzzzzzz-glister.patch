@@ -1,0 +1,51 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -45,6 +45,7 @@
+         "minecraft:apple" => (1.45, 10, 5.0, 0.5),
+         "minecraft:beetroot" => (1.6, 5, 2.0, 0.1),
+         "minecraft:melon_slice" => (1.45, 8, 3.0, 0.1),
++        "minecraft:glistering_melon_slice" => (1.45, 8, 5.0, 0.1),
+         "minecraft:golden_carrot" => (1.45, 15, 12.0, 0.5),
+         _ => return None,
+     };
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5591,8 +5591,9 @@
+                 });
+                 let damage = cannon_ammo.map_or(t.damage, |ammo| ammo.damage);
+                 let cannon_effect = match p.item.as_ref().map(|item| item.item.as_ref()) {
+-                    Some("minecraft:poisonous_potato") => Some(("minecraft:poison", 0)),
+-                    Some("create:honeyed_apple") => Some(("minecraft:slowness", 1)),
++                    Some("minecraft:poisonous_potato") => Some(("minecraft:poison", 160, 0)),
++                    Some("create:honeyed_apple") => Some(("minecraft:slowness", 160, 1)),
++                    Some("minecraft:glistering_melon_slice") => Some(("minecraft:glowing", 100, 0)),
+                     _ => None,
+                 };
+                 let baked = cannon_ammo.is_some()
+@@ -5629,13 +5630,13 @@
+                                     &source,
+                                 );
+                             }
+-                            if let Some((effect, amplifier)) = cannon_effect {
++                            if let Some((effect, duration, amplifier)) = cannon_effect {
+                                 let tags = &self.res.stations().enchantments.entity_tags;
+                                 if let Some(m) = self.mobs.iter_mut().find(|m| m.id == id)
+                                     && super::potions::mob_can_be_affected(tags, &m.kind.id, effect)
+                                 {
+                                     let new = !m.has_effect(effect);
+-                                    m.add_effect(effect, 160, amplifier);
++                                    m.add_effect(effect, duration, amplifier);
+                                     self.mod_effect_added(effect, Some(id as i32), amplifier, new);
+                                 }
+                             }
+@@ -5691,8 +5692,8 @@
+                         }
+                         let from = [p.previous.x, p.previous.y, p.previous.z];
+                         if self.mob_hits_player(damage, from, "minecraft:thrown") {
+-                            if let Some((effect, amplifier)) = cannon_effect {
+-                                self.give_player_effect(effect, 160, amplifier);
++                            if let Some((effect, duration, amplifier)) = cannon_effect {
++                                self.give_player_effect(effect, duration, amplifier);
+                             }
+                             for &(effect, duration, amplifier) in effects {
+                                 self.add_player_effect(horizon_client::effects::EffectInstance::new(effect, duration, amplifier));

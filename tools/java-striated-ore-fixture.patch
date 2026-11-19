@@ -1,0 +1,57 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.striatedOrePlacement"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,42 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void striatedOrePlacement(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var names = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var types = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.CONFIGURED_FEATURE);
++		var generator = level.getChunkSource().getGenerator();
++		long[] seeds = {0, 31, 810102};
++		String[] features = {"striated_ores_overworld", "striated_ores_overworld", "striated_ores_nether"};
++		for (int sample = 0; sample < seeds.length; sample++) {
++			var center = helper.absolutePos(new BlockPos(1, 1, 1)).offset(40 * sample, 52, 0);
++			var feature = types.get(com.simibubi.create.Create.asResource(features[sample]));
++			int radius = 16;
++			var upper = sample == 2 ? Blocks.NETHERRACK.defaultBlockState() : Blocks.STONE.defaultBlockState();
++			var lower = sample == 2 ? upper : Blocks.DEEPSLATE.defaultBlockState();
++			for (var at : BlockPos.betweenClosed(center.offset(-radius, -radius, -radius),
++				center.offset(radius, radius, radius)))
++				level.setBlock(at, at.getY() >= center.getY() ? upper : lower, 16 | 2);
++			System.out.printf("CREATE_STRIATED_ORIGIN %s,%d,%d,%d,%d%n", features[sample], seeds[sample],
++				center.getX(), center.getY(), center.getZ());
++			var random = new net.minecraft.world.level.levelgen.XoroshiroRandomSource(seeds[sample]);
++			boolean placed = feature.place(level, generator, random, center);
++			helper.assertTrue(placed, "Original Striated Ore failed with seed " + seeds[sample]);
++			int count = 0;
++			for (var at : BlockPos.betweenClosed(center.offset(-radius, -radius, -radius),
++				center.offset(radius, radius, radius))) {
++				var block = level.getBlockState(at);
++				if (block == (at.getY() >= center.getY() ? upper : lower))
++					continue;
++				count++;
++				System.out.printf("CREATE_STRIATED_BLOCK %s,%d,%d,%d,%d,%s%n",
++					features[sample], seeds[sample], at.getX() - center.getX(), at.getY() - center.getY(),
++					at.getZ() - center.getZ(), names.getKey(block.getBlock()));
++			}
++			System.out.printf("CREATE_STRIATED_COMPLETED %s,%d,%d%n", features[sample], seeds[sample], count);
++		}
++		helper.succeed();
++	}
+ }

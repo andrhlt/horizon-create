@@ -1,0 +1,32 @@
+--- a/crates/horizon-client/src/game/native_hooks.rs
++++ b/crates/horizon-client/src/game/native_hooks.rs
+@@ -8477,6 +8477,11 @@
+     ) {
+         mod_api::dispatch_place_block(self, mod_api::mods(), stack, pos, state);
+     }
++    /// A setblock command completed its mutation and neighbor updates.
++    pub(super) fn native_command_block_changed(&mut self, pos: [i32; 3]) {
++        let _ = pos;
++    }
++
+     /// A player right clicks the block at `pos` with `self.hand`, `face` the
+     /// face clicked: where `ServerPlayerGameMode.useItemOn` starts, before
+     /// the block's own use (a chest, a door, a lever) and before
+--- a/crates/horizon-client/src/game/commands.rs
++++ b/crates/horizon-client/src/game/commands.rs
+@@ -2729,6 +2729,7 @@
+         {
+             self.world.block_entities.insert(key, entity);
+         }
++        self.native_command_block_changed(pos);
+         Ok(true)
+     }
+     fn cmd_setblock(&mut self, ctx: &Context) -> R<i32> {
+@@ -2785,6 +2786,7 @@
+             self.process_level_events()
+                 .map_err(|e| CommandError::new(Text::literal(e.to_string())))?;
+         }
++        self.native_command_block_changed(pos);
+         self.feedback(Text::tr(
+             "commands.setblock.success",
+             &[&pos[0], &pos[1], &pos[2]],

@@ -1,0 +1,54 @@
+--- a/crates/horizon-client-render/src/chunk/block_entity.rs
++++ b/crates/horizon-client-render/src/chunk/block_entity.rs
+@@ -119,6 +119,8 @@
+ /// without comparing the whole entity, and no write can skip that.
+ pub struct ModBlockEntity {
+     fields: ModBlockEntityFields,
++    /// Unsaved state owned by the live block entity, never cloned or compared.
++    pub runtime: Compound,
+     revision: ModRevision,
+     // A client update can consume transient effects without changing saved
+     // fields. Most entities never use this; do not allocate their queue.
+@@ -149,6 +151,7 @@
+     pub fn new(fields: ModBlockEntityFields) -> Self {
+         Self {
+             fields,
++            runtime: Compound::new(),
+             revision: ModRevision {
+                 born: MOD_BLOCK_ENTITIES_MADE.fetch_add(1, Ordering::Relaxed),
+                 changes: 0,
+--- a/crates/horizon-client/src/game/commands.rs
++++ b/crates/horizon-client/src/game/commands.rs
+@@ -3194,6 +3194,10 @@
+         }
+         Ok(())
+     }
++    // Called after destination placement and before copied block-entity data
++    // replaces it, allowing a mod to retain unsaved placement state.
++    fn native_clone_block_entity_load(&mut self, _pos: [i32; 3], _entity: &mut crate::containers::BlockEntity) {}
++
+     fn clone_between(
+         &mut self,
+         ctx: &Context,
+@@ -3273,13 +3277,17 @@
+         // each copied state but a barrier counts as placed.
+         let barrier = self.pack.assets.registry.default_state("minecraft:barrier");
+         let mut count = 0;
+-        for (_, to, s, entity, name) in copies {
+-            self.place_state(to, s, strict, false)?;
+-            if Some(s) != barrier {
++        // Java places every copied state before loading copied entity data.
++        for (_, to, s, _, _) in &copies {
++            self.place_state(*to, *s, strict, false)?;
++            if Some(*s) != barrier {
+                 count += 1;
+             }
+-            if let Some(e) = entity {
++        }
++        for (_, to, _, entity, name) in copies {
++            if let Some(mut e) = entity {
+                 let key = (to[0], to[1], to[2]);
++                self.native_clone_block_entity_load(to, &mut e);
+                 self.world.block_entities.insert(key, e);
+                 // The copied tag carries the custom name.
+                 match name {

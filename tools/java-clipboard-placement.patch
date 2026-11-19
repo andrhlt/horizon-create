@@ -1,0 +1,57 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -145,6 +145,54 @@
+ 		runChainConveyor(helper, "rising_reversal", new BlockPos(6, 2, 3), true);
+ 	}
+ 
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void chainConveyorClipboardPlacement(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		helper.runAtTickTime(2, () -> {
++			var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++			var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++			player.setShiftKeyDown(true);
++			player.setYRot(0);
++			var clipboard = AllBlocks.CLIPBOARD.get();
++			Direction[] sides = {Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH,
++				Direction.EAST, Direction.WEST};
++			for (int i = 0; i < sides.length; i++) {
++				var side = sides[i];
++				var support = start.east(i * 4);
++				var target = support.relative(side);
++				world.setBlockAndUpdate(support, Blocks.STONE.defaultBlockState());
++				var stack = AllBlocks.CLIPBOARD.asStack();
++				if (i > 0) {
++					var entry = new com.simibubi.create.content.equipment.clipboard.ClipboardEntry(
++						false, net.minecraft.network.chat.Component.literal("#Warehouse"));
++					stack.set(AllDataComponents.CLIPBOARD_CONTENT,
++						com.simibubi.create.content.equipment.clipboard.ClipboardContent.EMPTY
++							.setPages(java.util.List.of(java.util.List.of(entry)))
++							.setType(com.simibubi.create.content.equipment.clipboard.ClipboardOverrides.ClipboardType.WRITTEN));
++				}
++				var saved = stack.save(world.registryAccess());
++				player.setItemInHand(hand, stack);
++				player.setPos(Vec3.atCenterOf(support.above(2)));
++				var hit = new net.minecraft.world.phys.BlockHitResult(
++					Vec3.atCenterOf(support).add(Vec3.atLowerCornerOf(side.getNormal()).scale(0.5)), side, support, false);
++				var result = stack.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++				var state = world.getBlockState(target);
++				if (state.getBlock() != clipboard)
++					throw new IllegalStateException("Clipboard did not place: " + side + " " + state + " " + result);
++				var shape = clipboard.getShape(state, world, target,
++					net.minecraft.world.phys.shapes.CollisionContext.empty()).toAabbs();
++				var clone = clipboard.getCloneItemStack(world, target, state).save(world.registryAccess());
++				boolean spent = player.getMainHandItem().isEmpty();
++				clipboard.attack(state, world, target, player);
++				var picked = player.getMainHandItem().save(world.registryAccess());
++				System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_PLACEMENT %s|%s|%s|%b|%b|%s|%s|%s%n",
++					side, state, shape, spent, world.isEmptyBlock(target), saved, clone, picked);
++			}
++			helper.succeed();
++		});
++	}
++
+ 	private static void runChainConveyor(CreateGameTestHelper helper, String scenario, BlockPos edge, boolean reverse) {
+ 		var world = helper.getLevel();
+ 		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);

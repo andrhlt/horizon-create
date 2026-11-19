@@ -1,0 +1,109 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders)
++			.stream().filter(test -> test.testName().equals("TestProcessing.weightedEjectorFunnel")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,93 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void weightedEjectorFunnel(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var blocks = net.minecraft.world.level.block.Blocks.SMOOTH_STONE;
++		var redstone = net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState();
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var face = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var west = net.minecraft.core.Direction.WEST;
++		var south = net.minecraft.core.Direction.SOUTH;
++		var shape = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.SHAPE;
++		var pulling = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape.PULLING;
++		var origins = java.util.List.of(new BlockPos(5, 104, -11), new BlockPos(5, 104, -5), new BlockPos(5, 104, 1));
++		var rigs = new java.util.ArrayList<WeightedFunnelRig>();
++		for (int i = 0; i < origins.size(); i++) {
++			var at = origins.get(i);
++			var chunk = new net.minecraft.world.level.ChunkPos(at);
++			level.setChunkForced(chunk.x, chunk.z, true);
++			level.getChunk(chunk.x, chunk.z);
++			for (int x = -3; x <= 7; x++)
++				for (int z = -2; z <= 2; z++) {
++					level.setBlockAndUpdate(at.offset(x, -1, z), blocks.defaultBlockState());
++					for (int y = 0; y < 7; y++)
++						level.removeBlock(at.offset(x, y, z), false);
++				}
++			level.setBlockAndUpdate(at, AllBlocks.WEIGHTED_EJECTOR.getDefaultState().setValue(horizontal, east));
++			level.setBlockAndUpdate(at.west(), redstone);
++			level.setBlockAndUpdate(at.north(), AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(face, south));
++			((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(at.north()))
++				.generatedSpeed.setValue(128);
++			level.setBlockAndUpdate(at.east(4), AllBlocks.DEPOT.getDefaultState());
++			var direction = i == 2 ? east : west;
++			var barrelAt = at.above().relative(direction.getOpposite());
++			level.setBlockAndUpdate(barrelAt, net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState());
++			level.setBlockAndUpdate(at.above(), AllBlocks.BRASS_BELT_FUNNEL.getDefaultState()
++				.setValue(horizontal, direction).setValue(shape, pulling));
++			var source = (com.simibubi.create.content.logistics.depot.EjectorBlockEntity) level.getBlockEntity(at);
++			var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) level.getBlockEntity(at.east(4));
++			var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(barrelAt);
++			source.setTarget(4, 0);
++			if (i == 1) {
++				barrel.setItem(0, new ItemStack(Items.IRON_INGOT, 63));
++				for (int slot = 1; slot < barrel.getContainerSize(); slot++)
++					barrel.setItem(slot, new ItemStack(Items.STONE, 64));
++			}
++			rigs.add(new WeightedFunnelRig(at, source, depot, barrel));
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			helper.assertTrue(tick >= 1, "Waiting for first measured tick");
++			for (int i = 0; i < rigs.size(); i++) {
++				var rig = rigs.get(i);
++				var input = rig.source().getBehaviour(com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE);
++				if (tick == 12) {
++					input.setCenteredHeldItem(new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++						new ItemStack(Items.IRON_INGOT, 3)));
++					rig.source().notifyUpdate();
++					level.removeBlock(rig.pos().west(), false);
++				}
++				if (i == 1 && tick == 20)
++					rig.barrel().clearContent();
++				int barrelIron = 0;
++				for (int slot = 0; slot < rig.barrel().getContainerSize(); slot++) {
++					var s = rig.barrel().getItem(slot);
++					if (s.is(Items.IRON_INGOT))
++						barrelIron += s.getCount();
++				}
++				int flying = rig.source().saveWithoutMetadata(level.registryAccess()).getList("LaunchedItems", 10).size();
++				System.out.printf(java.util.Locale.ROOT, "CREATE_EJECTOR_FUNNEL %d,%d,%s,%d,%d,%d,%d,%s%n",
++					i, tick, rig.source().getState(), input.getHeldItemStack().getCount(), flying,
++					barrelIron, rig.depot().getHeldItem().getCount(), level.getBlockState(rig.pos().above()).getValue(shape));
++			}
++			helper.assertTrue(tick >= 60, "Capturing funnel export and normal launch");
++			helper.assertTrue(rigs.get(0).barrel().getItem(0).getCount() == 3, "The aligned Pulling Funnel should catch iron");
++			helper.assertTrue(rigs.get(1).barrel().getItem(0).getCount() == 3, "The full Funnel should retry after space opens");
++			helper.assertTrue(rigs.get(2).barrel().getItem(0).getCount() == 3, "The opposite Funnel should pull without firing");
++			for (var at : origins) {
++				var chunk = new net.minecraft.world.level.ChunkPos(at);
++				level.setChunkForced(chunk.x, chunk.z, false);
++			}
++		});
++	}
++
++	private record WeightedFunnelRig(
++		BlockPos pos, com.simibubi.create.content.logistics.depot.EjectorBlockEntity source,
++		com.simibubi.create.content.logistics.depot.DepotBlockEntity depot,
++		net.minecraft.world.level.block.entity.BarrelBlockEntity barrel
++	) {}
+ }

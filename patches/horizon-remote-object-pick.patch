@@ -1,0 +1,24 @@
+--- a/crates/horizon-client/src/game/remote_vehicles.rs
++++ b/crates/horizon-client/src/game/remote_vehicles.rs
+@@ -55,6 +55,10 @@
+     /// Whether a use starts on an entity: the crosshair's `EntityHitResult`, or a fence knot.
+     /// Only a use: Horizon's attacks still go to the fence behind a knot.
+     pub(super) fn remote_use_targets_entity(&self) -> bool {
++        self.remote_use_targets_entity_base()
++    }
++
++    fn remote_use_targets_entity_base(&self) -> bool {
+         self.entity_targeted()
+             || self
+                 .remote_knot_hit()
+@@ -64,6 +68,10 @@
+     /// The nearest boat, minecart, item frame, armor stand or painting the
+     /// view hits within reach; also End crystals when attacking, and fence knots when using.
+     pub(super) fn remote_object_hit(&self, attacking: bool) -> Option<ObjectHit> {
++        self.remote_object_hit_base(attacking)
++    }
++
++    fn remote_object_hit_base(&self, attacking: bool) -> Option<ObjectHit> {
+         let (eye, dir) = self.aim()?;
+         let at = |d: f64| {
+             [

@@ -1,0 +1,2 @@
+recipe,width,height,slots,output,count,remainder
+crafting/kinetics/nozzle,3,3,"_,create:andesite_alloy,_,_,minecraft:white_wool,_,create:andesite_alloy,create:andesite_alloy,create:andesite_alloy",create:nozzle,1,

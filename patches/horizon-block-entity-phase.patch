@@ -1,0 +1,14 @@
+--- a/crates/horizon-client/src/game/block_entity_ticks.rs
++++ b/crates/horizon-client/src/game/block_entity_ticks.rs
+@@ -39,6 +39,11 @@
+ 
+ impl Game<'_> {
+     pub(super) fn tick_block_entities(&mut self) -> Result<()> {
++        let result = self.tick_block_entities_inner();
++        result
++    }
++
++    fn tick_block_entities_inner(&mut self) -> Result<()> {
+         self.tick_mount_menu();
+         self.tick_craft_table();
+         self.tick_container_reach();

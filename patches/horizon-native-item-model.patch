@@ -1,0 +1,12 @@
+--- a/crates/horizon-client/src/game/item_draw.rs
++++ b/crates/horizon-client/src/game/item_draw.rs
+@@ -64,9 +64,6 @@
+ }
+ impl ItemEnv for Env<'_, '_> {
+     fn item_model_property(&self, property: &str, stack: &StackView) -> bool {
+-        if horizon_client::mod_api::mods().is_empty() {
+-            return false;
+-        }
+         let mut value = false;
+         self.game
+             .native_item_model_property(property, stack, &mut value);

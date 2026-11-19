@@ -1,0 +1,22 @@
+--- a/crates/horizon-world/src/level/bonemeal.rs
++++ b/crates/horizon-world/src/level/bonemeal.rs
+@@ -365,6 +365,10 @@
+             }
+         }
+         let blocks = {
++            // Fixture-only: align the isolated DreamWorld RNG with the Java probe.
++            let mut fixture_random = std::env::var("CREATE_TREE_FERTILIZER_TRACE_SEED")
++                .ok().and_then(|seed| seed.parse().ok())
++                .map(horizon_core::random::LegacyRandom::new);
+             let mut simulated = TreeFertilizerLevel {
+                 blocks,
+                 soil,
+@@ -374,7 +378,7 @@
+                 seed: level.world_seed(),
+                 min_y: level.min_y(),
+                 max_y: level.max_y(),
+-                random: level.random(),
++                random: fixture_random.as_mut().unwrap_or_else(|| level.random()),
+             };
+             self.sim(&mut simulated, &mut Ticks::default())
+                 .perform_bonemeal(kind, BlockPos::new(0, 10, 0), planted);

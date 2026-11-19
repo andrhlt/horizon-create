@@ -1,0 +1,4 @@
+tick,action,used,held,foil,same_frequency,type,facing
+3,tune,true,1,true,true,create:stock_ticker,_
+4,place,true,0,false,true,create:stock_ticker,south
+5,sneak_place,true,0,false,false,create:stock_ticker,north

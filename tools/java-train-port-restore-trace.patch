@@ -1,0 +1,136 @@
+--- a/build.gradle
++++ b/build.gradle
+@@ -76,8 +76,11 @@
+                 systemProperty("parity.fastArrival", project.hasProperty("parityFastArrival").toString())
+                 systemProperty("parity.movingItemPortPreview", project.hasProperty("parityMovingItemArrival").toString())
+                 systemProperty("neoforge.enableGameTest", "true")
++                def restart = project.findProperty("parityReloadArrival") ?: ""
++                systemProperty("parity.reloadArrival", restart)
+                 programArguments.addAll("--quickPlaySingleplayer",
+-                    "MovingPortDepartureReference", "--width", "960", "--height", "540")
++                    restart == "restore" ? "MovingPortReloadSnapshot" : "MovingPortDepartureReference",
++                    "--width", "960", "--height", "540")
+             }
+             if (project.hasProperty("parityMovingPortPreview")) {
+                 def item = project.findProperty("parityMovingPortPreview") == "item"
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -375,6 +375,8 @@
+ 					JavaTrainDepartureProbe.carriage = c.anyAvailableEntity().getUUID();
+ 					System.out.println("JAVA_TRAIN_DEPART_FIXTURE " + JavaTrainDepartureProbe.carriage);
+ 				}
++				if (t == 152 && "capture".equals(System.getProperty("parity.reloadArrival")))
++					JavaTrainDepartureProbe.snapshot(level.getServer(), c.anyAvailableEntity().getUUID());
+ 				if (t == 27 && Boolean.getBoolean("parity.movingPortPreview")) {
+ 					train.runtime.paused = true;
+ 					level.setBlockAndUpdate(transferInterface.south(), Blocks.REDSTONE_BLOCK.defaultBlockState());
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaTrainDepartureProbe.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaTrainDepartureProbe.java
+@@ -1,6 +1,12 @@
+ package com.simibubi.create.infrastructure.gametest.tests;
+ 
+ import java.util.UUID;
++import java.io.IOException;
++import java.io.UncheckedIOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.world.level.storage.LevelResource;
+ 
+ import com.simibubi.create.Create;
+ import com.simibubi.create.content.trains.entity.Train;
+@@ -25,7 +31,34 @@
+     private static volatile boolean requested;
+     private static int elapsed;
+     private static int deadline;
++    private static long savedClock;
++    private static final boolean RESTORE = "restore".equals(System.getProperty("parity.reloadArrival"));
+ 
++    static void snapshot(MinecraftServer server, UUID id) {
++        Path source = server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
++        Path copy = source.getParent().resolve("MovingPortReloadSnapshot");
++        if (Files.exists(copy))
++            throw new IllegalStateException("The scratch snapshot directory already exists.");
++        long clock = server.overworld().getGameTime();
++        server.saveEverything(true, true, true);
++        try (var files = Files.walk(source)) {
++            for (Path file : files.toList()) {
++                Path below = source.relativize(file);
++                if (below.toString().equals("session.lock"))
++                    continue;
++                Path target = copy.resolve(below);
++                if (Files.isDirectory(file))
++                    Files.createDirectories(target);
++                else
++                    Files.copy(file, target);
++            }
++            Files.writeString(copy.resolve("parity-arrival"), id + ";" + clock);
++        } catch (IOException ex) {
++            throw new UncheckedIOException(ex);
++        }
++        System.out.printf("JAVA_ARRIVAL_SNAPSHOT %d;%s%n", clock, id);
++    }
++
+     private static boolean enabled() {
+         return Boolean.getBoolean("parity.movingDeparture");
+     }
+@@ -41,10 +74,31 @@
+ 
+     @SubscribeEvent
+     public static void observe(ServerTickEvent.Post event) {
+-        if (!enabled() || !requested)
++        if (!enabled() || (!requested && !RESTORE))
+             return;
+         var server = event.getServer();
+         var level = server.overworld();
++        if (RESTORE) {
++            if (carriage == null) {
++                try {
++                    String[] saved = Files.readString(server.getWorldPath(LevelResource.ROOT).resolve("parity-arrival")).split(";");
++                    carriage = UUID.fromString(saved[0]);
++                    savedClock = Long.parseLong(saved[1]);
++                } catch (IOException ex) {
++                    throw new UncheckedIOException(ex);
++                }
++            }
++            var receiver = level.getBlockEntity(new BlockPos(95, 115, -6));
++            int timer = receiver == null ? -1 : receiver.saveWithoutMetadata(level.registryAccess()).getInt("Timer");
++            boolean connected = receiver instanceof com.simibubi.create.content.contraptions.actors.psi.PortableStorageInterfaceBlockEntity psi
++                && psi.canTransfer();
++            var restored = train();
++            var entity = restored == null ? null : restored.carriages.getFirst().anyAvailableEntity();
++            System.out.printf(java.util.Locale.ROOT, "JAVA_TRAIN_ARRIVAL_REOPEN %d;%d;%.9f;%.9f;%b;%b%n",
++                level.getGameTime() - savedClock, timer, entity == null ? 0 : entity.getX(),
++                restored == null ? 0 : restored.speed, restored != null && restored.derailed, connected);
++            return;
++        }
+         var train = train();
+         if (train == null)
+             return;
+@@ -63,7 +117,7 @@
+         var mc = Minecraft.getInstance();
+         if (mc.getOverlay() == null && mc.screen instanceof TitleScreen && !opened) {
+             opened = true;
+-            mc.createWorldOpenFlows().openWorld("MovingPortDepartureReference", mc::stop);
++            mc.createWorldOpenFlows().openWorld(RESTORE ? "MovingPortReloadSnapshot" : "MovingPortDepartureReference", mc::stop);
+         }
+         if (mc.screen instanceof BackupConfirmScreen backup)
+             backup.children().stream().filter(Button.class::isInstance).map(Button.class::cast)
+@@ -80,14 +134,15 @@
+                 server.getCommands().performPrefixedCommand(command, "gamemode spectator " + name);
+                 server.getCommands().performPrefixedCommand(command, "tp " + name + " 104.5 117.2 -5.7 -84 19");
+                 var player = server.getPlayerList().getPlayerByName(name);
+-                server.getCommands().performPrefixedCommand(
++                if (!RESTORE)
++                    server.getCommands().performPrefixedCommand(
+                     player.createCommandSourceStack().withPermission(4), "test run testmisc.scheduledtrainfixedportlifecycle");
+                 System.out.println("JAVA_TRAIN_DEPART_TEST requested");
+             });
+             mc.options.hideGui = true;
+             return;
+         }
+-        if (++deadline >= 320) {
++        if (++deadline >= (RESTORE ? 45 : 320)) {
+             mc.stop();
+             return;
+         }

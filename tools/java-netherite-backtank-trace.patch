@@ -1,0 +1,82 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..efe3650be 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,9 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.netheriteBacktank"))
++			.sorted(java.util.Comparator.comparing(TestFunction::testName))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..9b5547c49 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -103,14 +103,26 @@ public class TestMisc {
+ 		BlockPos lava = new BlockPos(2, 2, 3);
+ 		BlockPos zombieSpawn = lava.above(2);
+ 		BlockPos armorStandPos = new BlockPos(2, 2, 1);
++		Zombie[] observed = new Zombie[1];
+ 		helper.runAtTickTime(5, () -> {
+-			Zombie zombie = helper.spawn(EntityType.ZOMBIE, zombieSpawn);
++			Zombie zombie = observed[0] = helper.spawn(EntityType.ZOMBIE, zombieSpawn);
+ 			ArmorStand armorStand = helper.getFirstEntity(EntityType.ARMOR_STAND, armorStandPos);
+ 			for (EquipmentSlot slot : EquipmentSlot.values()) {
+ 				zombie.setItemSlot(slot, armorStand.getItemBySlot(slot).copy());
+ 			}
+ 		});
+ 		helper.succeedWhen(() -> {
++		Zombie zombie = observed[0];
++		if (helper.getTick() == 0)
++			System.out.printf("BACKTANK_ORIGIN %s%n", helper.absolutePos(new BlockPos(0, 1, 0)).toShortString());
++		if (zombie == null) {
++			System.out.printf("BACKTANK_TRACE %d,%d,0,,,,,,%n", helper.getTick(), helper.getLevel().getGameTime() % 20);
++		} else {
++			System.out.printf(java.util.Locale.ROOT, "BACKTANK_TRACE %d,%d,1,%.3f,%d,%b,%b,%d,%.6f%n",
++				helper.getTick(), helper.getLevel().getGameTime() % 20, zombie.getHealth(), zombie.getRemainingFireTicks(), zombie.isInLava(),
++				zombie.fireImmune(), com.simibubi.create.content.equipment.armor.BacktankUtil.getAir(zombie.getItemBySlot(EquipmentSlot.CHEST)),
++				zombie.getY() - helper.absolutePos(new BlockPos(0, 1, 0)).getY());
++		}
+ 			helper.assertSecondsPassed(9);
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+diff --git a/src/main/resources/create.mixins.json b/src/main/resources/create.mixins.json
+index b5ea0067a..d831a4b82 100644
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -19,6 +19,7 @@
+     "MapItemSavedDataMixin",
+     "MobMixin",
+     "PlayerMixin",
++    "ParityGameTestOriginMixin",
+     "ProjectileUtilMixin",
+     "SmithingMenuMixin",
+     "WaterWheelFluidSpreadMixin",
+diff --git a/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+new file mode 100644
+index 000000000..29d8cc4a6
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+@@ -0,0 +1,17 @@
++package com.simibubi.create.foundation.mixin;
++
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.ModifyArg;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.gametest.framework.GameTestServer;
++
++@Mixin(GameTestServer.class)
++public class ParityGameTestOriginMixin {
++	@ModifyArg(method = "startTests", at = @At(value = "INVOKE",
++		target = "Lnet/minecraft/gametest/framework/StructureGridSpawner;<init>(Lnet/minecraft/core/BlockPos;IZ)V"), index = 0)
++	private BlockPos parityOrigin(BlockPos vanillaOrigin) {
++		return new BlockPos(3, vanillaOrigin.getY(), -12);
++	}
++}

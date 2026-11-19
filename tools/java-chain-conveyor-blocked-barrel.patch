@@ -1,0 +1,33 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -226,19 +226,20 @@
+ 					var barrelPos = portPos.below();
+ 					world.setBlockAndUpdate(barrelPos, Blocks.BARREL.defaultBlockState());
+ 					var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) world.getBlockEntity(barrelPos);
+-					barrel.setItem(0, new ItemStack(Items.STICK, 1));
+-					barrel.setItem(1, chainPackage("Away", Items.PAPER, 4));
++					for (int slot = 0; slot < barrel.getContainerSize(); slot++)
++						barrel.setItem(slot, new ItemStack(Items.STICK, 64));
+ 				}
+ 				if (port != null && tick >= 35 && tick <= 52) {
+ 					var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) world.getBlockEntity(portPos.below());
+-					boolean incoming = java.util.stream.IntStream.range(0, barrel.getContainerSize())
+-						.anyMatch(slot -> PackageItem.getAddress(barrel.getItem(slot)).equals("Lab-In"));
+-					boolean outgoing = PackageItem.getAddress(barrel.getItem(1)).equals("Away");
+-					boolean launched = dest.getLoopingPackages().stream()
+-						.anyMatch(box -> PackageItem.getAddress(box.item).equals("Away"));
+-					System.out.printf(Locale.ROOT, "CREATE_CHAIN_ADJACENT %d,%b,%b,%s,%.9f,%b,%b%n",
+-						tick, incoming, outgoing, chainReceipt(port), port.animationProgress.getValue(), launched,
+-						barrel.getItem(0).is(Items.STICK));
++					if (tick == 43)
++						barrel.setItem(2, ItemStack.EMPTY);
++					int sticks = java.util.stream.IntStream.range(0, barrel.getContainerSize())
++						.filter(slot -> barrel.getItem(slot).is(Items.STICK))
++						.map(slot -> barrel.getItem(slot).getCount()).sum();
++					boolean received = PackageItem.getAddress(barrel.getItem(2)).equals("Lab-In");
++					boolean blocked = port.saveWithoutMetadata(world.registryAccess()).contains("FailedLastExport");
++					System.out.printf(Locale.ROOT, "CREATE_CHAIN_BLOCKED_BARREL %d,%b,%b,%s,%d%n",
++						tick, blocked, received, chainReceipt(port), sticks);
+ 				}
+ 				String receipt = port == null ? "-" : chainReceipt(port);
+ 				System.out.printf(Locale.ROOT, "CREATE_CHAIN_WORLD %s,%d,%.8f,%.8f,%b,%b,%b,%b,%s,%.8f,%s%n",

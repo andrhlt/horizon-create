@@ -1,0 +1,100 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..5282b3f 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.detectorListFilter"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..5471ec9 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,81 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 36)
++	public static void detectorListFilter(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var power = com.simibubi.create.content.redstone.smartObserver.SmartObserverBlock.POWERED;
++		var type = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++		var players = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var observer = com.simibubi.create.AllBlocks.SMART_OBSERVER.get();
++		var stockpile = com.simibubi.create.AllBlocks.THRESHOLD_SWITCH.get();
++		var observers = new BlockPos[5];
++		for (int lane = 0; lane < observers.length; lane++) {
++			var local = new BlockPos(9 + 4 * lane, 8, 9);
++			observers[lane] = local;
++			var target = local.south();
++			if (lane < 2) {
++				helper.setBlock(target, lane == 0 ? Blocks.STONE : Blocks.BARREL);
++				if (lane == 1) {
++					var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) world.getBlockEntity(helper.absolutePos(target));
++					barrel.setItem(0, new ItemStack(Items.STONE, 16));
++				}
++			} else {
++				helper.setBlock(target, com.simibubi.create.AllBlocks.FLUID_TANK.get());
++				var tank = (com.simibubi.create.content.fluids.tank.FluidTankBlockEntity) world.getBlockEntity(helper.absolutePos(target));
++				var liquid = lane == 3 ? net.minecraft.world.level.material.Fluids.LAVA : net.minecraft.world.level.material.Fluids.WATER;
++				tank.getTankInventory().fill(new net.neoforged.neoforge.fluids.FluidStack(liquid, 2000),
++					net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
++			}
++			helper.setBlock(local, (lane == 4 ? stockpile : observer).defaultBlockState().setValue(facing, net.minecraft.core.Direction.SOUTH));
++			if (lane == 4) {
++				var be = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), local);
++				be.offWhenBelow = 500;
++				be.onWhenAbove = 1500;
++			}
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int lane = 0; lane < observers.length; lane++) {
++				var pos = helper.absolutePos(observers[lane]);
++				var be = (com.simibubi.create.foundation.blockEntity.SmartBlockEntity) world.getBlockEntity(pos);
++				if (tick == 4 || tick == 12 || tick == 22) {
++					var list = tick == 22 ? ItemStack.EMPTY : com.simibubi.create.AllItems.FILTER.asStack(2);
++					if (!list.isEmpty()) {
++						list.set(com.simibubi.create.AllDataComponents.FILTER_ITEMS,
++							net.minecraft.world.item.component.ItemContainerContents.fromItems(java.util.List.of(new ItemStack(Items.STONE), new ItemStack(Items.WATER_BUCKET))));
++						list.set(com.simibubi.create.AllDataComponents.FILTER_ITEMS_BLACKLIST, tick == 12);
++					}
++					players.getInventory().clearContent();
++					players.setItemInHand(hand, list);
++					if (!detectorListFilterClick(players, pos, net.minecraft.core.Direction.NORTH, true))
++						helper.fail("The original detector rejected the configured List Filter");
++				}
++				var filter = be.getBehaviour(type).getFilter();
++				int mode = filter.isEmpty() ? 0 : filter.getOrDefault(com.simibubi.create.AllDataComponents.FILTER_ITEMS_BLACKLIST, false) ? 2 : 1;
++				if (be instanceof com.simibubi.create.content.redstone.smartObserver.SmartObserverBlockEntity smart) {
++					boolean powered = world.getBlockState(pos).getValue(power);
++					System.out.printf("DETECTOR_LIST,%d,%d,%d,%d,%b,%b%n", tick, lane, mode, smart.turnOffTicks, powered, powered);
++				} else if (be instanceof com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity threshold) {
++					System.out.printf("DETECTOR_LIST,%d,%d,%d,%d,%b,%b%n", tick, lane, mode,
++						threshold.getStockLevel(), threshold.getState(), threshold.isPowered());
++				}
++			}
++			helper.assertTrue(tick == 28, "sampling the configured list");
++		});
++	}
++
++	private static boolean detectorListFilterClick(net.minecraft.world.entity.player.Player player, BlockPos pos,
++		net.minecraft.core.Direction face, boolean center) {
++		var point = pos.getCenter().relative(face, 0.46);
++		if (!center)
++			point = point.relative(face.getAxis().isVertical() ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.UP, 0.31);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var hit = new net.minecraft.world.phys.BlockHitResult(point, face, pos, false);
++		var event = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock(player, hand, pos, hit);
++		com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsInputHandler.onBlockActivated(event);
++		return event.isCanceled();
++	}
+ }

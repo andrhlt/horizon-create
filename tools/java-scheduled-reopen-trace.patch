@@ -1,0 +1,40 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -270,6 +270,37 @@
+                     t, route, station, (route != 0 && train.navigation.destinationBehindTrain),
+                     route != 0 ? train.navigation.distanceToDestination : 0,
+                     train.hasForwardConductor(), train.hasBackwardConductor());
++                if (t == 100 || t == 145) {
++                    var palette = new com.simibubi.create.content.trains.graph.DimensionPalette();
++                    var saved = train.write(palette, level.registryAccess());
++                    var restored = com.simibubi.create.content.trains.entity.Train.read(
++                        saved, level.registryAccess(), railway.trackNetworks, palette);
++                    var resaved = restored.write(palette, level.registryAccess());
++                    helper.assertTrue(saved.getCompound("Runtime").equals(resaved.getCompound("Runtime")),
++                        "Saved schedule state changed on loading");
++                    helper.assertTrue(restored.navigation.destination == train.navigation.destination
++                        && restored.navigation.distanceToDestination == train.navigation.distanceToDestination
++                        && restored.navigation.destinationBehindTrain == train.navigation.destinationBehindTrain,
++                        "Navigation changed on loading");
++                    helper.assertTrue(restored.getCurrentStation() == train.getCurrentStation()
++                        && restored.speed == train.speed, "Dock or speed changed on loading");
++                    var otherCar = restored.carriages.getFirst();
++                    var points = java.util.List.of(otherCar.leadingBogey().leading(), otherCar.leadingBogey().trailing(),
++                        otherCar.trailingBogey().leading(), otherCar.trailingBogey().trailing());
++                    double[] positions = {a, b, d, e};
++                    for (int i = 0; i < positions.length; i++) {
++                        var restoredPos = points.get(i).getPosition(restored.graph).x - origin.getX();
++                        helper.assertTrue(Math.abs(restoredPos - positions[i]) < 1e-7, "Wheel shifted on loading");
++                    }
++                    if (restored.getCurrentStation() != null) {
++                        restored.getCurrentStation().cancelReservation(restored);
++                        restored.getCurrentStation().reserveFor(train);
++                    }
++                    System.out.printf(java.util.Locale.ROOT, "CREATE_SCHEDULE_REOPEN %d;%s;%d;%s;%d;%.9f%n",
++                        t, restored.runtime.state, restored.runtime.currentEntry, restored.navigation.destinationBehindTrain,
++                        restored.getCurrentStation() == east ? 2 : restored.getCurrentStation() == global ? 1 : 0,
++                        restored.speed);
++                }
+                 if (t == 285) {
+                     helper.assertTrue(station == 2 && train.runtime.completed, "Schedule must finish at East");
+                     helper.succeed();

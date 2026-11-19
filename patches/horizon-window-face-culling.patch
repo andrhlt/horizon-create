@@ -1,0 +1,161 @@
+diff --git a/crates/horizon-client/src/mod_content.rs b/crates/horizon-client/src/mod_content.rs
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -1535,9 +1535,13 @@
+                     let Some(entry) = doc.get_mut(&b.decl.id) else {
+                         continue;
+                     };
+-                    // Faces beside a block that occludes nothing are drawn (`Block.shouldRenderFace`).
+-                    if !model && b.decl.properties.occludes == Some(false) {
+-                        entry.set("can_occlude", J::Bool(false));
++                    if !model {
++                        if b.decl.properties.occludes == Some(false) {
++                            entry.set("can_occlude", J::Bool(false));
++                        }
++                        if let Some(rule) = b.decl.properties.face_culling {
++                            entry.set("rule", J::Str(rule.name().into()));
++                        }
+                     }
+                     if model && let Some(schema) = entry.get_mut("schema") {
+                         for (property_name, property) in &b.decl.state_properties {
+diff --git a/crates/horizon-client-render/src/mesher.rs b/crates/horizon-client-render/src/mesher.rs
+--- a/crates/horizon-client-render/src/mesher.rs
++++ b/crates/horizon-client-render/src/mesher.rs
+@@ -2063,6 +2063,9 @@
+                             // connected textures.
+                             if state.pane
+                                 && !connected.is_empty()
++                                && !self
++                                    .visibility
++                                    .uses_state_sensitive_pane_culling(BlockStateId(id))
+                                 && let Some(dy) = match face.quad.facing {
+                                     ModelDirection::Up => Some(1),
+                                     ModelDirection::Down => Some(-1),
+diff --git a/crates/horizon-client-render/src/models.rs b/crates/horizon-client-render/src/models.rs
+--- a/crates/horizon-client-render/src/models.rs
++++ b/crates/horizon-client-render/src/models.rs
+@@ -173,6 +173,10 @@
+                 "leaves" => SkipRendering::Leaves,
+                 "liquid" => SkipRendering::Liquid,
+                 "mangrove_roots" => SkipRendering::MangroveRoots,
++                "connected_glass" => SkipRendering::ConnectedGlass,
++                "cutout_window" => SkipRendering::CutoutWindow,
++                "translucent_window" => SkipRendering::TranslucentWindow,
++                "connected_pane" => SkipRendering::ConnectedPane,
+                 _ => return Err("unrecognized render rule"),
+             };
+             Ok((
+diff --git a/crates/horizon-mods/src/content.rs b/crates/horizon-mods/src/content.rs
+--- a/crates/horizon-mods/src/content.rs
++++ b/crates/horizon-mods/src/content.rs
+@@ -93,6 +93,29 @@
+     /// `false`: the block occludes nothing, so its neighbours' faces are drawn and light passes
+     /// it (`BlockBehaviour.Properties.noOcclusion`); unset or `true`: as its template.
+     pub occludes: Option<bool>,
++    /// The block's pairwise face visibility rule; unset keeps the template's rule.
++    pub face_culling: Option<FaceCulling>,
++}
++
++/// Face culling for connected decorative glass and pane models.
++#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
++#[serde(rename_all = "snake_case")]
++pub enum FaceCulling {
++    ConnectedGlass,
++    CutoutWindow,
++    TranslucentWindow,
++    ConnectedPane,
++}
++
++impl FaceCulling {
++    pub fn name(self) -> &'static str {
++        match self {
++            Self::ConnectedGlass => "connected_glass",
++            Self::CutoutWindow => "cutout_window",
++            Self::TranslucentWindow => "translucent_window",
++            Self::ConnectedPane => "connected_pane",
++        }
++    }
+ }
+ 
+ /// Vanilla's `RenderShape`, by its constant's name: `MODEL` puts the block model in the chunk
+diff --git a/crates/horizon-world/src/block_render.rs b/crates/horizon-world/src/block_render.rs
+--- a/crates/horizon-world/src/block_render.rs
++++ b/crates/horizon-world/src/block_render.rs
+@@ -22,7 +22,20 @@
+     Leaves,
+     Liquid,
+     MangroveRoots,
+-}
++    ConnectedGlass,
++    CutoutWindow,
++    TranslucentWindow,
++    ConnectedPane,
++}
++impl SkipRendering {
++    fn connected_full_block(self) -> bool {
++        matches!(
++            self,
++            Self::ConnectedGlass | Self::CutoutWindow | Self::TranslucentWindow
++        )
++    }
++}
++
+ #[derive(Clone, Copy, Debug)]
+ pub struct RenderDefinition {
+     pub skip: SkipRendering,
+@@ -154,7 +167,13 @@
+             .copied()
+             .ok_or_else(|| invalid("unknown render state ID"))
+     }
+-    fn skips(a: State, b: State, direction: Direction, cutout_leaves: bool) -> bool {
++    fn skips(
++        a: State,
++        b: State,
++        direction: Direction,
++        cutout_leaves: bool,
++        same_state: bool,
++    ) -> bool {
+         let vertical = matches!(direction, Direction::Down | Direction::Up);
+         let bit = 1 << direction as u8;
+         let opposite = 1 << direction.opposite() as u8;
+@@ -164,6 +183,15 @@
+             SkipRendering::Leaves => !cutout_leaves && b.definition.skip == SkipRendering::Leaves,
+             SkipRendering::Liquid => a.fluid.same_family(b.fluid),
+             SkipRendering::MangroveRoots => a.block == b.block && vertical,
++            SkipRendering::ConnectedGlass => b.definition.skip.connected_full_block(),
++            SkipRendering::CutoutWindow => {
++                a.block == b.block || (!vertical && b.definition.skip.connected_full_block())
++            }
++            SkipRendering::TranslucentWindow => a.block == b.block,
++            SkipRendering::ConnectedPane if vertical => same_state,
++            SkipRendering::ConnectedPane => {
++                a.block == b.block && a.connections & bit != 0 && b.connections & opposite != 0
++            }
+             SkipRendering::Bars => {
+                 (a.block == b.block
+                     || (a.definition.bars_tag
+@@ -195,8 +223,15 @@
+             self.state(neighbor)?,
+             direction,
+             cutout_leaves,
++            state == neighbor,
+         ))
+     }
++    pub fn uses_state_sensitive_pane_culling(&self, state: BlockStateId) -> bool {
++        self.states
++            .get(state.0 as usize)
++            .is_some_and(|state| state.definition.skip == SkipRendering::ConnectedPane)
++    }
++
+     pub fn should_render_face(
+         &mut self,
+         state: BlockStateId,
+@@ -207,7 +242,7 @@
+         let a = self.state(state)?;
+         let b = self.state(neighbor)?;
+         let neighbor_face = b.faces[direction.opposite() as usize];
+-        if neighbor_face == 1 || Self::skips(a, b, direction, cutout_leaves) {
++        if neighbor_face == 1 || Self::skips(a, b, direction, cutout_leaves, state == neighbor) {
+             return Ok(false);
+         }
+         let own_face = a.faces[direction as usize];

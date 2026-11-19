@@ -1,0 +1,56 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..86709fd 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.intermediateCraftingRecipes")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..a6dd931 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -29,6 +29,39 @@ import net.minecraft.world.level.block.RedstoneLampBlock;
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++    public static void intermediateCraftingRecipes(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        for (String example : java.util.List.of(
++            "crafting/materials/electron_tube;1;2;create:polished_rose_quartz,create:iron_sheet",
++            "crafting/materials/transmitter;3;3;_,minecraft:lightning_rod,_,create:copper_sheet,create:copper_sheet,create:copper_sheet,_,minecraft:redstone,_",
++            "crafting/materials/rose_quartz;3;3;minecraft:redstone,minecraft:redstone,minecraft:redstone,minecraft:redstone,minecraft:quartz,minecraft:redstone,minecraft:redstone,minecraft:redstone,minecraft:redstone",
++            "crafting/materials/sand_paper;2;1;minecraft:paper,minecraft:sand",
++            "crafting/materials/red_sand_paper;2;1;minecraft:paper,minecraft:red_sand",
++            "crafting/materials/andesite_alloy;2;2;minecraft:iron_nugget,minecraft:andesite,minecraft:andesite,minecraft:iron_nugget"
++        )) {
++            String[] fields = example.split(";");
++            var items = new java.util.ArrayList<net.minecraft.world.item.ItemStack>();
++            for (String cell : fields[3].split(","))
++                items.add(cell.equals("_") ? net.minecraft.world.item.ItemStack.EMPTY :
++                    new net.minecraft.world.item.ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
++                        net.minecraft.resources.ResourceLocation.parse(cell))));
++            var input = net.minecraft.world.item.crafting.CraftingInput.of(
++                Integer.parseInt(fields[1]), Integer.parseInt(fields[2]), items);
++            var match = level.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level)
++                .orElseThrow(() -> new IllegalStateException("No original recipe for " + fields[0]));
++            helper.assertTrue(match.id().toString().equals("create:" + fields[0]), "Wrong recipe for " + example + ": " + match.id());
++            var out = match.value().assemble(input, level.registryAccess());
++            var leftovers = match.value().getRemainingItems(input).stream().filter(stack -> !stack.isEmpty())
++                .map(stack -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()) + ":" + stack.getCount())
++                .sorted().toList();
++            System.out.printf(java.util.Locale.ROOT, "CREATE_INTERMEDIATE_CRAFT %s;%s;%d;%s%n", example,
++                net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(out.getItem()), out.getCount(),
++                String.join(",", leftovers));
++        }
++        helper.succeed();
++    }
++
+ 	@GameTest(template = "schematicannon", timeoutTicks = FIFTEEN_SECONDS)
+ 	public static void schematicannon(CreateGameTestHelper helper) {
+ 		// load the structure

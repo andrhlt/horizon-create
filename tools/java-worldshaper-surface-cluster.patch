@@ -1,0 +1,93 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..13cbb3a 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.worldshaperSurfaceCluster"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..37283c7 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,74 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void worldshaperSurfaceCluster(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		helper.runAtTickTime(4, () -> {
++			for (int scenario = 0; scenario < 2; scenario++) {
++				var target = new BlockPos(-12, 112, -9);
++				level.setChunkForced(target.getX() >> 4, target.getZ() >> 4, true);
++				for (BlockPos d : BlockPos.betweenClosed(-6, -5, -6, 6, 6, 6))
++					level.setBlock(target.offset(d), Blocks.AIR.defaultBlockState(), 2);
++				var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++				var stack = com.simibubi.create.AllItems.WORLDSHAPER.asStack();
++				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack);
++				player.setPos(target.getX() + .5, target.getY() - .3, target.getZ() + 3.5);
++				player.setYRot(180);
++				player.setXRot(25);
++				level.setBlock(target, Blocks.GOLD_BLOCK.defaultBlockState(), 2);
++				boolean selected = com.simibubi.create.content.equipment.zapper.ZapperInteractionHandler.trySelect(stack, player);
++				level.setBlock(target, Blocks.STONE.defaultBlockState(), 2);
++				var brush = scenario == 0 ? com.simibubi.create.content.equipment.zapper.terrainzapper.TerrainBrushes.Surface
++					: com.simibubi.create.content.equipment.zapper.terrainzapper.TerrainBrushes.Cluster;
++				var tool = scenario == 0 ? com.simibubi.create.content.equipment.zapper.terrainzapper.TerrainTools.Overlay
++					: com.simibubi.create.content.equipment.zapper.terrainzapper.TerrainTools.Clear;
++				if (scenario == 0) {
++					for (int x = -2; x <= 2; x++) for (int y = -2; y <= 2; y++)
++						level.setBlock(target.offset(x, y, 0), Blocks.STONE.defaultBlockState(), 2);
++					level.setBlock(target.offset(1, 0, 0), Blocks.DIRT.defaultBlockState(), 2);
++					level.setBlock(target.offset(-1, 0, 1), Blocks.OBSIDIAN.defaultBlockState(), 2);
++				} else {
++					level.setBlock(target.offset(-1, 1, 0), Blocks.STONE.defaultBlockState(), 2);
++					level.setBlock(target.offset(-2, 2, 0), Blocks.STONE.defaultBlockState(), 2);
++					level.setBlock(target.offset(1, -1, 0), Blocks.DIRT.defaultBlockState(), 2);
++					level.setBlock(target.offset(2, -2, 0), Blocks.STONE.defaultBlockState(), 2);
++					level.setBlock(target.offset(0, 0, -1), Blocks.BEDROCK.defaultBlockState(), 2);
++					level.setBlock(target.offset(0, 0, -2), Blocks.STONE.defaultBlockState(), 2);
++				}
++				com.simibubi.create.content.equipment.zapper.terrainzapper.WorldshaperItem.configureSettings(stack,
++					com.simibubi.create.content.equipment.zapper.PlacementPatterns.Solid, brush,
++					4, scenario == 0 ? 1 : 0, scenario == 0 ? 1 : 0, tool,
++					com.simibubi.create.content.equipment.zapper.terrainzapper.PlacementOptions.Merged);
++				var eye = player.position().add(0, player.getEyeHeight(), 0);
++				var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, eye.add(player.getLookAngle().scale(128)),
++					net.minecraft.world.level.ClipContext.Block.OUTLINE, net.minecraft.world.level.ClipContext.Fluid.NONE, player));
++				var before = new java.util.HashMap<BlockPos, net.minecraft.world.level.block.state.BlockState>();
++				for (BlockPos d : BlockPos.betweenClosed(-5, -5, -5, 5, 5, 5)) {
++					var p = target.offset(d); before.put(p, level.getBlockState(p));
++				}
++				var result = com.simibubi.create.AllItems.WORLDSHAPER.get().use(level, player, net.minecraft.world.InteractionHand.MAIN_HAND);
++				var changed = new java.util.ArrayList<String>();
++				for (int x = -5; x <= 5; x++) for (int y = -5; y <= 5; y++) for (int z = -5; z <= 5; z++) {
++					var p = target.offset(x, y, z); var old = before.get(p); var now = level.getBlockState(p);
++					if (old != now) changed.add(x + ":" + y + ":" + z + ":" + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(old.getBlock()) + ">" + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(now.getBlock()));
++				}
++				if (!selected || !hit.getBlockPos().equals(target) || hit.getDirection() != net.minecraft.core.Direction.SOUTH
++					|| result.getResult() != net.minecraft.world.InteractionResult.SUCCESS
++					|| changed.size() != (scenario == 0 ? 23 : 5))
++					throw new IllegalStateException("Unexpected Worldshaper result: " + brush + " " + hit + " " + changed);
++				if (scenario == 0 && (!level.getBlockState(target.offset(1, 0, 1)).isAir()
++					|| !level.getBlockState(target.offset(-1, 0, 1)).is(Blocks.OBSIDIAN)))
++					throw new IllegalStateException("Surface overwrote an excluded cell");
++				if (scenario == 1 && (!level.getBlockState(target.offset(0, 0, -1)).is(Blocks.BEDROCK)
++					|| !level.getBlockState(target.offset(0, 0, -2)).is(Blocks.STONE)))
++					throw new IllegalStateException("Cluster crossed an unbreakable barrier");
++				System.out.printf("CREATE_WORLDSHAPER_DYNAMIC,%s,%s,%d:%d:%d,%s,%s,%s,%d,%s%n",
++					brush, tool, hit.getBlockPos().getX() - target.getX(), hit.getBlockPos().getY() - target.getY(), hit.getBlockPos().getZ() - target.getZ(),
++					hit.getDirection(), selected, result.getResult(), changed.size(), String.join("|", changed));
++			}
++			helper.succeed();
++		});
++	}
++
+ }

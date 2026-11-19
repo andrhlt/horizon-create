@@ -1,0 +1,134 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..47b2256de 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().startsWith("TestMisc.paletteWindows"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..355d5446b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,115 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 32)
++    public static void paletteWindows(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var pos = helper.absolutePos(new BlockPos(1, 2, 1)).above(8);
++        var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++        var names = java.util.List.of("tiled_glass", "framed_glass", "horizontal_framed_glass",
++            "vertical_framed_glass", "oak_window", "spruce_window", "birch_window", "jungle_window",
++            "acacia_window", "dark_oak_window", "mangrove_window", "crimson_window", "warped_window",
++            "cherry_window", "bamboo_window", "ornate_iron_window", "industrial_iron_window",
++            "weathered_iron_window");
++        helper.runAtTickTime(4, () -> {
++            for (var family : names) {
++                for (var id : java.util.List.of(family, family + "_pane")) {
++                    var block = registry.get(com.simibubi.create.Create.asResource(id));
++                    var state = block.defaultBlockState();
++                    helper.assertTrue(block != Blocks.AIR, "Unknown window " + id);
++                    world.setBlockAndUpdate(pos, state);
++                    System.out.printf("CREATE_WINDOW %s;%s;%.3f;%.3f;%d;%d;%s;%s%n", id,
++                        state, state.getDestroySpeed(world, pos), block.getExplosionResistance(),
++                        state.getMapColor(world, pos).id, state.getLightBlock(world, pos),
++                        state.propagatesSkylightDown(world, pos), state.canOcclude());
++                    world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++                }
++            }
++            var primary = registry.get(com.simibubi.create.Create.asResource("oak_window_pane"));
++            var adjacent = new net.minecraft.world.level.block.Block[] {Blocks.AIR, Blocks.GLASS_PANE,
++                primary, registry.get(com.simibubi.create.Create.asResource("framed_glass_pane")),
++                Blocks.IRON_BARS, Blocks.STONE, Blocks.GLASS, Blocks.OAK_FENCE};
++            for (var other : adjacent) {
++                world.setBlockAndUpdate(pos.east(), Blocks.AIR.defaultBlockState());
++                world.setBlockAndUpdate(pos, primary.defaultBlockState());
++                world.setBlockAndUpdate(pos.east(), other.defaultBlockState());
++                System.out.printf("CREATE_WINDOW_NEIGHBOR %s;%s%n",
++                    registry.getKey(other), world.getBlockState(pos));
++            }
++            world.setBlockAndUpdate(pos.east(), Blocks.AIR.defaultBlockState());
++            world.setBlockAndUpdate(pos, primary.defaultBlockState());
++            var paneState = world.getBlockState(pos);
++            var water = net.minecraft.world.level.material.Fluids.WATER.getSource(false);
++            var liquid = (net.minecraft.world.level.block.LiquidBlockContainer) primary;
++            helper.assertTrue(liquid.placeLiquid(world, pos, paneState, water), "Pane refused water");
++            System.out.printf("CREATE_WINDOW_WATER %s;%s%n",
++                world.getBlockState(pos), world.getFluidState(pos).isSource());
++            helper.succeed();
++        });
++    }
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 72)
++    public static void paletteWindowsRecycling(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var center = helper.absolutePos(new BlockPos(1, 2, 1)).above(12);
++        var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++        var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++        var families = java.util.List.of("tiled_glass", "framed_glass", "horizontal_framed_glass",
++            "vertical_framed_glass");
++        var positions = new java.util.LinkedHashMap<String, BlockPos>();
++        for (var family : families)
++            for (var suffix : java.util.List.of("", "_pane"))
++                positions.put(family + suffix, center.offset((positions.size() % 4) * 2, 0, (positions.size() / 4) * 2));
++        var silk = world.registryAccess()
++            .registryOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT)
++            .getHolderOrThrow(net.minecraft.world.item.enchantment.Enchantments.SILK_TOUCH);
++        var plainPick = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND_PICKAXE);
++        var silkPick = plainPick.copy();
++        silkPick.enchant(silk, 1);
++        java.util.function.IntConsumer capture = tick -> {
++            for (var entry : positions.entrySet()) {
++                var at = entry.getValue();
++                var furnace = (net.minecraft.world.level.block.entity.FurnaceBlockEntity) world.getBlockEntity(at);
++                var nbt = furnace.saveWithoutMetadata(world.registryAccess());
++                var input = furnace.getItem(0);
++                var output = furnace.getItem(2);
++                System.out.printf("CREATE_WINDOW_FURNACE %d;%s;%d;%d;%d;%s;%d;%s;%d%n", tick,
++                    entry.getKey(), nbt.getShort("CookTime"), nbt.getShort("CookTimeTotal"),
++                    nbt.getShort("BurnTime"),
++                    world.getBlockState(at).getValue(net.minecraft.world.level.block.AbstractFurnaceBlock.LIT),
++                    input.getCount(), items.getKey(output.getItem()), output.getCount());
++            }
++        };
++        helper.runAtTickTime(4, () -> {
++            var lootNames = new java.util.ArrayList<>(positions.keySet());
++            lootNames.addAll(java.util.List.of("oak_window", "oak_window_pane", "weathered_iron_window",
++                "weathered_iron_window_pane"));
++            var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++            for (var name : lootNames) {
++                var state = registry.get(com.simibubi.create.Create.asResource(name)).defaultBlockState();
++                for (var tool : java.util.List.of(plainPick, silkPick)) {
++                    var drops = net.minecraft.world.level.block.Block.getDrops(state, world, center, null, player, tool);
++                    var contents = drops.stream().map(stack -> items.getKey(stack.getItem()) + "=" + stack.getCount())
++                        .sorted().collect(java.util.stream.Collectors.joining("|"));
++                    System.out.printf("CREATE_WINDOW_LOOT %s;%s;%s%n", name, tool == silkPick, contents);
++                }
++            }
++            for (var entry : positions.entrySet()) {
++                var at = entry.getValue();
++                world.setBlockAndUpdate(at, Blocks.FURNACE.defaultBlockState());
++                var furnace = (net.minecraft.world.level.block.entity.FurnaceBlockEntity) world.getBlockEntity(at);
++                furnace.setItem(0, new net.minecraft.world.item.ItemStack(items.get(com.simibubi.create.Create.asResource(entry.getKey()))));
++                furnace.setItem(1, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.COAL));
++            }
++            capture.accept(0);
++        });
++        for (int index = 1; index <= 52; index++) {
++            int tick = index;
++            helper.runAtTickTime(4 + index, () -> {
++                capture.accept(tick);
++                if (tick == 52) helper.succeed();
++            });
++        }
++    }
+ }

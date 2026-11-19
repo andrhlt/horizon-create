@@ -1,0 +1,13 @@
+yaw,scenario,block,facing,waterlogged
+0,0,create:weighted_ejector,north,false
+0,1,create:weighted_ejector,north,true
+0,2,create:weighted_ejector,north,false
+90,0,create:weighted_ejector,east,false
+90,1,create:weighted_ejector,east,true
+90,2,create:weighted_ejector,east,false
+180,0,create:weighted_ejector,south,false
+180,1,create:weighted_ejector,south,true
+180,2,create:weighted_ejector,south,false
+270,0,create:weighted_ejector,west,false
+270,1,create:weighted_ejector,west,true
+270,2,create:weighted_ejector,west,false

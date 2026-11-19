@@ -1,0 +1,6 @@
+{
+  "template": "minecraft:andesite",
+  "properties": {
+    "requires_tool": true
+  }
+}

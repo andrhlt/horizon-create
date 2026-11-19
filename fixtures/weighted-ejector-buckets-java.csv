@@ -1,0 +1,14 @@
+tick,block,waterlogged,dispenser_item,east_block,east_level
+0,create:weighted_ejector,false,minecraft:water_bucket,minecraft:air,absent
+1,create:weighted_ejector,false,minecraft:water_bucket,minecraft:air,absent
+2,create:weighted_ejector,false,minecraft:water_bucket,minecraft:air,absent
+3,create:weighted_ejector,false,minecraft:water_bucket,minecraft:air,absent
+4,create:weighted_ejector,true,minecraft:bucket,minecraft:air,absent
+5,create:weighted_ejector,true,minecraft:bucket,minecraft:air,absent
+6,create:weighted_ejector,true,minecraft:bucket,minecraft:air,absent
+7,create:weighted_ejector,true,minecraft:bucket,minecraft:air,absent
+8,create:weighted_ejector,true,minecraft:bucket,minecraft:air,absent
+9,create:weighted_ejector,true,minecraft:bucket,minecraft:water,1
+10,create:weighted_ejector,false,minecraft:water_bucket,minecraft:water,1
+11,create:weighted_ejector,false,minecraft:water_bucket,minecraft:water,1
+12,create:weighted_ejector,false,minecraft:water_bucket,minecraft:water,1

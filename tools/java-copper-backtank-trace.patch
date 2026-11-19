@@ -1,0 +1,72 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -29,6 +29,69 @@
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 80)
++	public static void copperBacktank(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var manager = level.getRecipeManager();
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		for (String recipe : java.util.List.of(
++			"copper_backtank;3;3;create:andesite_alloy,create:shaft,create:andesite_alloy,minecraft:copper_ingot,minecraft:copper_block,minecraft:copper_ingot,_,minecraft:copper_ingot,_",
++			"copper_diving_helmet;3;2;minecraft:copper_ingot,minecraft:copper_ingot,minecraft:copper_ingot,minecraft:copper_ingot,minecraft:glass,minecraft:copper_ingot",
++			"copper_diving_boots;3;3;minecraft:copper_ingot,_,minecraft:copper_ingot,minecraft:copper_ingot,_,minecraft:copper_ingot,create:andesite_alloy,_,create:andesite_alloy")) {
++			var parts = recipe.split(";");
++			var input = net.minecraft.world.item.crafting.CraftingInput.of(Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
++				java.util.Arrays.stream(parts[3].split(",")).map(name -> name.equals("_") ? ItemStack.EMPTY :
++					new ItemStack(items.get(net.minecraft.resources.ResourceLocation.parse(name)))).toList());
++			var match = manager.getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level).orElseThrow();
++			helper.assertTrue(match.id().toString().equals("create:crafting/appliances/" + parts[0]), "Wrong gear recipe: " + match.id());
++			var output = match.value().assemble(input, level.registryAccess());
++			System.out.printf("CREATE_BACKTANK_CRAFT crafting/appliances/%s;%s;%s;%s;%s;%d;%n",
++				parts[0], parts[1], parts[2], parts[3], items.getKey(output.getItem()), output.getCount());
++		}
++		var blocks = com.simibubi.create.AllBlocks.COPPER_BACKTANK.getDefaultState();
++		var sourceState = com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState()
++			.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING, net.minecraft.core.Direction.DOWN);
++		var tanks = new BlockPos[3];
++		int[] rates = {16, 256, 256};
++		int[] startAir = {0, 883, 31};
++		for (int lane = 0; lane < tanks.length; lane++) {
++			var at = tanks[lane] = helper.absolutePos(new BlockPos(2 + lane * 3, 15, 2));
++			level.setBlockAndUpdate(at, blocks.setValue(
++				net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED, lane == 2));
++			var tank = (com.simibubi.create.content.equipment.armor.BacktankBlockEntity) level.getBlockEntity(at);
++			tank.setAirLevel(startAir[lane]);
++			level.setBlockAndUpdate(at.above(), sourceState);
++			((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity)
++				level.getBlockEntity(at.above())).generatedSpeed.setValue(rates[lane]);
++		}
++		for (int tick = 0; tick <= 35; tick++) {
++			int t = tick;
++			Runnable sample = () -> {
++				for (int lane = 0; lane < tanks.length; lane++) {
++					var tank = (com.simibubi.create.content.equipment.armor.BacktankBlockEntity) level.getBlockEntity(tanks[lane]);
++					System.out.printf(java.util.Locale.ROOT, "CREATE_BACKTANK_TICK %d,%d,%.3f,%d,%d,%d%n",
++						t, lane, tank.getSpeed(), tank.airLevel, tank.airLevelTimer, tank.getComparatorOutput());
++				}
++				if (t == 9)
++					level.removeBlock(tanks[0].above(), false);
++				if (t == 14) {
++					level.setBlockAndUpdate(tanks[0].above(), sourceState);
++					((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity)
++						level.getBlockEntity(tanks[0].above())).generatedSpeed.setValue(64);
++				}
++				if (t == 35) {
++					helper.assertTrue(((com.simibubi.create.content.equipment.armor.BacktankBlockEntity) level.getBlockEntity(tanks[1])).airLevel == 900, "Full tank");
++					helper.assertTrue(((com.simibubi.create.content.equipment.armor.BacktankBlockEntity) level.getBlockEntity(tanks[2])).airLevel == 31, "Wet tank charged");
++					helper.succeed();
++				}
++			};
++			if (t == 0)
++				sample.run();
++			else
++				helper.runAfterDelay(t, sample);
++		}
++	}
+ 	@GameTest(template = "schematicannon", timeoutTicks = FIFTEEN_SECONDS)
+ 	public static void schematicannon(CreateGameTestHelper helper) {
+ 		// load the structure

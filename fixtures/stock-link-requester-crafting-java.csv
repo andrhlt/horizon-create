@@ -1,0 +1,2 @@
+recipe,width,height,slots,output,count,remainder
+crafting/logistics/redstone_requester,1,3,"minecraft:redstone,create:stock_link,minecraft:iron_ingot",create:redstone_requester,1,

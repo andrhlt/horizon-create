@@ -1,0 +1,69 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..289e1ef 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.largeWaterwheel"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+index 4102b83..e15cb9f 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -16,6 +16,7 @@ import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
+ import com.simibubi.create.infrastructure.gametest.GameTestGroup;
+ 
+ import net.minecraft.core.BlockPos;
++import net.minecraft.util.Mth;
+ import net.minecraft.core.Holder;
+ import net.minecraft.core.registries.BuiltInRegistries;
+ import net.minecraft.gametest.framework.GameTest;
+@@ -193,6 +194,33 @@ public class TestFluids {
+ 		BlockPos stressometer = wheel.south();
+ 		helper.pullLever(openLever);
+ 		helper.succeedWhen(() -> {
++			if (expectedRpm == 4) {
++				var source = helper.getBlockEntity(AllBlockEntityTypes.LARGE_WATER_WHEEL.get(), wheel);
++				var speed = helper.getBlockEntity(AllBlockEntityTypes.SPEEDOMETER.get(), speedometer);
++				var stress = helper.getBlockEntity(AllBlockEntityTypes.STRESSOMETER.get(), stressometer);
++				var left = helper.getBlockState(leftEnd);
++				var right = helper.getBlockState(rightEnd);
++				System.out.printf(java.util.Locale.ROOT, "CREATE_WHEEL %d %b %d %d %b %b %d %.1f %.1f %.1f %.1f%n",
++					helper.getTick(), helper.getBlockState(leftLever).getValue(LeverBlock.POWERED),
++					left.is(Blocks.WATER) ? left.getValue(net.minecraft.world.level.block.LiquidBlock.LEVEL) : -1,
++					right.is(Blocks.WATER) ? right.getValue(net.minecraft.world.level.block.LiquidBlock.LEVEL) : -1,
++					helper.getBlockState(edges.get(0)).is(Blocks.WATER),
++					helper.getBlockState(edges.get(1)).is(Blocks.WATER),
++					source.flowScore, source.getSpeed(), speed.getSpeed(),
++					stress.getNetworkCapacity(), stress.getNetworkStress());
++				var pos = helper.absolutePos(wheel);
++				int sum = pos.getX() + pos.getY();
++				float phase = sum % 2 == 0 ? 22.5f : 0f;
++				long time = helper.getLevel().getGameTime();
++				float angle = ((time + .5f) * source.getSpeed() * 3f / 10 + phase) % 360;
++				System.out.printf(java.util.Locale.ROOT,
++					"CREATE_WHEEL_VISUAL %d %d %.1f %.1f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f%n",
++					helper.getTick(), time, phase, source.getSpeed(), angle,
++					speed.dialTarget, speed.prevDialState, speed.dialState,
++					-90f * Mth.lerp(.5f, speed.prevDialState, speed.dialState),
++					stress.dialTarget, stress.dialState,
++					-90f * Mth.lerp(.5f, stress.prevDialState, stress.dialState));
++			}
+ 			// must always be true
+ 			edges.forEach(pos -> helper.assertBlockNotPresent(Blocks.WATER, pos));
+ 			helper.assertBlockPresent(Blocks.WATER, rightEnd);
+@@ -211,6 +239,8 @@ public class TestFluids {
+ 				// 1-sided flow, should be spinning
+ 				helper.assertSpeedometerSpeed(speedometer, expectedRpm);
+ 				helper.assertStressometerCapacity(stressometer, expectedSU);
++				if (expectedRpm == 4)
++					helper.assertTrue(helper.getTick() >= 68, "Sampling the running wheel");
+ 			}
+ 		});
+ 	}

@@ -1,0 +1,52 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -501,6 +501,49 @@
+ 			tick, update.getUUID("LastEdit"), written, update.getCompound("components"));
+ 	}
+ 
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void chainConveyorClipboardLink(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var source = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		var target = source.east(3);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var actor = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var stack = AllBlocks.CLIPBOARD.asStack();
++		actor.setItemInHand(hand, stack);
++		for (var pos : java.util.List.of(source, target)) {
++			level.setBlockAndUpdate(pos.below(), Blocks.STONE.defaultBlockState());
++			level.setBlockAndUpdate(pos, AllBlocks.REDSTONE_LINK.getDefaultState()
++				.setValue(com.simibubi.create.content.redstone.link.RedstoneLinkBlock.FACING, Direction.UP));
++		}
++		helper.runAtTickTime(6, () -> {
++			var type = com.simibubi.create.content.redstone.link.LinkBehaviour.TYPE;
++			var sender = ((com.simibubi.create.foundation.blockEntity.SmartBlockEntity) level.getBlockEntity(source))
++				.getBehaviour(type);
++			var receiver = ((com.simibubi.create.foundation.blockEntity.SmartBlockEntity) level.getBlockEntity(target))
++				.getBehaviour(type);
++			var named = new ItemStack(Items.RED_DYE);
++			named.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal("Workshop"));
++			sender.setFrequency(true, named);
++			sender.setFrequency(false, ItemStack.EMPTY);
++			receiver.setFrequency(true, new ItemStack(Items.IRON_INGOT));
++			receiver.setFrequency(false, new ItemStack(Items.GOLD_INGOT));
++			var registries = level.registryAccess();
++			var hit = new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(source), Direction.UP, source, false);
++			var copy = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock(actor, hand, source, hit);
++			com.simibubi.create.content.equipment.clipboard.ClipboardValueSettingsHandler.rightClickToCopy(copy);
++			System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_LINK copy|%b|%s%n", copy.isCanceled(), stack.save(registries));
++			var before = new net.minecraft.nbt.CompoundTag();
++			receiver.writeToClipboard(registries, before, Direction.UP);
++			var paste = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(actor, target, Direction.UP,
++				net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
++			com.simibubi.create.content.equipment.clipboard.ClipboardValueSettingsHandler.leftClickToPaste(paste);
++			var after = new net.minecraft.nbt.CompoundTag();
++			receiver.writeToClipboard(registries, after, Direction.UP);
++			System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_LINK paste|%b|%s|%s%n", paste.isCanceled(), before, after);
++			helper.succeed();
++		});
++	}
++
+ 	private static void runChainConveyor(CreateGameTestHelper helper, String scenario, BlockPos edge, boolean reverse) {
+ 		var world = helper.getLevel();
+ 		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);

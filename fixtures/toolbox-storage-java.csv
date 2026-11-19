@@ -1,0 +1,11 @@
+action,transferred_or_remainder,slots,signal,first_eight_slots
+empty,0,32,0,_|_|_|_|_|_|_|_
+insert_first,0,32,1,minecraft:cobblestone=64|_|_|_|_|_|_|_
+reject_wrong_compartment,15,32,1,minecraft:cobblestone=64|_|_|_|_|_|_|_
+settle_gap,0,32,1,minecraft:cobblestone=64|minecraft:cobblestone=51|_|_|_|_|_|_
+take_high_slots_first,75,32,1,minecraft:cobblestone=40|_|_|_|_|_|_|_
+depleted,40,32,0,_|_|_|_|_|_|_|_
+remember_filter,1,32,0,_|_|_|_|_|_|_|_
+limited_rejects_empty,7,32,0,_|_|_|_|_|_|_|_
+new_compartment,0,32,1,_|_|_|_|minecraft:dirt=7|_|_|_
+reject_toolbox,1,32,1,_|_|_|_|minecraft:dirt=7|_|_|_

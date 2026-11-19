@@ -1,0 +1,25 @@
+--- a/crates/horizon-client-render/src/audio.rs
++++ b/crates/horizon-client-render/src/audio.rs
+@@ -1453,8 +1453,12 @@
+                 (None, false)
+             }
+         };
++        // Muted fixtures exercise event resolution and playback hooks without an output stream.
++        let process_muted_audio = output
++            && std::env::var_os("HORIZON_NO_AUDIO").is_some()
++            && std::env::var_os("HORIZON_CREATE_TEST_AUDIO").is_some();
+         let mut engine = SoundEngine::new(registry);
+-        engine.loaded = live;
++        engine.loaded = live || process_muted_audio;
+         #[cfg(feature = "audio")]
+         let cards = if live { card_fingerprint() } else { None };
+         // Where the cards gate the list (Linux, macOS), it starts empty: opening the
+@@ -1476,7 +1480,7 @@
+                 cache: Arc::default(),
+                 decoder: None,
+                 next: 0,
+-                live,
++                live: live || process_muted_audio,
+                 owner: 0,
+                 world: 0,
+                 shares: Arc::default(),

@@ -1,0 +1,36 @@
+diff --git a/crates/horizon-client/src/game/remote.rs b/crates/horizon-client/src/game/remote.rs
+--- a/crates/horizon-client/src/game/remote.rs
++++ b/crates/horizon-client/src/game/remote.rs
+@@ -6191,7 +6191,13 @@
+         }
+         Ok(())
+     }
++
++    // Native moving platforms can select a support face before vanilla travel
++    // and resolve contact against that face after travel.
++    fn begin_platform_player_motion(&self) {}
+ 
++    fn finish_platform_player_motion(&mut self, _jump: bool) {}
++
+     fn tick_remote_level(&mut self) -> Result<()> {
+         self.ticks += 1;
+         self.repro_tick();
+@@ -6313,6 +6319,7 @@
+         }
+         self.tick_subtitles();
+         self.tick_client_load();
++        self.begin_platform_player_motion();
+         let entity_collisions = self.player_entity_collisions();
+         // Those added before it tick before it: their pushes reach this move.
+         let pushed = pushed_after.add_vector(self.remote_pushes(true));
+@@ -6493,6 +6500,10 @@
+                 passenger.passenger_block_effects_tick()?;
+             }
+         }
++        self.finish_platform_player_motion(keys.jump);
++        let Some(player) = self.player.as_mut() else {
++            return Ok(());
++        };
+         // The server decides fire the window cannot predict (blaze fireballs,
+         // fire aspect, lightning): Entity.isOnFire reads the synched flag, so
+         // the predicted tick's countdown must not end it while it is set.

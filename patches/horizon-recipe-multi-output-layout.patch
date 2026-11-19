@@ -1,0 +1,88 @@
+diff --git a/crates/horizon-client/src/game/native_hooks.rs b/crates/horizon-client/src/game/native_hooks.rs
+index 0f4a93c..0d18426 100644
+--- a/crates/horizon-client/src/game/native_hooks.rs
++++ b/crates/horizon-client/src/game/native_hooks.rs
+@@ -1767,6 +1767,10 @@ pub(crate) enum NativeRecipeLayout {
+     Cooking,
+     /// One input, an arrow and the result (the stonecutter).
+     Single,
++    /// One input and simultaneous outputs. Extra `slots` after the input are
++    /// outputs; `results` is the last output. `note` holds a `|`-separated
++    /// chance label for each output in order.
++    Processing,
+     /// Template, base and addition, an arrow and the result.
+     Smithing,
+     /// A potion and an ingredient, an arrow and the result.
+diff --git a/crates/horizon-client/src/game/native_panel_recipes.rs b/crates/horizon-client/src/game/native_panel_recipes.rs
+index 2f22197..7116d93 100644
+--- a/crates/horizon-client/src/game/native_panel_recipes.rs
++++ b/crates/horizon-client/src/game/native_panel_recipes.rs
+@@ -255,6 +255,10 @@ impl Shown {
+                 vec![(0.0, 0.0)],
+             ),
+             BrowserLayout::Single => ((SLOT, SLOT), row(1)),
++            BrowserLayout::Processing => {
++                let h = self.slots.len().saturating_sub(1) as f32 * (SLOT + 6.0);
++                ((SLOT, h), vec![(0.0, ((h - SLOT) / 2.0).floor())])
++            }
+             BrowserLayout::Smithing => ((3.0 * SLOT, SLOT), row(3)),
+             BrowserLayout::Brewing => ((2.0 * SLOT, SLOT), row(2)),
+         }
+@@ -269,7 +273,11 @@ impl Shown {
+         }
+     }
+     fn height(&self, room: f32) -> f32 {
+-        let note = if self.note.is_empty() { 0.0 } else { 11.0 };
++        let note = if self.note.is_empty() || self.layout == BrowserLayout::Processing {
++            0.0
++        } else {
++            11.0
++        };
+         self.block(room) + note + GAP
+     }
+     /// Every slot's place from the recipe's corner (the result last), the
+@@ -277,6 +285,12 @@ impl Shown {
+     /// when the panel is `room` wide and that doesn't fit.
+     fn places(&self, room: f32) -> (Vec<(f32, f32)>, (f32, f32), (f32, f32)) {
+         let ((w, h), mut at) = self.inputs();
++        if self.layout == BrowserLayout::Processing {
++            for i in 0..self.slots.len().saturating_sub(1) {
++                at.push((w + 32.0, i as f32 * (SLOT + 6.0)));
++            }
++            return (at, (w + 4.0, ((h - 16.0) / 2.0).floor()), (0.0, 0.0));
++        }
+         // The mod's slots beyond the layout's are not shown.
+         at.truncate(self.slots.len() - 1);
+         let arrow = (w + 4.0, ((h - 16.0) / 2.0).floor());
+@@ -540,7 +554,30 @@ impl Game<'_> {
+                 batch.text(atlas, "+", rect[0] + 3.0, rect[1] + 2.0, color, true);
+                 horizon_client::widgets::record(&format!("+ {i}"), rect, enabled);
+             }
+-            if !note.is_empty() {
++            if r.layout == BrowserLayout::Processing {
++                for (index, chance) in note.split('|').enumerate() {
++                    if let Some(&(sx, sy)) = at.get(index + 1) {
++                        batch.text(
++                            atlas,
++                            chance,
++                            x + sx + SLOT + 2.0,
++                            y + sy + 5.0,
++                            rgba(224, 224, 224, 255),
++                            true,
++                        );
++                        horizon_client::widgets::record(
++                            chance,
++                            [
++                                x + sx + SLOT + 2.0,
++                                y + sy + 5.0,
++                                HudBatch::text_width(atlas, chance),
++                                9.0,
++                            ],
++                            false,
++                        );
++                    }
++                }
++            } else if !note.is_empty() {
+                 batch.text(atlas, &note, x, y + h + 2.0, rgba(224, 224, 224, 255), true);
+             }
+             for (k, &(sx, sy)) in at.iter().enumerate().filter(|(_, p)| p.0.is_finite()) {

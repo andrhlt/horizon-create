@@ -1,0 +1,92 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..4758610 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.fluidValvePlacement")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..5802f01 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,75 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void fluidValvePlacement(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var support = new BlockPos(-12, 160, -9);
++		level.setChunkForced(support.getX() >> 4, support.getZ() >> 4, true);
++		for (var pos : BlockPos.betweenClosed(support.offset(-2,-1,-2), support.offset(2,3,2)))
++			level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
++		level.setBlock(support, Blocks.STONE.defaultBlockState(), 2);
++		var block = (com.simibubi.create.content.fluids.pipes.valve.FluidValveBlock) com.simibubi.create.AllBlocks.FLUID_VALVE.get();
++		var stack = com.simibubi.create.AllBlocks.FLUID_VALVE.asStack();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			new net.minecraft.world.phys.Vec3(support.getX() + .5, support.getY() + 1, support.getZ() + .5),
++			net.minecraft.core.Direction.UP, support, false);
++		for (int yaw : new int[]{0, 90, 180, 270})
++			for (int pitch : new int[]{-90, 0, 90})
++				for (boolean sneaking : new boolean[]{false, true}) {
++					player.setYRot(yaw); player.setYHeadRot(yaw); player.setXRot(pitch); player.setShiftKeyDown(sneaking);
++					var context = new net.minecraft.world.item.context.BlockPlaceContext(
++						player, net.minecraft.world.InteractionHand.MAIN_HAND, stack, hit);
++					var placed = block.getStateForPlacement(context);
++					System.out.printf("CREATE_FLUID_VALVE_PLACEMENT,%d,%d,%s,%s,%s,%s,%s,%s%n", yaw, pitch, sneaking,
++						placed.getValue(com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock.FACING),
++						placed.getValue(com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock.AXIS_ALONG_FIRST_COORDINATE),
++						com.simibubi.create.content.fluids.pipes.valve.FluidValveBlock.getPipeAxis(placed),
++						block.getRotationAxis(placed),
++						placed.getValue(com.simibubi.create.content.fluids.pipes.valve.FluidValveBlock.ENABLED));
++				}
++		var target = support.above();
++		for (String scenario : new String[]{"shaft_north", "shaft_east", "pipe_east", "glass_east_x",
++				"glass_east_z", "encased_east", "pump_east_west", "smart_pipe_east_west", "tank_east",
++				"cauldron_east", "shaft_north_pipe_south", "water_source", "water_flow"}) {
++			for (var side : net.minecraft.core.Direction.Plane.HORIZONTAL)
++				level.setBlock(target.relative(side), Blocks.AIR.defaultBlockState(), 2);
++			level.setBlock(target, Blocks.AIR.defaultBlockState(), 2);
++			switch (scenario) {
++				case "shaft_north", "shaft_north_pipe_south" -> level.setBlock(target.north(),
++					com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.Z), 2);
++				case "shaft_east" -> level.setBlock(target.east(),
++					com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 2);
++				case "pipe_east" -> level.setBlock(target.east(), com.simibubi.create.AllBlocks.FLUID_PIPE.getDefaultState(), 2);
++				case "glass_east_x", "glass_east_z" -> level.setBlock(target.east(),
++					com.simibubi.create.AllBlocks.GLASS_FLUID_PIPE.getDefaultState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS,
++						scenario.endsWith("_x") ? net.minecraft.core.Direction.Axis.X : net.minecraft.core.Direction.Axis.Z), 2);
++				case "encased_east" -> level.setBlock(target.east(), com.simibubi.create.AllBlocks.ENCASED_FLUID_PIPE.getDefaultState(), 2);
++				case "pump_east_west" -> level.setBlock(target.east(),
++					com.simibubi.create.AllBlocks.MECHANICAL_PUMP.getDefaultState().setValue(net.minecraft.world.level.block.DirectionalBlock.FACING, net.minecraft.core.Direction.WEST), 2);
++				case "smart_pipe_east_west" -> level.setBlock(target.east(),
++					com.simibubi.create.AllBlocks.SMART_FLUID_PIPE.getDefaultState().setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, net.minecraft.core.Direction.WEST), 2);
++				case "tank_east" -> level.setBlock(target.east(), com.simibubi.create.AllBlocks.FLUID_TANK.getDefaultState(), 2);
++				case "cauldron_east" -> level.setBlock(target.east(), Blocks.WATER_CAULDRON.defaultBlockState(), 2);
++				case "water_source" -> level.setBlock(target, Blocks.WATER.defaultBlockState(), 2);
++				case "water_flow" -> level.setBlock(target, Blocks.WATER.defaultBlockState().setValue(net.minecraft.world.level.block.LiquidBlock.LEVEL, 1), 2);
++			}
++			if (scenario.equals("shaft_north_pipe_south"))
++				level.setBlock(target.south(), com.simibubi.create.AllBlocks.FLUID_PIPE.getDefaultState(), 2);
++			for (int yaw : new int[]{0, 90}) {
++				player.setYRot(yaw); player.setYHeadRot(yaw); player.setXRot(90); player.setShiftKeyDown(false);
++				var context = new net.minecraft.world.item.context.BlockPlaceContext(
++					player, net.minecraft.world.InteractionHand.MAIN_HAND, stack, hit);
++				var placed = block.getStateForPlacement(context);
++				System.out.printf("CREATE_FLUID_VALVE_NEIGHBOR,%s,%d,%s,%s,%s%n", scenario, yaw,
++					placed.getValue(com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock.AXIS_ALONG_FIRST_COORDINATE),
++					com.simibubi.create.content.fluids.pipes.valve.FluidValveBlock.getPipeAxis(placed),
++					placed.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED));
++			}
++		}
++
++		helper.succeed();
++	}
+ }

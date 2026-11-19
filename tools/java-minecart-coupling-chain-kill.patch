@@ -1,0 +1,59 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..2d04283 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.couplingProbe"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..b51bf31 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,40 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++ @GameTest(template = "threshold_switch_pulley", timeoutTicks = 220)
++ public static void couplingProbe(CreateGameTestHelper h) {
++  var w=h.getLevel();for(int x=0;x<=2;x++)for(int z=0;z<=2;z++)w.setChunkForced(x,z,true);
++  var area=new net.minecraft.world.phys.AABB(4,168,20,20,176,28);
++  w.getEntitiesOfClass(net.minecraft.world.entity.vehicle.AbstractMinecart.class,area).forEach(e->e.discard());
++  w.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,area).forEach(e->e.discard());
++  var sh=net.minecraft.world.level.block.state.properties.BlockStateProperties.RAIL_SHAPE;
++  for(int x=4;x<=18;x++){w.setBlock(new BlockPos(x,169,24),Blocks.STONE.defaultBlockState(),2);w.setBlock(new BlockPos(x,170,24),Blocks.RAIL.defaultBlockState().setValue(sh,net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST),2);}
++  var carts=new net.minecraft.world.entity.vehicle.Minecart[3];
++  for(int i=0;i<3;i++){carts[i]=new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART,w);carts[i].setUUID(new java.util.UUID(0,1501+i));carts[i].setPos(8.5+3*i,170.0625,24.5);w.addFreshEntity(carts[i]);}
++  var player=h.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,com.simibubi.create.AllItems.MINECART_COUPLING.asStack(3));
++  h.runAtTickTime(60,()->{
++   for(int i=0;i<3;i++){carts[i].setPos(8.5+3*i,170.0625,24.5);carts[i].setDeltaMovement(0,0,0);}
++   h.assertTrue(com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player,w,carts[0].getId(),carts[1].getId()),"first link failed");
++   h.assertTrue(com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player,w,carts[1].getId(),carts[2].getId()),"second link failed");
++   player.getInventory().setItem(1,player.getMainHandItem().copy());player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_SWORD));
++   carts[1].addTag("chain_b");
++   w.getServer().getCommands().performPrefixedCommand(w.getServer().createCommandSourceStack(), "kill @e[type=minecraft:minecart,tag=chain_b]");
++   System.out.printf("CHAIN_DESTROY middleRemoved=%s%n",carts[1].isRemoved());
++  });
++  h.runAtTickTime(61,()->{
++   var c0=carts[0].getData(com.simibubi.create.AllAttachmentTypes.MINECART_CONTROLLER);var c2=carts[2].getData(com.simibubi.create.AllAttachmentTypes.MINECART_CONTROLLER);
++   var drops=w.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,area,e->com.simibubi.create.AllItems.MINECART_COUPLING.isIn(e.getItem()));
++   drops.sort(java.util.Comparator.comparingDouble(e->e.position().x));
++   System.out.printf("CHAIN_DESTROY survivors=%s,%s couplingDrops=%d items=%d%n",c0.isLeadingCoupling(),c2.isConnectedToCoupling(),drops.size(),player.getInventory().countItem(com.simibubi.create.AllItems.MINECART_COUPLING.get()));
++   for(var e:drops)System.out.printf(java.util.Locale.ROOT,"CHAIN_DESTROY drop x=%.6f y=%.6f z=%.6f count=%d%n",e.getX(),e.getY(),e.getZ(),e.getItem().getCount());
++   h.assertTrue(carts[1].isRemoved() && !c0.isLeadingCoupling() && !c2.isConnectedToCoupling() && drops.size()==2,"wrong removal or drops");
++  });
++  h.runAtTickTime(90,()->{
++   var drops=w.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,area,e->com.simibubi.create.AllItems.MINECART_COUPLING.isIn(e.getItem()));
++   for(var e:drops)e.playerTouch(player);
++   int count=player.getInventory().countItem(com.simibubi.create.AllItems.MINECART_COUPLING.get());
++   System.out.printf("CHAIN_DESTROY pickup remaining=%d items=%d%n",w.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,area,e->com.simibubi.create.AllItems.MINECART_COUPLING.isIn(e.getItem())).size(),count);
++   h.assertTrue(count==3,"drops were not collectible");h.succeed();
++  });
++ }
+ }

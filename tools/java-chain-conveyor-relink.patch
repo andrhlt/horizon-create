@@ -1,0 +1,44 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -135,7 +135,7 @@
+ 		});
+ 	}
+ 
+-	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 100)
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 280)
+ 	public static void chainConveyorStraight(CreateGameTestHelper helper) {
+ 		runChainConveyor(helper, "straight", new BlockPos(7, 0, 0), false);
+ 	}
+@@ -154,7 +154,7 @@
+ 		var sidePos = end.south(7);
+ 		var sidePortPos = sidePos.east(2).below(2);
+ 		int startTick = 8;
+-		int last = reverse ? 66 : 79;
++		int last = reverse ? 66 : 249;
+ 		helper.runAtTickTime(2, () -> {
+ 			world.setBlockAndUpdate(start, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
+ 			world.setBlockAndUpdate(end, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
+@@ -232,6 +232,14 @@
+ 				}
+ 				if (reverse && tick == 41)
+ 					((CreativeMotorBlockEntity) world.getBlockEntity(motorPos)).generatedSpeed.setValue(128);
++				if (side != null && (tick == 10 || tick == 112)) {
++					boolean connect = tick == 112;
++					var player = chainPlayer(world, end, 8);
++					new ChainConveyorConnectionPacket(end, sidePos, new ItemStack(Items.CHAIN), connect).handle(player);
++					if (dest.connections.contains(sidePos.subtract(end)) != connect
++						|| side.connections.contains(end.subtract(sidePos)) != connect)
++						throw new IllegalStateException("Relay packet did not change both links");
++				}
+ 				if (tick == last - 3) {
+ 					var player = chainPlayer(world, start, 8);
+ 					new ChainConveyorConnectionPacket(start, end, new ItemStack(Items.CHAIN), false).handle(player);
+@@ -246,7 +254,7 @@
+ 					port == null ? 0 : port.animationProgress.getValue(), receipt);
+ 				chainPackages(world, scenario, tick, "A", source, start);
+ 				chainPackages(world, scenario, tick, "B", dest, start);
+-				if (side != null && tick < 70) {
++				if (side != null && tick < 230) {
+ 					System.out.printf(Locale.ROOT, "CREATE_CHAIN_BRANCH %d,%s,%s,%.8f,%.8f,%s,%.8f,%s%n", tick,
+ 						chainOffset(source.routingTable.getExitFor(chainPackage("Lab-In", Items.PAPER, 3))),
+ 						chainOffset(source.routingTable.getExitFor(chainPackage("Side", Items.STRING, 2))),

@@ -1,0 +1,7 @@
+{
+  "template": "minecraft:iron_bars",
+  "properties": {
+    "map_color": 15,
+    "sounds": "minecraft:copper_block"
+  }
+}

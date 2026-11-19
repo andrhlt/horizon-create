@@ -1,0 +1,13 @@
+block,tool,drop,count
+zinc_ore,stone,_,0
+zinc_ore,iron,create:raw_zinc,1
+zinc_ore,silk,create:zinc_ore,1
+deepslate_zinc_ore,stone,_,0
+deepslate_zinc_ore,iron,create:raw_zinc,1
+deepslate_zinc_ore,silk,create:deepslate_zinc_ore,1
+raw_zinc_block,stone,_,0
+raw_zinc_block,iron,create:raw_zinc_block,1
+raw_zinc_block,silk,create:raw_zinc_block,1
+zinc_block,stone,_,0
+zinc_block,iron,create:zinc_block,1
+zinc_block,silk,create:zinc_block,1

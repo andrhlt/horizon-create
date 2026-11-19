@@ -1,0 +1,43 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -29,6 +29,40 @@
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 80)
++	public static void metalScaffoldingDescent(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var actor = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var materials = java.util.List.of("andesite", "brass", "copper");
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var distance = net.minecraft.world.level.block.ScaffoldingBlock.DISTANCE;
++		var travel = net.minecraft.world.phys.Vec3.ZERO;
++		for (int index = 0; index < materials.size(); index++) {
++			var material = materials.get(index);
++			var floor = helper.absolutePos(new BlockPos(2 + 3 * index, 14, 2));
++			world.setBlockAndUpdate(floor, stone);
++			var key = com.simibubi.create.Create.asResource(material + "_scaffolding");
++			var block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(key);
++			var state = block.defaultBlockState().setValue(distance, 0);
++			for (int step = 1; step <= 5; step++)
++				world.setBlockAndUpdate(floor.above(step), state);
++			var top = floor.getY() + 6;
++			actor.setPos(floor.getX() + .5, top, floor.getZ() + .5);
++			actor.setDeltaMovement(travel);
++			actor.setOnGround(true);
++			actor.setShiftKeyDown(false);
++			actor.travel(travel);
++			actor.setShiftKeyDown(true);
++			for (int tick = 0; tick <= 12; tick++) {
++				System.out.printf(java.util.Locale.ROOT, "CREATE_METAL_SCAFFOLD_DESCENT %s,%d,%.9f,%.9f,%b%n",
++					material, tick, actor.getY() - top, actor.getDeltaMovement().y, actor.onClimbable());
++				actor.travel(travel);
++			}
++			helper.assertTrue(actor.getY() < top - 1, "Crouching must descend through upper scaffolds");
++		}
++		helper.succeed();
++	}
+ 	@GameTest(template = "schematicannon", timeoutTicks = FIFTEEN_SECONDS)
+ 	public static void schematicannon(CreateGameTestHelper helper) {
+ 		// load the structure

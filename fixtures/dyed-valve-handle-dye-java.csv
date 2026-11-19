@@ -1,0 +1,17 @@
+tick,color,id,facing,waterlogged,held_count,same_block_entity,angle,in_use,target_angle,handle_rpm,shaft_rpm,generator_capacity
+3,white,create:white_valve_handle,east,true,3,true,-137,16,-180,0.0000,-32.0000,8.0000
+4,orange,create:orange_valve_handle,east,true,3,true,-137,15,-180,0.0000,-32.0000,8.0000
+5,magenta,create:magenta_valve_handle,east,true,3,true,-137,14,-180,0.0000,-32.0000,8.0000
+6,light_blue,create:light_blue_valve_handle,east,true,3,true,-137,13,-180,0.0000,-32.0000,8.0000
+7,yellow,create:yellow_valve_handle,east,true,3,true,-137,12,-180,0.0000,-32.0000,8.0000
+8,lime,create:lime_valve_handle,east,true,3,true,-137,11,-180,0.0000,-32.0000,8.0000
+9,pink,create:pink_valve_handle,east,true,3,true,-137,10,-180,0.0000,-32.0000,8.0000
+10,gray,create:gray_valve_handle,east,true,3,true,-137,9,-180,0.0000,-32.0000,8.0000
+11,light_gray,create:light_gray_valve_handle,east,true,3,true,-137,8,-180,0.0000,-32.0000,8.0000
+12,cyan,create:cyan_valve_handle,east,true,3,true,-137,7,-180,0.0000,-32.0000,8.0000
+13,purple,create:purple_valve_handle,east,true,3,true,-137,6,-180,0.0000,-32.0000,8.0000
+14,blue,create:blue_valve_handle,east,true,3,true,-137,5,-180,0.0000,-32.0000,8.0000
+15,brown,create:brown_valve_handle,east,true,3,true,-137,4,-180,0.0000,-32.0000,8.0000
+16,green,create:green_valve_handle,east,true,3,true,-137,3,-180,0.0000,-32.0000,8.0000
+17,red,create:red_valve_handle,east,true,3,true,-137,2,-180,0.0000,-32.0000,8.0000
+18,black,create:black_valve_handle,east,true,3,true,-137,1,-180,0.0000,-32.0000,8.0000

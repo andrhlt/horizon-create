@@ -1,0 +1,90 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -185,6 +185,8 @@
+ 			level.setBlockAndUpdate(origin.east().above(3), controls);
+             var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.WHITE).get().defaultBlockState();
+             level.setBlockAndUpdate(origin.east(2).above(3), seat);
++            level.setBlockAndUpdate(origin.east(3).above(3), seat);
++            level.setBlockAndUpdate(origin.east(4).above(3), seat);
+ 			var area = com.simibubi.create.content.contraptions.glue.SuperGlueEntity.span(origin.east().above(), origin.east(4).above(3));
+ 			level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, area));
+ 			station.assemble(player.getUUID());
+@@ -231,6 +233,32 @@
+             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(click);
+             helper.assertTrue(click.isCanceled() && train.runtime.getSchedule() != null, "Conductor must accept the schedule");
+         });
++        var riderChunk = new net.minecraft.world.level.ChunkPos(origin);
++        for (int x = riderChunk.x - 2; x <= riderChunk.x + 2; x++)
++            for (int z = riderChunk.z - 1; z <= riderChunk.z + 1; z++)
++                level.setChunkForced(x, z, true);
++        var host = riderPlayer(helper, "TrainHost");
++        var guest = riderPlayer(helper, "TrainGuest");
++        var scoreboard = level.getScoreboard();
++        var riderTeam = scoreboard.addPlayerTeam("TrainSeatProbe");
++        riderTeam.setCollisionRule(net.minecraft.world.scores.Team.CollisionRule.NEVER);
++        scoreboard.addPlayerToTeam(host.getScoreboardName(), riderTeam);
++        scoreboard.addPlayerToTeam(guest.getScoreboardName(), riderTeam);
++        helper.runAfterDelay(21, () -> {
++            var train = com.simibubi.create.Create.RAILWAYS.trains.values().stream()
++                .filter(candidate -> candidate.owner.equals(player.getUUID())).findFirst().orElseThrow();
++            var car = train.carriages.getFirst().anyAvailableEntity();
++            var riders = java.util.List.of(host, guest);
++            for (int i = 0; i < riders.size(); i++) {
++                var rider = riders.get(i);
++                var seat = new BlockPos(i + 2, 2, 0);
++                var at = car.toGlobalVector(net.minecraft.world.phys.Vec3.atCenterOf(seat), 1);
++                rider.moveTo(at.x, at.y, at.z + 1.5, 180, 0);
++                new com.simibubi.create.content.contraptions.sync.ContraptionInteractionPacket(
++                    car, hand, seat, net.minecraft.core.Direction.UP).handle(rider);
++                helper.assertTrue(rider.getVehicle() == car, "Expected the player to board the train seat");
++            }
++        });
+         for (int tick = 23; tick <= 145; tick++) {
+ 			int t = tick;
+ 			helper.runAfterDelay(t, () -> {
+@@ -252,6 +280,18 @@
+                     t, train.speed, a, b, d, e, approaching ? 1 : 0, stopped ? 1 : 0,
+                     approaching ? train.navigation.distanceToDestination : 0, atOrigin ? 1 : 0,
+                     train.runtime.state, train.runtime.currentEntry, train.runtime.paused ? 1 : 0, train.runtime.completed ? 1 : 0);
++                for (var rider : java.util.List.of(host, guest)) {
++                    System.out.printf(java.util.Locale.ROOT, "CREATE_TRAIN_SEAT %d;%s;%s;%.9f;%.9f;%.9f%n",
++                        t, rider.getGameProfile().getName(), rider.isPassenger(),
++                        rider.getX() - origin.getX(), rider.getY() - origin.getY(), rider.getZ() - origin.getZ());
++                }
++                if (t == 59 || t == 113) {
++                    var leaving = t == 59 ? host : guest;
++                    leaving.stopRiding();
++                    System.out.printf(java.util.Locale.ROOT, "CREATE_TRAIN_DISMOUNT %d;%s;%.9f;%.9f;%.9f%n",
++                        t, leaving.isPassenger(), leaving.getX() - origin.getX(),
++                        leaving.getY() - origin.getY(), leaving.getZ() - origin.getZ());
++                }
+                 if (t == 145) {
+                     helper.assertTrue(stopped && train.runtime.completed, "Schedule must finish at Terminal");
+                     helper.succeed();
+@@ -260,6 +300,26 @@
+ 		}
+ 	}
+ 
++    private static net.minecraft.server.level.ServerPlayer riderPlayer(CreateGameTestHelper helper, String name) {
++        var server = helper.getLevel().getServer();
++        var profile = new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), name);
++        var cookie = net.minecraft.server.network.CommonListenerCookie.createInitial(profile, false);
++        var rider = new net.minecraft.server.level.ServerPlayer(server, helper.getLevel(), cookie.gameProfile(), cookie.clientInformation());
++        var connection = new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
++        new io.netty.channel.embedded.EmbeddedChannel(connection);
++        new net.minecraft.server.network.ServerGamePacketListenerImpl(server, connection, rider, cookie) {
++            @Override
++            public void send(net.minecraft.network.protocol.Packet<?> packet, net.minecraft.network.PacketSendListener callback) {}
++        };
++        helper.getLevel().addNewPlayer(rider);
++        rider.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
++        rider.getAbilities().flying = true;
++        rider.onUpdateAbilities();
++        var start = helper.absolutePos(BlockPos.ZERO);
++        rider.moveTo(start.getX() + .5, start.getY() + 4, start.getZ() + .5, 0, 0);
++        return rider;
++    }
++
+ 	private static void clickTrackForAssembly(com.simibubi.create.content.trains.track.TrackTargetingBlockItem item,
+ 			net.minecraft.world.entity.player.Player player, BlockPos pos) {
+ 		var hit = new net.minecraft.world.phys.BlockHitResult(

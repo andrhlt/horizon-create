@@ -1,0 +1,17 @@
+--- a/crates/horizon-client/src/motion.rs
++++ b/crates/horizon-client/src/motion.rs
+@@ -2400,6 +2400,14 @@
+         ))
+     }
+     fn legacy_on_position(&mut self) -> Result<BlockPos> {
++        // A seat's player collision surface is lower than the legacy offset.
++        // Dispatch its landing rule on the supported seat instead of the floor below.
++        if self.player.ground.on_ground
++            && let Some(pos) = self.player.ground.supporting_block
++            && self.resources.blocks.get(self.block(pos))?.coefficients.legacy_bounce_restitution.is_some()
++        {
++            return Ok(pos);
++        }
+         self.support(movement_support::LEGACY_SUPPORT_OFFSET)
+     }
+     fn block_state(&mut self, p: BlockPos) -> Result<BlockStateId> {

@@ -1,0 +1,146 @@
+{
+  "include_components": true,
+  "actions": [
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 4
+    },
+    {
+      "op": "configure",
+      "pos": [
+        0,
+        2,
+        0
+      ],
+      "fluid": "minecraft:water",
+      "amount": 1000
+    },
+    {
+      "op": "probe",
+      "label": "before-bridge",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 4
+    },
+    {
+      "op": "probe",
+      "label": "connected",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "remove",
+      "pos": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "removed",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 4
+    },
+    {
+      "op": "probe",
+      "label": "split",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    }
+  ]
+}

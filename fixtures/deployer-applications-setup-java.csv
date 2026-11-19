@@ -1,0 +1,7 @@
+scenario,input,held
+brass_log,minecraft:stripped_spruce_log[axis=z],create:brass_ingot
+brass_wood,minecraft:stripped_birch_wood[axis=z],create:brass_ingot
+copper_log,minecraft:stripped_oak_log[axis=z],minecraft:copper_ingot
+copper_wood,minecraft:stripped_dark_oak_wood[axis=z],minecraft:copper_ingot
+bound_cardboard,create:cardboard_block[axis=z],minecraft:string
+andesite_control,minecraft:stripped_acacia_log[axis=z],create:andesite_alloy

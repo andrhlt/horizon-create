@@ -1,0 +1,19 @@
+--- a/crates/horizon-client/src/game/lan_entities.rs
++++ b/crates/horizon-client/src/game/lan_entities.rs
+@@ -484,6 +484,16 @@
+             let e = add_state(out, o.id, &o.kind, [p.x, p.y, p.z], o.yaw, false);
+             e.pitch = o.pitch;
+             e.head_yaw = o.yaw;
++            if let Some(interaction) = &o.interaction {
++                let tag = self.persist.raw.get(&o.id);
++                let proxy = tag.is_some_and(|tag| tag.get("CreateTrainTrapdoorPos").is_some() || tag.get("CreateTrainDoorPos").is_some());
++                let open = tag.and_then(|tag| tag.get("CreateTrainTrapdoorOpen")) == Some(&Tag::Int(1));
++                let width = if proxy { 0.0 } else { interaction.width };
++                let height = if proxy { if open { 0.0001 } else { 0.0 } } else { interaction.height };
++                e.meta.push((8, serializer::FLOAT, Value::Float(width)));
++                e.meta.push((9, serializer::FLOAT, Value::Float(height)));
++                e.meta.push((10, serializer::BOOLEAN, Value::Bool(interaction.response)));
++            }
+             if let Some(tag) = self.persist.raw.get(&o.id) {
+                 self.lan_display_data_kept(o.id, tag, hub, e);
+             }

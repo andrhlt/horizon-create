@@ -1,0 +1,126 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,110 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void depotWeightedEjectorLaunch(CreateGameTestHelper helper) {
++		testDepotWeightedEjectorLaunch(helper, false);
++	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void depotWeightedEjectorOccupied(CreateGameTestHelper helper) {
++		testDepotWeightedEjectorLaunch(helper, true);
++	}
++
++	private static void testDepotWeightedEjectorLaunch(CreateGameTestHelper helper, boolean occupied) {
++		var level = helper.getLevel();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var south = net.minecraft.core.Direction.SOUTH;
++		// The GameTest grid is randomly placed millions of blocks from the origin,
++		// where EntityLauncher's absolute float centers can lose half a block.
++		var at = new BlockPos(5, 105, occupied ? -43 : -11);
++		var powerPos = at.west();
++		var motorPos = at.north();
++		var depotPos = at.east(4);
++		var chunk = new net.minecraft.world.level.ChunkPos(at);
++		level.setChunkForced(chunk.x, chunk.z, true);
++		level.getChunk(chunk.x, chunk.z);
++		for (int x = -1; x <= 5; x++)
++			for (int z = -2; z <= 2; z++) {
++				level.setBlockAndUpdate(at.offset(x, -1, z),
++					net.minecraft.world.level.block.Blocks.SMOOTH_STONE.defaultBlockState());
++				for (int y = 0; y < 7; y++)
++					level.removeBlock(at.offset(x, y, z), false);
++			}
++		level.setBlockAndUpdate(powerPos,
++			net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState());
++		level.setBlockAndUpdate(at, AllBlocks.WEIGHTED_EJECTOR.getDefaultState().setValue(horizontal, east));
++		level.setBlockAndUpdate(depotPos, AllBlocks.DEPOT.getDefaultState());
++		level.setBlockAndUpdate(motorPos,
++			AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, south));
++		((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motorPos))
++			.generatedSpeed.setValue(128);
++		var ejector = (com.simibubi.create.content.logistics.depot.EjectorBlockEntity) level.getBlockEntity(at);
++		ejector.setTarget(4, 0);
++		var input = ejector.getBehaviour(com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE);
++		var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) level.getBlockEntity(depotPos);
++		var receiverInput = depot.getBehaviour(com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE);
++		var sounds = new java.util.ArrayList<String>();
++		var windup = new java.util.ArrayList<String>();
++		java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listen = event -> {
++			if (event.getLevel() != level || event.getSound() == null)
++				return;
++			var id = event.getSound().value().getLocation().toString();
++			var soundPos = BlockPos.containing(event.getPosition());
++			if (at.equals(soundPos)) {
++				if (id.equals("minecraft:block.wooden_button.click_off")) {
++					windup.add(String.format(java.util.Locale.ROOT, "%s/%s/%.6f/%.6f",
++						id, event.getSource().getName(), event.getNewVolume(), event.getNewPitch()));
++					return;
++				}
++				if (!id.equals("minecraft:block.wooden_trapdoor.close") && !id.equals("minecraft:block.chest.open"))
++					return;
++			} else if (!depotPos.equals(soundPos) || !id.equals("create:depot_plop")) {
++				return;
++			}
++			sounds.add(String.format(java.util.Locale.ROOT, "%s/%s/%.6f/%.6f",
++				id, event.getSource().getName(), event.getNewVolume(), event.getNewPitch()));
++		};
++		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(listen);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			if (tick == 12) {
++				if (occupied)
++					receiverInput.setCenteredHeldItem(new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++						new ItemStack(Items.DIAMOND)));
++				helper.assertTrue(ejector.getState().name().equals("CHARGED"), "Ejector must be charged");
++				var stack = new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++					new ItemStack(Items.IRON_INGOT, 3));
++				stack.beltPosition = .5f;
++				input.setHeldItem(stack);
++				level.removeBlock(powerPos, false);
++			}
++			if (occupied && tick == 20) {
++				helper.assertTrue(depot.getHeldItem().is(Items.DIAMOND)
++					&& input.getHeldItemStack().getCount() == 3, "An occupied Depot must delay the launch");
++				receiverInput.removeHeldItem();
++			}
++			var saved = ejector.saveWithoutMetadata(level.registryAccess());
++			var flight = saved.getList("LaunchedItems", net.minecraft.nbt.Tag.TAG_COMPOUND);
++			var held = depot.getHeldItem();
++			var receiver = depot.saveWithoutMetadata(level.registryAccess()).getCompound("HeldItem");
++			var age = flight.isEmpty() ? -1 : flight.getCompound(0).getInt("Location");
++			System.out.printf(java.util.Locale.ROOT, "CREATE_EJECTOR_LAUNCH_%s %d,%s,%.6f,%.2f,%d,%d,%d,%.6f,%s%n",
++				occupied ? "OCCUPIED" : "EMPTY", tick, ejector.getState(), saved.getCompound("Lid").getFloat("Value"), ejector.getSpeed(),
++				input.getHeldItemStack().getCount(), age, held.is(Items.DIAMOND) ? -held.getCount() : held.getCount(),
++				held.isEmpty() ? 0 : receiver.getFloat("Pos"), sounds.isEmpty() ? "-" : String.join(";", sounds));
++			System.out.printf(java.util.Locale.ROOT, "CREATE_EJECTOR_WINDUP_%s %d,%d,%s%n",
++				occupied ? "OCCUPIED" : "EMPTY", tick, level.getGameTime() % 2,
++				windup.isEmpty() ? "-" : String.join(";", windup));
++			windup.clear();
++			sounds.clear();
++			helper.assertTrue(tick >= 60 && held.is(Items.IRON_INGOT) && held.getCount() == 3,
++				"All three ingots must arrive in the receiving Depot.");
++			net.neoforged.neoforge.common.NeoForge.EVENT_BUS.unregister(listen);
++			level.setChunkForced(chunk.x, chunk.z, false);
++		});
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestProcessing.depotWeightedEjector")).toList();
+ 	}
+ }

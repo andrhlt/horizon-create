@@ -1,0 +1,97 @@
+diff --git a/src/main/java/com/simibubi/create/api/connectivity/ConnectivityHandler.java b/src/main/java/com/simibubi/create/api/connectivity/ConnectivityHandler.java
+index 2b24e54..23e0a14 100644
+--- a/src/main/java/com/simibubi/create/api/connectivity/ConnectivityHandler.java
++++ b/src/main/java/com/simibubi/create/api/connectivity/ConnectivityHandler.java
+@@ -31,6 +31,7 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+ public class ConnectivityHandler {
+ 
+ 	public static <T extends BlockEntity & IMultiBlockEntityContainer> void formMulti(T be) {
++        System.out.printf("WIDE_FORM t=%d pos=%s width=%d height=%d controller=%s%n", be.getLevel().getGameTime(), be.getBlockPos(), be.getWidth(), be.getHeight(), be.isController());
+ 		SearchCache<T> cache = new SearchCache<>();
+ 		List<T> frontier = new ArrayList<>();
+ 		frontier.add(be);
+@@ -126,6 +127,7 @@ public class ConnectivityHandler {
+ 		}
+ 
+ 		if (!simulate) {
++            System.out.printf("WIDE_BEST t=%d pos=%s width=%d amount=%d oldwidth=%d oldheight=%d%n", be.getLevel().getGameTime(), be.getBlockPos(), bestWidth, bestAmount, be.getWidth(), be.getHeight());
+ 			int beWidth = be.getWidth();
+ 			if (beWidth == bestWidth && beWidth * beWidth * be.getHeight() == bestAmount)
+ 				return bestAmount;
+@@ -257,7 +259,9 @@ public class ConnectivityHandler {
+ 							}
+ 							if (be instanceof IMultiBlockEntityContainer.Fluid ifluidBE && ifluidBE.hasTank()
+ 								&& beTank != null) {
+-								beTank.fill(fluidAt, IFluidHandler.FluidAction.EXECUTE);
++                                System.out.printf("WIDE_TRANSFER before t=%d origin=%s pos=%s root=%s cap=%d other=%s%n", level.getGameTime(), origin, pos, beTank.getFluid(), beTank.getCapacity(), fluidAt);
++                                int moved = beTank.fill(fluidAt, IFluidHandler.FluidAction.EXECUTE);
++                                System.out.printf("WIDE_TRANSFER after t=%d origin=%s pos=%s moved=%d root=%s cap=%d%n", level.getGameTime(), origin, pos, moved, beTank.getFluid(), beTank.getCapacity());
+ 							}
+ 						}
+ 						tankAt.drain(tankAt.getCapacity(), IFluidHandler.FluidAction.EXECUTE);
+@@ -294,6 +298,7 @@ public class ConnectivityHandler {
+ 
+ 		int height = be.getHeight();
+ 		int width = be.getWidth();
++        System.out.printf("WIDE_SPLIT t=%d pos=%s width=%d height=%d removed=%s%n", level.getGameTime(), be.getBlockPos(), width, height, be.isRemoved());
+ 		if (width == 1 && height == 1)
+ 			return;
+ 
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..7906c49 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.tankMergeTrace")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..ca19fb7 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,41 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "shearing", timeoutTicks = 50)
++    public static void tankMergeTrace(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var base = helper.absolutePos(new BlockPos(3, 16, 3));
++        var tank = com.simibubi.create.AllBlocks.FLUID_TANK.getDefaultState();
++        helper.runAtTickTime(2, () -> {
++            for (int y = 0; y < 2; y++) for (int x = 0; x < 2; x++) for (int z = 0; z < 2; z++)
++                level.setBlockAndUpdate(base.east(x).above(y).south(z), tank);
++            level.setBlockAndUpdate(base.east(2), tank);
++            level.setBlockAndUpdate(base.east(2).south(), tank);
++        });
++        helper.runAtTickTime(8, () -> {
++            var cap = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK, base, null);
++            var extra = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK, base.east(2), null);
++            var extra2 = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK, base.east(2).south(), null);
++            System.out.printf("CREATE_EXTRA2_FILL %d|%d%n", extra2.fill(new net.neoforged.neoforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.LAVA, 1000), net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE), extra2.getTankCapacity(0));
++            System.out.printf("CREATE_EXTRA_FILL %d|%d%n", extra.fill(new net.neoforged.neoforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.LAVA, 3000), net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE), extra.getTankCapacity(0));
++            System.out.printf("CREATE_FULL_SPLIT_FILL %d|%d%n", cap.fill(new net.neoforged.neoforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.WATER, Integer.parseInt(System.getenv().getOrDefault("TANK_AMOUNT", "48000"))), net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE), cap.getTankCapacity(0));
++        });
++        for (int tick = 9; tick <= 16; tick++) {
++            final int sample = tick;
++            helper.runAtTickTime(tick, () -> {
++                if (sample == 10) level.destroyBlock(base, false);
++                for (int y = 0; y < 2; y++) for (int x = 0; x < 3; x++) for (int z = 0; z < 2; z++) {
++                    var pos = base.east(x).above(y).south(z);
++                    var cap = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK, pos, null);
++                    System.out.printf("CREATE_FULL_SPLIT %d|%d|%d|%d|%s|%s|%d%n", sample, y, x, z, level.getBlockState(pos).getBlock(), cap == null ? "-" : cap.getFluidInTank(0), cap == null ? 0 : cap.getTankCapacity(0));
++                    if (sample == 10 || sample == 11 || sample == 12) {
++                        var entity = level.getBlockEntity(pos);
++                        System.out.printf("CREATE_FULL_SPLIT_NBT %d|%d|%d|%d|%s%n", sample, y, x, z, entity == null ? "-" : entity.saveWithFullMetadata(level.registryAccess()));
++                    }
++                }
++                if (sample == 16) helper.succeed();
++            });
++        }
++    }
+ }

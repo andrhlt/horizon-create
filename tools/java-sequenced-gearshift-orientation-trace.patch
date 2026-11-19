@@ -1,0 +1,120 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..cae14b7bd 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.sequencedGearshiftPlacementAndWrench"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..90862998c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,88 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++
++
++
++
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 15)
++	public static void sequencedGearshiftPlacementAndWrench(CreateGameTestHelper helper) {
++		var state = com.simibubi.create.AllBlocks.SEQUENCED_GEARSHIFT.getDefaultState();
++		var block = com.simibubi.create.AllBlocks.SEQUENCED_GEARSHIFT.get();
++		var property = com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftBlock.VERTICAL;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_AXIS;
++		var x = net.minecraft.core.Direction.Axis.X;
++		var y = net.minecraft.core.Direction.Axis.Y;
++		var z = net.minecraft.core.Direction.Axis.Z;
++		var up = net.minecraft.core.Direction.UP;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var yaw = new float[]{0, 90, 0, 90, 0, 0, -90, 0};
++		var pitch = new float[]{0, 0, 80, -80, 0, 0, 20, 75};
++		for (int index = 0; index < yaw.length; index++) {
++			var place = helper.absolutePos(new BlockPos(12 + index * 3, 3, 2));
++			var face = switch (index) {
++				case 1 -> net.minecraft.core.Direction.EAST;
++				case 2, 7 -> up;
++				case 3 -> net.minecraft.core.Direction.DOWN;
++				case 6 -> net.minecraft.core.Direction.WEST;
++				default -> net.minecraft.core.Direction.NORTH;
++			};
++			var support = place.relative(face.getOpposite());
++			level.setBlockAndUpdate(support, Blocks.STONE.defaultBlockState());
++			if (index == 6)
++				level.setBlockAndUpdate(place.below(), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, y));
++			if (index == 4 || index == 5 || index == 7)
++				level.setBlockAndUpdate(place.east(), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, x));
++			if (index == 7)
++				level.setBlockAndUpdate(place.south(), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, z));
++			player.setYRot(yaw[index]);
++			player.setXRot(pitch[index]);
++			player.setYHeadRot(yaw[index]);
++			player.setYBodyRot(yaw[index]);
++			player.yRotO = yaw[index];
++			player.xRotO = pitch[index];
++			player.setShiftKeyDown(index == 5);
++			player.setItemInHand(hand, new ItemStack(com.simibubi.create.AllBlocks.SEQUENCED_GEARSHIFT.asItem()));
++			var ray = new net.minecraft.world.phys.BlockHitResult(support.getCenter().relative(face, 0.5), face, support, false);
++			var placeContext = new net.minecraft.world.item.context.BlockPlaceContext(player, hand, player.getItemInHand(hand), ray);
++			var result = block.getStateForPlacement(placeContext);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_SEQUENCER_PLACEMENT,%d,%f,%f,%s,%s,%s,%s%n",
++				index, yaw[index], pitch[index], index == 5, placeContext.getNearestLookingDirection(), result.getValue(horizontal), result.getValue(property));
++		}
++		player.setShiftKeyDown(false);
++		player.setItemInHand(hand, new ItemStack(com.simibubi.create.AllItems.WRENCH.get()));
++		var pos = helper.absolutePos(new BlockPos(12, 3, 10));
++		for (var previousAxis : new net.minecraft.core.Direction.Axis[]{x, z})
++			for (boolean vertical : new boolean[]{false, true})
++				for (var face : net.minecraft.core.Direction.values()) {
++					var prior = state.setValue(horizontal, previousAxis).setValue(property, vertical);
++					level.setBlockAndUpdate(pos, prior);
++					var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(face, 0.5), face, pos, false);
++					var context = new net.minecraft.world.item.context.UseOnContext(player, hand, hit);
++					var result = block.onWrenched(prior, context);
++					var placed = level.getBlockState(pos);
++					System.out.printf("CREATE_SEQUENCER_WRENCH,%s,%s,%s,%s,%s,%s%n", previousAxis, vertical, face,
++						placed.getValue(horizontal), placed.getValue(property), result.consumesAction());
++				}
++		level.setBlockAndUpdate(pos, state.setValue(horizontal, z).setValue(property, true));
++		player.setShiftKeyDown(true);
++		int before = player.getInventory().countItem(block.asItem());
++		var ray = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(up, 0.5), up, pos, false);
++		var pickup = new net.minecraft.world.item.context.UseOnContext(player, hand, ray);
++		var result = block.onSneakWrenched(level.getBlockState(pos), pickup);
++		int gained = player.getInventory().countItem(block.asItem()) - before;
++		System.out.printf("CREATE_SEQUENCER_WRENCH_PICKUP,%s,%s,%d%n",
++			result.consumesAction(), level.getBlockState(pos).isAir(), gained);
++		player.setShiftKeyDown(false);
++		helper.succeed();
++	}
+ }

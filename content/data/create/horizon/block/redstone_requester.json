@@ -1,0 +1,13 @@
+{
+  "template": "minecraft:andesite",
+  "item": true,
+  "properties": {
+    "occludes": false,
+    "sounds": "minecraft:netherite_block"
+  },
+  "state_properties": {
+    "axis": {"type": "enum", "values": ["x", "z"]},
+    "powered": {"type": "boolean"}
+  },
+  "default_state": {"axis": "x", "powered": "false"}
+}

@@ -1,0 +1,53 @@
+--- a/crates/horizon-client-render/src/entity.wgsl
++++ b/crates/horizon-client-render/src/entity.wgsl
+@@ -130,20 +130,34 @@
+ fn hdr_scene_alpha(scene: f32) -> f32 {
+     return 1.0 - 0.24 * scene;
+ }
++fn entity_lightmap(level: vec2<f32>) -> vec4<f32> {
++    return textureSampleLevel(lightmap, lightmap_sampler,
++        clamp(level / 256.0 + 0.5 / 16.0, vec2(0.5 / 16.0), vec2(15.5 / 16.0)), 0.0);
++}
+ fn entity_vertex(position: vec3<f32>, uv: vec2<f32>,
+     overlay: u32, color: vec4<f32>, light: vec4<u32>, normal: vec4<f32>) -> Out {
++    return entity_vertex_blended(position, uv, overlay, color, light, normal, -1.0);
++}
++fn entity_vertex_blended(position: vec3<f32>, uv: vec2<f32>,
++    overlay: u32, color: vec4<f32>, light: vec4<u32>, normal: vec4<f32>, light_blend: f32) -> Out {
+     var out: Out;
+     out.clip = globals.view_proj * vec4(position, 1.0);
+     out.proj = vec4(out.clip.xy * 0.5 + out.clip.w * 0.5, out.clip.zw);
+     out.uv = uv;
+-    let l = vec2(max(f32(light.y), dynamic_block_light(position)), f32(light.x));
+-    let lm = textureSampleLevel(lightmap, lightmap_sampler,
+-        clamp(l / 256.0 + 0.5 / 16.0, vec2(0.5 / 16.0), vec2(15.5 / 16.0)), 0.0);
++    let dynamic = dynamic_block_light(position);
++    let l = vec2(max(f32(light.y), dynamic), f32(light.x));
++    var lm = entity_lightmap(l);
++    var scene = hdr_scene(l.x / 16.0, l.y / 16.0);
++    if light_blend >= 0.0 {
++        let other = vec2(max(f32(light.w), dynamic), f32(light.z));
++        lm = mix(lm, entity_lightmap(other), light_blend);
++        scene = mix(scene, hdr_scene(other.x / 16.0, other.y / 16.0), light_blend);
++    }
+     // Celestial bodies, clouds, beacon beams, End portals and breaking cracks are unlit.
+     let unlit = overlay == 2u || overlay == 4u || overlay == 6u || overlay == 9u || overlay == 10u
+         || overlay == 11u || overlay == 12u;
+     out.light_color = select(lm, vec4(1.0), unlit);
+-    out.scene = select(hdr_scene(l.x / 16.0, l.y / 16.0), 0.0, unlit);
++    out.scene = select(scene, 0.0, unlit);
+     if globals.colored_count.x > 0u && !unlit {
+         out.light_color = vec4(min(out.light_color.rgb + native_colored_light(position), vec3(1.0)), out.light_color.a);
+     }
+@@ -180,7 +194,10 @@
+     // (a world warp's pipelines put the vertex through the mod's `world_warp`: gfx/world_warp.rs)
+     let at = position;
+     // [end world warp entity]
+-    var out = entity_vertex(at, uv, overlay & 0xffffu, color, light, normal);
++    // Subdivided spans carry the two original light coordinates and the
++    // fraction along the span. Blend sampled colors across the inserted vertices.
++    let blend = select(-1.0, glint_uv.x, (overlay & 0x01000000u) != 0u);
++    var out = entity_vertex_blended(at, uv, overlay & 0xffffu, color, light, normal, blend);
+     out.glint_uv = glint_uv;
+     out.tier = (overlay >> 16u) & 0xffu;
+     return out;

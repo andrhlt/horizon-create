@@ -1,0 +1,490 @@
+{
+  "ticks": [
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "readouts": [
+    {
+      "case": 0,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 0,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 0,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     █▒▒ Low (0%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " █▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.low"
+              },
+              " (0%) "
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 0,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 0,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     256su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "256",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              }
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     █▒▒ Low (50%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " █▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.low"
+              },
+              " (50%) "
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 1,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     128su / 256su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "128",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              },
+              {
+                "text": " / ",
+                "color": "gray"
+              },
+              {
+                "text": "256",
+                "extra": [
+                  {
+                    "translate": "create.generic.unit.stress"
+                  }
+                ],
+                "color": "dark_gray"
+              }
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     █▒▒ Low (25%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " █▒▒ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.low"
+              },
+              " (25%) "
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 2,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     192su / 256su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "192",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              },
+              {
+                "text": " / ",
+                "color": "gray"
+              },
+              {
+                "text": "256",
+                "extra": [
+                  {
+                    "translate": "create.generic.unit.stress"
+                  }
+                ],
+                "color": "dark_gray"
+              }
+            ],
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "stress",
+      "line": 0,
+      "text": "    Gauge Information:",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.gauge.info_header"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "stress",
+      "line": 1,
+      "text": "    Network Stress",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.title",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "stress",
+      "line": 2,
+      "text": "     ███ Overstressed (112%) ",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "text": " ███ ",
+            "extra": [
+              {
+                "translate": "create.tooltip.stressImpact.overstressed"
+              },
+              " (112%) "
+            ],
+            "color": "red"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "stress",
+      "line": 3,
+      "text": "    Remaining Capacity",
+      "component": {
+        "text": "    ",
+        "extra": [
+          {
+            "translate": "create.gui.stressometer.capacity",
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "case": 3,
+      "gauge": "stress",
+      "line": 4,
+      "text": "     -32su / 256su",
+      "component": {
+        "text": "     ",
+        "extra": [
+          {
+            "text": "-32",
+            "extra": [
+              {
+                "translate": "create.generic.unit.stress"
+              },
+              {
+                "text": " / ",
+                "color": "gray"
+              },
+              {
+                "text": "256",
+                "extra": [
+                  {
+                    "translate": "create.generic.unit.stress"
+                  }
+                ],
+                "color": "dark_gray"
+              }
+            ],
+            "color": "red"
+          }
+        ]
+      }
+    }
+  ]
+}

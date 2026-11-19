@@ -1,0 +1,53 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..1f90c87 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.fluidValveCycle")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..6420ec4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,36 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void fluidValveCycle(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(2, 3, 2));
++		var motorAt = at.west();
++		helper.runAtTickTime(2, () -> {
++			level.setBlockAndUpdate(at, com.simibubi.create.AllBlocks.FLUID_VALVE.getDefaultState()
++				.setValue(com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock.FACING, net.minecraft.core.Direction.UP)
++				.setValue(com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock.AXIS_ALONG_FIRST_COORDINATE, true));
++		});
++		for (int i = 3; i <= 21; i++) {
++			final int tick = i;
++			helper.runAtTickTime(tick, () -> {
++				if (tick == 4) {
++					level.setBlockAndUpdate(motorAt, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState()
++						.setValue(com.simibubi.create.content.kinetics.motor.CreativeMotorBlock.FACING, net.minecraft.core.Direction.EAST));
++					((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motorAt)).generatedSpeed.setValue(64);
++				}
++				if (tick == 13) {
++					((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motorAt)).generatedSpeed.setValue(-64);
++				}
++				var valve = (com.simibubi.create.content.fluids.pipes.valve.FluidValveBlockEntity) level.getBlockEntity(at);
++				var nbt = valve.saveWithFullMetadata(level.registryAccess());
++				boolean enabled = valve.getBlockState().getValue(com.simibubi.create.content.fluids.pipes.valve.FluidValveBlock.ENABLED);
++				System.out.printf("CREATE_FLUID_VALVE,%d,%s,%s,%s%n", tick, valve.getSpeed(), enabled, nbt.getCompound("Pointer"));
++				if (tick == 12 && !enabled) helper.fail("Valve did not open");
++				if (tick == 21 && enabled) helper.fail("Valve did not close");
++				if (tick == 21) helper.succeed();
++			});
++		}
++	}
+ }

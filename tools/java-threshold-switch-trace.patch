@@ -1,0 +1,51 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..14d6605 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestItems.thresholdSwitch"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+index 71d028a..675ee32 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+@@ -368,7 +368,31 @@ public class TestItems {
+ 		for (int i = 0; i < 18; i++) { // insert 18 stacks
+ 			ItemHandlerHelper.insertItem(chestStorage, new ItemStack(Items.DIAMOND, 64), false);
+ 		}
+-		helper.succeedWhen(() -> helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, true));
++		BlockPos detector = new BlockPos(2, 2, 1);
++		helper.succeedWhen(() -> {
++			var tag = helper.getBlockEntity(detector).saveWithoutMetadata(helper.getLevel().registryAccess());
++			boolean lit = helper.getBlockState(lamp).getValue(RedstoneLampBlock.LIT);
++			int tick = (int) helper.getTick();
++			System.out.printf("CREATE_THRESHOLD %d %d %d %d %d %d%n", tick,
++				tag.getInt("CurrentAmount"), tag.getInt("CurrentMaxAmount"),
++				tag.getBoolean("Powered") ? 1 : 0, tag.getBoolean("PoweredAfterDelay") ? 1 : 0, lit ? 1 : 0);
++			if (tick == 3)
++				helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, true);
++			if (tick == 7) {
++				var detectorEntity = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), detector);
++				detectorEntity.onWhenAbove = 128;
++				detectorEntity.offWhenBelow = 64;
++			}
++			if (tick == 14)
++				for (int slot = 0; slot < 18; slot++)
++					chestStorage.extractItem(slot, 64, false);
++			if (tick == 31)
++				ItemHandlerHelper.insertItem(chestStorage, new ItemStack(Items.DIAMOND, 64), false);
++			if (tick == 42)
++				ItemHandlerHelper.insertItem(chestStorage, new ItemStack(Items.DIAMOND, 64), false);
++			helper.assertTrue(tick >= 60, "Waiting for the threshold switch to settle");
++			helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, true);
++		});
+ 	}
+ 
+ 	@GameTest(template = "storages", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)

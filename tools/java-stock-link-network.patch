@@ -1,0 +1,87 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1058,4 +1058,73 @@
+ 		});
+ 	}
+ 
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stockLinkNetwork(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var a = helper.absolutePos(new BlockPos(3, 14, 2));
++		var b = a.south(4);
++		var other = b.south(4);
++		var direction = net.minecraft.core.Direction.EAST;
++		var frequency = new java.util.UUID(82, 15);
++		var unrelated = new java.util.UUID(91, 27);
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var signal = b.east().above(2);
++		var iron = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_INGOT);
++		var copper = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.COPPER_INGOT);
++		var gold = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.GOLD_INGOT);
++		var linkType = com.simibubi.create.AllBlockEntityTypes.PACKAGER_LINK.get();
++		helper.runAtTickTime(2, () -> {
++			for (var pos : java.util.List.of(a, b, other))
++				level.setBlockAndUpdate(pos, net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState());
++			var aBarrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(a);
++			aBarrel.setItem(0, iron.copyWithCount(12));
++			aBarrel.setItem(1, copper.copyWithCount(4));
++			var bBarrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(b);
++			bBarrel.setItem(0, iron.copyWithCount(5));
++			bBarrel.setItem(1, gold.copyWithCount(3));
++			((net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(other))
++				.setItem(0, iron.copyWithCount(9));
++			var packager = com.simibubi.create.AllBlocks.PACKAGER.getDefaultState();
++			var stockLink = com.simibubi.create.AllBlocks.STOCK_LINK.getDefaultState();
++			for (var pos : java.util.List.of(a.east(), a.west(), b.east(), other.east())) {
++				level.setBlockAndUpdate(pos, packager.setValue(net.minecraft.world.level.block.DirectionalBlock.FACING,
++					pos.equals(a.west()) ? direction.getOpposite() : direction));
++				level.setBlockAndUpdate(pos.above(), stockLink);
++				level.getBlockEntity(pos.above(), linkType).orElseThrow().behaviour.freqId =
++					pos.equals(other.east()) ? unrelated : frequency;
++			}
++		});
++		for (int tick = 4; tick <= 11; tick++) {
++			final int at = tick;
++			helper.runAtTickTime(tick, () -> {
++				if (at == 5) {
++					level.setBlockAndUpdate(signal, net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState());
++					level.setBlockAndUpdate(a.west().above(), air);
++				}
++				boolean ordered = false;
++				if (at == 8) {
++					var request = com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts.simple(
++						java.util.List.of(new com.simibubi.create.content.logistics.BigItemStack(iron, 6)));
++					ordered = com.simibubi.create.content.logistics.packagerLink.LogisticsManager.broadcastPackageRequest(
++						frequency, com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour.RequestType.PLAYER,
++						request, null, "Smelting");
++				}
++				var stock = com.simibubi.create.content.logistics.packagerLink.LogisticsManager.getSummaryOfNetwork(frequency, true);
++				var main = (com.simibubi.create.content.logistics.packager.PackagerBlockEntity) level.getBlockEntity(a.east());
++				var reserve = (com.simibubi.create.content.logistics.packager.PackagerBlockEntity) level.getBlockEntity(b.east());
++				var box = main.heldBox;
++				var item = box.isEmpty() ? net.minecraft.world.item.ItemStack.EMPTY :
++					com.simibubi.create.content.logistics.box.PackageItem.getContents(box).getStackInSlot(0);
++				var address = box.isEmpty() ? "_" : com.simibubi.create.content.logistics.box.PackageItem.getAddress(box);
++				var actual = ((net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(a)).getItem(0);
++				System.out.printf("CREATE_STOCK_NETWORK %d,%d,%d,%d,%d,%b,%d,%s,%d,%b,%d%n", at,
++					stock.getCountOf(iron), stock.getCountOf(copper), stock.getCountOf(gold), stock.contributingLinks,
++					ordered, item.getCount(), address, actual.getCount(), !reserve.heldBox.isEmpty(), main.animationTicks);
++				if (at == 11)
++					helper.succeed();
++			});
++		}
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().startsWith("TestMisc.stockLinkTuning"))
++			.filter(test -> test.testName().startsWith("TestMisc.stockLinkNetwork"))
+ 			.toList();
+ 	}
+ }

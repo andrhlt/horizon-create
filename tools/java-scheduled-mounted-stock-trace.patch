@@ -1,0 +1,84 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..453bf6c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.scheduledStaticItemCargo"))
++            .toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -193,11 +193,26 @@
+             var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.WHITE).get().defaultBlockState();
+             level.setBlockAndUpdate(origin.east(2).above(3), seat);
+             var chestPos = origin.east(3).above(3);
+-            level.setBlockAndUpdate(chestPos, Blocks.CHEST.defaultBlockState());
+-            var chest = (net.minecraft.world.level.block.entity.ChestBlockEntity) level.getBlockEntity(chestPos);
+-            chest.setItem(0, new ItemStack(Items.PAPER, 64));
+-            chest.setItem(1, new ItemStack(Items.PAPER, 7));
+-            chest.setItem(2, new ItemStack(Items.REDSTONE, 64));
++            var storageName = System.getenv("CREATE_TRAIN_STOCK_STORAGE");
++            var vaultStorage = "vault".equals(storageName);
++            var storage = vaultStorage ? com.simibubi.create.AllBlocks.ITEM_VAULT.get()
++                : "barrel".equals(storageName) ? Blocks.BARREL : Blocks.CHEST;
++            if (!"empty".equals(storageName))
++                level.setBlockAndUpdate(chestPos, storage.defaultBlockState());
++            if ("empty".equals(storageName)) {
++                // The carriage carries no mounted inventory in this case.
++            } else if (vaultStorage) {
++                var vault = (com.simibubi.create.content.logistics.vault.ItemVaultBlockEntity) level.getBlockEntity(chestPos);
++                var items = vault.getInventoryOfBlock();
++                items.setStackInSlot(0, new ItemStack(Items.PAPER, 64));
++                items.setStackInSlot(1, new ItemStack(Items.PAPER, 7));
++                items.setStackInSlot(2, new ItemStack(Items.REDSTONE, 64));
++            } else {
++                var items = (net.minecraft.world.Container) level.getBlockEntity(chestPos);
++                items.setItem(0, new ItemStack(Items.PAPER, 64));
++                items.setItem(1, new ItemStack(Items.PAPER, 7));
++                items.setItem(2, new ItemStack(Items.REDSTONE, 64));
++            }
+ 			var area = com.simibubi.create.content.contraptions.glue.SuperGlueEntity.span(origin.east().above(), origin.east(4).above(3));
+ 			level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, area));
+ 			station.assemble(player.getUUID());
+@@ -222,11 +237,14 @@
+             finish.getStation().name = "Terminal";
+             other.getStation().name = "Wrong way";
+             var mounted = train.carriages.getFirst().storage.getAllItems();
+-            helper.assertTrue(mounted != null && mounted.getSlots() == 27
++            var storageName = System.getenv("CREATE_TRAIN_STOCK_STORAGE");
++            var emptyStorage = "empty".equals(storageName);
++            helper.assertTrue(mounted != null && (emptyStorage ? mounted.getSlots() == 0
++                : mounted.getSlots() == ("vault".equals(storageName) ? 20 : 27)
+                 && mounted.getStackInSlot(0).is(Items.PAPER) && mounted.getStackInSlot(0).getCount() == 64
+                 && mounted.getStackInSlot(1).is(Items.PAPER) && mounted.getStackInSlot(1).getCount() == 7
+-                && mounted.getStackInSlot(2).is(Items.REDSTONE) && mounted.getStackInSlot(2).getCount() == 64,
+-                "The original carriage mounted one chest with both real paper stacks and the redstone decoy");
++                && mounted.getStackInSlot(2).is(Items.REDSTONE) && mounted.getStackInSlot(2).getCount() == 64),
++                "The original carriage has the expected mounted storage and contents");
+             var schedule = new com.simibubi.create.content.trains.schedule.Schedule();
+             schedule.cyclic = false;
+             for (String name : java.util.List.of("Origin", "Terminal")) {
+@@ -245,14 +263,14 @@
+                         condition.getData().putInt("Operator", 2);
+                     }
+                     fullStack.getData().putInt("Measure", 1);
+-                    fullStack.getData().putString("Threshold", "1");
++                    fullStack.getData().putString("Threshold", emptyStorage ? "0" : "1");
+                     pieces.getData().putInt("Measure", 0);
+-                    pieces.getData().putString("Threshold", "71");
++                    pieces.getData().putString("Threshold", emptyStorage ? "0" : "71");
+                     var tooMany = new com.simibubi.create.content.trains.schedule.condition.ItemThresholdCondition();
+                     tooMany.setItem(0, new ItemStack(Items.PAPER));
+                     tooMany.getData().putInt("Operator", 0);
+                     tooMany.getData().putInt("Measure", 0);
+-                    tooMany.getData().putString("Threshold", "71");
++                    tooMany.getData().putString("Threshold", emptyStorage ? "0" : "71");
+                     entry.conditions.add(java.util.List.of(fullStack, pieces));
+                     entry.conditions.add(java.util.List.of(tooMany));
+                 } else

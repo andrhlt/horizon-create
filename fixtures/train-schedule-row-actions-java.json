@@ -1,0 +1,216 @@
+{
+  "start": {
+    "Cyclic": 0,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 0,
+                "Value": 7
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Origin"
+          },
+          "Id": "create:destination"
+        }
+      },
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Terminal"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ],
+    "Progress": 1
+  },
+  "up": {
+    "Cyclic": 0,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Terminal"
+          },
+          "Id": "create:destination"
+        }
+      },
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 0,
+                "Value": 7
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Origin"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ],
+    "Progress": 1
+  },
+  "duplicated": {
+    "Cyclic": 0,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Terminal"
+          },
+          "Id": "create:destination"
+        }
+      },
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 0,
+                "Value": 7
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Origin"
+          },
+          "Id": "create:destination"
+        }
+      },
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 0,
+                "Value": 7
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Origin"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ],
+    "Progress": 1
+  },
+  "down": {
+    "Cyclic": 0,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 0,
+                "Value": 7
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Origin"
+          },
+          "Id": "create:destination"
+        }
+      },
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Terminal"
+          },
+          "Id": "create:destination"
+        }
+      },
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 0,
+                "Value": 7
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Origin"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ],
+    "Progress": 1
+  }
+}

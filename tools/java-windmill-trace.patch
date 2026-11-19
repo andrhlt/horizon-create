@@ -1,0 +1,104 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..9e1499a21 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().startsWith("TestMisc.windmillTrace"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..e0115933d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,85 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 40)
++    public static void windmillTrace(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var origin = helper.absolutePos(new BlockPos(1, 2, 1)).above(18);
++        var east = net.minecraft.core.Direction.EAST;
++        var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++        var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++        var bearing = com.simibubi.create.AllBlocks.WINDMILL_BEARING.getDefaultState().setValue(facing, east);
++        var shaft = com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis());
++        var fan = com.simibubi.create.AllBlocks.ENCASED_FAN.getDefaultState().setValue(facing, east.getOpposite());
++        var canvases = new net.minecraft.world.level.block.state.BlockState[] {
++            com.simibubi.create.AllBlocks.SAIL.getDefaultState().setValue(facing, east),
++            com.simibubi.create.AllBlocks.SAIL_FRAME.getDefaultState().setValue(facing, east),
++            com.simibubi.create.AllBlocks.DYED_SAILS.get(net.minecraft.world.item.DyeColor.RED).getDefaultState().setValue(facing, east),
++        };
++        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        var mills = java.util.List.of(origin, origin.south(7), origin.south(14));
++        int[] counts = { 7, 8, 16 };
++        for (int i = 0; i < mills.size(); i++) {
++            var at = mills.get(i);
++            var anchor = at.east();
++            level.setChunkForced(at.getX() >> 4, at.getZ() >> 4, true);
++            level.setChunkForced(anchor.getX() >> 4, anchor.south(3).getZ() >> 4, true);
++            level.setBlockAndUpdate(at, bearing);
++            level.setBlockAndUpdate(at.west(), shaft);
++            level.setBlockAndUpdate(at.west(2), fan);
++            for (int count = 0; count < counts[i]; count++) {
++                var pos = anchor.above(count / 4).south(count % 4);
++                level.setBlockAndUpdate(pos, i == 2 && count == 15
++                    ? Blocks.WHITE_WOOL.defaultBlockState() : canvases[count % canvases.length]);
++            }
++            var glue = new net.minecraft.world.phys.AABB(
++                net.minecraft.world.phys.Vec3.atLowerCornerOf(anchor),
++                net.minecraft.world.phys.Vec3.atLowerCornerOf(anchor.above(4).south(4).east()));
++            level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, glue));
++        }
++        java.util.function.Consumer<BlockPos> use = at -> {
++            var hit = new net.minecraft.world.phys.BlockHitResult(
++                net.minecraft.world.phys.Vec3.atCenterOf(at), east, at, false);
++            var result = level.getBlockState(at).useItemOn(net.minecraft.world.item.ItemStack.EMPTY, level, player, hand, hit);
++            helper.assertTrue(result.consumesAction(), "Empty hand did not operate the Windmill Bearing");
++        };
++        for (int i = 0; i <= 21; i++) {
++            int tick = i;
++            helper.runAtTickTime(i + 3, () -> {
++                if (tick == 1 || tick == 18)
++                    mills.forEach(use);
++                if (tick == 9 || tick == 14)
++                    for (var at : mills) {
++                        var be = (com.simibubi.create.content.contraptions.bearing.WindmillBearingBlockEntity)
++                            level.getBlockEntity(at);
++                        be.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE)
++                            .setValue(tick == 9 ? 1 : 0);
++                    }
++                for (int rig = 0; rig < mills.size(); rig++) {
++                    var at = mills.get(rig);
++                    var be = (com.simibubi.create.content.contraptions.bearing.WindmillBearingBlockEntity)
++                        level.getBlockEntity(at);
++                    var shaftEntity = (com.simibubi.create.content.kinetics.base.KineticBlockEntity) level.getBlockEntity(at.west());
++                    var saved = be.saveWithoutMetadata(level.registryAccess());
++                    var network = saved.getCompound("Network");
++                    var moved = be.getMovedContraption();
++                    int captured = moved == null ? 0 :
++                        ((com.simibubi.create.content.contraptions.bearing.BearingContraption) moved.getContraption()).getSailBlocks();
++                    int present = 0;
++                    for (int cell = 0; cell < counts[rig]; cell++)
++                        if (!level.getBlockState(at.east().above(cell / 4).south(cell % 4)).isAir())
++                            present++;
++                    System.out.printf(java.util.Locale.ROOT,
++                        "CREATE_WINDMILL %d;%d;%s;%.8f;%.8f;%.8f;%.8f;%.1f;%.1f;%d;%d;%s%n",
++                        tick, rig, saved.getBoolean("Running"), be.getGeneratedSpeed(), be.getSpeed(), shaftEntity.getSpeed(),
++                        saved.getFloat("Angle"), network.getFloat("Stress"), network.getFloat("Capacity"),
++                        captured, present, be.getLastAssemblyException() != null);
++                }
++                if (tick == 21)
++                    helper.succeed();
++            });
++        }
++    }
+ }

@@ -1,0 +1,64 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..a4571e3d5 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.cardboardArmorFuel"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..b33a775bf 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,45 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 220)
++	public static void cardboardArmorFuel(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var fuels = java.util.List.of(
++			com.simibubi.create.AllItems.CARDBOARD_HELMET.asStack(),
++			com.simibubi.create.AllItems.CARDBOARD_CHESTPLATE.asStack(),
++			com.simibubi.create.AllItems.CARDBOARD_LEGGINGS.asStack(),
++			com.simibubi.create.AllItems.CARDBOARD_BOOTS.asStack()
++		);
++		var furnaces = new java.util.LinkedHashMap<ItemStack,
++			net.minecraft.world.level.block.entity.FurnaceBlockEntity>();
++		helper.runAtTickTime(4, () -> {
++			var origin = helper.absolutePos(new BlockPos(1, 2, 1)).above(12);
++			for (var fuel : fuels) {
++				var at = origin.offset(2 * furnaces.size(), 0, 0);
++				level.setBlockAndUpdate(at, Blocks.FURNACE.defaultBlockState());
++				var furnace = (net.minecraft.world.level.block.entity.FurnaceBlockEntity) level.getBlockEntity(at);
++				furnace.setItem(0, Items.RAW_IRON.getDefaultInstance());
++				furnace.setItem(1, fuel.copy());
++				furnaces.put(fuel, furnace);
++			}
++		});
++		for (int i = 0; i <= 205; i++) {
++			final int tick = i;
++			helper.runAtTickTime(4 + tick, () -> {
++				for (var entry : furnaces.entrySet()) {
++					var furnace = entry.getValue();
++					var nbt = furnace.saveWithoutMetadata(level.registryAccess());
++					var output = furnace.getItem(2);
++					System.out.printf("CREATE_CARDBOARD_FUEL %d,%s,%d,%d,%d,%d,%s,%d%n", tick,
++						items.getKey(entry.getKey().getItem()),
++						nbt.getShort("CookTime"), nbt.getShort("CookTimeTotal"),
++						nbt.getShort("BurnTime"), furnace.getItem(1).getCount(),
++						items.getKey(output.getItem()), output.getCount());
++				}
++				if (tick == 205) helper.succeed();
++			});
++		}
++	}
+ }

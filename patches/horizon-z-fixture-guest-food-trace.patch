@@ -1,0 +1,47 @@
+--- a/crates/horizon-client/src/game/lan_actions.rs
++++ b/crates/horizon-client/src/game/lan_actions.rs
+@@ -4298,6 +4298,44 @@
+             let digging = play.digging;
+             let using = play.using.is_some();
+             let delayed = play.destroy_delay > 0 || play.use_delay > 0 || play.attack_ticks < 100;
++            // Test-only observation at the guest player tick boundary, before item use advances.
++            // This is independent of the frozen world clock and never drives the player.
++            if let Some(path) = std::env::var_os("HORIZON_TEST_GUEST_FOOD_TRACE") {
++                use std::io::Write;
++                thread_local! {
++                    static TICKS: std::cell::RefCell<std::collections::HashMap<u32, u64>> =
++                        std::cell::RefCell::new(std::collections::HashMap::new());
++                }
++                let tick = TICKS.with_borrow_mut(|ticks| {
++                    let next = ticks.entry(conn).or_default();
++                    let tick = *next;
++                    *next += 1;
++                    tick
++                });
++                let guest = &host.hub.guests[gi];
++                let stack = guest.inventory.get(guest.selected).and_then(|s| s.as_ref());
++                let slot0 = guest.inventory.first().and_then(|s| s.as_ref());
++                let row = serde_json::json!({
++                    "tick": tick,
++                    "player": guest.name,
++                    "selected": guest.selected,
++                    "slot0_item": slot0.map(|s| s.item.as_ref()).unwrap_or("minecraft:air"),
++                    "slot0_count": slot0.map(|s| s.count).unwrap_or(0),
++                    "offhand_item": guest.offhand.as_ref().map(|s| s.item.as_ref()).unwrap_or("minecraft:air"),
++                    "offhand_count": guest.offhand.as_ref().map(|s| s.count).unwrap_or(0),
++                    "using_slot": play.using.map(|(slot, _)| slot),
++                    "used_item": play.used_stack.as_ref().map(|stack| stack.item.as_ref()),
++                    "using": play.using.map(|(_, ticks)| ticks),
++                    "duration": play.use_duration,
++                    "item": stack.map(|s| s.item.as_ref()).unwrap_or("minecraft:air"),
++                    "count": stack.map(|s| s.count).unwrap_or(0),
++                    "hunger": guest.food,
++                    "saturation": guest.saturation,
++                });
++                if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
++                    let _ = writeln!(file, "{row}");
++                }
++            }
+             let mut tea_use = false;
+             if digging.is_some() || using || delayed {
+                 if pre_pending {

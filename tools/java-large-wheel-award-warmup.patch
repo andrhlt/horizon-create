@@ -1,0 +1,27 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -198,6 +198,7 @@
+         var worldWheel = helper.absolutePos(wheel);
+         var placed = level.getBlockState(worldWheel);
+         placed.getBlock().setPlacedBy(level, worldWheel, placed, owner, com.simibubi.create.AllBlocks.LARGE_WATER_WHEEL.asStack());
++        helper.runAfterDelay(5, () -> {
+         helper.pullLever(openLever);
+ 		helper.succeedWhen(() -> {
+ 			if (expectedRpm == 4) {
+@@ -205,7 +206,7 @@
+                 var ownerDone = owner.getAdvancements().getOrStartProgress(advancement).isDone();
+                 var bystanderDone = bystander.getAdvancements().getOrStartProgress(advancement).isDone();
+                 System.out.printf(java.util.Locale.ROOT, "CREATE_WHEEL_ADVANCEMENT %d;%d;%s;%s%n",
+-                    helper.getTick(), source.flowScore, ownerDone, bystanderDone);
++                    helper.getTick() - 5, source.flowScore, ownerDone, bystanderDone);
+                 if (source.flowScore != 0)
+                     helper.assertTrue(ownerDone && !bystanderDone, "Only the placed-by player must earn wheel power");
+ 				var speed = helper.getBlockEntity(AllBlockEntityTypes.SPEEDOMETER.get(), speedometer);
+@@ -241,6 +242,7 @@
+ 				helper.assertStressometerCapacity(stressometer, expectedSU);
+ 			}
+ 		});
++        });
+ 	}
+ 
+ 	@GameTest(template = "waterwheel_materials", timeoutTicks = CreateGameTestHelper.FIFTEEN_SECONDS)

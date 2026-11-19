@@ -1,0 +1,150 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..0f6008ac5 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.signalTrainOccupancy"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..8809a16d7 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,131 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 160)
++	public static void signalTrainOccupancy(CreateGameTestHelper helper) {
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var level = helper.getLevel();
++		var track = com.simibubi.create.AllBlocks.TRACK.get();
++		var casing = com.simibubi.create.AllBlocks.RAILWAY_CASING.asItem();
++		var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
++		var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
++		var origin = new BlockPos(9, 112, -8);
++		for (int x = -20; x <= 24; x++) {
++			var cell = origin.east(x);
++			level.setChunkForced(cell.getX() >> 4, cell.getZ() >> 4, true);
++			level.setBlockAndUpdate(origin.offset(x,-1,0), Blocks.SMOOTH_STONE.defaultBlockState());
++			level.setBlockAndUpdate(origin.east(x), rail);
++			level.setBlockAndUpdate(origin.east(x).above(), Blocks.AIR.defaultBlockState());
++		}
++		var destination = origin.south(2);
++		level.setBlockAndUpdate(destination, Blocks.AIR.defaultBlockState());
++		level.setBlockAndUpdate(destination.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++		var item = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) com.simibubi.create.AllBlocks.TRACK_STATION.asItem();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var signalItem = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) com.simibubi.create.AllBlocks.TRACK_SIGNAL.asItem();
++		var targets = java.util.List.of(origin.west(2), origin.east(7));
++		var signals = java.util.List.of(targets.get(0).south(3), targets.get(0).north(3), targets.get(1).south(3), targets.get(1).north(3));
++		for (var at : signals) {
++			level.setChunkForced(at.getX() >> 4, at.getZ() >> 4, true);
++			level.setBlockAndUpdate(at.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++		}
++		var signalPlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		helper.runAfterDelay(10, () -> {
++			for (int i = 0; i < signals.size(); i++) {
++				var railPos = targets.get(i / 2);
++				var support = signals.get(i).below();
++				level.setBlockAndUpdate(support.above(), Blocks.AIR.defaultBlockState());
++				level.setBlockAndUpdate(support.above(2), Blocks.AIR.defaultBlockState());
++				level.setBlockAndUpdate(support, Blocks.SMOOTH_STONE.defaultBlockState());
++				signalPlayer.setItemInHand(hand, new ItemStack(signalItem));
++				signalPlayer.setYRot(i % 2 == 0 ? -90 : 90);
++				signalPlayer.setXRot(20);
++				signalPlayer.setPos(railPos.getX() + .5, railPos.getY() + 1, railPos.getZ() + .5);
++				clickTrackForAssembly(signalItem, signalPlayer, railPos);
++				helper.assertTrue(signalPlayer.getMainHandItem().has(com.simibubi.create.AllDataComponents.TRACK_TARGETING_ITEM_SELECTED_POS),
++					"Signal selection failed on rail " + railPos);
++				signalPlayer.setPos(support.getX() + 2.5, support.getY() + 1, support.getZ() + .5);
++				clickTrackForAssembly(signalItem, signalPlayer, support);
++				helper.assertTrue(com.simibubi.create.AllBlocks.TRACK_SIGNAL.has(level.getBlockState(signals.get(i))),
++					"Signal placement failed for " + signals.get(i));
++			}
++		});
++		helper.runAfterDelay(7, () -> {
++
++			player.setItemInHand(hand, new ItemStack(item));
++			player.setYRot(90);
++			player.setXRot(20);
++			clickTrackForAssembly(item, player, origin);
++			clickTrackForAssembly(item, player, destination.below());
++		});
++		helper.runAfterDelay(12, () -> {
++			var station = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(destination);
++			helper.assertTrue(station != null && station.enterAssemblyMode(null), "Station must enter assembly mode");
++			player.setItemInHand(hand, new ItemStack(casing, 3));
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east()), "Expected first bogey");
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east(4)), "Expected rear bogey");
++			for (int x = 1; x <= 4; x++)
++				level.setBlockAndUpdate(origin.east(x).above(2), Blocks.OAK_PLANKS.defaultBlockState());
++			var controls = com.simibubi.create.AllBlocks.TRAIN_CONTROLS.get().defaultBlockState()
++				.setValue(com.simibubi.create.content.contraptions.actors.trainControls.ControlsBlock.FACING,
++					net.minecraft.core.Direction.EAST);
++			level.setBlockAndUpdate(origin.east().above(3), controls);
++			var area = com.simibubi.create.content.contraptions.glue.SuperGlueEntity.span(origin.east().above(), origin.east(4).above(3));
++			level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, area));
++			station.assemble(player.getUUID());
++		});
++		for (int tick = 13; tick <= 137; tick++) {
++			int t = tick;
++			helper.runAfterDelay(t, () -> {
++				var railway = com.simibubi.create.Create.RAILWAYS;
++				var train = railway.trains.values().stream().filter(candidate -> candidate.owner.equals(player.getUUID()))
++					.findFirst().orElse(null);
++				helper.assertTrue(train != null, "Station failed assembly: " + level.getBlockEntity(destination).saveWithoutMetadata(level.registryAccess()));
++				var c = train.carriages.getFirst();
++				double a = c.leadingBogey().leading().getPosition(train.graph).x - origin.getX();
++				double b = c.leadingBogey().trailing().getPosition(train.graph).x - origin.getX();
++				double d = c.trailingBogey().leading().getPosition(train.graph).x - origin.getX();
++				double e = c.trailingBogey().trailing().getPosition(train.graph).x - origin.getX();
++				int remaining = 0;
++				for (int i = 1; i <= 4; i++)
++					for (int dy = 1; dy <= 3; dy++)
++						if (!level.getBlockState(origin.east(i).above(dy)).isAir())
++							remaining++;
++				System.out.printf(java.util.Locale.ROOT,
++					"CREATE_TRAIN %d %.9f %.9f %.9f %.9f %.9f %d %d %d%n",
++					t, train.speed, a, b, d, e, train.carriages.size(), c.bogeySpacing, remaining);
++				var colors = signals.stream().map(pos -> {
++					var entity = level.getBlockEntity(pos);
++					helper.assertTrue(entity instanceof com.simibubi.create.content.trains.signal.SignalBlockEntity,
++						"Expected bound signal at " + pos);
++					return ((com.simibubi.create.content.trains.signal.SignalBlockEntity) entity).getState().name();
++				}).collect(java.util.stream.Collectors.joining(";"));
++				System.out.printf(java.util.Locale.ROOT, "CREATE_SIGNAL_TRAIN %d;%.9f;%.9f;%.9f;%.9f;%.9f;%s%n",
++					t, train.speed, a, b, d, e, colors);
++				if (t >= 18 && t < 137) {
++					var entity = c.anyAvailableEntity();
++					helper.assertTrue(entity != null, "Assembled carriage entity was not available");
++					var controls = new BlockPos(0, 2, 0);
++					var at = entity.toGlobalVector(net.minecraft.world.phys.Vec3.atCenterOf(controls), 0);
++					player.setPos(at.x, at.y, at.z + 1.5);
++					if (t == 18)
++						helper.assertTrue(entity.startControlling(controls, player), "Player could not take controls");
++					var keys = t < 49 ? java.util.List.of(0)
++						: t >= 84 && t < 110 ? java.util.List.of(1) : java.util.List.<Integer>of();
++					helper.assertTrue(entity.control(controls, keys, player), "Train control was refused at " + t);
++				}
++				if (t == 137)
++					helper.succeed();
++			});
++		}
++	}
++
++	private static void clickTrackForAssembly(com.simibubi.create.content.trains.track.TrackTargetingBlockItem item,
++			net.minecraft.world.entity.player.Player player, BlockPos pos) {
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(pos).add(0,.5,0), net.minecraft.core.Direction.UP, pos, false);
++		item.useOn(new net.minecraft.world.item.context.UseOnContext(player,
++			net.minecraft.world.InteractionHand.MAIN_HAND, hit));
++	}
+ }

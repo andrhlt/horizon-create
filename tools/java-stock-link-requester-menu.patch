@@ -1,0 +1,73 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1195,4 +1195,59 @@
+ 		}
+ 	}
+ 
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stockLinkRequesterMenu(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(3, 14, 2));
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		player.setPos(pos.getX() + .5, pos.getY(), pos.getZ() + 2.5);
++		var requester = com.simibubi.create.AllBlocks.REDSTONE_REQUESTER.get();
++		var type = com.simibubi.create.AllBlockEntityTypes.REDSTONE_REQUESTER.get();
++		var copper = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.COPPER_INGOT, 5);
++		var empty = net.minecraft.world.item.ItemStack.EMPTY;
++		var click = net.minecraft.world.inventory.ClickType.PICKUP;
++		level.setBlockAndUpdate(pos, requester.defaultBlockState());
++		var entity = level.getBlockEntity(pos, type).orElseThrow();
++		var iron = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_INGOT);
++		var gold = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.GOLD_INGOT);
++		entity.encodedRequest = com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts.simple(
++			java.util.List.of(new com.simibubi.create.content.logistics.BigItemStack(iron, 8),
++				new com.simibubi.create.content.logistics.BigItemStack(gold, 3)));
++		entity.encodedTargetAdress = "Smelting";
++		var menu = com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterMenu.create(99, player.getInventory(), entity);
++		helper.runAtTickTime(2, () -> stockRequesterMenuRow(helper, entity, menu, "initial"));
++		helper.runAtTickTime(3, () -> {
++			menu.setCarried(copper);
++			menu.clicked(36, 0, click, player);
++			menu.clicked(38, 1, click, player);
++			stockRequesterMenuRow(helper, entity, menu, "sample");
++			menu.setCarried(empty);
++			menu.clicked(37, 0, click, player);
++		});
++		helper.runAtTickTime(4, () -> {
++			menu.removed(player);
++			stockRequesterMenuRow(helper, entity, menu, "close_slots");
++			new com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterConfigurationPacket(
++				pos, "Factory A", true, java.util.List.of(12, 2)).handle(player);
++			stockRequesterMenuRow(helper, entity, menu, "configure");
++			helper.succeed();
++		});
++	}
++
++	private static void stockRequesterMenuRow(CreateGameTestHelper helper,
++		com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockEntity entity,
++		com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterMenu menu, String action) {
++		var contents = java.util.stream.IntStream.range(0, 9)
++			.mapToObj(i -> menu.ghostInventory.getStackInSlot(i))
++			.map(item -> item.isEmpty() ? "_" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item.getItem())
++				+ "=" + item.getCount()).toList();
++		var order = entity.encodedRequest.stacks().stream()
++			.map(item -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item.stack.getItem())
++				+ "=" + item.count).toList();
++		System.out.printf("CREATE_REQUESTER_MENU %d|%s|%s|%d|%s|%s|%b%n", helper.getTick(), action,
++			String.join(",", contents), menu.getCarried().getCount(), String.join(",", order),
++			entity.encodedTargetAdress, entity.allowPartialRequests);
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().startsWith("TestMisc.stockLinkRequester"))
++			.filter(test -> test.testName().equals("TestMisc.stockLinkRequesterMenu"))
+ 			.toList();
+ 	}
+ }

@@ -1,0 +1,26 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -169,14 +169,21 @@
+ 			var source = (ChainConveyorBlockEntity) world.getBlockEntity(start);
+ 			var dest = (ChainConveyorBlockEntity) world.getBlockEntity(end);
+ 			var player = chainPlayer(world, start, 1);
++			player.getInventory().setItem(0, ItemStack.EMPTY);
++			var offhand = net.minecraft.world.InteractionHand.OFF_HAND;
++			player.setItemInHand(offhand, new ItemStack(Items.CHAIN, 1));
+ 			var chain = new ItemStack(Items.CHAIN);
+ 			new ChainConveyorConnectionPacket(start, end, chain, true).handle(player);
+ 			chainConnectionLine(scenario, "insufficient", source, dest, player, edge);
+-			if (!source.connections.isEmpty() || !dest.connections.isEmpty() || player.getInventory().countItem(Items.CHAIN) != 1)
++			if (!source.connections.isEmpty() || !dest.connections.isEmpty() || player.getOffhandItem().getCount() != 1)
+ 				throw new IllegalStateException("Insufficient chains created a connection or changed inventory");
+-			player.getInventory().setItem(0, new ItemStack(Items.CHAIN, 16));
++			System.out.printf(Locale.ROOT, "CREATE_CHAIN_OFFHAND %s,insufficient,%d,%b%n",
++				scenario, player.getOffhandItem().getCount(), player.getMainHandItem().isEmpty());
++			player.setItemInHand(offhand, new ItemStack(Items.CHAIN, 16));
+ 			new ChainConveyorConnectionPacket(start, end, chain, true).handle(player);
+ 			chainConnectionLine(scenario, "connected", source, dest, player, edge);
++			System.out.printf(Locale.ROOT, "CREATE_CHAIN_OFFHAND %s,connected,%d,%b%n",
++				scenario, player.getOffhandItem().getCount(), player.getMainHandItem().isEmpty());
+ 			if (!source.connections.contains(edge) || !dest.connections.contains(edge.multiply(-1)))
+ 				throw new IllegalStateException("Connection packet did not link both conveyors");
+ 		});

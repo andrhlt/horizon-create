@@ -1,0 +1,89 @@
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+index 657f93b..45a2e93 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+@@ -95,6 +95,7 @@ public class CrossPlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+index 4e7785d..3b3571a 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+@@ -91,6 +91,7 @@ public class PlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+index ee1f50c..a2cbd61 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+@@ -118,6 +118,7 @@ public abstract class SymmetryMirror {
+ 	@OnlyIn(Dist.CLIENT)
+ 	public abstract PartialModel getModel();
+ 
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {}
+ 
+ 	protected Vec3 getDiff(BlockPos position) {
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..2ffeb85 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.creativeCrateUpwardChute")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..9799520 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,36 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void creativeCrateUpwardChute(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var cratePos = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		var chutePos = cratePos.below();
++		var fanPos = chutePos.below();
++		helper.runAtTickTime(4, () -> {
++			level.setBlock(cratePos, com.simibubi.create.AllBlocks.CREATIVE_CRATE.getDefaultState(), 3);
++			var crate = (com.simibubi.create.content.logistics.crate.CreativeCrateBlockEntity) level.getBlockEntity(cratePos);
++			crate.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE).setFilter(new ItemStack(Items.IRON_INGOT, 7));
++			level.setBlock(chutePos, com.simibubi.create.AllBlocks.CHUTE.getDefaultState(), 3);
++			level.setBlock(fanPos, com.simibubi.create.AllBlocks.ENCASED_FAN.getDefaultState()
++				.setValue(com.simibubi.create.content.kinetics.fan.EncasedFanBlock.FACING, net.minecraft.core.Direction.UP), 3);
++		});
++		helper.runAtTickTime(6, () -> {
++			var chute = (com.simibubi.create.content.logistics.chute.ChuteBlockEntity) level.getBlockEntity(chutePos);
++			var crate = (com.simibubi.create.content.logistics.crate.CreativeCrateBlockEntity) level.getBlockEntity(cratePos);
++			var filter = crate.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE);
++			var fan = (com.simibubi.create.content.kinetics.fan.EncasedFanBlockEntity) level.getBlockEntity(fanPos);
++			fan.setSpeed(256);
++			chute.updatePush(1);
++			helper.assertTrue(chute.getItemMotion() == 0.2f, "expected an upward 256 RPM fan");
++			chute.setItem(new ItemStack(Items.GOLD_INGOT, 5), 0);
++			for (int tick=0; tick <= 12; tick++) {
++				if (tick > 0) chute.tick();
++				System.out.printf("CREATE_CRATE_UPWARD_CHUTE,%d,%d,%s,%d,%.9f%n", tick, chute.getItem().getCount(), net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(filter.getFilter().getItem()), filter.getFilter().getCount(), chute.saveWithoutMetadata(level.registryAccess()).getFloat("ItemPosition"));
++			}
++			if (!chute.getItem().isEmpty() || !filter.getFilter().is(Items.IRON_INGOT)) throw new IllegalStateException("Chute did not empty into crate");
++			helper.succeed();
++		});
++	}
++
+ }

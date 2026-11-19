@@ -1,0 +1,10 @@
+{
+  "template": "minecraft:gold_block",
+  "item": true,
+  "properties": {"map_color": 34, "occludes": false, "sounds": "minecraft:netherite_block"},
+  "state_properties": {
+    "type": {"type": "enum", "values": ["entry_signal", "cross_signal"]},
+    "powered": {"type": "boolean"}
+  },
+  "default_state": {"type": "entry_signal", "powered": "false"}
+}

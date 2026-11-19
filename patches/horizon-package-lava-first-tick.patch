@@ -1,0 +1,38 @@
+--- a/crates/horizon-client/src/mobs/ai.rs
++++ b/crates/horizon-client/src/mobs/ai.rs
+@@ -1258,12 +1258,13 @@
+     if fire > 0.0 {
+         m.ticks_frozen = 0;
+     }
++    let ignore_initial_lava = m.first_tick && m.native_ignore_initial_lava();
+     // Entity.baseTick counts burn damage and the timer before a wet mob is put out.
+     if m.fire_ticks > 0 {
+         if m.fire_immune() {
+             m.fire_ticks = 0;
+         } else {
+-            if m.fire_ticks % 20 == 0 && !m.fluids.in_lava {
++            if m.fire_ticks % 20 == 0 && (!m.fluids.in_lava || ignore_initial_lava) {
+                 hurt(m, w, events, 1.0, Damage::of(DamageKind::OnFire));
+             }
+             m.fire_ticks -= 1;
+@@ -1342,7 +1343,7 @@
+             touches_lava(m, w),
+         )
+     };
+-    block_contact_damage(m, fire, lava, w, events);
++    block_contact_damage(m, fire, lava && !ignore_initial_lava, w, events);
+     // What a hurt outside the mob's own tick left (a scripted or a mob's
+     // hit) teleports before the rest of the tick, as it did inside it.
+     hurt_teleports(m, w, events);
+@@ -1738,6 +1739,11 @@
+     }
+ }
+ impl Mob {
++    /// Some custom entities use the original first-tick lava damage exemption.
++    fn native_ignore_initial_lava(&self) -> bool {
++        false
++    }
++
+     /// LivingEntity.isPushable (and the push it takes from `Entity.push(Entity)`):
+     /// bats and shulkers are never moved by others, nor is a mob on a climbable
+     /// block (`onClimbable`, cached by the last tick).

@@ -1,0 +1,127 @@
+--- a/crates/horizon-world/src/level/bonemeal.rs
++++ b/crates/horizon-world/src/level/bonemeal.rs
+@@ -280,6 +280,124 @@
+     }
+ }
+ 
++
++struct TreeFertilizerLevel<'a> {
++    blocks: std::collections::BTreeMap<[i32; 3], BlockStateId>,
++    soil: BlockStateId,
++    air: BlockStateId,
++    podzol: Option<super::states::BlockId>,
++    behaviours: &'a Behaviours,
++    random: &'a mut horizon_core::random::LegacyRandom,
++    seed: i64,
++    min_y: i32,
++    max_y: i32,
++}
++
++impl LevelAccess for TreeFertilizerLevel<'_> {
++    fn block_state(&self, pos: BlockPos) -> BlockStateId {
++        if pos.y < 10 {
++            return self.soil;
++        }
++        self.blocks.get(&[pos.x, pos.y, pos.z]).copied().unwrap_or(self.air)
++    }
++
++    fn set_raw(&mut self, pos: BlockPos, state: BlockStateId) -> Option<BlockStateId> {
++        let old = self.block_state(pos);
++        if self.podzol != Some(self.behaviours.block(state)) {
++            self.blocks.insert([pos.x, pos.y, pos.z], state);
++        }
++        Some(old)
++    }
++
++    fn is_loaded(&self, _pos: BlockPos) -> bool {
++        true
++    }
++
++    fn min_y(&self) -> i32 {
++        self.min_y
++    }
++
++    fn max_y(&self) -> i32 {
++        self.max_y
++    }
++
++    fn random(&mut self) -> &mut horizon_core::random::LegacyRandom {
++        self.random
++    }
++
++    fn game_time(&self) -> i64 {
++        0
++    }
++
++    fn world_seed(&self) -> i64 {
++        self.seed
++    }
++}
++
++impl Behaviours {
++    /// Grow against an isolated soil plane, then apply Create's replacement rules.
++    pub fn use_tree_fertilizer<L: LevelAccess + ?Sized>(
++        &self,
++        level: &mut L,
++        ticks: &mut Ticks,
++        pos: BlockPos,
++    ) -> bool {
++        use super::{data::state_flags, flags};
++
++        let state = level.block_state(pos);
++        let Some(kind) = self.bonemeal_kind(state) else {
++            return false;
++        };
++        let planted = self.table.set_int(state, self.props.stage, 1);
++        let mut soil = level.block_state(below(pos));
++        if self.tag("minecraft:dirt").is_some_and(|tag| self.in_set(soil, tag))
++            && let Some(dirt) = self.table.block_by_name("minecraft:dirt")
++        {
++            soil = self.default_of(dirt);
++        }
++
++        let mut blocks = std::collections::BTreeMap::new();
++        for x in -1..=1 {
++            for z in -1..=1 {
++                if self.block(level.block_state(pos.offset(x, 0, z))) == self.block(state) {
++                    blocks.insert([x, 10, z], planted);
++                }
++            }
++        }
++        let blocks = {
++            let mut simulated = TreeFertilizerLevel {
++                blocks,
++                soil,
++                air: BlockStateId(0),
++                podzol: self.table.block_by_name("minecraft:podzol"),
++                behaviours: self,
++                seed: level.world_seed(),
++                min_y: level.min_y(),
++                max_y: level.max_y(),
++                random: level.random(),
++            };
++            self.sim(&mut simulated, &mut Ticks::default())
++                .perform_bonemeal(kind, BlockPos::new(0, 10, 0), planted);
++            simulated.blocks
++        };
++
++        let mut live = self.sim(level, ticks);
++        for ([x, y, z], new) in blocks {
++            let at = pos.offset(x, y - 10, z);
++            let old = live.state(at);
++            if self.facts(old).hardness == -1.0
++                || (!self.has_flag(new, state_flags::CONDUCTOR)
++                    && !self.has_flag(old, state_flags::COLLISION_EMPTY))
++            {
++                continue;
++            }
++            live.destroy_block(at, true, flags::UPDATE_LIMIT);
++            live.set_block(at, new, flags::UPDATE_ALL);
++        }
++        true
++    }
++}
++
+ impl<L: LevelAccess + ?Sized> Sim<'_, L> {
+     fn next_int(&mut self, bound: i32) -> i32 {
+         self.random().next_int_bound(bound).unwrap_or(0)

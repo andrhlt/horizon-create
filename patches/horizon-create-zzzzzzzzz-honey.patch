@@ -1,0 +1,56 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -37,6 +37,7 @@
+         "minecraft:potato" => (1.25, 15, 5.0, 1.5),
+         "minecraft:baked_potato" => (1.25, 15, 5.0, 0.5),
+         "minecraft:poisonous_potato" => (1.25, 15, 5.0, 0.05),
++        "create:honeyed_apple" => (1.35, 15, 6.0, 0.1),
+         "minecraft:golden_apple" | "minecraft:enchanted_golden_apple" => (1.45, 100, 1.0, 0.05),
+         "minecraft:carrot" => (1.45, 12, 4.0, 0.3),
+         "minecraft:apple" => (1.45, 10, 5.0, 0.5),
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5590,6 +5590,11 @@
+                     })
+                 });
+                 let damage = cannon_ammo.map_or(t.damage, |ammo| ammo.damage);
++                let cannon_effect = match p.item.as_ref().map(|item| item.item.as_ref()) {
++                    Some("minecraft:poisonous_potato") => Some(("minecraft:poison", 0)),
++                    Some("create:honeyed_apple") => Some(("minecraft:slowness", 1)),
++                    _ => None,
++                };
+                 let baked = cannon_ammo.is_some()
+                     && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:baked_potato");
+                 match hit {
+@@ -5618,14 +5623,14 @@
+                                     &source,
+                                 );
+                             }
+-                            if p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:poisonous_potato") {
++                            if let Some((effect, amplifier)) = cannon_effect {
+                                 let tags = &self.res.stations().enchantments.entity_tags;
+                                 if let Some(m) = self.mobs.iter_mut().find(|m| m.id == id)
+-                                    && super::potions::mob_can_be_affected(tags, &m.kind.id, "poison")
++                                    && super::potions::mob_can_be_affected(tags, &m.kind.id, effect)
+                                 {
+-                                    let new = !m.has_effect("minecraft:poison");
+-                                    m.add_effect("minecraft:poison", 160, 0);
+-                                    self.mod_effect_added("minecraft:poison", Some(id as i32), 0, new);
++                                    let new = !m.has_effect(effect);
++                                    m.add_effect(effect, 160, amplifier);
++                                    self.mod_effect_added(effect, Some(id as i32), amplifier, new);
+                                 }
+                             }
+                             let apple = p.item.as_ref().map(|item| item.item.as_ref());
+@@ -5686,9 +5691,9 @@
+                         }
+                         let from = [p.previous.x, p.previous.y, p.previous.z];
+                         if self.mob_hits_player(damage, from, "minecraft:thrown")
+-                            && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:poisonous_potato")
++                            && let Some((effect, amplifier)) = cannon_effect
+                         {
+-                            self.give_player_effect("minecraft:poison", 160, 0);
++                            self.give_player_effect(effect, 160, amplifier);
+                         }
+                     }
+                     _ => {}

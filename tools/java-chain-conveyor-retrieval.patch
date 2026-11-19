@@ -1,0 +1,28 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -222,6 +222,25 @@
+ 					if (!source.connections.isEmpty() || !dest.connections.isEmpty())
+ 						throw new IllegalStateException("Disconnect packet left a unilateral edge");
+ 				}
++				if (tick == 50) {
++					var player = chainPlayer(world, end, 0);
++					player.getInventory().clearContent();
++					dest.addLoopingPackage(new ChainConveyorPackage(315, chainPackage("Inventory", Items.PAPER, 3)));
++					new com.simibubi.create.content.kinetics.chainConveyor.ChainPackageInteractionPacket(end, null, 315, true).handle(player);
++					var loop = player.getMainHandItem();
++					if (!PackageItem.getAddress(loop).equals("Inventory"))
++						throw new IllegalStateException("Loop package did not enter empty hand");
++					System.out.printf(Locale.ROOT, "CREATE_CHAIN_RETRIEVAL %s,loop,50,315,Inventory,main_hand%n", scenario);
++					player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.STICK));
++					dest.addTravellingPackage(new ChainConveyorPackage(2.5f, chainPackage("Pocket", Items.STRING, 2)),
++						edge.multiply(-1));
++					new com.simibubi.create.content.kinetics.chainConveyor.ChainPackageInteractionPacket(end, edge.multiply(-1), 2.5f, true).handle(player);
++					boolean received = java.util.stream.IntStream.range(0, 36)
++						.anyMatch(slot -> PackageItem.getAddress(player.getInventory().getItem(slot)).equals("Pocket"));
++					if (!received || !player.getMainHandItem().is(Items.STICK))
++						throw new IllegalStateException("Span package did not enter inventory");
++					System.out.printf(Locale.ROOT, "CREATE_CHAIN_RETRIEVAL %s,span,50,2.5,Pocket,inventory%n", scenario);
++				}
+ 				String receipt = port == null ? "-" : chainReceipt(port);
+ 				System.out.printf(Locale.ROOT, "CREATE_CHAIN_WORLD %s,%d,%.8f,%.8f,%b,%b,%b,%b,%s,%.8f,%s%n",
+ 					scenario, tick, source.getSpeed(), dest.getSpeed(), source.connections.contains(edge),

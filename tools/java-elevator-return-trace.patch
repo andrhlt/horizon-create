@@ -1,0 +1,40 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -155,7 +155,7 @@
+ 		});
+ 	}
+ 
+-	@GameTest(template = "elevator")
++	@GameTest(template = "elevator", timeoutTicks = 200)
+ 	public static void elevator(CreateGameTestHelper helper) {
+ 		BlockPos pulley = new BlockPos(5, 12, 3);
+ 		BlockPos secondaryPulley = new BlockPos(5, 12, 1);
+@@ -185,12 +185,24 @@
+ 
+ 				helper.pullLever(lever);
+ 				helper.fail("Entering step 2");
+-			} else { // step 2: wait for top lamp and cow passenger
++			} else if (helper.getTick() <= 90) {
+ 				helper.assertBlockProperty(topLamp, RedstoneLampBlock.LIT, true);
+ 				helper.assertBlockProperty(bottomLamp, RedstoneLampBlock.LIT, false);
+ 				helper.assertEntityPresent(EntityType.COW, cowEnd);
+-				// all done, disassemble
+-				helper.getBlockEntity(AllBlockEntityTypes.ELEVATOR_PULLEY.get(), pulley).clicked();
++				if (helper.getTick() == 90) {
++					BlockPos lowerLever = new BlockPos(1, 2, 2);
++					helper.setBlock(lowerLever, net.minecraft.world.level.block.Blocks.LEVER.defaultBlockState()
++						.setValue(LeverBlock.FACE, net.minecraft.world.level.block.state.properties.AttachFace.FLOOR)
++						.setValue(LeverBlock.FACING, net.minecraft.core.Direction.WEST));
++					helper.pullLever(lowerLever);
++				}
++				helper.fail("Waiting for return trip");
++			} else {
++				helper.assertBlockProperty(topLamp, RedstoneLampBlock.LIT, false);
++				helper.assertBlockProperty(bottomLamp, RedstoneLampBlock.LIT, true);
++				helper.assertEntityPresent(EntityType.COW, cowSpawn.below());
++				if (helper.getTick() < 155)
++					helper.fail("Waiting for cabin to settle");
+ 			}
+ 		});
+ 	}

@@ -1,0 +1,7 @@
+tick,rig,id,category,x,y,z,gain,pitch
+6,0,create:contraption_disassemble,block,1.5,0.5,0.5,0.3500,0.7500
+6,0,create:contraption_disassemble,block,2.5,0.5,0.5,0.3500,0.7500
+6,1,create:contraption_disassemble,block,-0.5,0.5,0.5,0.3500,0.7500
+6,1,create:contraption_disassemble,block,-1.5,0.5,0.5,0.3500,0.7500
+6,2,create:contraption_disassemble,block,1.5,0.5,0.5,0.3500,0.7500
+6,2,create:contraption_disassemble,block,2.5,0.5,0.5,0.3500,0.7500

@@ -1,0 +1,11 @@
+{
+  "java_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "incomplete_orders": [77, 88],
+  "remaining_order": 88,
+  "merged_order": 77,
+  "package_count": 1,
+  "package_contents": [
+    ["minecraft:iron_ingot", 2],
+    ["minecraft:gold_ingot", 2]
+  ]
+}

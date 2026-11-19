@@ -1,0 +1,55 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..4ded967 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.potatoCannon")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..671e514 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,36 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
+-}
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 25)
++	public static void potatoCannon(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 24, 2));
++		var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++			new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "CannonFixture"));
++		player.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		player.setPos(origin.getX() + .5, origin.getY(), origin.getZ() + .5);
++		player.setYRot(0); player.setXRot(0);
++		var cannon = com.simibubi.create.AllItems.POTATO_CANNON.asStack();
++		player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, cannon);
++		player.getInventory().setItem(1, new ItemStack(Items.POTATO, 3));
++		var target = EntityType.PIG.create(world);
++		target.setPos(origin.getX(), origin.getY() + 1, origin.getZ() + 5.5);
++		target.setNoAi(true); target.setNoGravity(true); target.setPersistenceRequired();
++		helper.runAtTickTime(1, () -> world.addFreshEntity(target));
++		helper.runAtTickTime(2, () -> {
++			cannon.use(world, player, net.minecraft.world.InteractionHand.MAIN_HAND);
++		});
++		for (int tick = 0; tick <= 7; tick++) {
++			final int sample = tick;
++			helper.runAtTickTime(2 + tick, () -> {
++				var p = target.position(); var v = target.getDeltaMovement();
++				var shots = world.getEntitiesOfClass(com.simibubi.create.content.equipment.potatoCannon.PotatoProjectileEntity.class,
++					new net.minecraft.world.phys.AABB(origin).inflate(15));
++				System.out.printf(java.util.Locale.ROOT, "CANNON_TARGET,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%d%n",
++					sample, target.getHealth(), p.x - player.getX(), p.y - player.getY(), p.z - player.getZ(), v.x, v.y, v.z, shots.size());
++				if (sample == 7) helper.succeed();
++			});
++		}
++	}
++
++}
+\ No newline at end of file

@@ -1,0 +1,66 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageFire"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,51 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void packageFire(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(2, 4, 2));
++		var at = net.minecraft.world.phys.Vec3.atBottomCenterOf(pos);
++		var boxStyle = com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES.getFirst();
++		for (String scenario : new String[]{"dry", "campfire", "flame", "lava", "resistant", "repeated"}) {
++			world.setBlockAndUpdate(pos.below(), Blocks.OBSIDIAN.defaultBlockState());
++			world.setBlockAndUpdate(pos, switch (scenario) {
++				case "flame", "resistant" -> Blocks.FIRE.defaultBlockState();
++				case "lava" -> Blocks.LAVA.defaultBlockState();
++				case "campfire" -> Blocks.CAMPFIRE.defaultBlockState();
++				default -> Blocks.AIR.defaultBlockState();
++			});
++			var stack = new ItemStack(boxStyle);
++			if (scenario.equals("resistant")) {
++				stack.set(net.minecraft.core.component.DataComponents.FIRE_RESISTANT, net.minecraft.util.Unit.INSTANCE);
++			}
++			var cargo = net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
++			cargo.set(0, new ItemStack(Items.CLAY_BALL, 3));
++			stack.set(com.simibubi.create.AllDataComponents.PACKAGE_CONTENTS,
++				net.minecraft.world.item.component.ItemContainerContents.fromItems(cargo));
++			var packageEntity = com.simibubi.create.content.logistics.box.PackageEntity.fromItemStack(world, at, stack);
++			world.addFreshEntity(packageEntity);
++			if (scenario.equals("dry"))
++				packageEntity.hurt(world.damageSources().inFire(), 1);
++			var bounds = new net.minecraft.world.phys.AABB(pos).inflate(3);
++			int limit = scenario.equals("dry") ? 110 : 55;
++			for (int tick = 0; tick <= limit; tick++) {
++				if (tick > 0 && scenario.equals("repeated"))
++					packageEntity.hurt(world.damageSources().inFire(), 1);
++				else if (tick > 0)
++					world.tickNonPassenger(packageEntity);
++				int spilled = world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, bounds).stream()
++					.filter(item -> item.getItem().is(Items.CLAY_BALL)).mapToInt(item -> item.getItem().getCount()).sum();
++				System.out.printf(java.util.Locale.ROOT, "PACKAGE_FIRE,%s,%d,%.9f,%d,%b,%d%n",
++					scenario, tick, packageEntity.getHealth(), packageEntity.getRemainingFireTicks(), packageEntity.isRemoved(), spilled);
++				if (packageEntity.isRemoved())
++					break;
++			}
++			packageEntity.discard();
++			world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, bounds).forEach(entity -> entity.discard());
++			world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++		}
++		helper.succeed();
++	}
+ }

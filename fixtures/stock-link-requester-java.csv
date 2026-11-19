@@ -1,0 +1,9 @@
+tick,powered,success,comparator,stored_iron,packaged_iron,address,animation
+3,false,false,0,6,0,_,0
+4,true,false,0,6,0,_,0
+5,false,false,0,6,0,_,0
+6,true,true,15,0,6,Smelting,20
+7,false,false,0,0,6,Smelting,19
+8,true,false,0,0,6,Smelting,18
+9,false,false,0,0,6,Smelting,17
+10,false,false,0,0,6,Smelting,16

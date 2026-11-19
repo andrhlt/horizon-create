@@ -1,0 +1,82 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..791a81665 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestContraptions.controls"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+index e74ff27e4..4bcf9d056 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -114,6 +114,28 @@ public class TestContraptions {
+ 
+ 		helper.whenSecondsPassed(1, () -> helper.pressButton(button));
+ 		helper.succeedWhen(() -> {
++            MechanicalBearingBlockEntity traceBearing =
++                helper.getBlockEntity(AllBlockEntityTypes.MECHANICAL_BEARING.get(), bearingPos);
++            var traceEntity = traceBearing.getMovedContraption();
++            var origin = helper.absolutePos(BlockPos.ZERO);
++            var traceState = helper.getBlockState(gearshift);
++            var buttonState = helper.getBlockState(button);
++            boolean harvesterDisabled = traceEntity != null && traceEntity.getContraption()
++                .isActorTypeDisabled(new net.minecraft.world.item.ItemStack(AllBlocks.MECHANICAL_HARVESTER.get()));
++            boolean ploughDisabled = traceEntity != null && traceEntity.getContraption()
++                .isActorTypeDisabled(new net.minecraft.world.item.ItemStack(AllBlocks.MECHANICAL_PLOUGH.get()));
++            var soils = dirt.stream().map(pos -> helper.getBlockState(pos).is(Blocks.FARMLAND))
++                .map(String::valueOf).collect(java.util.stream.Collectors.joining(":"));
++            var ages = wheat.stream().map(pos -> helper.getBlockState(pos).getValue(CropBlock.AGE))
++                .map(String::valueOf).collect(java.util.stream.Collectors.joining(":"));
++            System.out.printf(java.util.Locale.ROOT,
++                "CREATE_CONTROLS %d,%d,%d:%d:%d,%d,%d,%s,%s,%s,%s,%s,%s%n",
++                helper.getTick(), Math.floorMod(helper.getLevel().getGameTime(), 20),
++                origin.getX(), origin.getY(), origin.getZ(), step.get(),
++                traceState.getValue(SequencedGearshiftBlock.STATE),
++                buttonState.getValue(net.minecraft.world.level.block.ButtonBlock.POWERED),
++                traceEntity == null ? "" : String.format(java.util.Locale.ROOT, "%.9f", traceEntity.getAngle(1)),
++                harvesterDisabled, ploughDisabled, soils, ages);
+ 			helper.assertBlockPresent(Blocks.STONE_BUTTON, button);
+ 
+ 			// wait for gearshift to reset
+diff --git a/src/main/resources/create.mixins.json b/src/main/resources/create.mixins.json
+index b5ea0067a..ffadfeb68 100644
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -6,6 +6,7 @@
+   "plugin": "com.simibubi.create.foundation.mixin.CreateMixinPlugin",
+   "compatibilityLevel": "JAVA_21",
+   "mixins": [
++    "ParityGameTestOriginMixin",
+     "ArmorTrimMixin",
+     "BeehiveBlockMixin",
+     "BlockItemMixin",
+diff --git a/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+new file mode 100644
+index 000000000..a1ca98568
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+@@ -0,0 +1,17 @@
++package com.simibubi.create.foundation.mixin;
++
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.ModifyArg;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.gametest.framework.GameTestServer;
++
++@Mixin(GameTestServer.class)
++public class ParityGameTestOriginMixin {
++    @ModifyArg(method = "startTests", at = @At(value = "INVOKE",
++        target = "Lnet/minecraft/gametest/framework/StructureGridSpawner;<init>(Lnet/minecraft/core/BlockPos;IZ)V"), index = 0)
++    private BlockPos parityOrigin(BlockPos vanillaOrigin) {
++        return new BlockPos(3, vanillaOrigin.getY(), -12);
++    }
++}

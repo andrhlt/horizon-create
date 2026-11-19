@@ -1,0 +1,98 @@
+{
+  "default": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "Count": 0,
+                "Exact": 0
+              },
+              "Id": "create:player_count"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "shift": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "Count": 5,
+                "Exact": 1
+              },
+              "Id": "create:player_count"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "upper": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "Count": 20,
+                "Exact": 1
+              },
+              "Id": "create:player_count"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "lower": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "Count": 0,
+                "Exact": 0
+              },
+              "Id": "create:player_count"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  }
+}

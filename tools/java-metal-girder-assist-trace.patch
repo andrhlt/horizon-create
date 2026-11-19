@@ -1,0 +1,103 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..4bd7673be 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.metalGirderPlacementAssist"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..8262791d4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,71 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 15)
++	public static void metalGirderPlacementAssist(CreateGameTestHelper helper) {
++		var girder = com.simibubi.create.AllBlocks.METAL_GIRDER;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var waterlogged = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var x = com.simibubi.create.content.decoration.girder.GirderBlock.X;
++		var z = com.simibubi.create.content.decoration.girder.GirderBlock.Z;
++		var top = com.simibubi.create.content.decoration.girder.GirderBlock.TOP;
++		var bottom = com.simibubi.create.content.decoration.girder.GirderBlock.BOTTOM;
++		var east = net.minecraft.core.Direction.EAST;
++		var west = net.minecraft.core.Direction.WEST;
++		var up = net.minecraft.core.Direction.UP;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var held = new int[] {2, 2, 2, 2, 2};
++		for (int index = 0; index < held.length; index++) {
++			var origin = new BlockPos(12, 3, 2 + index * 5);
++			var dir = index == 1 ? up : east;
++			var baseline = girder.getDefaultState().setValue(axis, dir.getAxis()).setValue(x, index != 1)
++				.setValue(top, index == 1).setValue(bottom, index == 1);
++			helper.setBlock(origin, baseline);
++			if (index == 2)
++				helper.setBlock(origin.east(), net.minecraft.world.level.block.Blocks.STONE);
++			else {
++				int length = index == 3 ? 12 : 1;
++				for (int segment = 1; segment <= length; segment++)
++					helper.setBlock(origin.relative(dir, segment), baseline);
++			}
++			if (index == 4)
++				helper.setBlock(origin.east(2), net.minecraft.world.level.block.Blocks.WATER);
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int index = 0; index < held.length; index++) {
++				var origin = new BlockPos(12, 3, 2 + index * 5);
++				var target = index == 1 ? origin.above(2) : index == 2 || index == 3 ? origin.west() : origin.east(2);
++				var state = helper.getBlockState(target);
++				boolean placed = girder.has(state);
++				System.out.printf(java.util.Locale.ROOT,
++					"CREATE_GIRDER_ASSIST,%d,%d,%s,%s,%s,%s,%s,%s,%s,%d%n",
++					tick, index, placed ? "girder" : state.isAir() ? "air" : "water",
++					placed ? state.getValue(axis).getName() : "none", placed && state.getValue(x), placed && state.getValue(z),
++					placed && state.getValue(top), placed && state.getValue(bottom), placed && state.getValue(waterlogged),
++					held[index]);
++				if (tick == 3) {
++					var at = helper.absolutePos(origin);
++					player.setPos(at.getX(), at.getY(), at.getZ() - 2);
++					player.setShiftKeyDown(false);
++					var stack = new ItemStack(girder.asItem(), held[index]);
++					player.setItemInHand(hand, stack);
++					var hitPoint = index == 1 ? at.getCenter().add(-0.25, 0.38, 0) : at.getCenter().add(0.38, 0.375, 0);
++					var hit = new net.minecraft.world.phys.BlockHitResult(hitPoint, index == 1 ? west : up, at, false);
++					helper.getBlockState(origin).useItemOn(stack, level, player, hand, hit);
++					held[index] = stack.getCount();
++				}
++			}
++			if (tick < 7)
++				helper.fail("Waiting for the complete girder helper trace");
++		});
++	}
+ }

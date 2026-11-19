@@ -1,0 +1,83 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..cbc2c43 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageFilterMatching"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..987a876 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,64 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void packageFilterMatching(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var component = com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS;
++		var styles = com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES;
++		for (var box : styles) {
++			var stack = new ItemStack(box);
++			System.out.printf("PACKAGE_FORM,%s,%d,%b%n", box.style.getItemId(), stack.getMaxStackSize(), box.canFitInsideContainerItems());
++		}
++		String[][] scenarios = {
++			{null, "", "package"}, {null, "", "filter"}, {"", "", "package"}, {"", "*", "package"},
++			{"   ", "", "package"}, {"   ", "East", "package"}, {"East", "East", "package"},
++			{"East", "east", "package"}, {"East", "", "package"}, {"*", "", "package"},
++			{"West", "*", "package"}, {"Rail*", "Rail-2", "package"}, {"Rail-2", "Rail*", "package"},
++			{"Rail*", "R*", "package"}, {"*North", "North", "package"}, {"*North", "Old North", "package"},
++			{"Dock-?", "Dock-2", "package"}, {"Dock-?", "Dock-20", "package"},
++			{"Dock-[1-3]", "Dock-2", "package"}, {"Dock-[!1-3]", "Dock-2", "package"},
++			{"Dock-[!1-3]", "Dock-4", "package"}, {"Dock-{East,West}", "Dock-West", "package"},
++			{"Dock-{East,West}", "Dock-North", "package"}, {"Dock-{!East}", "Dock-West", "package"},
++			{"Dock-{!East}", "Dock-Eastern", "package"}, {"*{!East}", "Dock-East", "package"},
++			{"*{!East}", "Dock-West", "package"}, {"Dock\\*", "Dock*", "package"},
++			{"Dock[", "Dock", "package"}, {"^Depot.1$", "^Depot.1$", "package"},
++			{"^Depot.?", "^Depot.1", "package"}, {"É?", "É台", "package"}, {"D?", "D😀", "package"},
++			{"*", "East", "rare"}, {"*", "", "stone"}, {"*", "", "filter"},
++			{null, "", "filterConfigured"}, {"", "", "filterConfigured"}, {"", "", "filter"}, {"", "", "filterTrimmed"}
++		};
++		for (int index = 0; index < scenarios.length; index++) {
++			var row = scenarios[index];
++			var filter = com.simibubi.create.AllItems.PACKAGE_FILTER.asStack();
++			if (row[0] != null)
++				filter.set(component, row[0]);
++			var candidate = switch (row[2]) {
++				case "filter", "filterConfigured", "filterTrimmed" -> com.simibubi.create.AllItems.PACKAGE_FILTER.asStack();
++				case "stone" -> new ItemStack(Items.STONE);
++				case "rare" -> new ItemStack(styles.get(4));
++				default -> new ItemStack(styles.get(0));
++			};
++			if (row[2].equals("filterConfigured") || row[2].equals("filterTrimmed") || !row[1].isEmpty())
++				candidate.set(component, row[1]);
++			if (row[2].equals("filterTrimmed")) {
++				candidate.remove(net.minecraft.core.component.DataComponents.ENCHANTMENTS);
++				candidate.remove(net.minecraft.core.component.DataComponents.ATTRIBUTE_MODIFIERS);
++				System.out.println("PACKAGE_TRIMMED_PATCH," + candidate.getComponentsPatch());
++			}
++			var wrapped = com.simibubi.create.content.logistics.filter.FilterItemStack.of(filter);
++			boolean ordinary = wrapped.test(world, candidate, false);
++			boolean exact = wrapped.test(world, candidate, true);
++			boolean fluid = wrapped.test(world, new net.neoforged.neoforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.WATER, 1000), false);
++			System.out.printf("PACKAGE_MATCH,%d,%s,%s,%s,%b,%b,%b%n", index, packageAddressEvidence(row[0]),
++				packageAddressEvidence(row[1]), row[2], ordinary, exact, fluid);
++		}
++		helper.succeed();
++	}
++
++	private static String packageAddressEvidence(String text) {
++		if (text == null)
++			return "-";
++		return java.util.HexFormat.of().formatHex(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
++	}
+ }

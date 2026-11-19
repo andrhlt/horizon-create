@@ -1,0 +1,15 @@
+tick,shaft_material,shaft_type,shaft_face,shaft_along_first,cog_material,cog_type,cog_face,cog_along_first,wood_count,metal_count,dropped_wood
+0,none,none,none,false,none,none,none,false,2,2,0
+1,none,none,none,false,none,none,none,false,2,2,0
+2,none,none,none,false,none,none,none,false,2,2,0
+3,none,none,none,false,none,none,none,false,2,2,0
+4,wood,shaft,up,true,none,none,none,false,1,2,0
+5,wood,shaft,up,true,none,none,none,false,1,2,0
+6,metal,shaft,up,true,none,none,none,false,2,1,0
+7,metal,shaft,up,true,none,none,none,false,2,1,0
+8,none,none,none,false,none,none,none,false,2,2,0
+9,none,none,none,false,wood,cog,south,false,1,2,0
+10,none,none,none,false,wood,cog,south,false,1,2,0
+11,none,none,none,false,none,none,none,false,1,2,1
+12,none,none,none,false,none,none,none,false,1,2,1
+13,none,none,none,false,none,none,none,false,1,2,1

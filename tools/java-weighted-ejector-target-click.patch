@@ -1,0 +1,70 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaEjectorTargetClickProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaEjectorTargetClickProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaEjectorTargetClickProbe.java
+@@ -0,0 +1,65 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.logistics.depot.EjectorTargetHandler;
++import net.minecraft.client.Minecraft;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.phys.BlockHitResult;
++import net.minecraft.world.phys.Vec3;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaEjectorTargetClickProbe {
++    private static final BlockPos MARK = new BlockPos(9, 104, -11);
++    private static final BlockPos EMPTY = new BlockPos(9, 104, -9);
++    private static final BlockPos OTHER = new BlockPos(9, 104, -13);
++    private static int phase;
++    private static int next;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) {
++        if (!Boolean.getBoolean("parity.ejector.target_click") || phase >= 4)
++            return;
++        var game = Minecraft.getInstance();
++        var player = game.player;
++        var level = game.level;
++        if (player == null || level == null || game.gameMode == null || !player.isCreative()
++                || !AllBlocks.WEIGHTED_EJECTOR.isIn(player.getMainHandItem())
++                || !level.getBlockState(MARK).is(Blocks.SMOOTH_STONE) || player.tickCount < next)
++            return;
++        if (phase == 0 && (!level.getBlockState(EMPTY).is(Blocks.SMOOTH_STONE)
++                || !level.getBlockState(OTHER).is(Blocks.SMOOTH_STONE)))
++            return;
++        boolean previousSneaking = player.input.shiftKeyDown;
++        player.input.shiftKeyDown = true;
++        EjectorTargetHandler.tick();
++        try {
++            if (phase == 1) {
++                var selection = new PlayerInteractEvent.RightClickBlock(player, InteractionHand.MAIN_HAND, MARK,
++                    new BlockHitResult(Vec3.atCenterOf(MARK).add(0, .5, 0), Direction.UP, MARK, false));
++                EjectorTargetHandler.rightClickingBlocksSelectsThem(selection);
++                System.out.printf("JAVA_EJECTOR_CLICK mark,%b%n", selection.isCanceled());
++            } else {
++                BlockPos clicked = phase == 0 ? EMPTY : phase == 2 ? OTHER : MARK;
++                String label = phase == 0 ? "without_selection" : phase == 2 ? "other" : "selected";
++                var click = new PlayerInteractEvent.LeftClickBlock(player, clicked, Direction.UP,
++                    PlayerInteractEvent.LeftClickBlock.Action.START);
++                EjectorTargetHandler.leftClickingBlocksDeselectsThem(click);
++                System.out.printf("JAVA_EJECTOR_CLICK %s,%b%n", label, click.isCanceled());
++                if (!click.isCanceled())
++                    game.gameMode.startDestroyBlock(clicked, Direction.UP);
++            }
++        } finally {
++            player.input.shiftKeyDown = previousSneaking;
++        }
++        phase++;
++        next = player.tickCount + 8;
++    }
++}

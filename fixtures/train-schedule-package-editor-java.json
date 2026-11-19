@@ -1,0 +1,48 @@
+{
+  "deliver": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 7
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {},
+          "Id": "create:package_delivery"
+        }
+      }
+    ]
+  },
+  "retrieve": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 7
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Warehouse ***"
+          },
+          "Id": "create:package_retrieval"
+        }
+      }
+    ]
+  }
+}

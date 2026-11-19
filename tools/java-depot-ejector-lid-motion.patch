@@ -1,0 +1,85 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.weightedEjectorComparator")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,69 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void weightedEjectorComparator(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = new BlockPos(5, 104, -11);
++		var chunk = new net.minecraft.world.level.ChunkPos(at);
++		level.setChunkForced(chunk.x, chunk.z, true);
++		level.getChunk(chunk.x, chunk.z);
++		for (int x = -3; x <= 7; x++)
++			for (int z = -2; z <= 2; z++) {
++				level.setBlockAndUpdate(at.offset(x, -1, z),
++					net.minecraft.world.level.block.Blocks.SMOOTH_STONE.defaultBlockState());
++				for (int y = 0; y < 7; y++)
++					level.removeBlock(at.offset(x, y, z), false);
++			}
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var west = net.minecraft.core.Direction.WEST;
++		var south = net.minecraft.core.Direction.SOUTH;
++		var meter = at.east();
++		var dust = meter.east();
++		var end = at.east(4);
++		var plate = AllBlocks.WEIGHTED_EJECTOR.getDefaultState().setValue(horizontal, east);
++		level.setBlockAndUpdate(at, plate);
++		level.setBlockAndUpdate(at.west(), net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState());
++		level.setBlockAndUpdate(at.north(), AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, south));
++		((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(at.north()))
++			.generatedSpeed.setValue(128);
++		level.setBlockAndUpdate(meter, net.minecraft.world.level.block.Blocks.COMPARATOR.defaultBlockState().setValue(horizontal, west));
++		level.setBlockAndUpdate(dust, net.minecraft.world.level.block.Blocks.REDSTONE_WIRE.defaultBlockState());
++		level.setBlockAndUpdate(end, AllBlocks.DEPOT.getDefaultState());
++		var source = (com.simibubi.create.content.logistics.depot.EjectorBlockEntity) level.getBlockEntity(at);
++		var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) level.getBlockEntity(end);
++		source.setTarget(4, 0);
++		var count = source.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE);
++		count.setValue(4);
++		var input = source.getBehaviour(com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE);
++		var power = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWER;
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			helper.assertTrue(tick >= 1, "Waiting for the measured ticks");
++			if (tick >= 12 && tick <= 30 && (tick - 12) % 6 == 0) {
++				int size = 1 + (int)(tick - 12) / 6;
++				input.setCenteredHeldItem(new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++					new ItemStack(Items.IRON_INGOT, size)));
++				source.notifyUpdate();
++			}
++			if (tick == 34)
++				count.setValue(0);
++			if (tick == 36)
++				level.removeBlock(at.west(), false);
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_EJECTOR_LID_MOTION %d,%s,%.8f,%.8f,%.8f%n",
++				tick, source.getState(), source.getLidProgress(0), source.getLidProgress(.5f), source.getLidProgress(1));
++			int raw = level.getBlockState(at).getAnalogOutputSignal(level, at);
++			int comparator = ((net.minecraft.world.level.block.entity.ComparatorBlockEntity) level.getBlockEntity(meter)).getOutputSignal();
++			int wire = level.getBlockState(dust).getValue(power);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_EJECTOR_COMPARATOR %d,%s,%d,%d,%d,%d,%d%n",
++				tick, source.getState(), input.getHeldItemStack().getCount(), raw, comparator, wire, depot.getHeldItem().getCount());
++			helper.assertTrue(tick >= 62 && depot.getHeldItem().getCount() == 4 && comparator == 0 && wire == 0,
++				"The Comparator must reflect the held stack and turn off after its launch.");
++			level.setChunkForced(chunk.x, chunk.z, false);
++		});
++	}
+ }

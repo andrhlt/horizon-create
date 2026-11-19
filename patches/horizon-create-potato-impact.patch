@@ -1,0 +1,16 @@
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5594,6 +5594,13 @@
+                             .find(|m| m.id == id)
+                             .is_some_and(|m| m.damage_projectile(t.damage, source, aim, push));
+                         if hurt {
++                            // Create's potato adds its projectile knockback after
++                            // LivingEntity.hurt has applied the ordinary impulse.
++                            if t.id == "create:potato_projectile"
++                                && let Some(m) = self.mobs.iter_mut().find(|m| m.id == id)
++                            {
++                                m.knockback(1.5 * 0.6, -push[0], -push[1], &source);
++                            }
+                             self.player_hurt_mob(p, id);
+                         }
+                         // LivingEntity.hurtServer: PLAYER_HURT_ENTITY.

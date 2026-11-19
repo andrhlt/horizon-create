@@ -1,0 +1,81 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.metalBars"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,66 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void metalBars(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(1, 1, 1)).above(48);
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var variants = java.util.List.of("andesite", "brass", "copper");
++		var ingredients = java.util.List.of("create:andesite_alloy", "create:brass_ingot", "minecraft:copper_ingot");
++		for (int i = 0; i < variants.size(); i++) {
++			var material = variants.get(i);
++			var name = com.simibubi.create.Create.asResource(material + "_bars");
++			var input = new net.minecraft.world.item.crafting.SingleRecipeInput(new ItemStack(items.get(
++				net.minecraft.resources.ResourceLocation.parse(ingredients.get(i)))));
++			var matches = level.getRecipeManager().getRecipesFor(net.minecraft.world.item.crafting.RecipeType.STONECUTTING, input, level);
++			var recipe = matches.stream().filter(r -> r.id().toString().contains(material + "_bars_from_")).findFirst().orElseThrow();
++			var output = recipe.value().assemble(input, level.registryAccess());
++			helper.assertTrue(items.getKey(output.getItem()).equals(name), "Wrong stonecutting output");
++			var at = origin.east(i * 5);
++			var block = registry.get(name);
++			var initial = block.defaultBlockState();
++			System.out.printf("CREATE_METAL_BAR_RECIPE %s,%s,%s,%d,%d%n", name, ingredients.get(i), recipe.id(),
++				output.getCount(), initial.getMapColor(level, at).id);
++		}
++		helper.runAtTickTime(1, () -> {
++			for (int i = 0; i < variants.size(); i++) {
++				var at = origin.east(i * 5);
++				var block = registry.get(com.simibubi.create.Create.asResource(variants.get(i) + "_bars"));
++				level.setBlockAndUpdate(at, block.defaultBlockState());
++			}
++		});
++		for (int index = 1; index <= 8; index++) {
++			int tick = index;
++			helper.runAtTickTime(tick + 1, () -> {
++				for (int i = 0; i < variants.size(); i++) {
++					var at = origin.east(i * 5);
++					switch (tick) {
++					case 2 -> level.setBlockAndUpdate(at.north(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++					case 3 -> level.setBlockAndUpdate(at.east(), net.minecraft.world.level.block.Blocks.IRON_BARS.defaultBlockState());
++					case 4 -> level.setBlockAndUpdate(at.south(), net.minecraft.world.level.block.Blocks.GLASS_PANE.defaultBlockState());
++					case 5 -> level.setBlockAndUpdate(at.west(), net.minecraft.world.level.block.Blocks.OAK_FENCE.defaultBlockState());
++					case 6 -> level.removeBlock(at.north(), false);
++					case 7 -> {
++						var water = net.minecraft.world.level.material.Fluids.WATER.getSource(false);
++						((net.minecraft.world.level.block.SimpleWaterloggedBlock) level.getBlockState(at).getBlock())
++							.placeLiquid(level, at, level.getBlockState(at), water);
++					}
++					case 8 -> level.removeBlock(at.east(), false);
++					}
++					var state = level.getBlockState(at);
++					System.out.printf("CREATE_METAL_BAR_STATE %d,%s,%b,%b,%b,%b,%b%n", tick, variants.get(i),
++						state.getValue(net.minecraft.world.level.block.CrossCollisionBlock.NORTH),
++						state.getValue(net.minecraft.world.level.block.CrossCollisionBlock.EAST),
++						state.getValue(net.minecraft.world.level.block.CrossCollisionBlock.SOUTH),
++						state.getValue(net.minecraft.world.level.block.CrossCollisionBlock.WEST),
++						state.getValue(net.minecraft.world.level.block.CrossCollisionBlock.WATERLOGGED));
++				}
++				if (tick == 8)
++					helper.succeed();
++			});
++		}
++	}
+ }

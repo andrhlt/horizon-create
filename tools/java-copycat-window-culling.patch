@@ -1,0 +1,119 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaCopycatWindowCullingProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaCopycatWindowCullingProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaCopycatWindowCullingProbe.java
+@@ -0,0 +1,114 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.content.decoration.copycat.CopycatBlockEntity;
++import com.simibubi.create.content.decoration.copycat.CopycatPanelBlock;
++import com.simibubi.create.content.decoration.copycat.CopycatStepBlock;
++
++import java.util.List;
++import java.util.Map;
++
++import net.minecraft.client.Minecraft;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.core.RegistryAccess;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.nbt.NbtUtils;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.resources.ResourceLocation;
++import net.minecraft.world.level.BlockAndTintGetter;
++import net.minecraft.world.level.ColorResolver;
++import net.minecraft.world.level.block.Block;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.entity.BlockEntity;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.level.lighting.LevelLightEngine;
++import net.minecraft.world.level.material.FluidState;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaCopycatWindowCullingProbe {
++    private static boolean done;
++
++    private record Scene(Map<BlockPos, BlockState> blocks, Map<BlockPos, BlockEntity> entities)
++        implements BlockAndTintGetter {
++        public BlockState getBlockState(BlockPos pos) {
++            return blocks.getOrDefault(pos, Blocks.AIR.defaultBlockState());
++        }
++        public BlockEntity getBlockEntity(BlockPos pos) { return entities.get(pos); }
++        public FluidState getFluidState(BlockPos pos) { return getBlockState(pos).getFluidState(); }
++        public int getHeight() { return 384; }
++        public int getMinBuildHeight() { return -64; }
++        public float getShade(Direction side, boolean shaded) { return 1; }
++        public LevelLightEngine getLightEngine() { return null; }
++        public int getBlockTint(BlockPos pos, ColorResolver resolver) { return -1; }
++    }
++
++    private record Neighbour(String name, BlockState state, BlockState material) {
++        Map<BlockPos, BlockEntity> entities(BlockPos pos) {
++            if (material == null)
++                return Map.of();
++            var copycat = new CopycatBlockEntity(AllBlockEntityTypes.COPYCAT.get(), pos, state);
++            copycat.markVirtual();
++            var tag = new CompoundTag();
++            tag.put("Material", NbtUtils.writeBlockState(material));
++            copycat.handleUpdateTag(tag, RegistryAccess.EMPTY);
++            if (copycat.getMaterial() != material)
++                throw new IllegalStateException("Could not load the measured Copycat material");
++            return Map.of(pos, copycat);
++        }
++    }
++
++    private static BlockState block(String id) {
++        return BuiltInRegistries.BLOCK.get(ResourceLocation.parse(id)).defaultBlockState();
++    }
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) {
++        if (!Boolean.getBoolean("parity.copycatWindowCulling") || done)
++            return;
++        var minecraft = Minecraft.getInstance();
++        if (minecraft.screen == null || minecraft.getOverlay() != null)
++            return;
++        done = true;
++        try {
++            probe(minecraft);
++        } finally {
++            minecraft.stop();
++        }
++    }
++
++    private static void probe(Minecraft minecraft) {
++        var oak = block("create:oak_window");
++        var birch = block("create:birch_window");
++        var pos = new BlockPos(8, 111, -10);
++        for (var own : List.of(oak, birch)) {
++            var other = own == oak ? birch : oak;
++            for (var face : List.of(Direction.NORTH, Direction.SOUTH)) {
++                var panelInward = AllBlocks.COPYCAT_PANEL.getDefaultState().setValue(CopycatPanelBlock.FACING, face);
++                var panelOutward = panelInward.setValue(CopycatPanelBlock.FACING, face.getOpposite());
++                var step = AllBlocks.COPYCAT_STEP.getDefaultState().setValue(CopycatStepBlock.FACING, face);
++                var target = pos.relative(face);
++                for (var neighbour : List.of(
++                    new Neighbour("air", Blocks.AIR.defaultBlockState(), null),
++                    new Neighbour("same-window", own, null),
++                    new Neighbour("other-window", other, null),
++                    new Neighbour("inward-panel", panelInward, own),
++                    new Neighbour("outward-panel", panelOutward, own),
++                    new Neighbour("other-material-panel", panelInward, other),
++                    new Neighbour("step", step, own)
++                )) {
++                    var scene = new Scene(Map.of(pos, own, target, neighbour.state()), neighbour.entities(target));
++                    boolean visible = Block.shouldRenderFace(own, scene, pos, face, target);
++                    System.out.printf("CREATE_COPYCAT_WINDOW_CULL %s,%s,%s,%s%n",
++                        own == oak ? "oak" : "birch", neighbour.name(), face.getName(), visible);
++                }
++            }
++        }
++        System.out.println("CREATE_COPYCAT_WINDOW_CULL_DONE");
++    }
++}

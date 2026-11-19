@@ -1,0 +1,4 @@
+phase,running,angle,shaft_rpm,stress,capacity,captured,present
+before,true,0.30000001,1.00000000,0.0,512.0,8,0
+reopened,true,0.60000002,1.00000000,0.0,512.0,8,0
+stopped,false,0.00000000,0.00000000,0.0,0.0,0,8

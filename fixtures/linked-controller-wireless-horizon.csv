@@ -1,0 +1,11 @@
+mode,phase,receive,powered,wire
+solo,press before tick,15,false,0
+solo,press after tick,15,true,15
+solo,release before tick,15,true,15
+solo,release after tick,0,true,15
+solo,release after second tick,0,false,0
+lan,press before tick,15,false,0
+lan,press after tick,15,true,15
+lan,release before tick,15,true,15
+lan,release after tick,0,true,15
+lan,release after second tick,0,false,0

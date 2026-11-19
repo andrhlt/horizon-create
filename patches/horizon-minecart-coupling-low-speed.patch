@@ -1,0 +1,26 @@
+diff --git a/crates/horizon-client/src/game/minecarts.rs b/crates/horizon-client/src/game/minecarts.rs
+--- a/crates/horizon-client/src/game/minecarts.rs
++++ b/crates/horizon-client/src/game/minecarts.rs
+@@ -628,11 +628,17 @@
+         };
+         if let Ok(moved) = scene.resolve(c.bounds(), delta, 0.0, c.on_ground) {
+             c.fall_distance = self.vehicle_fall_reset(c.fall_distance, c.position, moved);
+-            c.position = Vec3::new(
+-                c.position.x + moved.x,
+-                c.position.y + moved.y,
+-                c.position.z + moved.z,
+-            );
++            // Pinned Create Java suppresses tiny resolved Entity.move position updates.
++            // Keep Horizon's standalone behavior and apply this only to linked carts.
++            if moved.length_squared() > 1.0e-7
++                || !super::create_minecart_coupling::is_linked(self, c.id)
++            {
++                c.position = Vec3::new(
++                    c.position.x + moved.x,
++                    c.position.y + moved.y,
++                    c.position.z + moved.z,
++                );
++            }
+             c.on_ground = delta.y < 0.0 && moved.y > delta.y;
+             c.horizontal_collision =
+                 (moved.x - delta.x).abs() > 1.0e-7 || (moved.z - delta.z).abs() > 1.0e-7;

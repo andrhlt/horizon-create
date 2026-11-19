@@ -1,0 +1,113 @@
+diff --git a/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java b/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java
+index 7c714b9..cf7bab4 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java
++++ b/src/main/java/com/simibubi/create/content/equipment/TreeFertilizerItem.java
+@@ -40,6 +40,8 @@ public class TreeFertilizerItem extends Item {
+ 
+ 			BlockPos saplingPos = context.getClickedPos();
+ 			TreesDreamWorld world = new TreesDreamWorld((ServerLevel) context.getLevel(), saplingPos);
++			// Fixture-only seed: repeat the same vanilla tree across obstruction cases.
++			world.getRandom().setSeed(8675309L);
+ 
+ 			for (BlockPos pos : BlockPos.betweenClosed(-1, 0, -1, 1, 0, 1)) {
+ 				if (context.getLevel()
+@@ -55,6 +57,8 @@ public class TreeFertilizerItem extends Item {
+ 				BlockPos actualPos = pos.offset(saplingPos).below(10);
+ 				BlockState newState = world.blocksAdded.get(pos);
+ 
++				if (newState.is(Blocks.OAK_LEAVES) && context.getLevel().getBlockState(actualPos).is(Blocks.STONE))
++					System.out.println("CREATE_TREE_FERTILIZER_LEAF_BLOCKED,true");
+ 				// Don't replace Bedrock
+ 				if (context.getLevel()
+ 					.getBlockState(actualPos)
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..2e2458e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.treeFertilizerObstructions"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..671b5bd 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,72 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void treeFertilizerObstructions(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var item = com.simibubi.create.AllItems.TREE_FERTILIZER.get();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		helper.runAtTickTime(4, () -> {
++			BlockPos leafOffset = null;
++			for (int scenario = 0; scenario < 5; scenario++) {
++				for (BlockPos delta : BlockPos.betweenClosed(-5, -1, -5, 5, 11, 5)) {
++					var target = origin.offset(delta);
++					level.setBlock(target, delta.getY() == -1 ? Blocks.DIRT.defaultBlockState() : Blocks.AIR.defaultBlockState(), 2);
++				}
++				int stage = scenario == 1 ? 1 : 0;
++				var sapling = scenario == 4 ? Blocks.SPRUCE_SAPLING : Blocks.OAK_SAPLING;
++				level.setBlockAndUpdate(origin, sapling.defaultBlockState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.STAGE, stage));
++				if (scenario == 4) {
++					for (int x = 0; x <= 1; x++)
++						for (int z = 0; z <= 1; z++)
++							level.setBlockAndUpdate(origin.offset(x, 0, z), sapling.defaultBlockState());
++				}
++				if (scenario == 1) {
++					level.setBlockAndUpdate(origin.above(), Blocks.STONE.defaultBlockState());
++					level.setBlockAndUpdate(origin.offset(leafOffset), Blocks.STONE.defaultBlockState());
++				}
++				if (scenario == 2)
++					level.setBlockAndUpdate(origin.above(), Blocks.BEDROCK.defaultBlockState());
++				if (scenario == 3) {
++					level.setBlockAndUpdate(origin.above(), Blocks.STONE.defaultBlockState());
++					level.setBlockAndUpdate(origin.above(2), Blocks.BEDROCK.defaultBlockState());
++				}
++				var stack = new ItemStack(item, 2);
++				player.setItemInHand(hand, stack);
++				var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(origin), net.minecraft.core.Direction.UP, origin, false);
++				var result = item.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++				if (scenario == 4) {
++					int logs = 0, podzol = 0;
++					for (int x = 0; x <= 1; x++)
++						for (int z = 0; z <= 1; z++)
++							if (level.getBlockState(origin.offset(x, 0, z)).is(Blocks.SPRUCE_LOG)) logs++;
++					for (BlockPos delta : BlockPos.betweenClosed(-5, -1, -5, 5, -1, 5))
++						if (level.getBlockState(origin.offset(delta)).is(Blocks.PODZOL)) podzol++;
++					System.out.printf("CREATE_TREE_FERTILIZER_SPRUCE,%d,%s,%d,%d,%d%n", stage, result, stack.getCount(), logs, podzol);
++					continue;
++				}
++				boolean trunkLog = level.getBlockState(origin.above()).is(Blocks.OAK_LOG);
++				boolean bedrockKept = level.getBlockState(origin.above()).is(Blocks.BEDROCK);
++				boolean bedrockCapKept = level.getBlockState(origin.above(2)).is(Blocks.BEDROCK);
++				boolean stoneKept = leafOffset != null && level.getBlockState(origin.offset(leafOffset)).is(Blocks.STONE);
++				if (scenario == 0) {
++					for (BlockPos delta : BlockPos.betweenClosed(-3, 2, -3, 3, 9, 3)) {
++						if ((delta.getX() != 0 || delta.getZ() != 0) && level.getBlockState(origin.offset(delta)).is(Blocks.OAK_LEAVES)) {
++							leafOffset = delta.immutable();
++							break;
++						}
++					}
++					if (leafOffset == null)
++						helper.fail("No baseline oak leaf found");
++				}
++				System.out.printf("CREATE_TREE_FERTILIZER,%s,%d,%s,%d,%s,%s,%s,%s%n",
++					scenario == 0 ? "baseline" : scenario == 1 ? "stone" : scenario == 2 ? "bedrock" : "combined", stage,
++					result, stack.getCount(), trunkLog, stoneKept, bedrockKept, bedrockCapKept);
++			}
++			helper.succeed();
++		});
++	}
+ }

@@ -1,0 +1,104 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -20,6 +20,34 @@
+     let y = f64::from(random.next_float() * 0.2);
+     let z = f64::from(random.next_float() * 0.2);
+     Vec3::new(velocity.x * x, velocity.y * y, velocity.z * z)
++}
++
++/// Measured Create 1.21.1 cannon ammunition whose ordinary flight and
++/// living-entity impact are implemented by this bridge.
++#[derive(Clone, Copy)]
++pub struct CreateCannonAmmo {
++    pub velocity: f32,
++    pub reload: i32,
++    pub damage: f32,
++    pub knockback: f32,
++}
++
++pub fn create_cannon_ammo(item: &str) -> Option<CreateCannonAmmo> {
++    let (velocity, reload, damage, knockback) = match item {
++        "minecraft:potato" => (1.25, 15, 5.0, 1.5),
++        "minecraft:carrot" => (1.45, 12, 4.0, 0.3),
++        "minecraft:apple" => (1.45, 10, 5.0, 0.5),
++        "minecraft:beetroot" => (1.6, 5, 2.0, 0.1),
++        "minecraft:melon_slice" => (1.45, 8, 3.0, 0.1),
++        "minecraft:golden_carrot" => (1.45, 15, 12.0, 0.5),
++        _ => return None,
++    };
++    Some(CreateCannonAmmo {
++        velocity,
++        reload,
++        damage,
++        knockback,
++    })
+ }
+ 
+ /// a content mod's thrown item projectile, a copy of `Snowball` that deals
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5583,15 +5583,13 @@
+             }
+             // a mod's copy of Snowball: its damage to anything it hits.
+             (ProjectileKind::Thrown(t), hit) => {
+-                let carrot = t.id == "create:potato_projectile"
+-                    && p.item
+-                        .as_ref()
+-                        .is_some_and(|item| item.item.as_ref() == "minecraft:carrot");
+-                let apple = t.id == "create:potato_projectile"
+-                    && p.item
+-                        .as_ref()
+-                        .is_some_and(|item| item.item.as_ref() == "minecraft:apple");
+-                let damage = if carrot { 4.0 } else { t.damage };
++                let cannon_ammo = (t.id == "create:potato_projectile").then(|| {
++                    let item = p.item.as_ref().map_or("minecraft:potato", |item| item.item.as_ref());
++                    horizon_client::projectiles::create_cannon_ammo(item).unwrap_or_else(|| {
++                        horizon_client::projectiles::create_cannon_ammo("minecraft:potato").unwrap()
++                    })
++                });
++                let damage = cannon_ammo.map_or(t.damage, |ammo| ammo.damage);
+                 match hit {
+                     Hit::Entity {
+                         who: Who::Mob(id), ..
+@@ -5603,19 +5601,11 @@
+                             .find(|m| m.id == id)
+                             .is_some_and(|m| m.damage_projectile(damage, source, aim, push));
+                         if hurt {
+-                            // Create's potato adds its projectile knockback after
+-                            // LivingEntity.hurt has applied the ordinary impulse.
+-                            if t.id == "create:potato_projectile"
++                            if let Some(ammo) = cannon_ammo
+                                 && let Some(m) = self.mobs.iter_mut().find(|m| m.id == id)
+                             {
+                                 m.knockback(
+-                                    if carrot {
+-                                        0.3_f32 as f64 * 0.6
+-                                    } else if apple {
+-                                        0.5 * 0.6
+-                                    } else {
+-                                        1.5 * 0.6
+-                                    },
++                                    f64::from(ammo.knockback) * 0.6,
+                                     -push[0],
+                                     -push[1],
+                                     &source,
+@@ -5647,13 +5637,14 @@
+                     _ => {}
+                 }
+                 self.thrown_break_event(p.id, atp);
+-                self.item_burst(atp, if carrot {
+-                    "minecraft:carrot"
+-                } else if apple {
+-                    "minecraft:apple"
++                let burst_item = if cannon_ammo.is_some() {
++                    p.item
++                        .as_ref()
++                        .map_or("minecraft:potato", |item| item.item.as_ref())
+                 } else {
+                     t.item
+-                });
++                };
++                self.item_burst(atp, burst_item);
+             }
+             (ProjectileKind::Egg, hit) => {
+                 if let Hit::Entity {

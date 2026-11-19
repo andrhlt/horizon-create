@@ -1,0 +1,70 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..963a1a1 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.depotPressing"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d..d95bc69 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,51 @@ public class TestProcessing {
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void depotPressing(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var motorState = AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east);
++		BlockPos motorPos = new BlockPos(1, 11, 1);
++		BlockPos pressPos = new BlockPos(2, 11, 1);
++		BlockPos depotPos = pressPos.below(2);
++		level.setBlockAndUpdate(helper.absolutePos(motorPos), motorState);
++		level.setBlockAndUpdate(helper.absolutePos(pressPos),
++			AllBlocks.MECHANICAL_PRESS.getDefaultState().setValue(horizontal, east));
++		level.setBlockAndUpdate(helper.absolutePos(depotPos), AllBlocks.DEPOT.getDefaultState());
++		var motor = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(motorPos);
++		motor.generatedSpeed.setValue(128);
++		var press = (com.simibubi.create.content.kinetics.press.MechanicalPressBlockEntity) helper.getBlockEntity(pressPos);
++		var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) helper.getBlockEntity(depotPos);
++		depot.setHeldItem(new ItemStack(Items.IRON_INGOT, 2));
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var behaviour = press.getPressingBehaviour();
++			var nbt = depot.saveWithoutMetadata(level.registryAccess());
++			var held = depot.getHeldItem();
++			var output = nbt.getCompound("OutputBuffer").getList("Items", 10);
++			int buffered = 0;
++			for (int slot = 0; slot < output.size(); slot++)
++				buffered += output.getCompound(slot).getInt("count");
++			System.out.printf(java.util.Locale.ROOT, "CREATE_PRESS %d %d %d %d %d %d %d %d %d %.6f%n",
++				tick, (int) press.getSpeed(), behaviour.running ? 1 : 0, behaviour.finished ? 1 : 0,
++				behaviour.mode.ordinal(), behaviour.runningTicks,
++				held.is(Items.IRON_INGOT) ? held.getCount() : 0,
++				held.is(AllItems.IRON_SHEET.get()) ? held.getCount() : 0, buffered,
++				behaviour.getRenderedHeadOffset(.5f) * behaviour.mode.headOffset);
++			if (tick == 15)
++				level.setBlockAndUpdate(helper.absolutePos(motorPos), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
++			if (tick == 21) {
++				level.setBlockAndUpdate(helper.absolutePos(motorPos), motorState);
++				var replacement = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity)
++					helper.getBlockEntity(motorPos);
++				replacement.generatedSpeed.setValue(128);
++			}
++			helper.assertTrue(tick >= 70, "Waiting for both press cycles");
++			helper.assertTrue(held.is(AllItems.IRON_SHEET.get()) && buffered == 1, "Both sheets should remain on the depot");
++		});
++	}
++
+ }

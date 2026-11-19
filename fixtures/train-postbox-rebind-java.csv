@@ -1,0 +1,4 @@
+phase,station_present,same_identity,address,primed,buffer_address
+before,true,true,Depot,false,Elsewhere
+removed,false,,,
+restored,true,true,Depot,false,Elsewhere

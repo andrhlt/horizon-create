@@ -1,0 +1,78 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,62 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void beltFunnelShapes(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(5, 11, 1));
++		var origin = net.minecraft.world.phys.Vec3.atLowerCornerOf(pos);
++		var direction = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.HORIZONTAL_FACING;
++		var variant = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.SHAPE;
++		var item = new net.minecraft.world.entity.item.ItemEntity(level, pos.getX(), pos.getY(), pos.getZ(),
++			new ItemStack(Items.IRON_INGOT));
++		var context = net.minecraft.world.phys.shapes.CollisionContext.of(item);
++		for (int material = 0; material < 2; material++) {
++			var block = material == 0 ? AllBlocks.ANDESITE_BELT_FUNNEL.get() : AllBlocks.BRASS_BELT_FUNNEL.get();
++			for (var facing : net.minecraft.core.Direction.Plane.HORIZONTAL) {
++				for (var form : com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape.values()) {
++					var state = block.defaultBlockState().setValue(direction, facing).setValue(variant, form);
++					var outline = state.getShape(level, pos);
++					var normal = state.getCollisionShape(level, pos);
++					var dropped = state.getCollisionShape(level, pos, context);
++					beltFunnelBoxes(material, facing, form, "outline", outline);
++					beltFunnelBoxes(material, facing, form, "normal", normal);
++					beltFunnelBoxes(material, facing, form, "item", dropped);
++					if (material == 1) {
++						var center = net.minecraft.world.phys.Vec3.atCenterOf(pos);
++						var side = center.add(0, .25, 0);
++						beltFunnelRay(facing, form, "front", outline.clip(side.relative(facing, 2),
++							side.relative(facing.getOpposite(), 2), pos), origin);
++						beltFunnelRay(facing, form, "top", outline.clip(center.add(0, 2, 0),
++							center.add(0, -1, 0), pos), origin);
++					}
++				}
++			}
++		}
++		helper.succeed();
++	}
++
++	private static void beltFunnelBoxes(int material, net.minecraft.core.Direction face,
++		com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape variant,
++		String type, net.minecraft.world.phys.shapes.VoxelShape shape) {
++		for (var box : shape.toAabbs())
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_BELT_FUNNEL_BOX %d,%s,%s,%s,%.12f,%.12f,%.12f,%.12f,%.12f,%.12f%n",
++				material, face.getName(), variant.getSerializedName(), type,
++				box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ);
++	}
++
++	private static void beltFunnelRay(net.minecraft.core.Direction face,
++		com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape variant, String ray,
++		net.minecraft.world.phys.BlockHitResult hit, net.minecraft.world.phys.Vec3 origin) {
++		if (hit == null) {
++			System.out.printf("CREATE_BELT_FUNNEL_RAY %s,%s,%s,none,,,%n",
++				face.getName(), variant.getSerializedName(), ray);
++			return;
++		}
++		var point = hit.getLocation().subtract(origin);
++		System.out.printf(java.util.Locale.ROOT, "CREATE_BELT_FUNNEL_RAY %s,%s,%s,%s,%.8f,%.8f,%.8f%n",
++			face.getName(), variant.getSerializedName(), ray, hit.getDirection().getName(), point.x, point.y, point.z);
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.beltFunnelShapes")).toList();
+ 	}
+ }

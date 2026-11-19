@@ -1,0 +1,20 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -224,6 +224,17 @@
+ 					if (!source.connections.isEmpty() || !dest.connections.isEmpty())
+ 						throw new IllegalStateException("Disconnect packet left a unilateral edge");
+ 				}
++				if (!reverse && tick == 2) {
++					for (BlockPos pos : java.util.List.of(start, end)) {
++						var state = world.getBlockState(pos);
++						var sky = net.minecraft.world.level.LightLayer.SKY;
++						System.out.printf(Locale.ROOT, "CREATE_CHAIN_WHEEL_SKY %s,%d,%b,%b,%d,%d,%d%n",
++							pos.equals(start) ? "A" : "B", state.getLightBlock(world, pos),
++							state.propagatesSkylightDown(world, pos), state.canOcclude(),
++							world.getBrightness(sky, pos.above()), world.getBrightness(sky, pos),
++							world.getBrightness(sky, pos.below()));
++					}
++				}
+ 				if (!reverse && tick >= 2 && tick <= 24) {
+ 					chainSuspendedSample(world, tick, "A", start, source);
+ 					chainSuspendedSample(world, tick, "B", start, dest);

@@ -1,0 +1,48 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestItems.smartObserverBeltAndFunnel"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+@@ -269,6 +269,33 @@
+ 				new BlockPos(6, 2, 1), // belt
+ 				new BlockPos(1, 3, 6) // funnel
+ 		);
++		var level = helper.getLevel();
++		var beltObserver = new BlockPos(3, 2, 2);
++		var funnelObserver = new BlockPos(6, 3, 4);
++		var gantryStart = helper.absolutePos(new BlockPos(5, 3, 6));
++		for (int i = 1; i <= 190; i++) {
++			int tick = i;
++			helper.runAfterDelay(tick, () -> {
++				var belt = (com.simibubi.create.content.redstone.smartObserver.SmartObserverBlockEntity)
++					level.getBlockEntity(helper.absolutePos(beltObserver));
++				var funnel = (com.simibubi.create.content.redstone.smartObserver.SmartObserverBlockEntity)
++					level.getBlockEntity(helper.absolutePos(funnelObserver));
++				var powered = com.simibubi.create.content.redstone.smartObserver.SmartObserverBlock.POWERED;
++				int b = belt.getBlockState().getValue(powered) ? 1 : 0;
++				int f = funnel.getBlockState().getValue(powered) ? 1 : 0;
++				var area = new net.minecraft.world.phys.AABB(gantryStart).inflate(12);
++				var carriage = level.getEntitiesOfClass(com.simibubi.create.content.contraptions.gantry.GantryContraptionEntity.class, area);
++				double x = carriage.isEmpty() ? 999 : carriage.getFirst().getX() - gantryStart.getX();
++				var values = new java.util.ArrayList<String>();
++				for (BlockPos pos : targets)
++					values.add(helper.getBlockState(pos).is(Blocks.DIAMOND_BLOCK) ? "1" : "0");
++				for (BlockPos pos : overflows)
++					values.add(helper.getBlockState(pos).is(Blocks.DIAMOND_BLOCK) ? "1" : "0");
++				System.out.printf(java.util.Locale.ROOT, "CREATE_OBSERVER_BELT %d %d %d %d %d %.8f %s %d %d%n",
++					tick, b, belt.turnOffTicks, f, funnel.turnOffTicks, x, String.join(" ", values),
++					helper.getTotalItems(new BlockPos(7, 3, 3)), helper.getTotalItems(new BlockPos(1, 3, 3)));
++			});
++		}
+ 		helper.pullLever(lever);
+ 		helper.succeedWhen(() -> {
+ 			helper.assertSecondsPassed(9);

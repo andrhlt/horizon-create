@@ -1,0 +1,99 @@
+--- a/crates/horizon-world/src/level/bonemeal.rs
++++ b/crates/horizon-world/src/level/bonemeal.rs
+@@ -355,7 +355,12 @@
+         };
+         let planted = self.table.set_int(state, self.props.stage, 1);
+         let mut soil = level.block_state(below(pos));
+-        if self.tag("minecraft:dirt").is_some_and(|tag| self.in_set(soil, tag))
++        // Create 6.0.10's DreamWorld normalizes the 1.21.1 dirt tag. The
++        // current game tag is narrower, so include its former vanilla members.
++        let legacy_dirt = ["minecraft:grass_block", "minecraft:podzol", "minecraft:mycelium",
++            "minecraft:moss_block", "minecraft:mud", "minecraft:muddy_mangrove_roots"]
++            .iter().any(|name| self.table.block_by_name(name) == Some(self.block(soil)));
++        if (legacy_dirt || self.tag("minecraft:dirt").is_some_and(|tag| self.in_set(soil, tag)))
+             && let Some(dirt) = self.table.block_by_name("minecraft:dirt")
+         {
+             soil = self.default_of(dirt);
+@@ -388,8 +393,15 @@
+                 max_y: level.max_y(),
+                 random: fixture_random.as_mut().unwrap_or_else(|| level.random()),
+             };
+-            self.sim(&mut simulated, &mut Ticks::default())
+-                .perform_bonemeal(kind, BlockPos::new(0, 10, 0), planted);
++            let mut temporary_ticks = Ticks::default();
++            let mut sim = self.sim(&mut simulated, &mut temporary_ticks);
++            let legacy_grower = self.data(planted).feature.as_deref()
++                .filter(|name| matches!(*name, "spruce" | "oak" | "mangrove" | "jungle" | "dark_oak"));
++            if matches!(kind, Kind::Sapling | Kind::Propagule) && let Some(name) = legacy_grower {
++                sim.grow_tree_create(name, BlockPos::new(0, 10, 0), planted);
++            } else {
++                sim.perform_bonemeal(kind, BlockPos::new(0, 10, 0), planted);
++            }
+             (simulated.blocks, simulated.insertion_order)
+         };
+ 
+--- a/crates/horizon-world/src/level/growth.rs
++++ b/crates/horizon-world/src/level/growth.rs
+@@ -264,6 +264,22 @@
+     None
+ }
+ 
++// 1.21.1 draws a float for a secondary tree; the newer weighted picker
++// draws an integer instead. Apply the old two-entry rule only for Create.
++fn weighted_create<R: RandomSource>(
++    list: &'static [(&'static str, i32)],
++    random: &mut R,
++    create_legacy: bool,
++) -> Option<&'static str> {
++    if create_legacy && let [first, second] = list {
++        let total = first.1 + second.1;
++        if total > 0 {
++            return Some(if random.next_float() < second.1 as f32 / total as f32 { second.0 } else { first.0 });
++        }
++    }
++    weighted(list, random)
++}
++
+ impl<L: LevelAccess + ?Sized> Sim<'_, L> {
+     /// `ConfiguredFeature.place(level, generator, level.random, pos)`. The
+     /// feature draws from a copy of the level random that replaces it after.
+@@ -387,7 +403,29 @@
+         pos: BlockPos,
+         state: BlockStateId,
+     ) -> bool {
+-        if let Some(mega) = weighted(grower.mega_trees, self.random())
++        self.grow_tree_selected(grower, pos, state, false)
++    }
++
++    /// Create's Tree Fertilizer uses 1.21.1 secondary feature selection.
++    pub(crate) fn grow_tree_create(&mut self, name: &str, pos: BlockPos, state: BlockStateId) -> bool {
++        let Some(grower) = grower(name) else { return false; };
++        self.grow_tree_selected(grower, pos, state, true)
++    }
++
++    fn grow_tree_selected(
++        &mut self,
++        grower: &TreeGrower,
++        pos: BlockPos,
++        state: BlockStateId,
++        create_legacy: bool,
++    ) -> bool {
++        // 1.21.1 chooses a sole mega feature without drawing a random value.
++        let mega = if create_legacy && let [(name, _)] = grower.mega_trees {
++            Some(*name)
++        } else {
++            weighted_create(grower.mega_trees, self.random(), create_legacy)
++        };
++        if let Some(mega) = mega
+             && self.feature_exists(mega)
+             && let Some((dx, dz, around)) = self.two_by_two(state, pos)
+         {
+@@ -408,7 +446,7 @@
+         } else {
+             grower.trees
+         };
+-        let Some(feature) = weighted(list, self.random()) else {
++        let Some(feature) = weighted_create(list, self.random(), create_legacy) else {
+             return false;
+         };
+         if !self.feature_exists(feature) {

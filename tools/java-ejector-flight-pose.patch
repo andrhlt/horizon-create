@@ -1,0 +1,85 @@
+diff --git a/src/main/java/com/simibubi/create/content/logistics/depot/EjectorRenderer.java b/src/main/java/com/simibubi/create/content/logistics/depot/EjectorRenderer.java
+--- a/src/main/java/com/simibubi/create/content/logistics/depot/EjectorRenderer.java
++++ b/src/main/java/com/simibubi/create/content/logistics/depot/EjectorRenderer.java
+@@ -24,6 +24,27 @@
+ import net.minecraft.world.phys.Vec3;
+ 
+ public class EjectorRenderer extends ShaftRenderer<EjectorBlockEntity> {
++    private static final java.util.Set<net.minecraft.core.BlockPos> probed = new java.util.HashSet<>();
++
++    private static boolean probeFlight(EjectorBlockEntity be) {
++        var pos = be.getBlockPos();
++        return Boolean.getBoolean("parity.ejector.flight_pose")
++            && pos.getY() == 104 && pos.getX() >= 5 && pos.getX() <= 8 && pos.getZ() == -11
++            && probed.add(pos.immutable());
++    }
++
++    private static void recordFlight(EjectorBlockEntity be, ItemStack stack, float time, float maxTime,
++            org.joml.Matrix4f pose) {
++        var origin = pose.transformPosition(new org.joml.Vector3f());
++        var right = pose.transformPosition(new org.joml.Vector3f(1, 0, 0));
++        var up = pose.transformPosition(new org.joml.Vector3f(0, 1, 0));
++        var back = pose.transformPosition(new org.joml.Vector3f(0, 0, 1));
++        System.out.printf(java.util.Locale.ROOT,
++            "CREATE_JAVA_EJECTOR_FLIGHT %s,%b,%.9f,%.9f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f%n",
++            be.getFacing().getName(), PackageItem.isPackage(stack), time, maxTime,
++            origin.x, origin.y, origin.z, right.x, right.y, right.z,
++            up.x, up.y, up.z, back.x, back.y, back.z);
++    }
+ 
+ 	static final Vec3 pivot = VecHelper.voxelSpace(0, 11.25, 0.75);
+ 
+@@ -53,12 +74,32 @@
+ 
+ 		var msr = TransformStack.of(ms);
+ 
++        boolean probe = probeFlight(be);
++        var launched = be.launchedItems;
++        if (probe) {
++            be.launcher.set(4, 0);
++            var ordinary = new ItemStack(net.minecraft.world.item.Items.IRON_INGOT);
++            var packageId = net.minecraft.resources.ResourceLocation.parse("create:cardboard_package_12x12");
++            var parcel = new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(packageId));
++            if (!PackageItem.isPackage(parcel))
++                throw new IllegalStateException("Expected original Create package item");
++            be.launchedItems = new java.util.ArrayList<>();
++            for (int age : new int[]{0, 1, 7, 13, 20, 21}) {
++                be.launchedItems.add(IntAttached.with(age, ordinary));
++                be.launchedItems.add(IntAttached.with(age, parcel));
++            }
++        }
++        var base = probe ? new org.joml.Matrix4f(ms.last().pose()).invert() : null;
+ 		float maxTime =
+ 				(float) (be.earlyTarget != null ? be.earlyTargetTime : be.launcher.getTotalFlyingTicks());
+ 		for (IntAttached<ItemStack> intAttached : be.launchedItems) {
+ 			float time = intAttached.getFirst() + partialTicks;
+-			if (time > maxTime)
+-				continue;
++            if (time > maxTime) {
++                if (probe) System.out.printf(java.util.Locale.ROOT,
++                    "CREATE_JAVA_EJECTOR_FLIGHT_HIDDEN %s,%b,%.9f,%.9f%n",
++                    be.getFacing().getName(), PackageItem.isPackage(intAttached.getValue()), time, maxTime);
++                continue;
++            }
+ 
+ 			ms.pushPose();
+ 			Vec3 launchedItemLocation = be.getLaunchedItemLocation(time);
+@@ -76,11 +117,18 @@
+ 				msr.rotateXDegrees(time * 40);
+ 			}
+ 			msr.translateBack(itemRotOffset);
++            if (probe) recordFlight(be, intAttached.getValue(), time, maxTime,
++                new org.joml.Matrix4f(base).mul(ms.last().pose()));
+ 			Minecraft.getInstance()
+ 				.getItemRenderer()
+ 				.renderStatic(intAttached.getValue(), ItemDisplayContext.FIXED, light, overlay, ms, buffer, be.getLevel(), 0);
+ 			ms.popPose();
+ 		}
++
++        if (probe) {
++            be.launchedItems = launched;
++            if (probed.size() == 4) System.out.println("CREATE_JAVA_EJECTOR_FLIGHT_COMPLETE");
++        }
+ 
+ 		DepotBehaviour behaviour = be.getBehaviour(DepotBehaviour.TYPE);
+ 		if (behaviour == null || behaviour.isEmpty())

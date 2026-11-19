@@ -1,0 +1,3 @@
+use,result,held_count,filter_id,filter_count,supplied_id,supplied_count
+1,SUCCESS,0,minecraft:iron_ingot,7,minecraft:iron_ingot,3
+2,SUCCESS,0,minecraft:iron_ingot,7,minecraft:iron_ingot,3

@@ -1,0 +1,179 @@
+{
+  "TWO": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Main Platform *"
+          },
+          "Id": "create:destination"
+        }
+      },
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Harbor"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "EDIT": {
+    "Cyclic": 0,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Main Platform *"
+          },
+          "Id": "create:destination"
+        }
+      },
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "East Pier *"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "REOPEN_TWO": {
+    "Cyclic": 0,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Main Platform *"
+          },
+          "Id": "create:destination"
+        }
+      },
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "East Pier *"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "DELETE": {
+    "Cyclic": 0,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "East Pier *"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "REOPEN_DELETE": {
+    "Cyclic": 0,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "East Pier *"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  }
+}

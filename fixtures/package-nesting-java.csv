@@ -1,0 +1,16 @@
+create:cardboard_package_12x12,false,false
+create:cardboard_package_10x12,false,false
+create:cardboard_package_10x8,false,false
+create:cardboard_package_12x10,false,false
+create:rare_creeper_package,false,false
+create:rare_darcy_package,false,false
+create:rare_evan_package,false,false
+create:rare_jinx_package,false,false
+create:rare_kryppers_package,false,false
+create:rare_simi_package,false,false
+create:rare_starlotte_package,false,false
+create:rare_thunder_package,false,false
+create:rare_up_package,false,false
+create:rare_vector_package,false,false
+minecraft:stone,true,true
+minecraft:shulker_box,false,false

@@ -1,0 +1,85 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..5fae8c38b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().startsWith("TestMisc.windmillSails"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..fde1718dc 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,66 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 32)
++    public static void windmillSails(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var origin = helper.absolutePos(new BlockPos(1, 2, 1)).above(16);
++        var facings = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++        var east = net.minecraft.core.Direction.EAST;
++        var unsup = com.simibubi.create.AllBlocks.SAIL_FRAME.getDefaultState().setValue(facings, east);
++        var white = com.simibubi.create.AllBlocks.SAIL.getDefaultState().setValue(facings, east);
++        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        var positions = java.util.List.of(origin, origin.above(), origin.above(2), origin.south(), origin.south(2),
++            origin.below(), origin.east());
++        var mill = origin.south(5);
++        level.setChunkForced(mill.getX() >> 4, mill.getZ() >> 4, true);
++        level.setChunkForced(mill.getX() >> 4, mill.south(7).getZ() >> 4, true);
++        level.setBlockAndUpdate(mill, com.simibubi.create.AllBlocks.WINDMILL_BEARING.getDefaultState().setValue(facings, east));
++        for (int i = 0; i < 8; i++)
++            level.setBlockAndUpdate(mill.east().south(i), white);
++        helper.runAtTickTime(3, () -> {
++            var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++            var families = new java.util.ArrayList<net.minecraft.world.level.block.Block>();
++            families.add(unsup.getBlock());
++            for (var dye : net.minecraft.world.item.DyeColor.values())
++                families.add(com.simibubi.create.AllBlocks.DYED_SAILS.get(dye).get());
++            for (var block : families) {
++                var state = block.defaultBlockState();
++                System.out.printf("CREATE_SAIL_MATERIAL %s;%s;%d;%.3f;%.3f%n",
++                    registry.getKey(block), state.getValue(facings).getName(), state.getMapColor(level, origin).id,
++                    state.getDestroySpeed(level, origin), block.getExplosionResistance());
++            }
++            for (int i = 0; i < positions.size(); i++)
++                level.setBlockAndUpdate(positions.get(i),
++                    i == 5 ? unsup : i == 4 ? white.setValue(facings, east.getOpposite()) : white);
++            var color = net.minecraft.world.item.Items.RED_DYE;
++            var shears = net.minecraft.world.item.Items.SHEARS;
++            var sequence = java.util.List.of(color, color, color, color, shears, shears, shears);
++            var point = net.minecraft.world.phys.Vec3.atLowerCornerOf(origin).add(0.60, 0.82, 0.69);
++            var hit = new net.minecraft.world.phys.BlockHitResult(point, east, origin, false);
++            for (int i = 0; i < sequence.size(); i++) {
++                var stack = new net.minecraft.world.item.ItemStack(sequence.get(i), sequence.get(i) == color ? 4 : 1);
++                player.setItemInHand(hand, stack);
++                level.getBlockState(origin).useItemOn(stack, level, player, hand, hit);
++                var states = positions.stream().map(pos -> registry.getKey(level.getBlockState(pos).getBlock()).toString())
++                    .collect(java.util.stream.Collectors.joining("|"));
++                System.out.printf("CREATE_SAIL_DYE %d;%s;%d;%d;%s%n", i,
++                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()),
++                    stack.getCount(), stack.getDamageValue(), states);
++            }
++            var millHit = new net.minecraft.world.phys.BlockHitResult(
++                net.minecraft.world.phys.Vec3.atCenterOf(mill), east, mill, false);
++            level.getBlockState(mill).useItemOn(net.minecraft.world.item.ItemStack.EMPTY, level, player, hand, millHit);
++        });
++        helper.runAtTickTime(5, () -> {
++            var bearing = (com.simibubi.create.content.contraptions.bearing.WindmillBearingBlockEntity) level.getBlockEntity(mill);
++            var moved = (com.simibubi.create.content.contraptions.bearing.BearingContraption)
++                bearing.getMovedContraption().getContraption();
++            System.out.printf("CREATE_SAIL_JOIN %d;%.1f%n", moved.getSailBlocks(), bearing.getGeneratedSpeed());
++            helper.assertTrue(moved.getSailBlocks() == 8, "Eight same-plane sails should attach without glue");
++            helper.succeed();
++        });
++    }
+ }

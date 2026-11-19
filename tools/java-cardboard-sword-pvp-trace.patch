@@ -1,0 +1,202 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..3c52d5a 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.cardboardSwordPvp"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..afb06cc 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -15,6 +15,29 @@ import com.simibubi.create.infrastructure.gametest.GameTestGroup;
+ 
+ import net.minecraft.core.BlockPos;
+ import net.minecraft.gametest.framework.GameTest;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++import java.util.UUID;
++import com.mojang.authlib.GameProfile;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.equipment.tool.KnockbackPacket;
++import net.minecraft.network.Connection;
++import net.minecraft.network.protocol.Packet;
++import net.minecraft.network.protocol.PacketFlow;
++import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
++import net.minecraft.server.level.ClientInformation;
++import net.minecraft.server.level.ServerPlayer;
++import net.minecraft.server.network.CommonListenerCookie;
++import net.minecraft.server.network.ServerGamePacketListenerImpl;
++import net.minecraft.world.effect.MobEffects;
++import net.minecraft.world.entity.ai.attributes.Attributes;
++import net.minecraft.world.item.enchantment.Enchantments;
++import net.minecraft.world.level.GameType;
++import net.minecraft.world.phys.Vec3;
++import net.neoforged.neoforge.common.NeoForge;
++import net.neoforged.neoforge.common.util.FakePlayer;
++import net.neoforged.neoforge.event.PlayLevelSoundEvent;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.sounds.SoundSource;
+ import net.minecraft.world.entity.EntityType;
+@@ -115,4 +138,153 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "shearing")
++    public static void cardboardSwordPvp(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var server = world.getServer();
++        var origin = helper.absolutePos(new BlockPos(2, 13, 2));
++        boolean originalPvp = server.isPvpAllowed();
++
++        class Attacker extends FakePlayer {
++            Attacker() {
++                super(world, new GameProfile(UUID.randomUUID(), "SwordAttacker"));
++            }
++
++            @Override
++            public boolean canHarmPlayer(net.minecraft.world.entity.player.Player target) {
++                return server.isPvpAllowed();
++            }
++
++            void arm(ItemStack stack) {
++                var main = EquipmentSlot.MAINHAND;
++                getMainHandItem().forEachModifier(main,
++                    (attribute, modifier) -> getAttribute(attribute).removeModifier(modifier));
++                setItemSlot(main, stack);
++                stack.forEachModifier(main,
++                    (attribute, modifier) -> getAttribute(attribute).addOrUpdateTransientModifier(modifier));
++                attackStrengthTicker = 25;
++            }
++        }
++
++        var attacker = new Attacker();
++        attacker.setGameMode(GameType.SURVIVAL);
++        var enchantments = world.registryAccess()
++            .registryOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT);
++        record Case(String label, boolean pvp, boolean cardboard,
++            boolean knockback, boolean sprint, boolean mounted, boolean creative) {}
++        var cases = List.of(
++            new Case("plain", true, true, false, false, false, false),
++            new Case("base_knockback", true, true, false, false, false, false),
++            new Case("pvp_disabled", false, true, false, false, false, false),
++            new Case("knockback_sprint", true, true, true, true, false, false),
++            new Case("mounted", true, true, false, false, true, false),
++            new Case("mounted_grounded", true, true, false, false, true, false),
++            new Case("creative_victim", true, true, false, false, false, true),
++            new Case("wood", true, false, false, false, false, false)
++        );
++
++        helper.runAtTickTime(1, () -> {
++            try {
++                for (var sample : cases) {
++                    server.setPvpAllowed(sample.pvp());
++                    var profile = new GameProfile(UUID.randomUUID(), "SwordVictim");
++                    var victim = new ServerPlayer(server, world, profile, ClientInformation.createDefault());
++                    var packets = new ArrayList<KnockbackPacket>();
++                    victim.connection = new ServerGamePacketListenerImpl(
++                        server, new Connection(PacketFlow.SERVERBOUND), victim,
++                        CommonListenerCookie.createInitial(profile, false)) {
++                            @Override
++                            public void send(Packet<?> packet) {
++                                if (packet instanceof ClientboundCustomPayloadPacket payload
++                                        && payload.payload() instanceof KnockbackPacket knockback)
++                                    packets.add(knockback);
++                            }
++                        };
++                    victim.setGameMode(sample.creative() ? GameType.CREATIVE : GameType.SURVIVAL);
++                    // Real ServerPlayer startup grants temporary spawn protection.
++                    for (int tick = 0; tick <= 60; tick++)
++                        victim.tick();
++                    victim.setPos(origin.getX() + 0.5, origin.getY(), origin.getZ() + 0.5);
++                    victim.setOnGround(true);
++                    victim.setDeltaMovement(Vec3.ZERO);
++                    var boat = sample.mounted() ? EntityType.BOAT.create(world) : null;
++                    if (boat != null) {
++                        boat.setPos(victim.getX(), victim.getY(), victim.getZ());
++                        world.addFreshEntity(boat);
++                        helper.assertTrue(victim.startRiding(boat, true), "The PvP victim could not board");
++                        victim.rideTick();
++                        // A game's current ground bit can lag until the next movement packet.
++                        victim.setOnGround(sample.label().equals("mounted_grounded"));
++                        victim.setDeltaMovement(Vec3.ZERO);
++                    }
++                    attacker.setPos(victim.getX(), victim.getY(), victim.getZ() - 2);
++                    attacker.setYRot(0);
++                    attacker.setOnGround(true);
++                    attacker.setSprinting(sample.sprint());
++                    attacker.setDeltaMovement(new Vec3(0.2, 0.05, 0.1));
++                    var item = sample.cardboard() ? AllItems.CARDBOARD_SWORD.asStack()
++                        : new ItemStack(Items.WOODEN_SWORD);
++                    if (sample.knockback())
++                        item.enchant(enchantments.getHolderOrThrow(Enchantments.KNOCKBACK), 2);
++                    attacker.getAttribute(Attributes.ATTACK_KNOCKBACK).setBaseValue(
++                        sample.label().equals("base_knockback") ? 2 : 0);
++                    attacker.arm(item);
++                    var sounds = new ArrayList<String>();
++                    java.util.function.Consumer<PlayLevelSoundEvent.AtPosition> listener = sound -> {
++                        if (sound.getLevel() == world && sound.getSound() != null)
++                            sounds.add(sound.getSound().value().getLocation() + "|" + sound.getSource().name()
++                                + "|" + sound.getNewVolume() + "|" + sound.getNewPitch());
++                    };
++                    NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.LOWEST, listener);
++                    float before = victim.getHealth();
++                    try {
++                        attacker.attack(victim);
++                    } finally {
++                        NeoForge.EVENT_BUS.unregister(listener);
++                    }
++                    var motion = victim.getDeltaMovement();
++                    var attackerMotion = attacker.getDeltaMovement();
++                    System.out.printf(Locale.ROOT,
++                        "SWORD_PVP,%s,%b,%.6f,%.6f,%.6f,%.6f,%.6f,%b,%b,%b,%.6f,%.6f,%.6f,%d,%.6f,%.6f,%s%n",
++                        sample.label(), sample.pvp(), before, victim.getHealth(), motion.x, motion.y, motion.z,
++                        victim.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), victim.isPassenger(), attacker.isSprinting(),
++                        attackerMotion.x, attackerMotion.y, attackerMotion.z,
++                        packets.size(), packets.isEmpty() ? 0 : packets.getFirst().yRot(),
++                        packets.isEmpty() ? 0 : packets.getFirst().strength(),
++                        String.join(";", sounds.stream().filter(sound -> sound.startsWith("create:")).toList()));
++                    if (sample.cardboard()) {
++                        helper.assertTrue(victim.getHealth() == before, "Cardboard Sword damaged a player");
++                        helper.assertTrue(!victim.hasEffect(MobEffects.MOVEMENT_SLOWDOWN), "Slowed a player");
++                        helper.assertTrue(!victim.isPassenger(), "Cardboard Sword did not dismount the player");
++                        helper.assertTrue(packets.size() == 1, "Wrong count of original knockback payloads");
++                    } else {
++                        helper.assertTrue(victim.getHealth() == before - 4, "Vanilla sword control should deal four damage");
++                        helper.assertTrue(packets.isEmpty(), "Vanilla sword sent a Create knockback payload");
++                    }
++                    if (boat != null)
++                        boat.discard();
++                }
++                var pig = EntityType.PIG.create(world);
++                pig.setPos(origin.getX() + 0.5, origin.getY(), origin.getZ() + 0.5);
++                pig.setOnGround(true);
++                world.addFreshEntity(pig);
++                attacker.setPos(pig.getX(), pig.getY(), pig.getZ() - 2);
++                attacker.setYRot(0);
++                attacker.setSprinting(false);
++                attacker.getAttribute(Attributes.ATTACK_KNOCKBACK).setBaseValue(2);
++                attacker.arm(AllItems.CARDBOARD_SWORD.asStack());
++                attacker.attack(pig);
++                var impulse = pig.getDeltaMovement();
++                System.out.printf(Locale.ROOT, "SWORD_MOB_BASE,%.6f,%.6f,%.6f,%.6f%n",
++                    pig.getHealth(), impulse.x, impulse.y, impulse.z);
++                helper.assertTrue(pig.getHealth() == 10 && impulse.z == 2.0,
++                    "Wrong original knockback against a pig with a base modifier");
++                pig.discard();
++                helper.succeed();
++            } finally {
++                server.setPvpAllowed(originalPvp);
++            }
++        });
++    }
+ }

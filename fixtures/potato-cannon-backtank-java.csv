@@ -1,0 +1,7 @@
+initial_air,result,air,damage,ammo,cooldown
+0,SUCCESS,0,1,2,true
+1,SUCCESS,0,0,2,true
+4,SUCCESS,0,0,2,true
+100,SUCCESS,96,0,2,true
+900,SUCCESS,896,0,2,true
+950,SUCCESS,896,0,2,true

@@ -1,0 +1,86 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1127,4 +1127,72 @@
+ 		}
+ 	}
+ 
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stockLinkRequester(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var storage = helper.absolutePos(new BlockPos(3, 14, 2));
++		var machine = storage.east();
++		var link = machine.above();
++		var requester = storage.south(4);
++		var signal = requester.east();
++		var iron = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_INGOT);
++		var freq = new java.util.UUID(115, 80);
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var power = net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState();
++		var block = com.simibubi.create.AllBlocks.REDSTONE_REQUESTER.get();
++		var type = com.simibubi.create.AllBlockEntityTypes.REDSTONE_REQUESTER.get();
++		var order = com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts.simple(
++			java.util.List.of(new com.simibubi.create.content.logistics.BigItemStack(iron, 8)));
++		helper.runAtTickTime(2, () -> {
++			level.setBlockAndUpdate(storage, net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState());
++			((net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(storage))
++				.setItem(0, iron.copyWithCount(6));
++			level.setBlockAndUpdate(machine, com.simibubi.create.AllBlocks.PACKAGER.getDefaultState()
++				.setValue(net.minecraft.world.level.block.DirectionalBlock.FACING, net.minecraft.core.Direction.EAST));
++			level.setBlockAndUpdate(link, com.simibubi.create.AllBlocks.STOCK_LINK.getDefaultState());
++			level.getBlockEntity(link, com.simibubi.create.AllBlockEntityTypes.PACKAGER_LINK.get()).orElseThrow()
++				.behaviour.freqId = freq;
++			level.setBlockAndUpdate(requester, block.defaultBlockState());
++			var entity = level.getBlockEntity(requester, type).orElseThrow();
++			entity.behaviour.freqId = freq;
++			entity.encodedRequest = order;
++			entity.encodedTargetAdress = "Smelting";
++			System.out.printf("CREATE_STOCK_REQUESTER_DEFAULT %s%n", block.defaultBlockState());
++		});
++		for (int tick = 3; tick <= 10; tick++) {
++			final int at = tick;
++			helper.runAtTickTime(tick, () -> {
++				var entity = level.getBlockEntity(requester, type).orElseThrow();
++				switch (at) {
++				case 4 -> level.setBlockAndUpdate(signal, power);
++				case 5, 7, 9 -> level.setBlockAndUpdate(signal, air);
++				case 6 -> {
++					entity.allowPartialRequests = true;
++					level.setBlockAndUpdate(signal, power);
++				}
++				case 8 -> {
++					entity.encodedRequest = com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts.empty();
++					level.setBlockAndUpdate(signal, power);
++				}
++				default -> {}
++				}
++				var state = level.getBlockState(requester);
++				var machineEntity = (com.simibubi.create.content.logistics.packager.PackagerBlockEntity) level.getBlockEntity(machine);
++				var box = machineEntity.heldBox;
++				var cargo = box.isEmpty() ? net.minecraft.world.item.ItemStack.EMPTY :
++					com.simibubi.create.content.logistics.box.PackageItem.getContents(box).getStackInSlot(0);
++				var remainder = ((net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(storage)).getItem(0);
++				System.out.printf("CREATE_STOCK_REQUESTER %d,%b,%b,%d,%d,%d,%s,%d%n", at,
++					state.getValue(com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlock.POWERED),
++					entity.lastRequestSucceeded, block.getAnalogOutputSignal(state, level, requester),
++					remainder.getCount(), cargo.getCount(),
++					box.isEmpty() ? "_" : com.simibubi.create.content.logistics.box.PackageItem.getAddress(box),
++					machineEntity.animationTicks);
++				if (at == 10)
++					helper.succeed();
++			});
++		}
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().startsWith("TestMisc.stockLinkNetwork"))
++			.filter(test -> test.testName().startsWith("TestMisc.stockLinkRequester"))
+ 			.toList();
+ 	}
+ }

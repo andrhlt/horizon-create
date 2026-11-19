@@ -1,0 +1,15 @@
+diff --git a/crates/horizon-client/src/game/use_hand.rs b/crates/horizon-client/src/game/use_hand.rs
+--- a/crates/horizon-client/src/game/use_hand.rs
++++ b/crates/horizon-client/src/game/use_hand.rs
+@@ -486,8 +486,10 @@
+             if self.start_eating(&info) {
+                 self.award_stat("used", &stack.item, 1);
+             } else {
+-                // BlockItem.place's FAIL.
++                // BlockItem.place's FAIL. Restore the stack if the client
++                // predicted a placement the server refused.
+                 self.use_failed = true;
++                self.guest_inventory_resend |= self.lan_acting.is_some();
+             }
+             return Ok(true);
+         };

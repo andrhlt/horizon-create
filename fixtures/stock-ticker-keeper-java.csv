@@ -1,0 +1,10 @@
+tick,case,keeper
+2,alone,false
+3,empty_seat,false
+4,occupied_seat,true
+5,occupied_one_below,true
+6,occupied_two_below,false
+7,occupied_diagonal,false
+8,empty_burner,false
+9,adjacent_burner,true
+10,burner_below,false

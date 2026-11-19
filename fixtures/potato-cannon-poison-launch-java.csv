@@ -1,0 +1,5 @@
+case,result,ammo,damage,x,y,z,vx,vy,vz,item
+unlit,SUCCESS,2,1,-0.750000000,1.469999999,1.500000000,0.124844044,0.000000000,2.496880847,minecraft:poisonous_potato
+burning,SUCCESS,2,1,-0.750000000,1.469999999,1.500000000,0.124844044,0.000000000,2.496880847,minecraft:poisonous_potato
+invulnerable,SUCCESS,2,1,-0.750000000,1.469999999,1.500000000,0.124844044,0.000000000,2.496880847,minecraft:poisonous_potato
+burning_invulnerable,SUCCESS,2,1,-0.750000000,1.469999999,1.500000000,0.124844044,0.000000000,2.496880847,minecraft:poisonous_potato

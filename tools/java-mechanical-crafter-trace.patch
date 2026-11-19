@@ -1,0 +1,42 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.crushingWheelCrafting"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -71,7 +71,26 @@
+ 		);
+ 		levers.forEach(helper::pullLever);
+ 		ItemStack expected = new ItemStack(AllBlocks.CRUSHING_WHEEL.get(), 2);
+-		helper.succeedWhen(() -> helper.assertContainerContains(chest, expected));
++		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_CRAFTER %d", helper.getTick());
++			for (var p : java.util.List.of(new BlockPos(3,2,3), new BlockPos(4,3,3),
++				new BlockPos(5,5,3), new BlockPos(2,4,3))) {
++				var saved = helper.getBlockEntity(p).saveWithoutMetadata(access);
++				var group = saved.getCompound("GroupedItems").getList("Grid",10);
++				var inventory = saved.getCompound("Inventory").getList("Items",10);
++				System.out.printf(java.util.Locale.ROOT, " %.4f %s %d %d %d",
++					saved.getFloat("Speed"), saved.getString("Phase"), saved.getInt("CountDown"),
++					inventory.getCompound(0).getInt("count"), group.size());
++			}
++			int count = 0;
++			var storage = helper.itemStorageAt(chest);
++			for (int i = 0; i < storage.getSlots(); i++)
++				if (storage.getStackInSlot(i).is(expected.getItem()))
++					count += storage.getStackInSlot(i).getCount();
++			System.out.printf(java.util.Locale.ROOT, " %d%n", count);
++			helper.assertContainerContains(chest, expected);
++		});
+ 	}
+ 
+ 	@GameTest(template = "precision_mechanism_crafting", timeoutTicks = CreateGameTestHelper.TWENTY_SECONDS)

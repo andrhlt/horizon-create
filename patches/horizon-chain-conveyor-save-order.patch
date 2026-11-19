@@ -1,0 +1,51 @@
+--- a/crates/horizon-client/src/save.rs
++++ b/crates/horizon-client/src/save.rs
+@@ -1436,7 +1436,40 @@
+         ));
+     }
+     map.insert("blending_data".into(), Tag::compound(fields));
++}
++fn order_conveyor_chunk_entities(entities: &mut [Tag], chunk: [i32; 2]) {
++    if !entities.iter().any(|tag| {
++        matches!(tag.get("id"), Some(Tag::String(id)) if id.to_string_lossy() == "create:chain_conveyor")
++    }) {
++        return;
++    }
++
++    // ChunkSerializer writes the positions from ChunkAccess.getBlockEntitiesPos,
++    // which adds the chunk's fastutil map keys to a Java HashSet. The list
++    // order decides which colliding entries register first after loading it.
++    let live = crate::block_entities::chunk_map_order(
++        entities
++            .iter()
++            .filter_map(|tag| block_entity_order::saved_at(tag, chunk)),
++    );
++    let ranks: std::collections::HashMap<_, _> = live
++        .iter()
++        .enumerate()
++        .map(|(rank, &pos)| (pos, rank))
++        .collect();
++    let capacity = (live.len() * 4).div_ceil(3).max(16).next_power_of_two();
++    entities.sort_by_key(|tag| {
++        block_entity_order::saved_at(tag, chunk).map_or((usize::MAX, usize::MAX), |pos| {
++            let (x, y, z) = pos;
++            let hash = (y.wrapping_add(z.wrapping_mul(31)))
++                .wrapping_mul(31)
++                .wrapping_add(x) as u32;
++            let bucket = (hash ^ (hash >> 16)) as usize & (capacity - 1);
++            (bucket, ranks[&pos])
++        })
++    });
+ }
++
+ /// The chunk NBT vanilla's `SerializableChunkData.write` produces for a full
+ /// chunk in a level of `shape`.
+ pub fn encode_with(
+@@ -1622,6 +1655,7 @@
+             }
+         }
+     }
++    order_conveyor_chunk_entities(&mut block_entities, [chunk.x, chunk.z]);
+     let mut root = extras
+         .map(|e| Tag::Compound(e.root.clone()))
+         .unwrap_or_else(|| Tag::Compound(Compound::new()));

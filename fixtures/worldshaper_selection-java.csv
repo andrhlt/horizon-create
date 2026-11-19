@@ -1,0 +1,3 @@
+case,selected,repeated_selection,component_id,name,facing,half,shape,waterlogged,input_state_unchanged,item_count,has_component
+stone,true,false,create:shaper_block_used,minecraft:stone,,,,,true,1,true
+stairs,true,false,create:shaper_block_used,minecraft:oak_stairs,east,top,straight,false,true,1,true

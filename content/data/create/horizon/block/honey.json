@@ -1,0 +1,7 @@
+{
+  "template": "minecraft:water",
+  "item": false,
+  "properties": {
+    "map_color": 40
+  }
+}

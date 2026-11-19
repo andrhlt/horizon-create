@@ -1,0 +1,71 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders)
++			.stream().filter(test -> test.testName().equals("TestProcessing.stationaryFunnelPlacement")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,55 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stationaryFunnelPlacement(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var west = net.minecraft.core.Direction.WEST;
++		var main = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var positions = java.util.List.of(new BlockPos(5, 105, -11), new BlockPos(5, 105, -8),
++			new BlockPos(5, 105, -5), new BlockPos(5, 105, -2), new BlockPos(5, 105, 1), new BlockPos(5, 105, 4));
++		var stone = net.minecraft.world.level.block.Blocks.SMOOTH_STONE.defaultBlockState();
++		var barrel = net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState();
++		for (int mode = 0; mode < positions.size(); mode++) {
++			var target = positions.get(mode);
++			var chunk = new net.minecraft.world.level.ChunkPos(target);
++			level.setChunkForced(chunk.x, chunk.z, true);
++			level.getChunk(chunk.x, chunk.z);
++			for (int x = -2; x <= 2; x++)
++				level.setBlockAndUpdate(target.offset(x, -2, 0), stone);
++			level.removeBlock(target, false);
++			level.setBlockAndUpdate(target.east(), barrel);
++			level.setBlockAndUpdate(target.below(), switch (mode / 2) {
++				case 0 -> stone;
++				case 1 -> AllBlocks.DEPOT.getDefaultState();
++				default -> AllBlocks.WEIGHTED_EJECTOR.getDefaultState();
++			});
++			var held = AllBlocks.BRASS_FUNNEL.asStack();
++			player.setItemInHand(main, held);
++			player.setPos(target.getX() - 1.5, target.getY() - 1, target.getZ() + .5);
++			player.setYRot(-90);
++			player.setXRot(2);
++			player.setShiftKeyDown(mode % 2 == 1);
++			var hit = new net.minecraft.world.phys.BlockHitResult(
++				new net.minecraft.world.phys.Vec3(target.getX() + 1, target.getY() + .5, target.getZ() + .5),
++				west, target.east(), false);
++			var action = held.useOn(new net.minecraft.world.item.context.UseOnContext(player, main, hit));
++			var observed = level.getBlockState(target);
++			var block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(observed.getBlock());
++			var facing = com.simibubi.create.content.logistics.funnel.AbstractFunnelBlock.getFunnelFacing(observed);
++			var variant = observed.hasProperty(com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.SHAPE)
++				? observed.getValue(com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.SHAPE).getSerializedName()
++				: String.valueOf(observed.getValue(com.simibubi.create.content.logistics.funnel.FunnelBlock.EXTRACTING));
++			System.out.printf("CREATE_FUNNEL_STATIONARY_PLACEMENT %d,%s,%s,%s,%d%n",
++				mode, block, facing.getName(), variant, held.getCount());
++			helper.assertTrue(action.consumesAction() && facing == west && held.isEmpty(), "A real side click should place and consume the Funnel");
++		}
++		for (var target : positions) {
++			var chunk = new net.minecraft.world.level.ChunkPos(target);
++			level.setChunkForced(chunk.x, chunk.z, false);
++		}
++		helper.succeed();
++	}
+ }

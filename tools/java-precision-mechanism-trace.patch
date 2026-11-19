@@ -1,0 +1,75 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.precisionMechanismCrafting"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -79,6 +79,7 @@
+ 		BlockPos lever = new BlockPos(6, 3, 6);
+ 		BlockPos output = new BlockPos(11, 3, 1);
+ 		helper.pullLever(lever);
++		SequencedAssemblyRecipe.precisionFixtureRandom = net.minecraft.util.RandomSource.create(0L);
+ 
+ 		SequencedAssemblyRecipe recipe = (SequencedAssemblyRecipe) helper.getLevel().getRecipeManager()
+ 				.byKey(Create.asResource("sequenced_assembly/precision_mechanism"))
+@@ -91,6 +92,38 @@
+ 				.toArray(Item[]::new);
+ 
+ 		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_PRECISION %d", helper.getTick());
++			for (var p : java.util.List.of(new BlockPos(10,2,5), new BlockPos(10,2,3),
++				new BlockPos(1,2,3), new BlockPos(1,2,1))) {
++				var belt = helper.getBlockEntity(p).saveWithoutMetadata(access);
++				System.out.printf(java.util.Locale.ROOT, " %.4f", belt.getFloat("Speed"));
++				var cargo = belt.getCompound("Inventory").getList("Items",10);
++				var summary = new java.util.ArrayList<String>();
++				for (int i = 0; i < cargo.size(); i++) {
++					var entry = cargo.getCompound(i);
++					var item = entry.getCompound("Item");
++					if (item.isEmpty())
++						continue;
++					var step = item.getCompound("components").getCompound("create:sequenced_assembly").getInt("step");
++					summary.add(String.format(java.util.Locale.ROOT, "%s/%d/%d/%.7f/%d", item.getString("id"),
++						item.getInt("count"), step, entry.getFloat("Pos"), entry.getBoolean("Locked") ? 1 : 0));
++				}
++				System.out.printf(" %s", summary.isEmpty() ? "-" : String.join(";",summary));
++			}
++			for (var p : java.util.List.of(new BlockPos(7,4,5), new BlockPos(3,4,3), new BlockPos(9,4,1))) {
++				var saved = helper.getBlockEntity(p).saveWithoutMetadata(access);
++				System.out.printf(java.util.Locale.ROOT, " %.4f %s %d %d", saved.getFloat("Speed"),
++					saved.getString("State"), saved.getInt("Timer"), saved.getCompound("HeldItem").getInt("count"));
++			}
++			var storage = helper.itemStorageAt(output);
++			var out = new java.util.TreeMap<String,Integer>();
++			for (int slot=0; slot < storage.getSlots(); slot++) {
++				var item = storage.getStackInSlot(slot);
++				if (!item.isEmpty())
++					out.merge(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item.getItem()).toString(), item.getCount(), Integer::sum);
++			}
++			System.out.println(" " + (out.isEmpty() ? "-" : out.toString().replace(" ","")));
+ 			helper.assertContainerContains(output, result);
+ 			helper.assertAnyContained(output, possibleResults);
+ 		});
+--- a/src/main/java/com/simibubi/create/content/processing/sequenced/SequencedAssemblyRecipe.java
++++ b/src/main/java/com/simibubi/create/content/processing/sequenced/SequencedAssemblyRecipe.java
+@@ -129,7 +129,11 @@
+ 		return loops;
+ 	}
+ 
++	public static RandomSource precisionFixtureRandom;
++
+ 	private ItemStack rollResult(RandomSource random) {
++		if (precisionFixtureRandom != null)
++			random = precisionFixtureRandom;
+ 		float totalWeight = 0;
+ 		for (ProcessingOutput entry : resultPool)
+ 			totalWeight += entry.getChance();

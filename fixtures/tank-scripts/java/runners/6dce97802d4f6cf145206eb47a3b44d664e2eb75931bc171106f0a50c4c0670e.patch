@@ -1,0 +1,145 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..0571168 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.tankScript")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..95dc9e5 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,128 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "shearing", timeoutTicks = 2000)
++    public static void tankScript(CreateGameTestHelper helper) throws Exception {
++        var script = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(java.nio.file.Path.of(System.getenv("TANK_SCRIPT")))).getAsJsonObject();
++        var level = helper.getLevel();
++        var base = helper.absolutePos(new BlockPos(3, 16, 3));
++        int tick = 2;
++        var batches = new java.util.TreeMap<Integer, java.util.List<com.google.gson.JsonObject>>();
++        for (var item : script.getAsJsonArray("actions")) {
++            var action = item.getAsJsonObject();
++            var op = action.get("op").getAsString();
++            if (op.equals("tick")) { tick += action.get("count").getAsInt(); continue; }
++            batches.computeIfAbsent(tick, ignored -> new java.util.ArrayList<>()).add(action);
++        }
++        for (var batch : batches.entrySet()) {
++            final int logicalTick = batch.getKey() - 2;
++            helper.runAtTickTime(batch.getKey(), () -> {
++              for (var action : batch.getValue()) {
++                var op = action.get("op").getAsString();
++                if (op.equals("probe")) {
++                    for (var point : action.getAsJsonArray("positions")) {
++                        var relative = tankPos(point.getAsJsonArray());
++                        var pos = base.offset(relative);
++                        var block = level.getBlockState(pos).getBlock();
++                        var cap = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK, pos, null);
++                        var be = level.getBlockEntity(pos);
++                        var row = new com.google.gson.JsonObject();
++                        row.addProperty("type", "probe"); row.addProperty("label", action.get("label").getAsString()); row.addProperty("tick", logicalTick);
++                        row.add("pos", point); row.addProperty("block", net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).toString());
++                        if (be instanceof com.simibubi.create.content.fluids.tank.FluidTankBlockEntity tank) {
++                            var c = tank.getController().subtract(base); var coords = new com.google.gson.JsonArray();
++                            coords.add(c.getX()); coords.add(c.getY()); coords.add(c.getZ()); row.add("controller", coords);
++                        } else row.add("controller", com.google.gson.JsonNull.INSTANCE);
++                        var stack = cap == null ? net.neoforged.neoforge.fluids.FluidStack.EMPTY : cap.getFluidInTank(0);
++                        row.addProperty("capacity", cap == null ? 0 : cap.getTankCapacity(0));
++                        row.addProperty("fluid", net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(stack.getFluid()).toString());
++                        row.addProperty("amount", stack.getAmount());
++                        if (script.has("include_signals") && script.get("include_signals").getAsBoolean()) {
++                            var state = level.getBlockState(pos);
++                            row.addProperty("light", state.getLightEmission(level, pos));
++                            row.addProperty("comparator", state.hasAnalogOutputSignal() ? state.getAnalogOutputSignal(level, pos) : 0);
++                        }
++                        if (script.has("include_block_light") && script.get("include_block_light").getAsBoolean()) row.addProperty("block_light", level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, pos));
++                        if (script.has("include_shape") && script.get("include_shape").getAsBoolean()) {
++                            var state = level.getBlockState(pos);
++                            if (state.hasProperty(com.simibubi.create.content.fluids.tank.FluidTankBlock.SHAPE))
++                                row.addProperty("shape", state.getValue(com.simibubi.create.content.fluids.tank.FluidTankBlock.SHAPE).getSerializedName());
++                            else row.add("shape", com.google.gson.JsonNull.INSTANCE);
++                        }
++                        if (script.has("include_components") && script.get("include_components").getAsBoolean()) tankComponents(row, stack, level);
++                        System.out.println("TANK_SCRIPT " + row);
++                    }
++                    continue;
++                }
++                if (op.equals("clone")) {
++                    var a = base.offset(tankPos(action.getAsJsonArray("from")));
++                    var b = base.offset(tankPos(action.getAsJsonArray("to")));
++                    var d = base.offset(tankPos(action.getAsJsonArray("dest")));
++                    String mode = action.get("mode").getAsString().equals("move") ? "move" : "normal";
++                    String command = String.format("clone %d %d %d %d %d %d %d %d %d replace %s", a.getX(),a.getY(),a.getZ(),b.getX(),b.getY(),b.getZ(),d.getX(),d.getY(),d.getZ(),mode);
++                    level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput().withLevel(level), command);
++                    continue;
++                }
++                var pos = base.offset(tankPos(action.getAsJsonArray("pos")));
++                switch (op) {
++                    case "place" -> level.setBlockAndUpdate(pos, action.has("block") && action.get("block").getAsString().equals("creative") ? com.simibubi.create.AllBlocks.CREATIVE_FLUID_TANK.getDefaultState() : com.simibubi.create.AllBlocks.FLUID_TANK.getDefaultState());
++                    case "remove" -> level.destroyBlock(pos, false);
++                    case "setblock" -> {
++                        String command = String.format("setblock %d %d %d %s", pos.getX(), pos.getY(), pos.getZ(), action.get("state").getAsString());
++                        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput().withLevel(level), command);
++                    }
++                    case "wrench" -> {
++                        var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++                        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++                        var wrench = com.simibubi.create.AllItems.WRENCH.asStack();
++                        player.setItemInHand(hand, wrench);
++                        var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(pos), net.minecraft.core.Direction.NORTH, pos, false);
++                        wrench.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++                    }
++                    case "fill" -> {
++                        var cap = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK, pos, null);
++                        var mode = action.has("simulate") && action.get("simulate").getAsBoolean() ? net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.SIMULATE : net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE;
++                        int accepted = cap.fill(tankStack(action, level), mode);
++                        var row = new com.google.gson.JsonObject(); row.addProperty("type", "fill"); row.addProperty("tick", logicalTick); row.add("pos", action.get("pos")); row.addProperty("accepted", accepted);
++                        System.out.println("TANK_SCRIPT " + row);
++                    }
++                    case "configure" -> {
++                        var cap = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK, pos, null);
++                        ((com.simibubi.create.content.fluids.tank.CreativeFluidTankBlockEntity.CreativeSmartFluidTank) cap).setContainedFluid(tankStack(action, level));
++                        var row = new com.google.gson.JsonObject(); row.addProperty("type", "configure"); row.addProperty("tick", logicalTick); row.add("pos", action.get("pos")); System.out.println("TANK_SCRIPT " + row);
++                    }
++                    case "drain" -> {
++                        var cap = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK, pos, null);
++                        var mode = action.has("simulate") && action.get("simulate").getAsBoolean() ? net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.SIMULATE : net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE;
++                        var stack = action.has("fluid") ? cap.drain(tankStack(action, level), mode) : cap.drain(action.get("amount").getAsInt(), mode);
++                        var row = new com.google.gson.JsonObject(); row.addProperty("type", "drain"); row.addProperty("tick", logicalTick); row.add("pos", action.get("pos"));
++                        row.addProperty("fluid", net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(stack.getFluid()).toString()); row.addProperty("amount", stack.getAmount());
++                        if (script.has("include_components") && script.get("include_components").getAsBoolean()) tankComponents(row, stack, level);
++                        System.out.println("TANK_SCRIPT " + row);
++                    }
++                    default -> throw new IllegalArgumentException("Unknown tank action: " + op);
++                }
++              }
++            });
++        }
++        helper.runAtTickTime(tick + 1, helper::succeed);
++    }
++
++    private static net.neoforged.neoforge.fluids.FluidStack tankStack(com.google.gson.JsonObject action, net.minecraft.server.level.ServerLevel level) {
++        if (action.get("fluid").getAsString().equals("minecraft:empty")) return net.neoforged.neoforge.fluids.FluidStack.EMPTY;
++        var json = new com.google.gson.JsonObject(); json.add("id", action.get("fluid")); json.add("amount", action.get("amount"));
++        if (action.has("components")) json.add("components", action.get("components"));
++        var tag = (net.minecraft.nbt.CompoundTag) com.mojang.serialization.JsonOps.INSTANCE.convertTo(net.minecraft.nbt.NbtOps.INSTANCE, json);
++        return net.neoforged.neoforge.fluids.FluidStack.parseOptional(level.registryAccess(), tag);
++    }
++
++    private static void tankComponents(com.google.gson.JsonObject row, net.neoforged.neoforge.fluids.FluidStack stack, net.minecraft.server.level.ServerLevel level) {
++        var tag = (net.minecraft.nbt.CompoundTag) stack.saveOptional(level.registryAccess());
++        row.add("components", tag.contains("components") ? net.minecraft.nbt.NbtOps.INSTANCE.convertTo(com.mojang.serialization.JsonOps.INSTANCE, tag.getCompound("components")) : com.google.gson.JsonNull.INSTANCE);
++    }
++
++    private static BlockPos tankPos(com.google.gson.JsonArray coords) {
++        return new BlockPos(coords.get(0).getAsInt(), coords.get(1).getAsInt(), coords.get(2).getAsInt());
++    }
+ }

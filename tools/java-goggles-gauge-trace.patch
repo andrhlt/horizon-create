@@ -1,0 +1,87 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaGaugeTooltipProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaGaugeTooltipProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaGaugeTooltipProbe.java
+@@ -0,0 +1,82 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import java.lang.reflect.Field;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.ArrayList;
++import java.util.List;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
++import com.simibubi.create.content.kinetics.gauge.SpeedGaugeBlockEntity;
++import com.simibubi.create.content.kinetics.gauge.StressGaugeBlockEntity;
++
++import net.minecraft.client.Minecraft;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.RegistryAccess;
++import net.minecraft.network.chat.Component;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaGaugeTooltipProbe {
++    private static boolean ran;
++    private static int joinedTicks;
++    private static Field field(Class<?> type, String name) throws ReflectiveOperationException {
++        var field = type.getDeclaredField(name);
++        field.setAccessible(true);
++        return field;
++    }
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws Exception {
++        var minecraft = Minecraft.getInstance();
++        if (ran || minecraft.player == null || ++joinedTicks < 30)
++            return;
++        ran = true;
++        var speed = new SpeedGaugeBlockEntity(AllBlockEntityTypes.SPEEDOMETER.get(), BlockPos.ZERO,
++            AllBlocks.SPEEDOMETER.getDefaultState());
++        var stress = new StressGaugeBlockEntity(AllBlockEntityTypes.STRESSOMETER.get(), BlockPos.ZERO,
++            AllBlocks.STRESSOMETER.getDefaultState());
++        // A real stressometer sends an observation to its server once per observed position.
++        // The probe has no world; skip that packet while retaining the real formatting.
++        field(StressGaugeBlockEntity.class, "lastSent").set(null, BlockPos.ZERO);
++        var capacity = field(KineticBlockEntity.class, "capacity");
++        var used = field(KineticBlockEntity.class, "stress");
++        var overloaded = field(KineticBlockEntity.class, "overStressed");
++        float[][] cases = {
++            {0, 0, 0}, {8, 256, 0}, {-32.25f, 256, 128}, {64, 256, 152},
++            {100, 256, 192}, {112, 256, 240}, {256, 256, 288}, {32, 1048576, 512.75f},
++            {1.024f, 1048576, 0}, {1.005f, 1048576, 0},
++        };
++        String fixture = System.getProperty("create.goggles.fixture");
++        if (fixture != null) {
++            var samples = Files.readAllLines(Path.of(fixture));
++            cases = new float[samples.size() - 1][3];
++            for (int i = 0; i < cases.length; i++) {
++                String[] record = samples.get(i + 1).split(",");
++                cases[i] = new float[]{8, Float.parseFloat(record[1]), Float.parseFloat(record[2])};
++            }
++        }
++        for (int i = 0; i < cases.length; i++) {
++            for (var gauge : fixture == null ? List.of(speed, stress) : List.of(stress)) {
++                gauge.setSpeed(cases[i][0]);
++                capacity.setFloat(gauge, cases[i][1]);
++                used.setFloat(gauge, cases[i][2]);
++                overloaded.setBoolean(gauge, cases[i][2] > cases[i][1]);
++                var tooltip = new ArrayList<Component>();
++                gauge.addToGoggleTooltip(tooltip, false);
++                for (int line = 0; line < tooltip.size(); line++) {
++                    String type = gauge == speed ? "speed" : "stress";
++                    var row = tooltip.get(line);
++                    System.out.println("CREATE_GOGGLE_GAUGE " + i + " " + type + " " + line + " "
++                        + row.getString() + " || " + Component.Serializer.toJson(row, RegistryAccess.EMPTY));
++                }
++            }
++        }
++        minecraft.stop();
++    }
++}

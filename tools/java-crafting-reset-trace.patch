@@ -1,0 +1,77 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.craftingResets"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1,9 +1,19 @@
+ package com.simibubi.create.infrastructure.gametest.tests;
+ 
++import net.minecraft.core.component.DataComponents;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.nbt.ListTag;
++import net.minecraft.network.chat.Component;
++import net.minecraft.world.item.crafting.CraftingInput;
++import net.minecraft.world.item.crafting.RecipeType;
++import net.minecraft.world.item.component.CustomData;
++import net.minecraft.world.item.component.ItemContainerContents;
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
+ import com.simibubi.create.AllBlockEntityTypes;
+ import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+ import com.simibubi.create.content.schematics.SchematicItem;
+@@ -115,4 +125,42 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void craftingResets(CreateGameTestHelper helper) {
++		var filter = AllItems.FILTER.asStack();
++		filter.set(AllDataComponents.FILTER_ITEMS, ItemContainerContents.fromItems(java.util.List.of(Items.DIAMOND.getDefaultInstance())));
++		var schedule = AllItems.SCHEDULE.asStack();
++		var saved = new CompoundTag();
++		saved.putBoolean("Cyclic", true);
++		saved.put("Entries", new ListTag());
++		schedule.set(AllDataComponents.TRAIN_SCHEDULE, saved);
++		var level = helper.getLevel();
++		for (var inputStack : java.util.List.of(filter, schedule)) {
++			inputStack.set(DataComponents.CUSTOM_NAME, Component.literal("Configured part"));
++			inputStack.set(DataComponents.CUSTOM_DATA, CustomData.of(saved));
++			var input = CraftingInput.of(1, 1, java.util.List.of(inputStack));
++			var match = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, input, level).orElseThrow();
++			var name = BuiltInRegistries.ITEM.getKey(inputStack.getItem()).getPath();
++			helper.assertTrue(match.id().toString().equals("create:crafting/appliances/" + name + "_clear"), "Unexpected recipe " + match.id());
++			var result = match.value().assemble(input, level.registryAccess());
++			var original = inputStack.getItem().getDefaultInstance();
++			helper.assertTrue(ItemStack.matches(result, original), "Reset result differs from the default stack");
++			var remainder = match.value().getRemainingItems(input).stream().filter(item -> !item.isEmpty()).count();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_CRAFTING_RESET %s,%d,%b,%b,%b,%d%n", match.id(), result.getCount(),
++				result.has(DataComponents.CUSTOM_NAME), result.has(DataComponents.CUSTOM_DATA),
++				result.has(name.equals("filter") ? AllDataComponents.FILTER_ITEMS : AllDataComponents.TRAIN_SCHEDULE), remainder);
++		}
++
++		var blankSchedule = AllItems.SCHEDULE.asStack();
++		blankSchedule.setCount(3);
++		var blankInput = CraftingInput.of(1, 1, java.util.List.of(blankSchedule));
++		var blankRecipe = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, blankInput, level).orElseThrow();
++		var blankResult = blankRecipe.value().assemble(blankInput, level.registryAccess());
++		helper.assertTrue(blankRecipe.id().toString().equals("create:crafting/appliances/schedule_clear"),
++			"A single blank schedule grid slot should use the reset recipe");
++		helper.assertTrue(ItemStack.matches(blankResult, AllItems.SCHEDULE.asStack()), "Reset result for blank Schedule");
++		System.out.println("CREATE_BLANK_SCHEDULE_RESULT " + blankResult.getCount());
++		helper.succeed();
++	}
+ }

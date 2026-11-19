@@ -1,0 +1,44 @@
+{
+  "blank": [
+    "Harbor",
+    "Harbor West",
+    "East Yard"
+  ],
+  "prefix": [
+    "Harbor",
+    "Harbor West"
+  ],
+  "selected": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "TimeUnit": 1,
+                "Value": 5
+              },
+              "Id": "create:delay"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Harbor"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "restricted": [
+    "Harbor",
+    "Harbor West"
+  ],
+  "fallback": [
+    "Harbor",
+    "Harbor West",
+    "East Yard"
+  ]
+}

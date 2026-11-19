@@ -1,0 +1,100 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..3795c6fd9 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.mechanicalSaw"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..6b8b9df02 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -29,6 +29,81 @@ import net.minecraft.world.level.block.RedstoneLampBlock;
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 125)
++	public static void mechanicalSaw(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var vertical = new BlockPos(8, 180, 8);
++		var horizontal = new BlockPos(8, 180, 22);
++		var supplyUp = vertical.north();
++		var supplySide = horizontal.west();
++		var target = horizontal.east();
++		var sawBlock = com.simibubi.create.AllBlocks.MECHANICAL_SAW.get();
++		var motorBlock = com.simibubi.create.AllBlocks.CREATIVE_MOTOR.get();
++		var posFacing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var direction = net.minecraft.core.Direction.UP;
++		level.setChunkForced(0, 0, true);
++		level.setChunkForced(0, 1, true);
++		for (int z = 3; z <= 26; z++)
++			for (int x = 5; x <= 14; x++)
++				level.setBlockAndUpdate(new BlockPos(x, 179, z), Blocks.SMOOTH_STONE.defaultBlockState());
++		level.setBlockAndUpdate(vertical, sawBlock.defaultBlockState().setValue(posFacing, direction)
++			.setValue(com.simibubi.create.content.kinetics.saw.SawBlock.AXIS_ALONG_FIRST_COORDINATE, false));
++		level.setBlockAndUpdate(horizontal, sawBlock.defaultBlockState().setValue(posFacing, net.minecraft.core.Direction.EAST));
++		level.setBlockAndUpdate(target, Blocks.STONE.defaultBlockState());
++		level.setBlockAndUpdate(supplyUp, motorBlock.defaultBlockState().setValue(posFacing, net.minecraft.core.Direction.SOUTH));
++		level.setBlockAndUpdate(supplySide, motorBlock.defaultBlockState().setValue(posFacing, net.minecraft.core.Direction.EAST));
++		for (var pos : java.util.List.of(supplyUp, supplySide)) {
++			var motor = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(pos);
++			motor.generatedSpeed.setValue(96);
++		}
++
++		var outputBox = new net.minecraft.world.phys.AABB(4, 179, 4, 17, 183, 15);
++		level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, outputBox)
++			.forEach(net.minecraft.world.entity.Entity::discard);
++		var filtering = com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(
++			level, vertical, com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE);
++		filtering.setFilter(new ItemStack(Items.BAMBOO_MOSAIC));
++		for (int tick = 0; tick <= 95; tick++) {
++			int t = tick;
++			Runnable sample = () -> {
++				var up = (com.simibubi.create.content.kinetics.saw.SawBlockEntity) level.getBlockEntity(vertical);
++				var side = (com.simibubi.create.content.kinetics.saw.SawBlockEntity) level.getBlockEntity(horizontal);
++				var breakData = side.saveWithoutMetadata(level.registryAccess());
++				int[] counts = new int[2];
++				for (var item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, outputBox)) {
++					var stack = item.getItem();
++					if (stack.is(Items.BAMBOO_MOSAIC)) counts[0] += stack.getCount();
++					if (stack.is(Items.DIAMOND)) counts[1] += stack.getCount();
++				}
++				var inventory = up.inventory;
++				System.out.printf(java.util.Locale.ROOT, "CREATE_MECHANICAL_SAW %d,%.2f,%.2f,%.2f,%d,%d,%d,%d,%d,%.2f,%d,%d,%s,%s%n",
++					t, up.getSpeed(), inventory.remainingTime, inventory.recipeDuration, inventory.appliedRecipe ? 1 : 0,
++					inventory.getStackInSlot(0).getCount(), inventory.getStackInSlot(1).getCount(), counts[0], counts[1], side.getSpeed(),
++					breakData.getInt("Progress"), breakData.getInt("NextTick"),
++					net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(target).getBlock()),
++					net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(target.above()).getBlock()));
++				if (t == 3 || t == 65) {
++					var stack = new ItemStack(t == 3 ? Items.BAMBOO_PLANKS : Items.DIAMOND);
++					var item = new net.minecraft.world.entity.item.ItemEntity(level, 8.5, 180.79, 8.5, stack);
++					item.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
++					level.addFreshEntity(item);
++				}
++				if (t == 8) {
++					level.setBlockAndUpdate(target, Blocks.OAK_LOG.defaultBlockState());
++					level.setBlockAndUpdate(target.above(), Blocks.OAK_LOG.defaultBlockState());
++				}
++				if (t == 95) {
++					helper.assertTrue(counts[0] == 1 && counts[1] == 1, "Saw did not eject the expected outputs");
++					helper.assertTrue(level.isEmptyBlock(target) && level.isEmptyBlock(target.above()), "Saw did not cut connected logs");
++					helper.succeed();
++				}
++			};
++			if (t == 0)
++				sample.run();
++			else
++				helper.runAfterDelay(t, sample);
++		}
++	}
+ 	@GameTest(template = "schematicannon", timeoutTicks = FIFTEEN_SECONDS)
+ 	public static void schematicannon(CreateGameTestHelper helper) {
+ 		// load the structure

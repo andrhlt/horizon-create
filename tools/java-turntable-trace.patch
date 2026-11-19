@@ -1,0 +1,132 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,117 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void turntableParity(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var block = AllBlocks.TURNTABLE.get();
++		var state = block.defaultBlockState();
++		var table = helper.absolutePos(new BlockPos(2, 12, 2));
++		var blockId = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block);
++		var dirs = net.minecraft.core.Direction.values();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var floor = table.below();
++		var up = net.minecraft.core.Direction.UP;
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		level.setBlockAndUpdate(floor, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++		for (int yaw : new int[] {0, 90, 180, 270}) {
++			level.setBlockAndUpdate(table, air);
++			player.setYRot(yaw);
++			player.setPos(table.getX() + .5, table.getY(), table.getZ() - 2.0);
++			player.setItemInHand(hand, block.asItem().getDefaultInstance());
++			var hit = new net.minecraft.world.phys.BlockHitResult(floor.getCenter().relative(up, .5), up, floor, false);
++			var result = player.getItemInHand(hand).useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			var placed = level.getBlockState(table);
++			var boxes = placed.getShape(level, table).toAabbs().stream().map(box ->
++				String.format(java.util.Locale.ROOT, "%.4f:%.4f:%.4f:%.4f:%.4f:%.4f",
++					box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ))
++				.collect(java.util.stream.Collectors.joining("|"));
++			helper.assertTrue(placed.is(block), "Turntable failed ordinary survival placement");
++			System.out.printf(java.util.Locale.ROOT, "CREATE_TURNTABLE_PLACEMENT %d,%s,%d,%s,%s,%.2f,%.2f,%d,%s%n",
++				yaw, result, player.getItemInHand(hand).getCount(), blockId,
++				block.getRotationAxis(placed).getSerializedName(), placed.getDestroySpeed(level, table),
++				block.getExplosionResistance(), placed.getMapColor(level, table).id, boxes);
++		}
++		for (var direction : dirs)
++			System.out.printf(java.util.Locale.ROOT, "CREATE_TURNTABLE_SHAFT %s,%b%n", direction.getSerializedName(),
++				block.hasShaftTowards(level, table, state, direction));
++
++		var slab = net.minecraft.world.item.Items.SPRUCE_SLAB.getDefaultInstance();
++		var shaft = AllBlocks.SHAFT.asStack();
++		var input = net.minecraft.world.item.crafting.CraftingInput.of(1, 2, java.util.List.of(slab, shaft));
++		var recipe = level.getRecipeManager().getRecipeFor(
++			net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level).orElseThrow();
++		var product = recipe.value().assemble(input, level.registryAccess());
++		System.out.printf(java.util.Locale.ROOT, "CREATE_TURNTABLE_CRAFTING %s,1,2,minecraft:spruce_slab|create:shaft,%s,%d%n",
++			recipe.id(), net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(product.getItem()), product.getCount());
++
++		var linked = table.east(3);
++		var side = table.east(6);
++		var above = table.east(9);
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var motorState = AllBlocks.CREATIVE_MOTOR.getDefaultState();
++		for (var pos : java.util.List.of(linked, side, above))
++			level.setBlockAndUpdate(pos, state);
++		level.setBlockAndUpdate(linked.below(), motorState.setValue(facing, up));
++		level.setBlockAndUpdate(side.north(), motorState.setValue(facing, net.minecraft.core.Direction.SOUTH));
++		level.setBlockAndUpdate(above.above(), motorState.setValue(facing, up.getOpposite()));
++		var type = AllBlockEntityTypes.TURNTABLE.get();
++		var get = (java.util.function.Function<BlockPos, com.simibubi.create.content.kinetics.turntable.TurntableBlockEntity>)
++			pos -> level.getBlockEntity(pos, type).orElseThrow();
++		var effect = get.apply(table);
++		var names = new String[] {"stopped", "forward", "reverse", "airborne", "upward", "below_top", "faster", "server_player"};
++		var rpms = new float[] {0, 16, -32, 16, 16, 16, 64, 16};
++		var pigType = net.minecraft.world.entity.EntityType.PIG;
++		for (int i = 0; i < names.length; i++) {
++			int index = i;
++			helper.runAtTickTime(i + 2, () -> {
++				effect.setSpeed(rpms[index]);
++				net.minecraft.world.entity.Entity entity = names[index].equals("server_player") ? player : pigType.create(level);
++				double height = names[index].equals("below_top") ? .499 : .5;
++				double dy = names[index].equals("upward") ? .1 : 0;
++				boolean grounded = !names[index].equals("airborne");
++				entity.setPos(table.getX() + .5, table.getY() + height, table.getZ() + .5);
++				entity.setDeltaMovement(0, dy, 0);
++				entity.setYRot(90);
++				entity.setYBodyRot(80);
++				entity.setYHeadRot(70);
++				entity.setOnGround(grounded);
++				block.entityInside(state, level, table, entity);
++				var bodyYaw = ((net.minecraft.world.entity.LivingEntity) entity).yBodyRot;
++				System.out.printf(java.util.Locale.ROOT, "CREATE_TURNTABLE_CONTACT %d,%s,%.4f,%b,%.4f,%.4f,%.4f,%.4f,%.4f,%b%n",
++					helper.getTick(), names[index], effect.getSpeed(), grounded, height, dy, entity.getYRot(),
++					bodyYaw, entity.getYHeadRot(), entity.onGround());
++			});
++		}
++
++		var live = pigType.create(level);
++		live.getRandom().setSeed(451);
++		live.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED).setBaseValue(0);
++		live.setPos(linked.getX() + .5, linked.getY() + 1.25, linked.getZ() + .5);
++		live.setYRot(90);
++		live.setYBodyRot(90);
++		live.setYHeadRot(90);
++		helper.runAtTickTime(8, () -> {
++			helper.assertTrue(get.apply(linked).getSpeed() != 0, "Live Turntable must spin from below");
++			level.addFreshEntity(live);
++		});
++		var motor = level.getBlockEntity(linked.below(), AllBlockEntityTypes.MOTOR.get()).orElseThrow();
++		for (int tick = 8; tick <= 24; tick++) {
++			int at = tick;
++			helper.runAtTickTime(at, () -> {
++				if (at == 14)
++					motor.generatedSpeed.setValue(-16);
++				if (at == 20)
++					level.setBlockAndUpdate(linked.below(), air);
++				System.out.printf(java.util.Locale.ROOT, "CREATE_TURNTABLE_LIVE %d,%.4f,%.4f,%.4f,%.4f,%.9f,%.4f,%.4f,%.4f,%b%n",
++					helper.getTick(), get.apply(linked).getSpeed(), get.apply(side).getSpeed(), get.apply(above).getSpeed(),
++					get.apply(linked).calculateStressApplied(), live.getY() - linked.getY(), live.getYRot(),
++					live.yBodyRot, live.getYHeadRot(), live.onGround());
++				if (at == 24)
++					helper.succeed();
++			});
++		}
++	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.turntableParity"))
++			.toList();
+ 	}
+ }

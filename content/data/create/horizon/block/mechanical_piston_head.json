@@ -1,0 +1,166 @@
+{
+  "template": "minecraft:stone",
+  "item": false,
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "up",
+        "down",
+        "north",
+        "south",
+        "east",
+        "west"
+      ]
+    },
+    "waterlogged": {
+      "type": "boolean"
+    },
+    "type": {
+      "type": "enum",
+      "values": [
+        "normal",
+        "sticky"
+      ]
+    }
+  },
+  "default_state": {
+    "facing": "north",
+    "waterlogged": "false",
+    "type": "normal"
+  },
+  "properties": {
+    "occludes": false,
+    "waterloggable": true
+  },
+  "shapes": {
+    "property": "facing",
+    "values": {
+      "up": [
+        [
+          0,
+          0.75,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "down": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.25,
+          1
+        ]
+      ],
+      "north": [
+        [
+          0,
+          0,
+          0,
+          1,
+          1,
+          0.25
+        ]
+      ],
+      "south": [
+        [
+          0,
+          0,
+          0.75,
+          1,
+          1,
+          1
+        ]
+      ],
+      "east": [
+        [
+          0.75,
+          0,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "west": [
+        [
+          0,
+          0,
+          0,
+          0.25,
+          1,
+          1
+        ]
+      ]
+    }
+  },
+  "collision_shapes": {
+    "property": "facing",
+    "values": {
+      "up": [
+        [
+          0,
+          0.75,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "down": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.25,
+          1
+        ]
+      ],
+      "north": [
+        [
+          0,
+          0,
+          0,
+          1,
+          1,
+          0.25
+        ]
+      ],
+      "south": [
+        [
+          0,
+          0,
+          0.75,
+          1,
+          1,
+          1
+        ]
+      ],
+      "east": [
+        [
+          0.75,
+          0,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "west": [
+        [
+          0,
+          0,
+          0,
+          0.25,
+          1,
+          1
+        ]
+      ]
+    }
+  }
+}

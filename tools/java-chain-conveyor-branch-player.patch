@@ -1,0 +1,29 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -10,6 +10,8 @@
+ import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorBlockEntity;
+ import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorConnectionPacket;
+ import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorPackage;
++import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorShape.ChainConveyorBB;
++import com.simibubi.create.content.kinetics.chainConveyor.ChainPackageInteractionPacket;
+ import com.simibubi.create.content.kinetics.motor.CreativeMotorBlock;
+ import com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity;
+ import com.simibubi.create.content.logistics.box.PackageItem;
+@@ -216,8 +218,15 @@
+ 						if (!inject.export(world, start, box, true) || !inject.export(world, start, box, false))
+ 							throw new IllegalStateException("Travel package ingress was rejected");
+ 					} else {
+-						source.addLoopingPackage(new ChainConveyorPackage(40, box));
+-						source.addLoopingPackage(new ChainConveyorPackage(40, chainPackage("Side", Items.STRING, 2)));
++						var player = chainPlayer(world, start, 1);
++						var shape = new ChainConveyorBB(new Vec3(.5, 0, .5));
++						float angle = shape.getChainPosition(shape.intersect(new Vec3(3, .25, 3), new Vec3(.5, .25, .5)));
++						for (var item : java.util.List.of(box, chainPackage("Side", Items.STRING, 2))) {
++							player.getInventory().setItem(0, item);
++							new ChainPackageInteractionPacket(start, null, angle, false).handle(player);
++							if (!player.getMainHandItem().isEmpty())
++								throw new IllegalStateException("Player branch package insertion failed");
++						}
+ 					}
+ 				}
+ 				if (reverse && tick == 11) {

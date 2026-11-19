@@ -1,0 +1,56 @@
+--- a/crates/horizon-client/src/lan/guest.rs
++++ b/crates/horizon-client/src/lan/guest.rs
+@@ -1028,6 +1028,22 @@
+     use horizon_world::nbt::Tag;
+     let mut w = Writer::new();
+     match name {
++        "minecraft:block_entity_data" => {
++            let Tag::Compound(fields) = value else {
++                return None;
++            };
++            let Tag::String(kind) = value.get("id")? else {
++                return None;
++            };
++            let id = ids("minecraft:block_entity_type", &kind.to_string().ok()?)?;
++            if id < 0 {
++                return None;
++            }
++            let mut data = fields.clone();
++            data.remove(&"id".into());
++            w.varint(id);
++            w.nbt(&Tag::Compound(data));
++        }
+         "minecraft:provides_trim_material" => match value {
+             Tag::String(name) => {
+                 let name = name.to_string().ok()?;
+@@ -1517,6 +1533,10 @@
+         // These built-ins use their own stream codecs, not the custom NBT route.
+         for (name, kind) in [
+             (
++                "minecraft:block_entity_data",
++                horizon_protocol::item::component::BLOCK_ENTITY_DATA,
++            ),
++            (
+                 "minecraft:provides_trim_material",
+                 horizon_protocol::item::component::PROVIDES_TRIM_MATERIAL,
+             ),
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -1595,10 +1595,16 @@
+                 // carries the type of each block's entity.
+                 let new_items = self.items.iter().map(|i| i.rename.to.clone());
+                 let new_blocks: Vec<_> = self.blocks.iter().map(|b| b.decl.id.clone()).collect();
++                // Create's tuned Stock Link stack uses this typed Java ID. The
++                // block itself keeps its Horizon block entity registration.
++                let mut block_entities = new_blocks.clone();
++                if new_blocks.iter().any(|name| name == "create:stock_link") {
++                    block_entities.push("create:packager_link".into());
++                }
+                 let mut registries = vec![
+                     ("minecraft:item", new_items.collect::<Vec<_>>()),
+                     ("minecraft:block", new_blocks.clone()),
+-                    ("minecraft:block_entity_type", new_blocks),
++                    ("minecraft:block_entity_type", block_entities),
+                 ];
+                 if !self.effects.is_empty() {
+                     let new_effects = self.effects.iter().map(|e| e.id.clone());

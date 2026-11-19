@@ -1,0 +1,54 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -364,4 +364,51 @@
+ 			helper.assertContainerContains(depot.east(2), Items.GRASS_BLOCK);
+ 		});
+ 	}
++
++	@GameTest(template = "3_pipe_split", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void encasedPipeDrainFitting(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pipe = com.simibubi.create.AllBlocks.ENCASED_FLUID_PIPE.getDefaultState();
++		var anchor = helper.absolutePos(new BlockPos(2, 12, 2));
++		var blocks = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		String[] neighbors = {"minecraft:air", "minecraft:stone", "minecraft:water",
++			"minecraft:water_cauldron", "create:fluid_tank", "create:creative_fluid_tank",
++			"create:basin", "create:portable_fluid_interface", "create:spout", "create:item_drain",
++			"create:hose_pulley", "create:fluid_pipe", "create:encased_fluid_pipe",
++			"create:mechanical_pump", "create:opposed_pump", "create:smart_fluid_pipe", "create:fluid_valve"};
++		for (var face : net.minecraft.core.Direction.values()) {
++			var port = com.simibubi.create.content.fluids.pipes.EncasedPipeBlock.FACING_TO_PROPERTY_MAP.get(face);
++			var target = anchor.relative(face);
++			var opposite = face.getOpposite();
++			for (String neighbor : neighbors) {
++				String id = neighbor.equals("create:opposed_pump") ? "create:mechanical_pump" : neighbor;
++				var facing = neighbor.equals("create:opposed_pump") ? opposite : face;
++				var otherState = blocks.get(net.minecraft.resources.ResourceLocation.parse(id)).defaultBlockState();
++				String properties = "";
++				var directionProperty = com.simibubi.create.content.fluids.pipes.EncasedPipeBlock.FACING_TO_PROPERTY_MAP.get(opposite);
++				var facingProperty = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++				if (otherState.hasProperty(directionProperty)) {
++					otherState = otherState.setValue(directionProperty, true);
++					properties = "[" + opposite.getName() + "=true]";
++				} else if (otherState.hasProperty(facingProperty)) {
++					otherState = otherState.setValue(facingProperty, facing);
++					properties = "[facing=" + facing.getName() + "]";
++				}
++				level.setBlock(target, otherState, 2);
++				for (boolean open : new boolean[] {false, true}) {
++					var pipeState = pipe.setValue(port, open);
++					level.setBlock(anchor, pipeState, 2);
++					var behaviour = com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(
++						level, anchor, com.simibubi.create.content.fluids.FluidTransportBehaviour.TYPE);
++					helper.assertTrue(behaviour != null, "Missing Encased Pipe transport");
++					boolean capability = com.simibubi.create.content.fluids.FluidPropagator.hasFluidCapability(level, target, opposite);
++					var fitting = behaviour.getRenderedRimAttachment(level, anchor, pipeState, face);
++					System.out.printf("CREATE_ENCASED_DRAIN %s,%b,%s,%b,%s%n",
++						face.getName(), open, id + properties, capability, fitting.name());
++				}
++				level.setBlock(target, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
++			}
++		}
++		helper.succeed();
++	}
+ }

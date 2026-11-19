@@ -1,0 +1,44 @@
+[
+  {
+    "scenario": "blank",
+    "result": "SUCCESS",
+    "address": "　",
+    "before": "{count:1,id:\"create:clipboard\"}",
+    "after": "{count:1,id:\"create:clipboard\"}"
+  },
+  {
+    "scenario": "first",
+    "result": "SUCCESS",
+    "address": "Warehouse",
+    "before": "{count:1,id:\"create:clipboard\"}",
+    "after": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+  },
+  {
+    "scenario": "duplicate",
+    "result": "SUCCESS",
+    "address": "Warehouse",
+    "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}",
+    "after": "{components:{\"create:clipboard_content\":{pages:[[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+  },
+  {
+    "scenario": "spaced_duplicate",
+    "result": "SUCCESS",
+    "address": "Warehouse",
+    "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:1b,icon:{},item_amount:0,text:\"# Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"empty\"}},count:1,id:\"create:clipboard\"}",
+    "after": "{components:{\"create:clipboard_content\":{pages:[[{checked:1b,icon:{},item_amount:0,text:\"# Warehouse\"}]],previously_opened_page:0,read_only:0b,type:\"empty\"}},count:1,id:\"create:clipboard\"}"
+  },
+  {
+    "scenario": "first_free",
+    "result": "SUCCESS",
+    "address": "Warehouse",
+    "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:1b,icon:{},item_amount:0,text:\"Line 0\"},{checked:1b,icon:{},item_amount:0,text:\"Line 1\"},{checked:1b,icon:{},item_amount:0,text:\"Line 2\"},{checked:1b,icon:{},item_amount:0,text:\"Line 3\"},{checked:1b,icon:{},item_amount:0,text:\"Line 4\"},{checked:1b,icon:{},item_amount:0,text:\"Line 5\"},{checked:1b,icon:{},item_amount:0,text:\"Line 6\"},{checked:1b,icon:{},item_amount:0,text:\"Line 7\"},{checked:1b,icon:{},item_amount:0,text:\"Line 8\"},{checked:1b,icon:{},item_amount:0,text:\"Line 9\"},{checked:1b,icon:{},item_amount:0,text:\"Line 10\"},{checked:1b,icon:{},item_amount:0,text:\"Line 11\"}],[{checked:1b,icon:{},item_amount:0,text:\"Keep\"}],[]],previously_opened_page:1,read_only:1b,type:\"empty\"}},count:1,id:\"create:clipboard\"}",
+    "after": "{components:{\"create:clipboard_content\":{pages:[[{checked:1b,icon:{},item_amount:0,text:\"Line 0\"},{checked:1b,icon:{},item_amount:0,text:\"Line 1\"},{checked:1b,icon:{},item_amount:0,text:\"Line 2\"},{checked:1b,icon:{},item_amount:0,text:\"Line 3\"},{checked:1b,icon:{},item_amount:0,text:\"Line 4\"},{checked:1b,icon:{},item_amount:0,text:\"Line 5\"},{checked:1b,icon:{},item_amount:0,text:\"Line 6\"},{checked:1b,icon:{},item_amount:0,text:\"Line 7\"},{checked:1b,icon:{},item_amount:0,text:\"Line 8\"},{checked:1b,icon:{},item_amount:0,text:\"Line 9\"},{checked:1b,icon:{},item_amount:0,text:\"Line 10\"},{checked:1b,icon:{},item_amount:0,text:\"Line 11\"}],[{checked:1b,icon:{},item_amount:0,text:\"Keep\"},{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}],[]],previously_opened_page:1,read_only:1b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+  },
+  {
+    "scenario": "append_page",
+    "result": "SUCCESS",
+    "address": "Warehouse",
+    "before": "{components:{\"create:clipboard_content\":{pages:[[{checked:1b,icon:{},item_amount:0,text:\"Line 0\"},{checked:1b,icon:{},item_amount:0,text:\"Line 1\"},{checked:1b,icon:{},item_amount:0,text:\"Line 2\"},{checked:1b,icon:{},item_amount:0,text:\"Line 3\"},{checked:1b,icon:{},item_amount:0,text:\"Line 4\"},{checked:1b,icon:{},item_amount:0,text:\"Line 5\"},{checked:1b,icon:{},item_amount:0,text:\"Line 6\"},{checked:1b,icon:{},item_amount:0,text:\"Line 7\"},{checked:1b,icon:{},item_amount:0,text:\"Line 8\"},{checked:1b,icon:{},item_amount:0,text:\"Line 9\"},{checked:1b,icon:{},item_amount:0,text:\"Line 10\"},{checked:1b,icon:{},item_amount:0,text:\"Line 11\"}]],previously_opened_page:1,read_only:1b,type:\"empty\"}},count:1,id:\"create:clipboard\"}",
+    "after": "{components:{\"create:clipboard_content\":{pages:[[{checked:1b,icon:{},item_amount:0,text:\"Line 0\"},{checked:1b,icon:{},item_amount:0,text:\"Line 1\"},{checked:1b,icon:{},item_amount:0,text:\"Line 2\"},{checked:1b,icon:{},item_amount:0,text:\"Line 3\"},{checked:1b,icon:{},item_amount:0,text:\"Line 4\"},{checked:1b,icon:{},item_amount:0,text:\"Line 5\"},{checked:1b,icon:{},item_amount:0,text:\"Line 6\"},{checked:1b,icon:{},item_amount:0,text:\"Line 7\"},{checked:1b,icon:{},item_amount:0,text:\"Line 8\"},{checked:1b,icon:{},item_amount:0,text:\"Line 9\"},{checked:1b,icon:{},item_amount:0,text:\"Line 10\"},{checked:1b,icon:{},item_amount:0,text:\"Line 11\"}],[{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}]],previously_opened_page:1,read_only:1b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+  }
+]

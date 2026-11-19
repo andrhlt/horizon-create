@@ -1,0 +1,98 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,95 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 50)
++	public static void standaloneBeltDeploying(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var base = helper.absolutePos(new BlockPos(3, 14, 3));
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var first = com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock.AXIS_ALONG_FIRST_COORDINATE;
++		var east = net.minecraft.core.Direction.EAST;
++		var south = net.minecraft.core.Direction.SOUTH;
++		var down = net.minecraft.core.Direction.DOWN;
++		var labels = java.util.List.of("shaft_planks", "cog_planks", "wax", "dewax", "deoxidise", "create_copper_deoxidise");
++		var inputs = java.util.List.of("create:shaft", "create:cogwheel", "minecraft:copper_block",
++			"minecraft:waxed_exposed_cut_copper_stairs", "minecraft:weathered_copper", "create:weathered_copper_tile_slab");
++		var held = java.util.List.of("minecraft:spruce_planks", "minecraft:oak_planks", "minecraft:honeycomb_block",
++			"minecraft:iron_axe", "minecraft:iron_axe", "minecraft:iron_axe");
++		int[] damages = {0,0,0,7,17,25};
++		var belts = new java.util.ArrayList<com.simibubi.create.content.kinetics.belt.BeltBlockEntity>();
++		var deployers = new java.util.ArrayList<com.simibubi.create.content.kinetics.deployer.DeployerBlockEntity>();
++		for (int i = 0; i < labels.size(); i++) {
++			var start = base.south(2 * i);
++			for (int segment = 0; segment < 4; segment++) {
++				var part = switch (segment) {
++					case 0 -> com.simibubi.create.content.kinetics.belt.BeltPart.START;
++					case 3 -> com.simibubi.create.content.kinetics.belt.BeltPart.END;
++					default -> com.simibubi.create.content.kinetics.belt.BeltPart.MIDDLE;
++				};
++				level.setBlockAndUpdate(start.east(segment), com.simibubi.create.AllBlocks.BELT.getDefaultState()
++					.setValue(horizontal, east).setValue(com.simibubi.create.content.kinetics.belt.BeltBlock.PART, part)
++					.setValue(com.simibubi.create.content.kinetics.belt.BeltBlock.SLOPE,
++						com.simibubi.create.content.kinetics.belt.BeltSlope.HORIZONTAL));
++			}
++			com.simibubi.create.content.kinetics.belt.BeltBlock.initBelt(level, start);
++			belts.add((com.simibubi.create.content.kinetics.belt.BeltBlockEntity) level.getBlockEntity(start));
++			var drive = start.north();
++			level.setBlockAndUpdate(drive, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, south));
++			((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(drive)).generatedSpeed.setValue(-64);
++			var at = start.east().above(2);
++			level.setBlockAndUpdate(at, com.simibubi.create.AllBlocks.DEPLOYER.getDefaultState().setValue(facing, down).setValue(first, true));
++			var machine = (com.simibubi.create.content.kinetics.deployer.DeployerBlockEntity) level.getBlockEntity(at);
++			deployers.add(machine);
++			var drive2 = at.west();
++			level.setBlockAndUpdate(drive2, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east));
++			((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(drive2)).generatedSpeed.setValue(64);
++			var resource = net.minecraft.resources.ResourceLocation.parse(held.get(i));
++			var tool = new net.minecraft.world.item.ItemStack(items.get(resource), i < 2 ? 2 : 1);
++			tool.setDamageValue(damages[i]);
++			var capability = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, at, null);
++			helper.assertTrue(capability.insertItem(0, tool, false).isEmpty(), "Could not load tool");
++			System.out.printf(java.util.Locale.ROOT, "CREATE_STANDALONE_DEPLOY_SETUP %s,%s,%s,%d,%d%n", labels.get(i),
++				inputs.get(i), held.get(i), tool.getCount(), tool.getDamageValue());
++		}
++		helper.onEachTick(() -> {
++			long tick = helper.getTick() - 4;
++			if (tick < 0 || tick > 24)
++				return;
++			for (int i = 0; i < labels.size(); i++) {
++				var belt = belts.get(i);
++				var deployer = deployers.get(i);
++				var data = deployer.getUpdateTag(level.registryAccess());
++				var current = deployer.getPlayer().getMainHandItem();
++				belt.getInventory().write(level.registryAccess());
++				var stacks = belt.getInventory().getTransportedItems();
++				var transported = stacks.isEmpty() ? null : stacks.get(0);
++				if (tick == 15) {
++					var outcomes = java.util.List.of("create:cogwheel", "create:large_cogwheel", "minecraft:waxed_copper_block",
++						"minecraft:exposed_cut_copper_stairs", "minecraft:exposed_copper", "create:exposed_copper_tile_slab");
++					helper.assertTrue(transported != null && outcomes.get(i).equals(items.getKey(transported.stack.getItem()).toString()),
++						"Missing standalone belt output for " + labels.get(i));
++					helper.assertTrue(current.getCount() == 1 && current.getDamageValue() == damages[i],
++						"Held item count or durability differs for " + labels.get(i));
++				}
++				System.out.printf(java.util.Locale.ROOT, "CREATE_STANDALONE_DEPLOY %d,%s,%.0f,%.0f,%s,%d,%d,%d,%s,%s%n", tick, labels.get(i),
++					belt.getSpeed(), deployer.getSpeed(), data.getString("State"), data.getInt("Timer"),
++					current.getCount(), current.getDamageValue(), transported == null ? "_" : items.getKey(transported.stack.getItem()),
++					transported == null ? "_" : transported.locked);
++			}
++			if (tick == 0) {
++				for (int i = 0; i < labels.size(); i++) {
++					var input = new net.minecraft.world.item.ItemStack(items.get(net.minecraft.resources.ResourceLocation.parse(inputs.get(i))));
++					var carried = new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(input);
++					carried.beltPosition = carried.prevBeltPosition = 1.375f;
++					carried.insertedAt = 1;
++					carried.insertedFrom = net.minecraft.core.Direction.UP;
++					belts.get(i).getInventory().addItem(carried);
++				}
++			}
++		});
++		helper.runAtTickTime(29, helper::succeed);
++	}
+ }

@@ -1,0 +1,67 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..842b493 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.superGlueSelection"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..2c01560 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,48 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void superGlueSelection(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		helper.runAtTickTime(4, () -> {
++			var from = new BlockPos(-12, 112, -9);
++			var to = from.offset(2, 0, 0);
++			level.setChunkForced(from.getX() >> 4, from.getZ() >> 4, true);
++			for (int x = 0; x <= 2; x++) level.setBlock(from.offset(x, 0, 0), Blocks.STONE.defaultBlockState(), 2);
++			var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++			player.setPos(to.getX() + .5, to.getY(), to.getZ() + 2.0);
++			var stack = com.simibubi.create.AllItems.SUPER_GLUE.asStack();
++			player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack);
++			new com.simibubi.create.content.contraptions.glue.SuperGlueSelectionPacket(from, to).handle(player);
++			var glue = level.getEntitiesOfClass(com.simibubi.create.content.contraptions.glue.SuperGlueEntity.class,
++				new net.minecraft.world.phys.AABB(from).inflate(10));
++			if (glue.size() != 1) throw new IllegalStateException("Expected one glue entity, got " + glue.size());
++			var entity = glue.get(0);
++			var tag = new net.minecraft.nbt.CompoundTag();
++			entity.addAdditionalSaveData(tag);
++			var box = entity.getBoundingBox();
++			System.out.printf("CREATE_SUPER_GLUE,%d:%d:%d,%d:%d:%d,%s,%s,%s,%s,%s,%s,%d,%s%n",
++				from.getX(), from.getY(), from.getZ(), to.getX(), to.getY(), to.getZ(),
++				box.minX-from.getX(), box.minY-from.getY(), box.minZ-from.getZ(),
++				box.maxX-from.getX(), box.maxY-from.getY(), box.maxZ-from.getZ(), stack.getDamageValue(), tag);
++			for (var old : glue) old.discard();
++			for (int damage : new int[] {97, 98}) {
++				var edgeFrom = from.offset((damage - 96) * 24, 0, 0);
++				var edgeTo = edgeFrom.offset(2, 0, 0);
++				level.setChunkForced(edgeFrom.getX() >> 4, edgeFrom.getZ() >> 4, true);
++				for (int x = 0; x <= 2; x++) level.setBlock(edgeFrom.offset(x, 0, 0), Blocks.STONE.defaultBlockState(), 2);
++				player.setPos(edgeTo.getX() + .5, edgeTo.getY(), edgeTo.getZ() + 2.0);
++				var worn = com.simibubi.create.AllItems.SUPER_GLUE.asStack();
++				worn.setDamageValue(damage);
++				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, worn);
++				new com.simibubi.create.content.contraptions.glue.SuperGlueSelectionPacket(edgeFrom, edgeTo).handle(player);
++				var after = level.getEntitiesOfClass(com.simibubi.create.content.contraptions.glue.SuperGlueEntity.class,
++					new net.minecraft.world.phys.AABB(edgeFrom).inflate(10));
++				var held = player.getItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND);
++				System.out.printf("CREATE_SUPER_GLUE_EDGE,%d,%d,%d,%d%n", damage, after.size(), held.getCount(), held.getDamageValue());
++				for (var old : after) old.discard();
++			}
++			helper.succeed();
++		});
++	}
+ }

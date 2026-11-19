@@ -1,0 +1,5 @@
+case,assigned,hand_item,dropped_count,exact_component,at_center,zero_motion
+absent,false,minecraft:air,0,false,false,false
+empty_hand,false,create:schedule,0,true,false,false
+occupied_hand,false,minecraft:paper,1,true,true,true
+auto,false,minecraft:air,0,false,false,false

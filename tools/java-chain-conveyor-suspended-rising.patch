@@ -1,0 +1,63 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -222,9 +222,9 @@
+ 					if (!source.connections.isEmpty() || !dest.connections.isEmpty())
+ 						throw new IllegalStateException("Disconnect packet left a unilateral edge");
+ 				}
+-				if (!reverse && tick >= 2 && tick <= 24) {
+-					chainSuspendedSample(world, tick, "A", start, source);
+-					chainSuspendedSample(world, tick, "B", start, dest);
++				if (tick >= 2 && (reverse || tick <= 24)) {
++					chainSuspendedSample(world, reverse, tick, "A", start, source);
++					chainSuspendedSample(world, reverse, tick, "B", start, dest);
+ 				}
+ 				String receipt = port == null ? "-" : chainReceipt(port);
+ 				System.out.printf(Locale.ROOT, "CREATE_CHAIN_WORLD %s,%d,%.8f,%.8f,%b,%b,%b,%b,%s,%.8f,%s%n",
+@@ -242,24 +242,30 @@
+ 		}
+ 	}
+ 
+-	private static void chainSuspendedSample(ServerLevel world, int tick, String wheel, BlockPos origin,
++	private static void chainSuspendedSample(ServerLevel world, boolean rising, int tick, String wheel, BlockPos origin,
+ 			ChainConveyorBlockEntity owner) {
+ 		for (var box : owner.getLoopingPackages())
+-			chainSuspendedPackage(world, tick, wheel, origin, owner, box, null);
++			chainSuspendedPackage(world, rising, tick, wheel, origin, owner, box, null);
+ 		for (var entry : owner.getTravellingPackages().entrySet())
+ 			for (var box : entry.getValue())
+-				chainSuspendedPackage(world, tick, wheel, origin, owner, box, entry.getKey());
++				chainSuspendedPackage(world, rising, tick, wheel, origin, owner, box, entry.getKey());
+ 	}
+ 
+-	private static void chainSuspendedPackage(ServerLevel world, int tick, String wheel, BlockPos origin,
++	private static void chainSuspendedPackage(ServerLevel world, boolean rising, int tick, String wheel, BlockPos origin,
+ 			ChainConveyorBlockEntity owner, ChainConveyorPackage box, BlockPos edge) {
+ 		if (!PackageItem.getAddress(box.item).equals("Lab-In"))
+ 			return;
+-		box.worldPosition = owner.getPackagePosition(box.chainPosition, edge);
++		// Match the sampled tick's cached span. Calling getPackagePosition
++		// after the motor changes would refresh polarity on the live conveyor.
+ 		box.yaw = net.minecraft.util.Mth.wrapDegrees(box.chainPosition);
+-		if (edge != null) {
++		if (edge == null) {
++			box.worldPosition = owner.getPackagePosition(box.chainPosition, null);
++			if (owner.reversed)
++				box.yaw += 180;
++		} else {
+ 			var stats = owner.connectionStats.get(edge);
+ 			var diff = stats.end().subtract(stats.start()).normalize();
++			box.worldPosition = stats.start().add(diff.scale(Math.min(stats.chainLength(), box.chainPosition)));
+ 			box.yaw = net.minecraft.util.Mth.wrapDegrees((float) net.minecraft.util.Mth.atan2(diff.x, diff.z)
+ 				* net.minecraft.util.Mth.RAD_TO_DEG - 90);
+ 		}
+@@ -283,8 +289,8 @@
+ 				-pose.yaw, Direction.Axis.Y);
+ 			var roll = net.minecraft.util.Mth.wrapDegrees((float) dangleHeading(-dangle.x, dangle.y)) / 2;
+ 			var pitch = net.minecraft.util.Mth.wrapDegrees((float) dangleHeading(dangle.z, dangle.y)) / 2;
+-			System.out.printf(Locale.ROOT, "CREATE_CHAIN_SUSPENDED %d,%s,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",
+-				tick, wheel, box.netId, target.x, target.y, target.z, physical.x, physical.y, physical.z, pose.yaw,
++			System.out.printf(Locale.ROOT, "CREATE_CHAIN_SUSPENDED%s %d,%s,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",
++				rising ? "_RISING" : "", tick, wheel, box.netId, target.x, target.y, target.z, physical.x, physical.y, physical.z, pose.yaw,
+ 				net.minecraft.util.Mth.clamp(roll, -25, 25), net.minecraft.util.Mth.clamp(pitch, -25, 25));
+ 		} catch (ReflectiveOperationException e) {
+ 			throw new IllegalStateException("Original package visual tick failed", e);

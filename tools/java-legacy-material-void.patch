@@ -1,0 +1,77 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..a778446 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.legacyMaterialVoid")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..4c7b6f2 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,60 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void legacyMaterialFloat(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var types = new net.minecraft.world.item.Item[] {com.simibubi.create.AllItems.SHADOW_STEEL.get(),
++			com.simibubi.create.AllItems.REFINED_RADIANCE.get(), net.minecraft.world.item.Items.IRON_INGOT};
++		var start = helper.absolutePos(new BlockPos(1, 12, 1));
++		var drops = new net.minecraft.world.entity.item.ItemEntity[types.length];
++		double y = start.getY() + .5;
++		for (int i = 0; i < types.length; i++) {
++			var drop = new net.minecraft.world.entity.item.ItemEntity(level, start.getX() + .5 + i * 2, y,
++				start.getZ() + .5, new net.minecraft.world.item.ItemStack(types[i]), 0, 0, 0);
++			drop.setPickUpDelay(32767);
++			level.addFreshEntity(drop);
++			drops[i] = drop;
++		}
++		for (int tick = 0; tick <= 8; tick++) {
++			helper.runAtTickTime(tick, () -> {
++				for (var drop : drops) {
++					var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(drop.getItem().getItem());
++					System.out.printf(java.util.Locale.ROOT, "CREATE_LEGACY_FLOAT,%d,%s,%.11f,%.11f,%s%n",
++						drop.tickCount, id, drop.getY() - y, drop.getDeltaMovement().y, drop.isNoGravity());
++				}
++			});
++		}
++		helper.succeedWhen(() -> {
++			helper.assertTrue(drops[0].tickCount > 8, "wait for 8 samples");
++			helper.assertTrue(drops[0].isNoGravity() && drops[1].isNoGravity(), "both magical materials float");
++			helper.assertTrue(drops[2].getY() < y, "iron control falls");
++		});
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void legacyMaterialVoid(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var start = helper.absolutePos(new BlockPos(1, 0, 1));
++		double y = level.getMinBuildHeight() - 9;
++		var stack = com.simibubi.create.AllItems.CHROMATIC_COMPOUND.asStack(3);
++		var drop = new net.minecraft.world.entity.item.ItemEntity(level, start.getX() + .5, y,
++			start.getZ() + .5, stack, 0, -0.6, 0);
++		drop.setPickUpDelay(32767);
++		level.addFreshEntity(drop);
++		for (int tick = 0; tick <= 8; tick++) {
++			helper.runAtTickTime(tick, () -> {
++				var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(drop.getItem().getItem());
++				System.out.printf(java.util.Locale.ROOT, "CREATE_LEGACY_VOID,%d,%s,%d,%.13f,%.13f,%s,%s,%.13f%n",
++					drop.tickCount, id, drop.getItem().getCount(), drop.getY() - y, drop.getDeltaMovement().y,
++					drop.isNoGravity(), drop.isSilent(), drop.fallDistance);
++			});
++		}
++		helper.succeedWhen(() -> {
++			helper.assertTrue(drop.tickCount > 8, "wait for 8 samples");
++			helper.assertTrue(drop.getItem().is(com.simibubi.create.AllItems.SHADOW_STEEL.get()), "converted to Shadow Steel");
++			helper.assertTrue(drop.getItem().getCount() == 3 && drop.isSilent() && drop.isNoGravity(), "conversion preserves count and sets effects");
++		});
++	}
++
+ }

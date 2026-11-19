@@ -1,0 +1,120 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleEntryProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleEntryProbe.java
+new file mode 100644
+index 0000000..fff3e24
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleEntryProbe.java
+@@ -0,0 +1,114 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.trains.schedule.Schedule;
++import com.simibubi.create.content.trains.schedule.ScheduleScreen;
++import com.simibubi.create.content.trains.schedule.destination.DestinationInstruction;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.Screenshot;
++import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaScheduleEntryProbe {
++    private static final String FILTER = "Main Platform *";
++    private static int phase;
++    private static int elapsed;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.scheduleEntry"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.getOverlay() != null
++            || !AllItems.SCHEDULE.isIn(mc.player.getMainHandItem()))
++            return;
++        elapsed++;
++        switch (phase) {
++            case 0 -> {
++                if (mc.screen == null && elapsed >= 8) {
++                    use(mc);
++                    advance();
++                }
++            }
++            case 1 -> {
++                if (mc.screen instanceof ScheduleScreen screen && elapsed >= 6) {
++                    click(screen, 50, 31);
++                    advance();
++                }
++            }
++            case 2 -> {
++                if (!(mc.screen instanceof ScheduleScreen screen) || elapsed < 8)
++                    return;
++                var editing = field(ScheduleScreen.class, "editingDestination", screen);
++                if (!(editing instanceof DestinationInstruction))
++                    throw new AssertionError("Add Action did not open DestinationInstruction");
++                click(screen, 110, 93);
++                for (char c : FILTER.toCharArray())
++                    screen.charTyped(c, 0);
++                capture(mc, "schedule-destination-editor");
++                click(screen, 230, 94);
++                advance();
++            }
++            case 3 -> {
++                if (!(mc.screen instanceof ScheduleScreen screen) || elapsed < 8)
++                    return;
++                var schedule = (Schedule) field(ScheduleScreen.class, "schedule", screen);
++                if (schedule.entries.size() != 1 || !(schedule.entries.getFirst().instruction instanceof DestinationInstruction d)
++                    || !d.getFilter().equals(FILTER))
++                    throw new AssertionError(schedule.write(mc.level.registryAccess()).toString());
++                System.out.println("CREATE_SCHEDULE_DESTINATION " + schedule.write(mc.level.registryAccess()));
++                capture(mc, "schedule-destination-row");
++                click(screen, 222, 204);
++                advance();
++            }
++            case 4 -> {
++                if (!mc.player.getMainHandItem().has(AllDataComponents.TRAIN_SCHEDULE) || elapsed < 10)
++                    return;
++                System.out.println("CREATE_SCHEDULE_ITEM " + mc.player.getMainHandItem().get(AllDataComponents.TRAIN_SCHEDULE));
++                use(mc);
++                advance();
++            }
++            case 5 -> {
++                if (!(mc.screen instanceof ScheduleScreen screen) || elapsed < 8)
++                    return;
++                var schedule = (Schedule) field(ScheduleScreen.class, "schedule", screen);
++                System.out.println("CREATE_SCHEDULE_REOPEN " + schedule.write(mc.level.registryAccess()));
++                System.out.println("CREATE_SCHEDULE_DESTINATION_DONE");
++                advance();
++            }
++        }
++    }
++
++    private static void use(Minecraft mc) throws ReflectiveOperationException {
++        var method = Minecraft.class.getDeclaredMethod("startUseItem");
++        method.setAccessible(true);
++        method.invoke(mc);
++    }
++
++    private static Object field(Class<?> owner, String name, Object target) throws ReflectiveOperationException {
++        var field = owner.getDeclaredField(name);
++        field.setAccessible(true);
++        return field.get(target);
++    }
++
++    private static void click(ScheduleScreen screen, int dx, int dy) throws ReflectiveOperationException {
++        int left = (int) field(AbstractContainerScreen.class, "leftPos", screen);
++        int top = (int) field(AbstractContainerScreen.class, "topPos", screen);
++        screen.mouseClicked(left + dx, top + dy, 0);
++    }
++
++    private static void capture(Minecraft mc, String name) {
++        Screenshot.grab(mc.gameDirectory, name + ".png", mc.getMainRenderTarget(),
++            message -> System.out.println(message.getString()));
++    }
++
++    private static void advance() {
++        phase++;
++        elapsed = 0;
++    }
++}

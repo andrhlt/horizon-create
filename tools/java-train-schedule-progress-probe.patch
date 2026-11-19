@@ -1,0 +1,91 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleProgressProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleProgressProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleProgressProbe.java
+@@ -0,0 +1,86 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.trains.schedule.Schedule;
++import com.simibubi.create.content.trains.schedule.ScheduleEntry;
++import com.simibubi.create.content.trains.schedule.ScheduleScreen;
++import com.simibubi.create.content.trains.schedule.condition.ScheduledDelay;
++import com.simibubi.create.content.trains.schedule.destination.DestinationInstruction;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaScheduleProgressProbe {
++    private static int phase;
++    private static int elapsed;
++    private static boolean supplied;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.scheduleProgress"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.getOverlay() != null)
++            return;
++        if (!supplied) {
++            var server = mc.getSingleplayerServer();
++            var playerId = mc.player.getUUID();
++            server.execute(() -> {
++                var player = server.getPlayerList().getPlayer(playerId);
++                var item = AllItems.SCHEDULE.asStack();
++                var schedule = new Schedule();
++                schedule.savedProgress = 1;
++                schedule.cyclic = false;
++                for (String destination : java.util.List.of("Origin", "Terminal")) {
++                    var stop = new ScheduleEntry();
++                    var instruction = new DestinationInstruction();
++                    instruction.getData().putString("Text", destination);
++                    stop.instruction = instruction;
++                    stop.conditions.add(java.util.List.of(new ScheduledDelay()));
++                    schedule.entries.add(stop);
++                }
++                item.set(AllDataComponents.TRAIN_SCHEDULE, schedule.write(player.registryAccess()));
++                player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, item);
++            });
++            supplied = true;
++        }
++        if (!AllItems.SCHEDULE.isIn(mc.player.getMainHandItem()))
++            return;
++        if (++elapsed < 9)
++            return;
++        if (phase % 2 == 0 && mc.screen == null) {
++            String[] label = {"START", "WRAPPED", "SKIPPED", "RESET"};
++            var tag = mc.player.getMainHandItem().get(AllDataComponents.TRAIN_SCHEDULE);
++            System.out.println("CREATE_SCHEDULE_PROGRESS_" + label[phase / 2] + " " + tag);
++            if (phase == 6) {
++                System.out.println("CREATE_SCHEDULE_PROGRESS_DONE");
++                phase++;
++                mc.stop();
++                return;
++            }
++            var method = Minecraft.class.getDeclaredMethod("startUseItem");
++            method.setAccessible(true);
++            method.invoke(mc);
++        } else if (phase % 2 == 1 && mc.screen instanceof ScheduleScreen screen) {
++            click(screen, phase == 5 ? 54 : 72, 205);
++            click(screen, 222, 204);
++        } else {
++            return;
++        }
++        phase++;
++        elapsed = 0;
++    }
++
++    private static void click(ScheduleScreen screen, int dx, int dy) throws ReflectiveOperationException {
++        var left = AbstractContainerScreen.class.getDeclaredField("leftPos");
++        var top = AbstractContainerScreen.class.getDeclaredField("topPos");
++        left.setAccessible(true);
++        top.setAccessible(true);
++        screen.mouseClicked((int) left.get(screen) + dx, (int) top.get(screen) + dy, 0);
++    }
++}

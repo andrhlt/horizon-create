@@ -1,0 +1,10 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": { "occludes": false },
+  "state_properties": {
+    "facing": { "type": "enum", "values": ["up", "down", "north", "south", "east", "west"] },
+    "powered": { "type": "boolean" }
+  },
+  "default_state": { "facing": "up", "powered": "false" }
+}

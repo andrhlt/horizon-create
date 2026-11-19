@@ -1,0 +1,33 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.steamEngine"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -110,6 +110,18 @@
+ 		helper.succeedWhen(() -> {
+ 			StressGaugeBlockEntity stress = helper.getBlockEntity(AllBlockEntityTypes.STRESSOMETER.get(), stressometer);
+ 			SpeedGaugeBlockEntity speed = helper.getBlockEntity(AllBlockEntityTypes.SPEEDOMETER.get(), speedometer);
++			var access = helper.getLevel().registryAccess();
++			var boiler = helper.getBlockEntity(new BlockPos(1, 3, 1)).saveWithoutMetadata(access).getCompound("Boiler");
++			var shaftA = helper.getBlockEntity(new BlockPos(1, 3, 5)).saveWithoutMetadata(access);
++			var shaftB = helper.getBlockEntity(new BlockPos(2, 3, 5)).saveWithoutMetadata(access);
++			var pumpA = helper.getBlockEntity(new BlockPos(3, 3, 1)).saveWithoutMetadata(access);
++			var pumpB = helper.getBlockEntity(new BlockPos(3, 3, 2)).saveWithoutMetadata(access);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_STEAM %d %.4f %d %d %b %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f%n",
++				helper.getTick(), boiler.getFloat("Supply"), boiler.getInt("Engines"), boiler.getInt("ActiveHeat"),
++				boiler.getBoolean("PassiveHeat"), pumpA.getFloat("Speed"), pumpB.getFloat("Speed"),
++				shaftA.getFloat("Speed"), shaftA.getFloat("EnginePower"),
++				shaftB.getFloat("Speed"), shaftB.getFloat("EnginePower"),
++				speed.getSpeed(), stress.getNetworkCapacity());
+ 			float capacity = stress.getNetworkCapacity();
+ 			helper.assertCloseEnoughTo(capacity, 2048);
+ 			float rotationSpeed = Mth.abs(speed.getSpeed());

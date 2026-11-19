@@ -1,0 +1,52 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..ca36743 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.buildersTeaUse"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..0020d61 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,33 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 50)
++    public static void buildersTeaUse(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++            new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "TeaTester"));
++        player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        var tea = com.simibubi.create.AllItems.BUILDERS_TEA.asStack();
++        player.setItemInHand(hand, tea);
++        player.getFoodData().setSaturation(5.0f);
++        tea.use(world, player, hand);
++        helper.assertTrue(player.isUsingItem(), "Tea must start use at full hunger");
++
++        for (int tick = 0; tick <= 44; tick++) {
++            if (tick > 0)
++                player.doTick();
++            var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getItemInHand(hand).getItem());
++            var haste = player.getEffect(net.minecraft.world.effect.MobEffects.DIG_SPEED);
++            System.out.printf(java.util.Locale.ROOT,
++                "CREATE_TEA_USE,%d,%s,%d,%d,%.9f,%d,%d,%b,%b%n",
++                tick, item, player.getUseItemRemainingTicks(), player.getFoodData().getFoodLevel(),
++                player.getFoodData().getSaturationLevel(), haste == null ? 0 : haste.getDuration(),
++                haste == null ? -1 : haste.getAmplifier(), haste != null && haste.isVisible(),
++                haste != null && haste.showIcon());
++        }
++        helper.assertTrue(player.getItemInHand(hand).is(Items.GLASS_BOTTLE), "Tea must return the bottle");
++        helper.succeed();
++    }
+ }

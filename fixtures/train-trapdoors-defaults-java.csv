@@ -1,0 +1,3 @@
+id,facing,half,open,powered,waterlogged,hardness,resistance,map_color
+create:train_trapdoor,north,bottom,false,false,false,3.00,6.00,45
+create:framed_glass_trapdoor,north,bottom,false,false,false,3.00,6.00,0

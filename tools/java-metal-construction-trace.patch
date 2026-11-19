@@ -1,0 +1,99 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..478c3576d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.metalConstructionRecipes"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..689dbdba8 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,67 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++    public static void metalConstructionRecipes(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        for (String example : java.util.List.of(
++            "crafting/materials/andesite_alloy_block;3;3;create:andesite_alloy,create:andesite_alloy,create:andesite_alloy,create:andesite_alloy,create:andesite_alloy,create:andesite_alloy,create:andesite_alloy,create:andesite_alloy,create:andesite_alloy",
++            "crafting/materials/andesite_alloy_from_block;1;1;create:andesite_alloy_block"
++        )) {
++            String[] fields = example.split(";");
++            var items = new java.util.ArrayList<net.minecraft.world.item.ItemStack>();
++            for (String cell : fields[3].split(","))
++                items.add(cell.equals("_") ? net.minecraft.world.item.ItemStack.EMPTY :
++                    new net.minecraft.world.item.ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
++                        net.minecraft.resources.ResourceLocation.parse(cell))));
++            var input = net.minecraft.world.item.crafting.CraftingInput.of(
++                Integer.parseInt(fields[1]), Integer.parseInt(fields[2]), items);
++            var match = level.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level)
++                .orElseThrow(() -> new IllegalStateException("No original recipe for " + fields[0]));
++            helper.assertTrue(match.id().toString().equals("create:" + fields[0]), "Wrong recipe for " + example + ": " + match.id());
++            var out = match.value().assemble(input, level.registryAccess());
++            var leftovers = match.value().getRemainingItems(input).stream().filter(stack -> !stack.isEmpty())
++                .map(stack -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()) + ":" + stack.getCount())
++                .sorted().toList();
++            System.out.printf(java.util.Locale.ROOT, "CREATE_METAL_CRAFT %s;%s;%d;%s%n", example,
++                net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(out.getItem()), out.getCount(),
++                String.join(",", leftovers));
++        }
++        var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++        var blocks = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        var wrench = com.simibubi.create.AllItems.WRENCH.asStack();
++        var at = helper.absolutePos(new BlockPos(1, 9, 1));
++        player.setPos(at.getX() + .5, at.getY(), at.getZ() - 2.0);
++        player.setShiftKeyDown(true);
++        for (var material : java.util.List.of("andesite_alloy_block", "industrial_iron_block", "weathered_iron_block")) {
++            var id = com.simibubi.create.Create.asResource(material);
++            var block = blocks.get(id);
++            var state = block.defaultBlockState();
++            var woodenPick = net.minecraft.world.item.Items.WOODEN_PICKAXE.getDefaultInstance();
++            level.setBlockAndUpdate(at, state);
++            player.getInventory().clearContent();
++            player.setItemInHand(hand, wrench);
++            var face = net.minecraft.core.Direction.NORTH;
++            var hit = new net.minecraft.world.phys.BlockHitResult(at.getCenter().relative(face, .5), face, at, false);
++            var use = wrench.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++            var place = net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.getKey(state.getSoundType().getPlaceSound());
++            System.out.printf(java.util.Locale.ROOT, "CREATE_METAL_CONSTRUCTION %s,%.2f,%.2f,%d,%b,%b,%s,%s,%s,%d%n",
++                id, state.getDestroySpeed(level, at), block.getExplosionResistance(), state.getMapColor(level, at).id,
++                state.requiresCorrectToolForDrops(), woodenPick.isCorrectToolForDrops(state), place,
++                use, blocks.getKey(level.getBlockState(at).getBlock()), player.getInventory().countItem(block.asItem()));
++            if (material.equals("andesite_alloy_block"))
++                continue;
++            var input = new net.minecraft.world.item.crafting.SingleRecipeInput(net.minecraft.world.item.Items.IRON_INGOT.getDefaultInstance());
++            var recipeId = com.simibubi.create.Create.asResource(material + "_from_ingots_iron_stonecutting");
++            var recipe = level.getRecipeManager().getRecipesFor(net.minecraft.world.item.crafting.RecipeType.STONECUTTING, input, level)
++                .stream().filter(entry -> entry.id().equals(recipeId)).findFirst().orElseThrow();
++            var out = recipe.value().assemble(input, level.registryAccess());
++            System.out.printf(java.util.Locale.ROOT, "CREATE_METAL_CUT %s,minecraft:iron_ingot,%s,%d,%d%n",
++                items.getKey(out.getItem()), recipe.id(), out.getCount(), state.getMapColor(level, at).id);
++        }
++        helper.succeed();
++    }
++
+ }

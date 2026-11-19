@@ -1,0 +1,8 @@
+action,held,count,damage,states
+0,minecraft:red_dye,4,0,create:red_sail|create:white_sail|create:white_sail|create:white_sail|create:white_sail|create:sail_frame|create:white_sail
+1,minecraft:red_dye,4,0,create:red_sail|create:red_sail|create:white_sail|create:white_sail|create:white_sail|create:sail_frame|create:white_sail
+2,minecraft:red_dye,4,0,create:red_sail|create:red_sail|create:white_sail|create:red_sail|create:white_sail|create:sail_frame|create:white_sail
+3,minecraft:red_dye,4,0,create:red_sail|create:red_sail|create:red_sail|create:red_sail|create:white_sail|create:sail_frame|create:white_sail
+4,minecraft:shears,1,0,create:sail_frame|create:red_sail|create:red_sail|create:red_sail|create:white_sail|create:sail_frame|create:white_sail
+5,minecraft:shears,1,0,create:sail_frame|create:sail_frame|create:red_sail|create:red_sail|create:white_sail|create:sail_frame|create:white_sail
+6,minecraft:shears,1,0,create:sail_frame|create:sail_frame|create:red_sail|create:sail_frame|create:white_sail|create:sail_frame|create:white_sail

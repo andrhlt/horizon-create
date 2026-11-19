@@ -1,0 +1,49 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -311,23 +311,42 @@
+         var server = helper.getLevel().getServer();
+         var root = server.getAdvancements().get(com.simibubi.create.Create.asResource("root"));
+         var alloy = server.getAdvancements().get(com.simibubi.create.Create.asResource("andesite_alloy"));
++        var casing = server.getAdvancements().get(com.simibubi.create.Create.asResource("andesite_casing"));
+         var progress = player.getAdvancements();
+-        helper.assertTrue(root != null && alloy != null, "Expected both original advances");
++        helper.assertTrue(root != null && alloy != null && casing != null, "Expected both original advances");
+         for (int tick = 1; tick <= 14; tick++) {
+             int t = tick;
+             helper.runAfterDelay(t, () -> {
+                 var rootDone = progress.getOrStartProgress(root).isDone();
+                 var alloyDone = progress.getOrStartProgress(alloy).isDone();
+-                System.out.printf(java.util.Locale.ROOT, "CREATE_FIRST_ADVANCEMENTS %d;%s;%s%n",
+-                    t, rootDone, alloyDone);
++                var casingDone = progress.getOrStartProgress(casing).isDone();
++                System.out.printf(java.util.Locale.ROOT, "CREATE_CASING_ADVANCEMENT %d;%s;%s;%s%n",
++                    t, rootDone, alloyDone, casingDone);
+                 if (t == 4 || t == 8) {
+                     var item = t == 4 ? new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STICK)
+                         : com.simibubi.create.AllItems.ANDESITE_ALLOY.asStack();
+                     player.getInventory().setItem(t == 4 ? 0 : 1, item);
+                     net.minecraft.advancements.CriteriaTriggers.INVENTORY_CHANGED.trigger(player, player.getInventory(), item);
+                 }
++                if (t == 11) {
++                    var level = helper.getLevel();
++                    var pos = helper.absolutePos(new BlockPos(0, 4, 0));
++                    var face = net.minecraft.core.Direction.UP;
++                    var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++                    level.setBlockAndUpdate(pos, net.minecraft.world.level.block.Blocks.STRIPPED_OAK_LOG.defaultBlockState());
++                    player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
++                    player.getInventory().selected = 1;
++                    var top = net.minecraft.world.phys.Vec3.atCenterOf(pos).add(0, .5, 0);
++                    var hit = new net.minecraft.world.phys.BlockHitResult(top, face, pos, false);
++                    var click = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock(player, hand, pos, hit);
++                    net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(click);
++                    helper.assertTrue(level.getBlockState(pos).is(com.simibubi.create.AllBlocks.ANDESITE_CASING.get())
++                        && player.getItemInHand(hand).isEmpty(), "Original manual application did not consume the alloy and case the log");
++                    System.out.printf(java.util.Locale.ROOT, "CREATE_CASING_ACTION %d;%s%n",
++                        t, progress.getOrStartProgress(casing).isDone());
++                }
+                 if (t == 14) {
+-                    helper.assertTrue(rootDone && alloyDone, "Original inventory criteria did not award");
++                    helper.assertTrue(rootDone && alloyDone && casingDone, "Original inventory criteria did not award");
+                     helper.succeed();
+                 }
+             });

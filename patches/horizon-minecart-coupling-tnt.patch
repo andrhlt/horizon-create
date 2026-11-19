@@ -1,0 +1,11 @@
+diff --git a/crates/horizon-client/src/game/minecarts.rs b/crates/horizon-client/src/game/minecarts.rs
+--- a/crates/horizon-client/src/game/minecarts.rs
++++ b/crates/horizon-client/src/game/minecarts.rs
+@@ -1611,6 +1611,7 @@
+         });
+         self.combat.explosion_in_water = false;
+         self.combat.rail_proof_blast = false;
++        super::create_minecart_coupling::cart_destroyed_at(self, c.id, c.position);
+     }
+     /// `AbstractMinecart.push` from each player walking into a cart
+     /// (`LivingEntity.pushEntities`): the window's player and every server

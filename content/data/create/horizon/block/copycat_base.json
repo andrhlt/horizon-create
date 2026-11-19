@@ -1,0 +1,7 @@
+{
+  "template": "minecraft:gold_block",
+  "item": false,
+  "properties": {
+    "map_color": 61
+  }
+}

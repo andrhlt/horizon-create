@@ -1,0 +1,121 @@
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+index 657f93b..45a2e93 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+@@ -95,6 +95,7 @@ public class CrossPlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+index 4e7785d..3b3571a 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+@@ -91,6 +91,7 @@ public class PlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+index ee1f50c..a2cbd61 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+@@ -118,6 +118,7 @@ public abstract class SymmetryMirror {
+ 	@OnlyIn(Dist.CLIENT)
+ 	public abstract PartialModel getModel();
+ 
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {}
+ 
+ 	protected Vec3 getDiff(BlockPos position) {
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..bd00427 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.creativeCrateHopper")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..4a001ef 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,68 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void creativeCrateHopper(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		int lane = 0;
++		for (String mode : new String[]{"ordinary", "empty", "powered", "full"}) {
++			var pos = helper.absolutePos(new BlockPos(2, 2, 2)).above(20).east(4 * lane++);
++			var pullPos = pos.below();
++			var pushPos = pos.west();
++			java.util.function.IntConsumer record = frame -> {
++				var pull = (net.minecraft.world.level.block.entity.HopperBlockEntity) level.getBlockEntity(pullPos);
++				var push = (net.minecraft.world.level.block.entity.HopperBlockEntity) level.getBlockEntity(pushPos);
++				var crate = (com.simibubi.create.content.logistics.crate.CreativeCrateBlockEntity) level.getBlockEntity(pos);
++				var filter = crate.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE);
++				var cargo = pull.getItem(0);
++				var data = cargo.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA);
++				boolean tagged = data != null && data.copyTag().getInt("marker") == 17;
++				System.out.printf("CREATE_CRATE_HOPPER,%s,%d,%d,%d,%s,%d,%d%n",
++					mode, frame, tagged ? cargo.getCount() : 0, push.getItem(0).getCount(), tagged,
++					filter.getFilter().getCount(), cargo.is(Items.COBBLESTONE) ? cargo.getCount() : 0);
++				if (frame == 20) {
++					int supplied = mode.equals("ordinary") ? 3 : 0;
++					int remaining = mode.equals("powered") ? 5 : 2;
++					int cobblestone = mode.equals("full") ? 64 : 0;
++					if ((tagged ? cargo.getCount() : 0) != supplied || push.getItem(0).getCount() != remaining
++						|| (cargo.is(Items.COBBLESTONE) ? cargo.getCount() : 0) != cobblestone)
++						throw new IllegalStateException("Unexpected Create Crate Hopper variant " + mode);
++				}
++			};
++			helper.runAtTickTime(4, () -> {
++				level.setBlock(pos, com.simibubi.create.AllBlocks.CREATIVE_CRATE.getDefaultState(), 3);
++				var crate = (com.simibubi.create.content.logistics.crate.CreativeCrateBlockEntity) level.getBlockEntity(pos);
++				var filter = crate.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE);
++				var sample = new ItemStack(Items.IRON_INGOT, 7);
++				var marker = new net.minecraft.nbt.CompoundTag();
++				marker.putInt("marker", 17);
++				sample.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
++					net.minecraft.world.item.component.CustomData.of(marker));
++				if (!mode.equals("empty"))
++					filter.setFilter(sample);
++				level.setBlock(pullPos, Blocks.HOPPER.defaultBlockState(), 3);
++				level.setBlock(pushPos, Blocks.HOPPER.defaultBlockState()
++					.setValue(net.minecraft.world.level.block.HopperBlock.FACING, net.minecraft.core.Direction.EAST), 3);
++				var push = (net.minecraft.world.level.block.entity.HopperBlockEntity) level.getBlockEntity(pushPos);
++				push.setItem(0, new ItemStack(Items.GOLD_INGOT, 5));
++				if (mode.equals("powered")) {
++					level.setBlock(pullPos.east(), Blocks.REDSTONE_BLOCK.defaultBlockState(), 3);
++					level.setBlock(pushPos.west(), Blocks.REDSTONE_BLOCK.defaultBlockState(), 3);
++				}
++				if (mode.equals("full")) {
++					var pull = (net.minecraft.world.level.block.entity.HopperBlockEntity) level.getBlockEntity(pullPos);
++					for (int slot = 0; slot < pull.getContainerSize(); slot++)
++						pull.setItem(slot, new ItemStack(Items.COBBLESTONE, 64));
++				}
++				record.accept(0);
++			});
++			for (int tick = 1; tick <= 20; tick++) {
++				final int frame = tick;
++				helper.runAtTickTime(4 + tick, () -> record.accept(frame));
++			}
++		}
++		helper.runAtTickTime(25, helper::succeed);
++	}
++
+ }

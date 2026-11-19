@@ -1,0 +1,73 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.potionBrewing"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -3,6 +3,7 @@
+ import java.util.List;
+ 
+ import com.simibubi.create.AllBlocks;
++import com.simibubi.create.AllBlockEntityTypes;
+ import com.simibubi.create.AllItems;
+ import com.simibubi.create.Create;
+ import com.simibubi.create.content.processing.recipe.ProcessingOutput;
+@@ -51,7 +52,49 @@
+ 
+ 		helper.pullLever(potionLever);
+ 		helper.whenSecondsPassed(15, () -> helper.pullLever(bottleLever));
+-		helper.succeedWhen(() -> helper.assertContainerContains(chest, expected));
++		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			var basin = helper.getBlockEntity(new BlockPos(4,3,3)).saveWithoutMetadata(access);
++			var mixer = helper.getBlockEntity(AllBlockEntityTypes.MECHANICAL_MIXER.get(), new BlockPos(4,5,3));
++			var saved = mixer.saveWithoutMetadata(access);
++			var spout = helper.getBlockEntity(new BlockPos(8,4,3)).saveWithoutMetadata(access);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_BREW %d %.4f %d %d %d %d",
++				helper.getTick(), saved.getFloat("Speed"), saved.getBoolean("Running") ? 1 : 0,
++				saved.getInt("Ticks"), mixer.processingTicks, spout.getInt("ProcessingTicks"));
++			for (var tankName : new String[] {"InputTanks", "OutputTanks"}) {
++				var tanks = basin.getList(tankName, 10);
++				for (int i = 0; i < tanks.size(); i++) {
++					var fluid = tanks.getCompound(i).getCompound("TankContent").getCompound("Fluid");
++					traceBrewFluid(fluid);
++				}
++			}
++			traceBrewFluid(spout.getList("Tanks",10).getCompound(0).getCompound("TankContent").getCompound("Fluid"));
++			var inv = basin.getCompound("InputItems").getList("Items",10);
++			int wart = 0;
++			int melon = 0;
++			for (int i = 0; i < inv.size(); i++) {
++				var item = inv.getCompound(i);
++				if (item.getString("id").equals("minecraft:nether_wart"))
++					wart += item.getInt("count");
++				if (item.getString("id").equals("minecraft:glistering_melon_slice"))
++					melon += item.getInt("count");
++			}
++			int filled = 0;
++			var output = helper.itemStorageAt(chest);
++			for (int slot = 0; slot < output.getSlots(); slot++)
++				if (ItemStack.isSameItemSameComponents(output.getStackInSlot(slot), expected))
++					filled += output.getStackInSlot(slot).getCount();
++			System.out.printf(java.util.Locale.ROOT, " %d %d %d%n", wart, melon, filled);
++			helper.assertContainerContains(chest, expected);
++		});
++	}
++
++	private static void traceBrewFluid(net.minecraft.nbt.CompoundTag fluid) {
++		var id = fluid.getString("id");
++		var potion = fluid.getCompound("components").getCompound("minecraft:potion_contents").getString("potion");
++		System.out.printf(java.util.Locale.ROOT, " %s %d", id.isEmpty() ? "-" : potion.isEmpty() ? id : potion,
++			fluid.getInt("amount"));
++
+ 	}
+ 
+ 	@GameTest(template = "spout_crafting", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)

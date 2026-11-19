@@ -1,0 +1,8 @@
+scenario,primary,secondary,water,output
+iron_alloy,minecraft:andesite,minecraft:iron_nugget,0,create:andesite_alloy
+zinc_alloy,minecraft:andesite,create:zinc_nugget,0,create:andesite_alloy
+dough,create:wheat_flour,-,1000,create:dough
+mud_dirt,minecraft:dirt,-,250,minecraft:mud
+mud_coarse,minecraft:coarse_dirt,-,250,minecraft:mud
+mud_rooted,minecraft:rooted_dirt,-,250,minecraft:mud
+grass_rejected,minecraft:grass_block,-,250,-

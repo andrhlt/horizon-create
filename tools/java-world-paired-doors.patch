@@ -1,0 +1,160 @@
+diff --git a/src/main/java/com/simibubi/create/content/decoration/slidingDoor/SlidingDoorBlockEntity.java b/src/main/java/com/simibubi/create/content/decoration/slidingDoor/SlidingDoorBlockEntity.java
+index 4753508..8be8e17 100644
+--- a/src/main/java/com/simibubi/create/content/decoration/slidingDoor/SlidingDoorBlockEntity.java
++++ b/src/main/java/com/simibubi/create/content/decoration/slidingDoor/SlidingDoorBlockEntity.java
+@@ -74,6 +74,10 @@ public class SlidingDoorBlockEntity extends SmartBlockEntity {
+ 		level.playSound(null, worldPosition, SoundEvents.IRON_DOOR_CLOSE, SoundSource.BLOCKS, .5f, 1);
+ 	}
+ 
++	public float fixtureAnimation(float partialTick) {
++		return animation.getValue(partialTick);
++	}
++
+ 	@Override
+ 	public void addBehaviours(List<BlockEntityBehaviour> behaviours) {}
+ 
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..3601fb7 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,140 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void worldPairedDoorManual(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var materials = java.util.List.of(com.simibubi.create.AllBlocks.ANDESITE_DOOR.get(),
++			com.simibubi.create.AllBlocks.COPPER_DOOR.get(), com.simibubi.create.AllBlocks.BRASS_DOOR.get(),
++			com.simibubi.create.AllBlocks.TRAIN_DOOR.get(), com.simibubi.create.AllBlocks.FRAMED_GLASS_DOOR.get());
++		var ids = java.util.List.of("andesite_door", "copper_door", "brass_door", "train_door", "framed_glass_door");
++		var positions = new java.util.ArrayList<java.util.List<BlockPos>>();
++		for (int i = 0; i < materials.size(); i++) {
++			var lowerLeft = helper.absolutePos(new BlockPos(2, 12, 2 + 4 * i));
++			var lowerRight = lowerLeft.east();
++			var halves = java.util.List.of(lowerLeft, lowerLeft.above(), lowerRight, lowerRight.above());
++			positions.add(halves);
++			level.setBlockAndUpdate(lowerLeft.below(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++			level.setBlockAndUpdate(lowerRight.below(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++			for (int j = 0; j < halves.size(); j++) {
++				var state = materials.get(i).defaultBlockState()
++					.setValue(net.minecraft.world.level.block.DoorBlock.FACING, net.minecraft.core.Direction.NORTH)
++					.setValue(net.minecraft.world.level.block.DoorBlock.HINGE, j < 2
++						? net.minecraft.world.level.block.state.properties.DoorHingeSide.LEFT
++						: net.minecraft.world.level.block.state.properties.DoorHingeSide.RIGHT)
++					.setValue(net.minecraft.world.level.block.DoorBlock.HALF, j % 2 == 0
++						? net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER
++						: net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER)
++					.setValue(com.simibubi.create.content.decoration.slidingDoor.SlidingDoorBlock.VISIBLE, true);
++				level.setBlock(halves.get(j), state, net.minecraft.world.level.block.Block.UPDATE_CLIENTS
++					| net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE);
++			}
++		}
++
++
++		for (int i = 0; i < materials.size(); i++) {
++			for (boolean open : new boolean[] {false, true}) {
++				var block = materials.get(i);
++				var state = block.defaultBlockState()
++					.setValue(net.minecraft.world.level.block.DoorBlock.HALF,
++						net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER)
++					.setValue(net.minecraft.world.level.block.DoorBlock.OPEN, open);
++				var fresh = (com.simibubi.create.content.decoration.slidingDoor.SlidingDoorBlockEntity)
++					block.newBlockEntity(positions.get(i).getFirst(), state);
++				System.out.printf(java.util.Locale.ROOT, "CREATE_WORLD_DOOR_FRESH,%s,%b,%.9f%n",
++					ids.get(i), open, fresh.fixtureAnimation(1));
++			}
++		}
++		var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
++		java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listen = event -> {
++			for (int i = 0; i < positions.size(); i++) {
++				var pos = BlockPos.containing(event.getPosition());
++				int half = positions.get(i).indexOf(pos);
++				if (event.getLevel() != level || half < 0 || event.getSound() == null)
++					continue;
++				var sound = net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.getKey(event.getSound().value());
++				if (sound == null || !sound.getPath().contains("iron_door"))
++					continue;
++				System.out.printf(java.util.Locale.ROOT, "CREATE_WORLD_PAIRED_DOOR_CUE,%s,%d,%d,%s,%.7f,%.7f%n",
++					ids.get(i), helper.getTick(), half, sound, event.getNewVolume(),
++					event.getNewPitch());
++			}
++		};
++		bus.addListener(net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition.class, listen);
++
++
++		boolean postActions = System.getenv("CREATE_WORLD_DOOR_POST") != null;
++		java.util.function.IntConsumer actuate = tick -> {
++		for (int material = 0; material < positions.size(); material++) {
++			var halves = positions.get(material);
++			if (tick == 3 || tick == 13) {
++				var pos = halves.getFirst();
++				player.setPos(pos.getX() + .5, pos.getY(), pos.getZ() - 1.5);
++				var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter(),
++					net.minecraft.core.Direction.NORTH, pos, false);
++				var result = level.getBlockState(pos).useWithoutItem(level, player, hit);
++				helper.assertTrue(result.consumesAction(), "Expected a door interaction");
++			}
++		}
++		};
++		java.util.function.Consumer<net.neoforged.neoforge.event.tick.LevelTickEvent.Post> sample = new java.util.function.Consumer<>() {
++			@Override
++			public void accept(net.neoforged.neoforge.event.tick.LevelTickEvent.Post event) {
++				int tick = (int) helper.getTick();
++				if (event.getLevel() != level || tick < 0 || tick > 23)
++					return;
++				if (postActions) actuate.accept(tick);
++				for (int material = 0; material < positions.size(); material++) {
++					var open = new StringBuilder();
++					var visible = new StringBuilder();
++					var powered = new StringBuilder();
++					for (var pos : positions.get(material)) {
++						var state = level.getBlockState(pos);
++						helper.assertTrue(state.is(materials.get(material)), "Door disappeared at " + pos);
++						open.append(state.getValue(net.minecraft.world.level.block.DoorBlock.OPEN) ? 1 : 0);
++						visible.append(state.getValue(com.simibubi.create.content.decoration.slidingDoor.SlidingDoorBlock.VISIBLE) ? 1 : 0);
++						powered.append(state.getValue(net.minecraft.world.level.block.DoorBlock.POWERED) ? 1 : 0);
++					}
++					System.out.printf("CREATE_WORLD_PAIRED_DOOR_POST,%s,%d,%s,%s,%s%n",
++						ids.get(material), tick, open, visible, powered);
++
++					if (tick == 2 || tick == 4 || tick == 14 || tick == 21) {
++						var base = positions.get(material).getFirst();
++						for (double x : new double[] {.08, .5}) {
++							var origin = new net.minecraft.world.phys.Vec3(base.getX() + x, base.getY() + 1.62, base.getZ() - 1.5);
++							var end = origin.add(0, 0, 4);
++							var hit = level.clip(new net.minecraft.world.level.ClipContext(origin, end,
++								net.minecraft.world.level.ClipContext.Block.OUTLINE,
++								net.minecraft.world.level.ClipContext.Fluid.NONE, player));
++							var target = hit.getBlockPos().equals(base.above()) && hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK;
++							System.out.printf(java.util.Locale.ROOT, "CREATE_WORLD_PAIRED_DOOR_OUTLINE,%s,%d,%.2f,%b,%s,%.9f%n",
++								ids.get(material), tick, x, target,
++								target ? hit.getDirection().getName() : "-", target ? hit.getLocation().z - base.getZ() : 0);
++						}
++					}
++					for (int leaf = 0; leaf < 2; leaf++) {
++						var entity = (com.simibubi.create.content.decoration.slidingDoor.SlidingDoorBlockEntity)
++							level.getBlockEntity(positions.get(material).get(leaf * 2));
++						System.out.printf(java.util.Locale.ROOT, "CREATE_WORLD_PAIRED_DOOR_PROGRESS,%s,%d,%d,%.9f,%.9f%n",
++							ids.get(material), tick, leaf,
++							entity.fixtureAnimation(0), entity.fixtureAnimation(1));
++					}
++				}
++				if (tick == 23) {
++					bus.unregister(listen);
++					bus.unregister(this);
++					helper.succeed();
++				}
++			}
++		};
++		bus.addListener(net.neoforged.neoforge.event.tick.LevelTickEvent.Post.class, sample);
++		if (!postActions) {
++			helper.runAfterDelay(3, () -> actuate.accept(3));
++			helper.runAfterDelay(13, () -> actuate.accept(13));
++		}
++
++
++	}
+ }

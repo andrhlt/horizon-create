@@ -1,0 +1,47 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.brassMixing2"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -39,7 +39,31 @@
+ 		helper.pullLever(armLever);
+ 		helper.whenSecondsPassed(7, () -> helper.pullLever(armLever));
+ 		helper.whenSecondsPassed(10, () -> helper.pullLever(basinLever));
+-		helper.succeedWhen(() -> helper.assertContainerContains(output, AllItems.BRASS_INGOT.get()));
++		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			var arm = helper.getBlockEntity(new BlockPos(2, 3, 6)).saveWithoutMetadata(access);
++			var mixer = (com.simibubi.create.content.kinetics.mixer.MechanicalMixerBlockEntity) helper.getBlockEntity(new BlockPos(3, 5, 3));
++			var basinEntity = helper.getLevel().getBlockEntity(helper.absolutePos(new BlockPos(3, 3, 3)));
++			var basin = basinEntity == null ? new net.minecraft.nbt.CompoundTag() : basinEntity.saveWithoutMetadata(access);
++			var zinc = helper.getBlockEntity(new BlockPos(4, 2, 8)).saveWithoutMetadata(access);
++			var copper = helper.getBlockEntity(new BlockPos(1, 2, 8)).saveWithoutMetadata(access);
++			var held = arm.getCompound("HeldItem");
++			var input = basin.getCompound("InputItems").getList("Items", 10);
++			var reduced = new int[2];
++			for (int i = 0; i < input.size(); i++) {
++				var stack = input.getCompound(i);
++				if (stack.getString("id").equals("create:zinc_ingot")) reduced[0] += stack.getInt("count");
++				if (stack.getString("id").equals("minecraft:copper_ingot")) reduced[1] += stack.getInt("count");
++			}
++			System.out.printf(java.util.Locale.ROOT, "CREATE_ARM %d %.4f %s %d %.7f %s %d %d %d %.4f %b %d %d %d %d %d%n",
++				helper.getTick(), arm.getFloat("Speed"), arm.getString("Phase"), arm.getInt("TargetPointIndex"),
++				arm.getFloat("MovementProgress"), held.getString("id").isEmpty() ? "-" : held.getString("id"),
++				held.getInt("count"), zinc.getCompound("HeldItem").getCompound("Item").getInt("count"),
++				copper.getCompound("HeldItem").getCompound("Item").getInt("count"), mixer.getSpeed(),
++				mixer.running, mixer.runningTicks, mixer.processingTicks,
++				reduced[0], reduced[1], helper.getTotalItems(output));
++			helper.assertContainerContains(output, AllItems.BRASS_INGOT.get());
++		});
+ 	}
+ 
+ 	@GameTest(template = "potion_brewing", timeoutTicks = CreateGameTestHelper.THIRTY_SECONDS)

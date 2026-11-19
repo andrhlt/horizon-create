@@ -1,0 +1,7 @@
+{
+  "template": "minecraft:andesite",
+  "item": true,
+  "properties": {"map_color": 48, "occludes": false},
+  "state_properties": {"facing": {"type": "enum", "values": ["down", "up", "north", "south", "west", "east"]}},
+  "default_state": {"facing": "north"}
+}

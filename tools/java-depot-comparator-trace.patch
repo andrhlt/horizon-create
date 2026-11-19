@@ -1,0 +1,50 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..bf6ede9 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestItems.depotComparatorOutput"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+index 71d028a..014b0fb 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+@@ -412,11 +412,30 @@ public class TestItems {
+ 		BlockPos fullPearlNixie = new BlockPos(3, 2, 1);
+ 		BlockPos halfPearlNixie = new BlockPos(1, 2, 1);
+ 
++		BlockPos changingDepot = new BlockPos(1, 2, 3);
+ 		helper.succeedWhen(() -> {
++			var lookup = helper.getLevel().registryAccess();
++			System.out.printf("CREATE_DEPOT %d", helper.getTick());
++			for (BlockPos nixie : List.of(halfPearlNixie, fullPearlNixie, diamondNixie, swordNixie)) {
++				var display = helper.getBlockEntity(nixie).saveWithoutMetadata(lookup);
++				var comparator = helper.getBlockEntity(nixie.south()).saveWithoutMetadata(lookup);
++				System.out.printf(" %d %d", comparator.getInt("OutputSignal"), display.getInt("RedstoneStrength"));
++			}
++			System.out.println();
+ 			helper.assertNixiePower(swordNixie, 15);
+ 			helper.assertNixiePower(diamondNixie, 15);
+ 			helper.assertNixiePower(fullPearlNixie, 15);
+-			helper.assertNixiePower(halfPearlNixie, 8);
++			int tick = (int) helper.getTick();
++			if (tick == 0)
++				helper.assertNixiePower(halfPearlNixie, 8);
++			if (tick == 0 || tick == 8) {
++				var depot = helper.getBlockEntity(AllBlockEntityTypes.DEPOT.get(), changingDepot);
++				depot.setHeldItem(tick == 0 ? ItemStack.EMPTY : new ItemStack(Items.ENDER_PEARL, 4));
++				helper.getLevel().updateNeighbourForOutputSignal(helper.absolutePos(changingDepot),
++					helper.getBlockState(changingDepot).getBlock());
++			}
++			helper.assertTrue(tick >= 16, "Waiting for the depot and comparator to settle");
++			helper.assertNixiePower(halfPearlNixie, 4);
+ 		});
+ 	}
+ 

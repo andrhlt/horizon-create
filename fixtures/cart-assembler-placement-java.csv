@@ -1,0 +1,9 @@
+rail,shape,yaw,block,kind,backwards,after_shape,wet,stack
+minecraft:rail,north_south,0,create:cart_assembler,regular,true,north_south,false,1
+minecraft:rail,east_west,180,create:cart_assembler,regular,false,east_west,false,1
+minecraft:powered_rail,north_south,0,create:cart_assembler,powered_rail,true,north_south,false,1
+minecraft:powered_rail,east_west,180,create:cart_assembler,powered_rail,false,east_west,false,1
+minecraft:detector_rail,north_south,0,create:cart_assembler,detector_rail,true,north_south,false,1
+minecraft:detector_rail,east_west,180,create:cart_assembler,detector_rail,false,east_west,false,1
+minecraft:activator_rail,north_south,0,create:cart_assembler,activator_rail,true,north_south,false,1
+minecraft:activator_rail,east_west,180,create:cart_assembler,activator_rail,false,east_west,false,1

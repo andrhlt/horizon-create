@@ -1,0 +1,97 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..05f1c7022 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.trainSignals"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..d62edec42 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,78 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 90)
++    public static void trainSignals(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var track = com.simibubi.create.AllBlocks.TRACK.get();
++        var signal = com.simibubi.create.AllBlocks.TRACK_SIGNAL;
++        var type = com.simibubi.create.content.trains.signal.SignalBlock.TYPE;
++        var powered = com.simibubi.create.content.trains.signal.SignalBlock.POWERED;
++        var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
++        var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
++        var ground = Blocks.SMOOTH_STONE.defaultBlockState();
++        var origin = helper.absolutePos(new BlockPos(1, 8, 1));
++        for (int x = -8; x <= 14; x++) {
++            level.setBlockAndUpdate(origin.east(x).below(), ground);
++            level.setBlockAndUpdate(origin.east(x), rail);
++        }
++        var item = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) signal.asItem();
++        var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        var destinations = java.util.List.of(origin.south(3), origin.north(3), origin.west(4).south(3), origin.east(4).south(3));
++        for (var pos : destinations)
++            level.setBlockAndUpdate(pos.below(), ground);
++        java.util.function.Consumer<BlockPos> use = pos -> {
++            var face = net.minecraft.core.Direction.UP;
++            var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(face, .5), face, pos, false);
++            player.setPos(pos.getX() + .5, pos.getY() + 1, pos.getZ() + .5);
++            player.getMainHandItem().useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++        };
++        for (int i = 0; i <= 43; i++) {
++            int tick = i;
++            helper.runAtTickTime(tick + 8, () -> {
++                if (tick == 1) {
++                    for (int mode = 0; mode < destinations.size(); mode++) {
++                        var clicked = mode == 3 ? origin.east(4) : origin;
++                        player.setItemInHand(hand, new ItemStack(item, 2));
++                        player.setYRot(mode == 1 ? 90 : -90);
++                        player.setXRot(20);
++                        if (mode != 3)
++                            use.accept(clicked);
++                        int selected = player.getMainHandItem().has(com.simibubi.create.AllDataComponents.TRACK_TARGETING_ITEM_SELECTED_POS) ? 1 : 0;
++                        use.accept(destinations.get(mode).below());
++                        System.out.printf("CREATE_SIGNAL_PLACE %d;%d;%d;%d%n", mode, selected, player.getMainHandItem().getCount(),
++                            signal.has(level.getBlockState(destinations.get(mode))) ? 1 : 0);
++                    }
++                }
++                if (tick == 8)
++                    level.setBlockAndUpdate(destinations.get(0).above(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++                if (tick == 26)
++                    level.setBlockAndUpdate(destinations.get(0).above(), Blocks.AIR.defaultBlockState());
++                if (tick == 35) {
++                    player.setItemInHand(hand, new ItemStack(com.simibubi.create.AllItems.WRENCH.get()));
++                    use.accept(destinations.get(0));
++                }
++                if (tick == 40)
++                    level.setBlockAndUpdate(origin, Blocks.AIR.defaultBlockState());
++                for (int index = 0; index < destinations.size(); index++) {
++                    var pos = destinations.get(index);
++                    var state = level.getBlockState(pos);
++                    if (!(level.getBlockEntity(pos) instanceof
++                        com.simibubi.create.content.trains.signal.SignalBlockEntity entity))
++                        continue;
++                    var tag = entity.saveWithoutMetadata(level.registryAccess());
++                    var delta = tag.getIntArray("TargetTrack");
++                    System.out.printf(java.util.Locale.ROOT, "CREATE_SIGNAL_STATE %d;%d;%s;%s;%s;%s;%d;%s;%s;%d;%d;%d%n",
++                        tick, index, state.getValue(type).getSerializedName(), state.getValue(powered), entity.getState(),
++                        entity.getOverlay(), state.getAnalogOutputSignal(level, pos), tag.getBoolean("Power"),
++                        tag.getBoolean("TargetDirection"), delta.length == 3 ? delta[0] : 0,
++                        delta.length == 3 ? delta[1] : 0, delta.length == 3 ? delta[2] : 0);
++                }
++                if (tick == 43)
++                    helper.succeed();
++            });
++        }
++    }
+ }

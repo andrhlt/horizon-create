@@ -1,0 +1,9 @@
+tick,wrapper,input,held,state,adjacent,material,consumed
+4,"Block{create:copycat_panel}[facing=up,waterlogged=false]",minecraft:water_bucket,minecraft:bucket,"Block{create:copycat_panel}[facing=up,waterlogged=true]",Block{minecraft:air},Block{minecraft:oak_log}[axis=y],1
+4,"Block{create:copycat_panel}[facing=up,waterlogged=false]",minecraft:bucket,minecraft:water_bucket,"Block{create:copycat_panel}[facing=up,waterlogged=false]",Block{minecraft:air},Block{minecraft:oak_log}[axis=y],1
+4,"Block{create:copycat_panel}[facing=up,waterlogged=false]",minecraft:lava_bucket,minecraft:bucket,"Block{create:copycat_panel}[facing=up,waterlogged=false]",Block{minecraft:lava}[level=0],Block{minecraft:oak_log}[axis=y],1
+4,"Block{create:copycat_panel}[facing=up,waterlogged=false]",minecraft:bucket,minecraft:lava_bucket,"Block{create:copycat_panel}[facing=up,waterlogged=false]",Block{minecraft:air},Block{minecraft:oak_log}[axis=y],1
+4,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]",minecraft:water_bucket,minecraft:bucket,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=true]",Block{minecraft:air},Block{minecraft:oak_log}[axis=y],1
+4,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]",minecraft:bucket,minecraft:water_bucket,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]",Block{minecraft:air},Block{minecraft:oak_log}[axis=y],1
+4,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]",minecraft:lava_bucket,minecraft:bucket,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]",Block{minecraft:lava}[level=0],Block{minecraft:oak_log}[axis=y],1
+4,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]",minecraft:bucket,minecraft:lava_bucket,"Block{create:copycat_step}[facing=south,half=bottom,waterlogged=false]",Block{minecraft:air},Block{minecraft:oak_log}[axis=y],1

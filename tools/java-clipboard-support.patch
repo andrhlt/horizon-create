@@ -1,0 +1,56 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -302,6 +302,53 @@
+ 		});
+ 	}
+ 
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 25)
++	public static void chainConveyorClipboardSupport(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var support = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		helper.runAtTickTime(2, () -> {
++			var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++			var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++			player.setShiftKeyDown(true);
++			player.setYRot(0);
++			for (int i = 0; i < 4; i++) {
++				var anchor = support.east(i * 4);
++				var target = anchor.above();
++				boolean wet = i % 2 == 1;
++				boolean attack = i >= 2;
++				var scenario = (wet ? "wet" : "dry") + (attack ? "_attack" : "_support");
++				level.setBlockAndUpdate(anchor, Blocks.STONE.defaultBlockState());
++				if (wet)
++					level.setBlockAndUpdate(target, Blocks.WATER.defaultBlockState());
++				var stack = AllBlocks.CLIPBOARD.asStack();
++				player.setItemInHand(hand, stack);
++				player.setPos(Vec3.atCenterOf(anchor.above(2)));
++				var hit = new net.minecraft.world.phys.BlockHitResult(
++					Vec3.atCenterOf(anchor).add(0, 0.5, 0), Direction.UP, anchor, false);
++				stack.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++				var placed = level.getBlockState(target);
++				if (!AllBlocks.CLIPBOARD.has(placed))
++					throw new IllegalStateException("Clipboard did not place at " + scenario + ": " + placed);
++				var collision = placed.getCollisionShape(level, target).toAabbs();
++				if (attack)
++					placed.attack(level, target, player);
++				else
++					level.setBlockAndUpdate(anchor, Blocks.AIR.defaultBlockState());
++				var immediate = level.getBlockState(target);
++				System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_SUPPORT %s|%s|%s|%s|%d%n",
++					scenario, placed, collision, immediate, player.getMainHandItem().getCount());
++			}
++		});
++		helper.runAtTickTime(7, () -> {
++			for (int i = 0; i < 4; i++) {
++				var target = support.east(i * 4).above();
++				System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_SUPPORT_TICK %d|5|%s%n",
++					i, level.getBlockState(target));
++			}
++			helper.succeed();
++		});
++	}
++
+ 	private static void runChainConveyor(CreateGameTestHelper helper, String scenario, BlockPos edge, boolean reverse) {
+ 		var world = helper.getLevel();
+ 		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);

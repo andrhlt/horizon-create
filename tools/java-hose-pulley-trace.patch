@@ -1,0 +1,38 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.hosePulleyTransfer"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -52,6 +52,23 @@
+ 		BlockPos lever = new BlockPos(7, 7, 5);
+ 		helper.pullLever(lever);
+ 		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			var left = helper.getBlockEntity(new BlockPos(4, 7, 3)).saveWithoutMetadata(access);
++			var right = helper.getBlockEntity(new BlockPos(8, 7, 3)).saveWithoutMetadata(access);
++			var pump = helper.getBlockEntity(new BlockPos(6, 7, 3)).saveWithoutMetadata(access);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_HOSE %d %.4f %.4f %.4f %.4f %.4f %d %d",
++				helper.getTick(), left.getCompound("Offset").getFloat("Value"),
++				right.getCompound("Offset").getFloat("Value"), left.getFloat("Speed"), right.getFloat("Speed"),
++				pump.getFloat("Speed"), left.getCompound("Tank").getCompound("Fluid").getInt("amount"),
++				right.getCompound("Tank").getCompound("Fluid").getInt("amount"));
++			for (int startX : new int[]{2, 8}) {
++				System.out.print(" ");
++				for (var p : BlockPos.betweenClosed(new BlockPos(startX, 3, 2), new BlockPos(startX + 2, 5, 4))) {
++					var fs = helper.getLevel().getFluidState(helper.absolutePos(p));
++					System.out.print(fs.isEmpty() ? "-" : Integer.toString(fs.getAmount()));
++				}
++			}
++			System.out.println();
+ 			helper.assertSecondsPassed(15);
+ 			// check filled
+ 			BlockPos filledLowerCorner = new BlockPos(2, 3, 2);

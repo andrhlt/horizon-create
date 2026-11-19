@@ -1,0 +1,8 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "state_properties": {
+    "axis": {"type": "enum", "values": ["x", "y", "z"]}
+  },
+  "default_state": {"axis": "y"}
+}

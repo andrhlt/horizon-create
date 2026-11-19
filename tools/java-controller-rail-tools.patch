@@ -1,0 +1,207 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,10 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> java.util.Set.of(
++				"TestMisc.controllerRailWrenchAndReuse",
++				"TestMisc.controllerRailCartAssemblerDirection"
++			).contains(test.testName())).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,188 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 30)
++	public static void controllerRailWrenchAndReuse(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		for (int cx = 0; cx <= 2; cx++)
++			for (int cz = 1; cz <= 2; cz++)
++				world.setChunkForced(cx, cz, true);
++		var controller = com.simibubi.create.AllBlocks.CONTROLLER_RAIL;
++		var shape = com.simibubi.create.content.redstone.rail.ControllerRailBlock.SHAPE;
++		var backwards = com.simibubi.create.content.redstone.rail.ControllerRailBlock.BACKWARDS;
++		var assembler = com.simibubi.create.AllBlocks.CART_ASSEMBLER;
++		var kind = com.simibubi.create.content.contraptions.mounted.CartAssemblerBlock.RAIL_TYPE;
++		var assemblerBackwards = com.simibubi.create.content.contraptions.mounted.CartAssemblerBlock.BACKWARDS;
++		var assemblerShape = com.simibubi.create.content.contraptions.mounted.CartAssemblerBlock.RAIL_SHAPE;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var mainHand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var railShapes = shape.getPossibleValues().stream().toList();
++
++		helper.runAtTickTime(3, () -> {
++			for (int index = 0; index < railShapes.size(); index++) {
++				var orientation = railShapes.get(index);
++				for (boolean allSupports : new boolean[]{false, true}) {
++					var at = new BlockPos(7 + index * 5, 171, allSupports ? 29 : 24);
++					world.setBlockAndUpdate(at, Blocks.AIR.defaultBlockState());
++					world.setBlockAndUpdate(at.below(), Blocks.STONE.defaultBlockState());
++					for (var side : net.minecraft.core.Direction.Plane.HORIZONTAL) {
++						boolean support = allSupports || orientation.getSerializedName().equals("ascending_" + side.getName());
++						world.setBlockAndUpdate(at.relative(side), (support ? Blocks.STONE : Blocks.AIR).defaultBlockState());
++					}
++					var state = controller.getDefaultState().setValue(shape, orientation).setValue(backwards, true);
++					world.setBlockAndUpdate(at, state);
++					world.setBlock(at, state, 2);
++					var wrench = com.simibubi.create.AllItems.WRENCH.asStack();
++					player.setItemInHand(mainHand, wrench);
++					var hit = new net.minecraft.world.phys.BlockHitResult(
++						net.minecraft.world.phys.Vec3.atCenterOf(at), net.minecraft.core.Direction.UP, at, false);
++					var result = wrench.useOn(new net.minecraft.world.item.context.UseOnContext(player, mainHand, hit));
++					var changed = world.getBlockState(at);
++					helper.assertTrue(result.consumesAction() && controller.has(changed), "controller rail wrench failed");
++					System.out.printf("CONTROLLER_RAIL_WRENCH %s,%s,%s,%s%n",
++						orientation, allSupports, changed.getValue(shape), changed.getValue(backwards));
++				}
++			}
++			for (int variant = 0; variant < 2; variant++) {
++				boolean wet = variant != 0;
++				var at = new BlockPos(37 + variant * 4, 171, 44);
++				player.getInventory().clearContent();
++				world.setBlockAndUpdate(at, Blocks.AIR.defaultBlockState());
++				world.setBlockAndUpdate(at.below(), Blocks.STONE.defaultBlockState());
++				var state = controller.getDefaultState().setValue(
++					net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED, wet);
++				world.setBlockAndUpdate(at, state);
++				var tool = com.simibubi.create.AllItems.WRENCH.asStack();
++				player.setItemInHand(mainHand, tool);
++				player.setShiftKeyDown(true);
++				var hit = new net.minecraft.world.phys.BlockHitResult(
++					net.minecraft.world.phys.Vec3.atCenterOf(at), net.minecraft.core.Direction.UP, at, false);
++				var result = tool.useOn(new net.minecraft.world.item.context.UseOnContext(player, mainHand, hit));
++				player.setShiftKeyDown(false);
++				helper.assertTrue(result.consumesAction(), "controller rail pickup failed");
++				System.out.printf("CONTROLLER_RAIL_PICKUP %s,%s,%s,%d%n", wet,
++					net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(world.getBlockState(at).getBlock()),
++					world.getFluidState(at).isSource(), player.getInventory().countItem(controller.asItem()));
++			}
++			for (int index = 0; index < 2; index++) {
++				var at = new BlockPos(8 + index * 4, 171, 42);
++				var northSouth = net.minecraft.world.level.block.state.properties.RailShape.NORTH_SOUTH;
++				var eastWest = net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST;
++				var axis = index == 0 ? northSouth : eastWest;
++				var reverse = index == 0;
++				player.getInventory().clearContent();
++				world.setBlockAndUpdate(at, Blocks.AIR.defaultBlockState());
++				world.setBlockAndUpdate(at.below(), Blocks.STONE.defaultBlockState());
++				var rail = controller.getDefaultState().setValue(shape, axis).setValue(backwards, reverse);
++				world.setBlockAndUpdate(at, rail);
++				world.setBlock(at, rail, 2);
++				player.setYRot(0);
++				var held = assembler.asStack(2);
++				player.setItemInHand(mainHand, held);
++				var hit = new net.minecraft.world.phys.BlockHitResult(
++					net.minecraft.world.phys.Vec3.atCenterOf(at), net.minecraft.core.Direction.UP, at, false);
++				var result = held.useOn(new net.minecraft.world.item.context.UseOnContext(player, mainHand, hit));
++				var state = world.getBlockState(at);
++				helper.assertTrue(result.consumesAction() && assembler.has(state), "could not reuse the controller rail");
++				System.out.printf("CONTROLLER_RAIL_REUSE %d,place,%s,%s,%s,%d,%d,%d%n",
++					index, state.getValue(kind), state.getValue(assemblerBackwards), state.getValue(assemblerShape),
++					held.getCount(), player.getInventory().countItem(controller.asItem()),
++					player.getInventory().countItem(Blocks.POWERED_RAIL.asItem()));
++				held = new ItemStack(Blocks.POWERED_RAIL);
++				player.setItemInHand(mainHand, held);
++				state.useItemOn(held, world, player, mainHand, hit);
++				state = world.getBlockState(at);
++				System.out.printf("CONTROLLER_RAIL_REUSE %d,powered,%s,%s,%s,%d,%d,%d%n",
++					index, state.getValue(kind), state.getValue(assemblerBackwards), state.getValue(assemblerShape),
++					held.getCount(), player.getInventory().countItem(controller.asItem()),
++					player.getInventory().countItem(Blocks.POWERED_RAIL.asItem()));
++				held = player.getInventory().items.stream().filter(stack -> stack.is(controller.asItem())).findFirst().orElseThrow();
++				player.getInventory().removeItem(held);
++				player.setItemInHand(mainHand, held);
++				state.useItemOn(held, world, player, mainHand, hit);
++				state = world.getBlockState(at);
++				System.out.printf("CONTROLLER_RAIL_REUSE %d,controller,%s,%s,%s,%d,%d,%d%n",
++					index, state.getValue(kind), state.getValue(assemblerBackwards), state.getValue(assemblerShape),
++					held.getCount(), player.getInventory().countItem(controller.asItem()),
++					player.getInventory().countItem(Blocks.POWERED_RAIL.asItem()));
++			}
++			helper.succeed();
++		});
++	}
++
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 30)
++	public static void controllerRailCartAssemblerDirection(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var fixture = helper.absolutePos(new BlockPos(0, 9, 0));
++		var origin = new BlockPos(Math.floorDiv(fixture.getX(), 16) * 16 + 1, fixture.getY(),
++			Math.floorDiv(fixture.getZ(), 16) * 16 + 4);
++		var chunk = new net.minecraft.world.level.ChunkPos(origin);
++		world.setChunkForced(chunk.x, chunk.z, true);
++		var controller = com.simibubi.create.AllBlocks.CONTROLLER_RAIL;
++		var assembler = com.simibubi.create.AllBlocks.CART_ASSEMBLER;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var railShape = net.minecraft.world.level.block.state.properties.BlockStateProperties.RAIL_SHAPE;
++		var eastWest = net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST;
++		var regularRail = Blocks.RAIL.defaultBlockState().setValue(railShape, eastWest);
++		var cargo = Blocks.POLISHED_ANDESITE.defaultBlockState();
++		var carts = new java.util.ArrayList<net.minecraft.world.entity.vehicle.AbstractMinecart>();
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		helper.runAtTickTime(1, () -> {
++			for (int rig = 0; rig < 2; rig++) {
++				var line = origin.south(rig * 5);
++				for (int x = 0; x <= 12; x++) {
++					var at = line.east(x);
++					world.setBlockAndUpdate(at, Blocks.AIR.defaultBlockState());
++					world.setBlockAndUpdate(at.below(), Blocks.STONE.defaultBlockState());
++				}
++				for (int x = 0; x <= 12; x++)
++					world.setBlockAndUpdate(line.east(x), regularRail);
++				var center = line.east(6);
++				world.setBlockAndUpdate(center.north(), Blocks.AIR.defaultBlockState());
++				world.setBlockAndUpdate(center.above(), Blocks.AIR.defaultBlockState());
++				var rail = controller.getDefaultState()
++					.setValue(com.simibubi.create.content.redstone.rail.ControllerRailBlock.SHAPE, eastWest)
++					.setValue(com.simibubi.create.content.redstone.rail.ControllerRailBlock.BACKWARDS, rig == 1);
++				world.setBlockAndUpdate(center, rail);
++				world.setBlock(center, rail, 2);
++				var held = assembler.asStack();
++				player.setItemInHand(hand, held);
++				var hit = new net.minecraft.world.phys.BlockHitResult(
++					net.minecraft.world.phys.Vec3.atCenterOf(center), net.minecraft.core.Direction.UP, center, false);
++				helper.assertTrue(held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit)).consumesAction(),
++					"could not place a directional assembler");
++				world.setBlockAndUpdate(center.above(), cargo);
++				world.setBlockAndUpdate(center.north(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++			}
++		});
++		helper.runAtTickTime(5, () -> {
++			for (int rig = 0; rig < 2; rig++) {
++				var cart = net.minecraft.world.entity.EntityType.MINECART.create(world);
++				helper.assertTrue(cart != null, "could not create minecart");
++				cart.moveTo(origin.getX() + 6.5, origin.getY() + .0625, origin.getZ() + .5 + rig * 5, 0, 0);
++				world.addFreshEntity(cart);
++				carts.add(cart);
++			}
++		});
++		helper.succeedWhen(() -> {
++			var tick = helper.getTick() - 5;
++			if (tick < 0)
++				helper.fail("waiting for minecarts");
++			for (int rig = 0; rig < 2; rig++) {
++				var cart = carts.get(rig);
++				var center = origin.south(rig * 5).east(6);
++				var waiting = world.getBlockState(center.above());
++				System.out.printf(java.util.Locale.ROOT, "CONTROLLER_CART_DIRECTION %d,%d,%.12f,%.12f,%.12f,%s,%d%n",
++					tick, rig, cart.getX() - origin.getX(), cart.getZ() - origin.getZ(), cart.getDeltaMovement().x,
++					registry.getKey(waiting.getBlock()), cart.tickCount);
++			}
++			if (tick < 8)
++				helper.fail("waiting for directional assembler departure");
++		});
++	}
++
+ }

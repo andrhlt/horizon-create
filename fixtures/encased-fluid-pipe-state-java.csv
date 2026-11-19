@@ -1,0 +1,17 @@
+case,action,id,faces,waterlogged,entity_id,clone_item,held_count,result
+straight,wrong_casing,create:fluid_pipe,000011,false,create:fluid_pipe,create:fluid_pipe,1,PASS_TO_DEFAULT_BLOCK_INTERACTION
+straight,encase,create:encased_fluid_pipe,000011,-,create:encased_fluid_pipe,create:fluid_pipe,5,SUCCESS
+straight,add_north_pipe,create:encased_fluid_pipe,000011,-,create:encased_fluid_pipe,create:fluid_pipe,5,-
+straight,uncase,create:fluid_pipe,001100,false,create:fluid_pipe,create:fluid_pipe,1,SUCCESS
+elbow,wrong_casing,create:fluid_pipe,001001,false,create:fluid_pipe,create:fluid_pipe,1,PASS_TO_DEFAULT_BLOCK_INTERACTION
+elbow,encase,create:encased_fluid_pipe,001001,-,create:encased_fluid_pipe,create:fluid_pipe,5,SUCCESS
+elbow,uncase,create:fluid_pipe,001001,false,create:fluid_pipe,create:fluid_pipe,1,SUCCESS
+junction,wrong_casing,create:fluid_pipe,000111,false,create:fluid_pipe,create:fluid_pipe,1,PASS_TO_DEFAULT_BLOCK_INTERACTION
+junction,encase,create:encased_fluid_pipe,000111,-,create:encased_fluid_pipe,create:fluid_pipe,5,SUCCESS
+junction,uncase,create:fluid_pipe,001100,false,create:fluid_pipe,create:fluid_pipe,1,SUCCESS
+wet,wrong_casing,create:fluid_pipe,001100,true,create:fluid_pipe,create:fluid_pipe,1,PASS_TO_DEFAULT_BLOCK_INTERACTION
+wet,encase,create:encased_fluid_pipe,001100,-,create:encased_fluid_pipe,create:fluid_pipe,5,SUCCESS
+wet,uncase,create:fluid_pipe,001100,false,create:fluid_pipe,create:fluid_pipe,1,SUCCESS
+glass,wrong_casing,create:glass_fluid_pipe,y,false,create:glass_fluid_pipe,create:fluid_pipe,1,PASS_TO_DEFAULT_BLOCK_INTERACTION
+glass,encase,create:encased_fluid_pipe,110000,-,create:encased_fluid_pipe,create:fluid_pipe,5,SUCCESS
+glass,uncase,create:fluid_pipe,110000,false,create:fluid_pipe,create:fluid_pipe,1,SUCCESS

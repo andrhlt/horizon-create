@@ -1,0 +1,48 @@
+--- a/build.gradle
++++ b/build.gradle
+@@ -91,9 +91,14 @@
+ 
+         gameTestServer {
+             type = "gameTestServer"
+-            def fluid = project.findProperty("parityMountedComparator") == "fluid"
+-            gameDirectory = project.file(fluid ? "run/bearing-fluid-port-readout-test-server" : "run/bearing-item-port-readout-test-server")
++            def mode = project.findProperty("parityMountedComparator")
++            def fluid = mode == "fluid"
++            def rescue = mode == "rescue"
++            def idle = mode == "idle" || rescue
++            gameDirectory = project.file("run/bearing-${mode}-port-readout-test-server")
+             systemProperty("parity.mountedComparatorFluid", fluid.toString())
++            systemProperty("parity.mountedComparatorIdle", idle.toString())
++            systemProperty("parity.mountedComparatorRescue", rescue.toString())
+         }
+     }
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -62,11 +62,25 @@
+ 		Object2LongMap<Item> content = helper.getItemContent(barrel);
+ 		BlockPos lever = new BlockPos(1, 5, 1);
+ 		var port = setupMountedComparator(helper, com.simibubi.create.AllBlocks.PORTABLE_STORAGE_INTERFACE.get());
+-		helper.pullLever(lever);
+ 		BlockPos outputPos = new BlockPos(4, 2, 1);
++		boolean idle = Boolean.getBoolean("parity.mountedComparatorIdle");
++		if (idle)
++			helper.setBlock(outputPos.south().below(), Blocks.REDSTONE_BLOCK);
++		helper.pullLever(lever);
+ 		helper.succeedWhen(() -> {
+ 			traceMounted(helper, "mounted_item_extract", barrel, outputPos);
+ 			boolean settled = traceMountedComparator(helper, port);
++			if (idle) {
++				boolean rescue = Boolean.getBoolean("parity.mountedComparatorRescue");
++				if (!rescue || helper.getTick() <= 28) {
++					helper.assertBlockProperty(outputPos.south(), net.minecraft.world.level.block.HopperBlock.ENABLED, false);
++					helper.assertContainerEmpty(outputPos);
++				}
++				if (rescue && helper.getTick() == 28)
++					helper.setBlock(outputPos.south().below(), Blocks.AIR);
++				helper.assertSecondsPassed(rescue ? 5 : 7);
++				return;
++			}
+ 			helper.assertContentPresent(content, outputPos); // verify all extracted
+ 			helper.powerLever(lever);
+ 			helper.assertContainerEmpty(barrel); // verify nothing left

@@ -1,0 +1,46 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {
+    "occludes": false,
+    "sounds": "minecraft:stone"
+  },
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "south",
+        "east",
+        "west"
+      ]
+    }
+  },
+  "default_state": {
+    "facing": "north"
+  },
+  "shapes": {
+    "default": [
+      [
+        0,
+        0.125,
+        0,
+        1,
+        1,
+        1
+      ]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [
+        0,
+        0.125,
+        0,
+        1,
+        1,
+        1
+      ]
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.couplingProbe")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,49 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++ @GameTest(template = "threshold_switch_pulley", timeoutTicks = 220)
++ public static void couplingProbe(CreateGameTestHelper helper) {
++  var world = helper.getLevel();
++  for (int cx=0; cx<=2; cx++) for (int cz=0; cz<=2; cz++) world.setChunkForced(cx,cz,true);
++  world.getEntitiesOfClass(net.minecraft.world.entity.vehicle.AbstractMinecart.class, new net.minecraft.world.phys.AABB(0, 160, 0, 45, 180, 45)).forEach(cart -> cart.discard());
++  var shape = net.minecraft.world.level.block.state.properties.BlockStateProperties.RAIL_SHAPE;
++  for (int z = 20; z <= 31; z++) for (int x = 3; x <= 25; x++) for (int y = 170; y <= 173; y++)
++   world.setBlock(new BlockPos(x,y,z), Blocks.AIR.defaultBlockState(), 2);
++  for (int z : new int[]{24, 28}) for (int x = 4; x <= 24; x++) {
++   for (int y=170; y<=173; y++) world.setBlock(new BlockPos(x,y,z), Blocks.AIR.defaultBlockState(), 2);
++   world.setBlock(new BlockPos(x,169,z), Blocks.STONE.defaultBlockState(), 2);
++   if (x >= 13) world.setBlock(new BlockPos(x,170,z), Blocks.STONE.defaultBlockState(), 2);
++  }
++  for (int z : new int[]{24, 28}) for (int x = 4; x <= 24; x++) {
++   int y = x >= 13 ? 171 : 170;
++   var railShape = x == 12 ? net.minecraft.world.level.block.state.properties.RailShape.ASCENDING_EAST : net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST;
++   world.setBlock(new BlockPos(x,y,z), Blocks.RAIL.defaultBlockState().setValue(shape,railShape), 2);
++  }
++  var a = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  var b = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  var base = new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART, world);
++  a.setUUID(java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"));
++  b.setUUID(java.util.UUID.fromString("00000000-0000-0000-0000-000000000002"));
++  base.setUUID(java.util.UUID.fromString("00000000-0000-0000-0000-000000000003"));
++  a.setPos(8.5,170.0625,24.5); b.setPos(11.5,170.0625,24.5); base.setPos(11.5,170.0625,28.5);
++  world.addFreshEntity(a); world.addFreshEntity(b); world.addFreshEntity(base);
++  var player=helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++  player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, com.simibubi.create.AllItems.MINECART_COUPLING.asStack(2));
++  helper.runAtTickTime(60, () -> {
++   System.out.printf("COUPLING_SLOPE_RAIL %s,%s,%s,%s,%s,%s%n", world.getBlockState(new BlockPos(11,170,24)), world.getBlockState(new BlockPos(12,170,24)), world.getBlockState(new BlockPos(13,171,24)), world.getBlockState(new BlockPos(11,170,28)), world.getBlockState(new BlockPos(12,170,28)), world.getBlockState(new BlockPos(13,171,28)));
++   for (int z : new int[]{24,28}) {
++    helper.assertTrue(world.getBlockState(new BlockPos(11,170,z)).getValue(shape) == net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST, "wrong approach rail");
++    helper.assertTrue(world.getBlockState(new BlockPos(12,170,z)).getValue(shape) == net.minecraft.world.level.block.state.properties.RailShape.ASCENDING_EAST, "wrong slope rail");
++    helper.assertTrue(world.getBlockState(new BlockPos(13,171,z)).getValue(shape) == net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST, "wrong upper rail");
++   }
++   helper.assertTrue(com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player, world, a.getId(), b.getId()), "coupling failed");
++   a.setDeltaMovement(0.1,0,0); base.setDeltaMovement(0.1,0,0);
++   System.out.printf(java.util.Locale.ROOT,"COUPLING_SLOPE 0,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",a.getX(),a.getY(),a.getDeltaMovement().x,a.getDeltaMovement().y,b.getX(),b.getY(),b.getDeltaMovement().x,b.getDeltaMovement().y,base.getX(),base.getY(),base.getDeltaMovement().x,base.getDeltaMovement().y);
++  });
++  for (int t=61; t<=140; t++) { final int tick=t; helper.runAtTickTime(t, () -> {
++   if (tick == 73) { b.setDeltaMovement(0.3,0,0); base.setDeltaMovement(0.3,0,0); }
++   System.out.printf(java.util.Locale.ROOT,"COUPLING_SLOPE %d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",tick-60,a.getX(),a.getY(),a.getDeltaMovement().x,a.getDeltaMovement().y,b.getX(),b.getY(),b.getDeltaMovement().x,b.getDeltaMovement().y,base.getX(),base.getY(),base.getDeltaMovement().x,base.getDeltaMovement().y);
++   if (tick == 140) helper.succeed();
++  }); }
++ }
+ }

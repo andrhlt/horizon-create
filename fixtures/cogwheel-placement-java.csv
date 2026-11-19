@@ -1,0 +1,11 @@
+case,placed,axis,waterlogged,remaining
+0,small,x,false,1
+1,large,z,false,1
+2,small,x,false,1
+3,large,y,false,1
+4,small,y,false,1
+5,none,none,false,2
+6,none,none,false,2
+7,large,x,true,1
+8,large,x,false,1
+9,small,y,false,1

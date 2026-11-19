@@ -1,0 +1,9 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.219",
+  "script_sha256": "fdf3f339765b6479a1d61c2f8710efbaaad06a9c645e335b13300bbab6883709",
+  "patch_sha256": "27be2514a3fb1b6ba5fdd8d448cb44884e351da913c7b662b3dbcb161ab40f82",
+  "elapsed_seconds": 15.888,
+  "fill": "fixture setup through Java fluid capability; not player bucket interaction"
+}

@@ -1,0 +1,47 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -125,6 +125,8 @@
+ 		var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
+ 		var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
+ 		var origin = new BlockPos(9, 112, -8);
++        level.getGameRules().getRule(net.minecraft.world.level.GameRules.RULE_DAYLIGHT).set(false, level.getServer());
++        level.setDayTime(58);
+ 		for (int x = -20; x <= 24; x++) {
+ 			var cell = origin.east(x);
+ 			level.setChunkForced(cell.getX() >> 4, cell.getZ() >> 4, true);
+@@ -218,7 +220,16 @@
+                 var delay = new com.simibubi.create.content.trains.schedule.condition.ScheduledDelay();
+                 delay.getData().putInt("Value", name.equals("Origin") ? 3 : 5);
+                 delay.getData().putInt("TimeUnit", 0);
+-                entry.conditions.add(java.util.List.of(delay));
++                if (name.equals("Origin")) {
++                    var redstone = new com.simibubi.create.content.trains.schedule.condition.StationPoweredCondition();
++                    var time = new com.simibubi.create.content.trains.schedule.condition.TimeOfDayCondition();
++                    time.getData().putInt("Hour", 6);
++                    time.getData().putInt("Minute", 1);
++                    time.getData().putInt("Rotation", 9);
++                    entry.conditions.add(java.util.List.of(redstone, time));
++                } else {
++                    entry.conditions.add(java.util.List.of(delay));
++                }
+                 schedule.entries.add(entry);
+             }
+             var programmed = com.simibubi.create.AllItems.SCHEDULE.asStack();
+@@ -252,6 +263,17 @@
+                     t, train.speed, a, b, d, e, approaching ? 1 : 0, stopped ? 1 : 0,
+                     approaching ? train.navigation.distanceToDestination : 0, atOrigin ? 1 : 0,
+                     train.runtime.state, train.runtime.currentEntry, train.runtime.paused ? 1 : 0, train.runtime.completed ? 1 : 0);
++                int condition = train.runtime.conditionProgress.isEmpty() ? 0 : train.runtime.conditionProgress.getFirst();
++                System.out.printf(java.util.Locale.ROOT, "CREATE_SCHEDULED_POWER_TIME %d;%d;%s;%d%n", t,
++                    level.getDayTime(), level.hasNeighborSignal(destination), condition);
++                if (t == 32)
++                    level.setBlockAndUpdate(destination.above(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++                if (t == 36) {
++                    level.setBlockAndUpdate(destination.above(), Blocks.AIR.defaultBlockState());
++                    level.setDayTime(266);
++                }
++                if (t == 40)
++                    level.setDayTime(267);
+                 if (t == 145) {
+                     helper.assertTrue(stopped && train.runtime.completed, "Schedule must finish at Terminal");
+                     helper.succeed();

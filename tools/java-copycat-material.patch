@@ -1,0 +1,124 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestMisc.copycat"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,107 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 32)
++	public static void copycatMaterialTrace(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var pos = new BlockPos(8, 170, 23);
++		world.setChunkForced(0, 1, true);
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		player.setYRot(90.0f);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var east = net.minecraft.core.Direction.EAST;
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(pos), east, pos, false);
++		var wrappers = new net.minecraft.world.level.block.state.BlockState[] {
++			com.simibubi.create.AllBlocks.COPYCAT_PANEL.getDefaultState(),
++			com.simibubi.create.AllBlocks.COPYCAT_STEP.getDefaultState(),
++		};
++		var cases = java.util.List.of(
++			Blocks.STONE, Blocks.OAK_LOG, Blocks.STONE_STAIRS, Blocks.BARREL,
++			Blocks.GLASS_PANE, Blocks.IRON_BARS, Blocks.OAK_TRAPDOOR,
++			com.simibubi.create.content.decoration.palettes.AllPaletteBlocks.OAK_WINDOW.get(),
++			com.simibubi.create.content.decoration.palettes.AllPaletteBlocks.OAK_WINDOW_PANE.get()
++		);
++		helper.runAtTickTime(3, () -> {
++			for (var wrapper : wrappers) {
++				for (var material : cases) {
++					world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++					world.setBlockAndUpdate(pos, wrapper);
++					player.getInventory().clearContent();
++					player.setItemInHand(hand, new ItemStack(material, 4));
++					var key = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(material);
++					for (String action : java.util.List.of("apply", "repeat", "different", "wrench", "sneak-wrench")) {
++						if (action.equals("different"))
++							player.setItemInHand(hand, new ItemStack(Blocks.DIRT, 3));
++						var stack = player.getItemInHand(hand);
++						Object result;
++						if (action.endsWith("wrench")) {
++							var wrench = com.simibubi.create.AllItems.WRENCH.asStack();
++							player.setItemInHand(hand, wrench);
++							player.setShiftKeyDown(action.equals("sneak-wrench"));
++							result = wrench.getItem().useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++							player.setShiftKeyDown(false);
++						} else {
++							result = world.getBlockState(pos).useItemOn(stack, world, player, hand, hit);
++						}
++						var entity = world.getBlockEntity(pos);
++						String appearance = "-";
++						int consumed = 0;
++						if (entity instanceof com.simibubi.create.content.decoration.copycat.CopycatBlockEntity copycat) {
++							appearance = copycat.getMaterial().toString();
++							consumed = copycat.getConsumedItem().getCount();
++						}
++						String inventory = player.getInventory().items.stream()
++							.filter(item -> !item.isEmpty())
++							.map(item -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item.getItem()) + "=" + item.getCount())
++							.sorted().collect(java.util.stream.Collectors.joining("|"));
++						System.out.printf("COPYCAT_TRACE %d;%s;%s;%s;%s;%s;%s;%d;%s%n",
++							helper.getTick(), wrapper, key, action, result, world.getBlockState(pos), appearance, consumed, inventory);
++					}
++				}
++			}
++			helper.succeed();
++		});
++	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 32)
++	public static void copycatLifecycle(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var pos = new BlockPos(8, 170, 30);
++		world.setChunkForced(0, 1, true);
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var creative = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
++		var off = net.minecraft.world.InteractionHand.OFF_HAND;
++		player.setYRot(90.0f);
++		player.setYHeadRot(90.0f);
++		var wrappers = java.util.List.of(
++			com.simibubi.create.AllBlocks.COPYCAT_PANEL.getDefaultState(),
++			com.simibubi.create.AllBlocks.COPYCAT_STEP.getDefaultState()
++		);
++		helper.runAtTickTime(4, () -> {
++			for (var wrapper : wrappers) {
++				for (var action : java.util.List.of("survival-break", "creative-break")) {
++					world.setBlockAndUpdate(pos, wrapper);
++					player.setItemInHand(off, new ItemStack(Items.OAK_LOG, 3));
++					wrapper.getBlock().setPlacedBy(world, pos, wrapper, player, new ItemStack(wrapper.getBlock()));
++					var blockEntity = (com.simibubi.create.content.decoration.copycat.CopycatBlockEntity) world.getBlockEntity(pos);
++					System.out.printf("COPYCAT_LIFECYCLE %d;%s;%s;placed;%s;%d;%d%n", helper.getTick(), wrapper, action,
++						blockEntity.getMaterial(), blockEntity.getConsumedItem().getCount(), player.getItemInHand(off).getCount());
++					var breaker = action.equals("creative-break") ? creative : player;
++					wrapper.getBlock().playerWillDestroy(world, pos, wrapper, breaker);
++					world.destroyBlock(pos, !breaker.isCreative(), breaker);
++					var dropped = world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
++						new net.minecraft.world.phys.AABB(pos).inflate(3));
++					var contents = dropped.stream().map(entity -> net.minecraft.core.registries.BuiltInRegistries.ITEM
++						.getKey(entity.getItem().getItem()) + "=" + entity.getItem().getCount())
++						.sorted().collect(java.util.stream.Collectors.joining("|"));
++					System.out.printf("COPYCAT_LIFECYCLE %d;%s;%s;removed;%s;%s%n", helper.getTick(), wrapper, action,
++						world.getBlockState(pos), contents);
++					dropped.forEach(net.minecraft.world.entity.item.ItemEntity::discard);
++				}
++			}
++			helper.succeed();
++		});
++	}
+ }

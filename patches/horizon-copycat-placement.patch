@@ -1,0 +1,36 @@
+diff --git a/crates/horizon-world/src/level/place.rs b/crates/horizon-world/src/level/place.rs
+--- a/crates/horizon-world/src/level/place.rs
++++ b/crates/horizon-world/src/level/place.rs
+@@ -81,7 +81,7 @@
+ }
+ 
+ /// `Direction.orderedByNearest(entity)`.
+-pub(crate) fn ordered_by_nearest(yaw: f32, pitch: f32) -> [Direction; 6] {
++pub fn ordered_by_nearest(yaw: f32, pitch: f32) -> [Direction; 6] {
+     let pitch_rad = pitch * (std::f32::consts::PI / 180.0);
+     let yaw_rad = -yaw * (std::f32::consts::PI / 180.0);
+     let pitch_sin = trig::sin(f64::from(pitch_rad));
+diff --git a/crates/horizon-world/src/level/mod.rs b/crates/horizon-world/src/level/mod.rs
+--- a/crates/horizon-world/src/level/mod.rs
++++ b/crates/horizon-world/src/level/mod.rs
+@@ -143,7 +143,7 @@
+ pub use falling::Landing;
+ pub use interact::{InteractionResult, PlayerContext, PlayerEffect, UseBranch, hit_slot};
+ pub use pistons::{BlockEventData, MovingPiston};
+-pub use place::{PlaceContext, PlaceOutcome, PlacementContext};
++pub use place::{PlaceContext, PlaceOutcome, PlacementContext, ordered_by_nearest};
+ pub use states::{BlockId, PropKey, StateTable};
+ pub use tick::{Precipitation, PrecipitationKind, RandomTickMask};
+ pub use ticks::Ticks;
+diff --git a/crates/horizon-client/src/game/spill.rs b/crates/horizon-client/src/game/spill.rs
+--- a/crates/horizon-client/src/game/spill.rs
++++ b/crates/horizon-client/src/game/spill.rs
+@@ -416,7 +416,7 @@
+ 
+ impl GameLevel<'_> {
+     /// `Block.popResource(level, pos, stack)` with the broken block's copied components.
+-    fn pop_resource(&mut self, pos: [i32; 3], mut stack: ItemStack) {
++    pub(super) fn pop_resource(&mut self, pos: [i32; 3], mut stack: ItemStack) {
+         self.pending.attach(pos, &mut stack);
+         let at = pop_position(&mut self.world.random, pos);
+         self.spill.spawns.push(Spawn {

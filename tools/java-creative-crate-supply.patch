@@ -1,0 +1,100 @@
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+index 657f93b..45a2e93 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/CrossPlaneMirror.java
+@@ -95,6 +95,7 @@ public class CrossPlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+index 4e7785d..3b3571a 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/PlaneMirror.java
+@@ -91,6 +91,7 @@ public class PlaneMirror extends SymmetryMirror {
+ 	}
+ 
+ 	@Override
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {
+ 		super.applyModelTransform(ms);
+ 		TransformStack.of(ms)
+diff --git a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+index ee1f50c..a2cbd61 100644
+--- a/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
++++ b/src/main/java/com/simibubi/create/content/equipment/symmetryWand/mirror/SymmetryMirror.java
+@@ -118,6 +118,7 @@ public abstract class SymmetryMirror {
+ 	@OnlyIn(Dist.CLIENT)
+ 	public abstract PartialModel getModel();
+ 
++	@OnlyIn(Dist.CLIENT)
+ 	public void applyModelTransform(PoseStack ms) {}
+ 
+ 	protected Vec3 getDiff(BlockPos position) {
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..8a84c3a 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.creativeCrateSupply")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..ec7264c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,47 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void creativeCrateSupply(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		helper.runAtTickTime(4, () -> {
++			for(int limit : new int[]{64, 16}) {
++				level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
++				level.setBlock(pos, com.simibubi.create.AllBlocks.CREATIVE_CRATE.getDefaultState(), 3);
++				var crate = (com.simibubi.create.content.logistics.crate.CreativeCrateBlockEntity) level.getBlockEntity(pos);
++				var filter = crate.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE);
++				var inv = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, pos, net.minecraft.core.Direction.NORTH);
++				var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++				var held = new ItemStack(Items.IRON_INGOT, 7);
++				var tag = new net.minecraft.nbt.CompoundTag(); tag.putInt("marker", 17);
++				held.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(tag));
++				if (limit != 64) held.set(net.minecraft.core.component.DataComponents.MAX_STACK_SIZE, limit);
++				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, held);
++				var top = new net.minecraft.world.phys.Vec3(pos.getX()+.5, pos.getY()+.875, pos.getZ()+.5);
++				var side = new net.minecraft.world.phys.Vec3(pos.getX(), pos.getY()+.5, pos.getZ()+.5);
++				boolean topHit = filter.testHit(top), sideHit = filter.testHit(side);
++				var hit = new net.minecraft.world.phys.BlockHitResult(top, net.minecraft.core.Direction.UP, pos, false);
++				filter.onShortInteract(player, net.minecraft.world.InteractionHand.MAIN_HAND, net.minecraft.core.Direction.UP, hit);
++				var saved = crate.saveWithFullMetadata(level.registryAccess());
++				var first = inv.extractItem(0, 3, false); var second = inv.extractItem(0, 64, false);
++				var other = inv.extractItem(1, 64, false);
++				var remainder = inv.insertItem(1, new ItemStack(Items.GOLD_INGOT, 5), false);
++				System.out.printf("CREATE_CREATIVE_CRATE,%s,%s,%d,%s,%d,%d,%d,%s,%d,%d,%d,%s,%s%n", topHit, sideHit,
++					held.getCount(), net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(filter.getFilter().getItem()), filter.getFilter().getCount(),
++					inv.getSlots(), inv.getStackInSlot(0).getCount(), first.getItem() == Items.IRON_INGOT, first.getCount(), second.getCount(), other.getCount(),
++					remainder.isEmpty(), first.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA));
++				var exactBelow = com.simibubi.create.foundation.item.ItemHelper.extract(inv, stack -> true, 9, false);
++				var exactAbove = com.simibubi.create.foundation.item.ItemHelper.extract(inv, stack -> true, limit + 1, false);
++				System.out.printf("CREATE_CRATE_EXACT_LIMIT,%d,%d,%d%n", limit, exactBelow.getCount(), exactAbove.getCount());
++				if (exactBelow.getCount() != 9 || !exactAbove.isEmpty())
++					throw new IllegalStateException("Unexpected exact-count extraction");
++				System.out.println("CREATE_CREATIVE_CRATE_NBT " + saved);
++				if (!topHit || sideHit || held.getCount()!=7 || filter.getFilter().getCount()!=7 || first.getCount()!=3 || second.getCount()!=limit || !other.isEmpty() || !remainder.isEmpty())
++					throw new IllegalStateException("Creative Crate did not match expected supply");
++			}
++			helper.succeed();
++		});
++	}
++
+ }

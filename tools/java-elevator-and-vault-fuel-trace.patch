@@ -1,0 +1,119 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..1262d7d10 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,10 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> java.util.Set.of("TestContraptions.elevator",
++                "TestContraptions.vaultsProtectFuel").contains(test.testName()))
++            .sorted(java.util.Comparator.comparing(TestFunction::testName))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+index e74ff27e4..201726eca 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -171,6 +171,7 @@ public class TestContraptions {
+ 				15, () -> helper.getBlockEntity(AllBlockEntityTypes.ELEVATOR_PULLEY.get(), pulley).clicked()
+ 		);
+ 		helper.succeedWhen(() -> {
++			traceElevator(helper, bottomLamp, topLamp, lever, secondaryPulley);
+ 			helper.assertSecondsPassed(1);
+ 			if (!helper.getBlockState(lever).getValue(LeverBlock.POWERED)) { // step 1: check entity, lamps, and secondary, then move up
+ 				helper.getFirstEntity(AllEntityTypes.CONTROLLED_CONTRAPTION.get(), elevatorStart); // make sure entity exists
+@@ -274,8 +275,55 @@ public class TestContraptions {
+ 		helper.runAtTickTime(10, () -> helper.pullLever(lever));
+ 
+ 		helper.succeedWhen(() -> {
++			traceFuel(helper, barrelLamp, vaultLamp, lever);
+ 			helper.assertBlockProperty(barrelLamp, RedstoneLampBlock.LIT, false);
+ 			helper.assertBlockProperty(vaultLamp, RedstoneLampBlock.LIT, true);
+ 		});
+ 	}
++	private static void traceElevator(CreateGameTestHelper helper, BlockPos lower, BlockPos upper, BlockPos lever,
++		BlockPos mirror) {
++		var origin = helper.absolutePos(new BlockPos(0, 1, 0));
++		var level = helper.getLevel();
++		var area = new net.minecraft.world.phys.AABB(origin).expandTowards(10, 16, 8);
++		var cabins = level.getEntitiesOfClass(
++			com.simibubi.create.content.contraptions.ControlledContraptionEntity.class, area);
++		var levels = cabins.stream().map(cabin -> String.format(java.util.Locale.ROOT, "%.9f",
++			cabin.getY() - origin.getY())).sorted().collect(java.util.stream.Collectors.joining("|"));
++		var cows = level.getEntitiesOfClass(net.minecraft.world.entity.animal.Cow.class, area).stream()
++			.map(cow -> String.format(java.util.Locale.ROOT, "%.6f", cow.getY() - origin.getY()))
++			.sorted().collect(java.util.stream.Collectors.joining("|"));
++		var secondary = level.getBlockEntity(helper.absolutePos(mirror));
++		boolean linked = secondary instanceof ElevatorPulleyBlockEntity pulley && pulley.getMirrorParent() != null;
++		System.out.printf("ELEVATOR_TRACE %d,%d,%d:%d:%d,%s,%s,%s,%s,%s,%s%n", helper.getTick(),
++			level.getGameTime() % 20, origin.getX(), origin.getY(), origin.getZ(),
++			helper.getBlockState(lower).getValue(RedstoneLampBlock.LIT),
++			helper.getBlockState(upper).getValue(RedstoneLampBlock.LIT),
++			helper.getBlockState(lever).getValue(LeverBlock.POWERED), linked, levels, cows);
++	}
++
++	private static void traceFuel(CreateGameTestHelper helper, BlockPos barrel, BlockPos vault, BlockPos lever) {
++		var origin = helper.absolutePos(new BlockPos(0, 1, 0));
++		var level = helper.getLevel();
++		var area = new net.minecraft.world.phys.AABB(origin).expandTowards(5, 5, 6);
++		var carts = level.getEntitiesOfClass(net.minecraft.world.entity.vehicle.MinecartFurnace.class, area)
++			.stream().sorted(java.util.Comparator.comparingDouble(cart -> cart.getX()))
++			.map(cart -> String.format(java.util.Locale.ROOT, "%.9f:%d",
++				cart.getZ() - origin.getZ(), cart.saveWithoutId(new net.minecraft.nbt.CompoundTag()).getShort("Fuel")))
++			.collect(java.util.stream.Collectors.joining("|"));
++        for (BlockPos lamp : java.util.List.of(barrel, vault)) {
++            var comparator = helper.absolutePos(lamp.north());
++            var entity = level.getBlockEntity(comparator);
++            var output = entity instanceof net.minecraft.world.level.block.entity.ComparatorBlockEntity ce
++                ? ce.getOutputSignal() : -1;
++            var store = level.getBlockState(comparator.north());
++            System.out.printf("VAULT_SIGNAL %d %d %s %d %s%n", helper.getTick(), lamp.getX(),
++                level.getBlockState(comparator), output, store);
++        }
++		System.out.printf("VAULT_FUEL_TRACE %d,%d,%d:%d:%d,%s,%s,%s,%s%n", helper.getTick(),
++			level.getGameTime() % 20, origin.getX(), origin.getY(), origin.getZ(),
++			helper.getBlockState(barrel).getValue(RedstoneLampBlock.LIT),
++			helper.getBlockState(vault).getValue(RedstoneLampBlock.LIT),
++			helper.getBlockState(lever).getValue(LeverBlock.POWERED), carts);
++	}
++
+ }
+diff --git a/src/main/resources/create.mixins.json b/src/main/resources/create.mixins.json
+index b5ea0067a..ffadfeb68 100644
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -6,6 +6,7 @@
+   "plugin": "com.simibubi.create.foundation.mixin.CreateMixinPlugin",
+   "compatibilityLevel": "JAVA_21",
+   "mixins": [
++    "ParityGameTestOriginMixin",
+     "ArmorTrimMixin",
+     "BeehiveBlockMixin",
+     "BlockItemMixin",
+diff --git a/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+new file mode 100644
+index 000000000..a1ca98568
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+@@ -0,0 +1,17 @@
++package com.simibubi.create.foundation.mixin;
++
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.ModifyArg;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.gametest.framework.GameTestServer;
++
++@Mixin(GameTestServer.class)
++public class ParityGameTestOriginMixin {
++    @ModifyArg(method = "startTests", at = @At(value = "INVOKE",
++        target = "Lnet/minecraft/gametest/framework/StructureGridSpawner;<init>(Lnet/minecraft/core/BlockPos;IZ)V"), index = 0)
++    private BlockPos parityOrigin(BlockPos vanillaOrigin) {
++        return new BlockPos(3, vanillaOrigin.getY(), -12);
++    }
++}

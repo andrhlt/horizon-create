@@ -1,0 +1,93 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..f20999a05 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.metalGirderWrenchConnections"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..bf556be7d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,61 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++
++
++
++
++
++
++	@GameTest(template = "shearing", timeoutTicks = 16)
++	public static void metalGirderWrenchConnections(CreateGameTestHelper helper) {
++		var girder = com.simibubi.create.AllBlocks.METAL_GIRDER;
++		var wrench = com.simibubi.create.AllItems.WRENCH;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var xAxis = net.minecraft.core.Direction.Axis.X;
++		var x = com.simibubi.create.content.decoration.girder.GirderBlock.X;
++		var z = com.simibubi.create.content.decoration.girder.GirderBlock.Z;
++		var top = com.simibubi.create.content.decoration.girder.GirderBlock.TOP;
++		var bottom = com.simibubi.create.content.decoration.girder.GirderBlock.BOTTOM;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var beam = girder.getDefaultState().setValue(axis, xAxis).setValue(x, true);
++		for (int index = 0; index < 4; index++) {
++			var pos = new BlockPos(12, 3, 2 + index * 5);
++			var initial = index == 2 ? beam.setValue(z, true)
++				: index == 3 ? beam.setValue(axis, net.minecraft.core.Direction.Axis.Y).setValue(top, true).setValue(bottom, true)
++				: beam;
++			level.setBlock(helper.absolutePos(pos), initial, 2 | 16);
++			if (index == 1) {
++				level.setBlock(helper.absolutePos(pos), initial.setValue(top, true), 2 | 16);
++				level.setBlock(helper.absolutePos(pos.above()), beam.setValue(bottom, true), 2 | 16);
++			}
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int index = 0; index < 4; index++) {
++				var pos = new BlockPos(12, 3, 2 + index * 5);
++				var state = helper.getBlockState(pos);
++				var other = helper.getBlockState(pos.above());
++				System.out.printf(java.util.Locale.ROOT, "CREATE_GIRDER_WRENCH,%d,%d,%s,%s,%s,%s,%s,%s%n",
++					tick, index, state.getValue(axis).getName(), state.getValue(x), state.getValue(z),
++					state.getValue(top), state.getValue(bottom), girder.has(other) && other.getValue(bottom));
++				if (tick == 3 || (tick == 5 && index == 0) || (tick == 7 && index < 2)) {
++					var at = helper.absolutePos(pos);
++					player.setPos(at.getX(), at.getY(), at.getZ() - 2);
++					player.setShiftKeyDown(false);
++					var tool = wrench.asStack();
++					player.setItemInHand(hand, tool);
++					var hitPoint = at.getCenter().add(0, tick == 5 ? -0.33 : 0.30, -0.25);
++					var hit = new net.minecraft.world.phys.BlockHitResult(hitPoint, net.minecraft.core.Direction.NORTH, at, false);
++					state.useItemOn(tool, level, player, hand, hit);
++				}
++			}
++			if (tick < 9)
++				helper.fail("Waiting for the complete girder wrench connection trace");
++		});
++	}
+ }

@@ -1,0 +1,45 @@
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -3112,6 +3112,8 @@
+     tnt_refused: Option<BlockPos>,
+     /// Their permission level: an op's above 0 (`PlayerList.isOp`).
+     lan_acting_permission: Option<u8>,
++    /// The acting guest’s dominant hand from its Client Information packet.
++    lan_acting_main_hand_left: Option<bool>,
+     /// The spawn protection radius that holds the acting guest back
+     /// (`DedicatedServer.isUnderSpawnProtection` before the position test):
+     /// None for an operator, without operators, or off a dedicated server.
+@@ -11959,6 +11961,7 @@
+             native_click_cursor: None,
+             tnt_refused: None,
+             lan_acting_permission: None,
++            lan_acting_main_hand_left: None,
+             lan_acting_spawn_protection: None,
+             lan_acting_entity: None,
+             native_login_permission: None,
+--- a/crates/horizon-client/src/game/lan_actions.rs
++++ b/crates/horizon-client/src/game/lan_actions.rs
+@@ -288,6 +288,7 @@
+         Option<String>,
+         Option<u128>,
+         Option<u8>,
++        Option<bool>,
+         Option<u32>,
+         Option<i32>,
+     ),
+@@ -728,6 +729,7 @@
+             self.lan_acting_name.replace(g.name.clone()),
+             self.lan_acting_uuid.replace(g.uuid),
+             self.lan_acting_permission.replace(g.permission),
++            self.lan_acting_main_hand_left.replace(g.info.main_hand == 0),
+             self.lan_acting_entity.replace(g.entity_id as u32),
+             std::mem::replace(&mut self.lan_acting_spawn_protection, spawn_protection),
+         );
+@@ -1025,6 +1027,7 @@
+             self.lan_acting_name,
+             self.lan_acting_uuid,
+             self.lan_acting_permission,
++            self.lan_acting_main_hand_left,
+             self.lan_acting_entity,
+             self.lan_acting_spawn_protection,
+         ) = acting;

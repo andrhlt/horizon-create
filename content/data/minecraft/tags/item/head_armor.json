@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "create:cardboard_helmet",
+    "create:copper_diving_helmet"
+  ]
+}

@@ -1,0 +1,215 @@
+diff --git a/build.gradle b/build.gradle
+--- a/build.gradle
++++ b/build.gradle
+@@ -70,2 +70,7 @@
+             client()
++            if (project.hasProperty("parityCopperCasing")) {
++                gameDirectory = project.file("run/copper-casing-probe")
++                systemProperty("parity.copperCasing", "true")
++                programArguments.addAll("--width", "640", "--height", "360")
++            }
+         }
+diff --git a/src/main/resources/create.mixins.json b/src/main/resources/create.mixins.json
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -64,2 +64,3 @@
+     "client.CameraMixin",
++    "client.CopperCasingHiddenWindowMixin",
+     "client.EntityContraptionInteractionMixin",
+diff --git a/src/main/java/com/simibubi/create/foundation/mixin/client/CopperCasingHiddenWindowMixin.java b/src/main/java/com/simibubi/create/foundation/mixin/client/CopperCasingHiddenWindowMixin.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/client/CopperCasingHiddenWindowMixin.java
+@@ -0,0 +1,19 @@
++package com.simibubi.create.foundation.mixin.client;
++
++import org.lwjgl.glfw.GLFW;
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.Inject;
++import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
++
++import com.mojang.blaze3d.platform.Window;
++
++@Mixin(Window.class)
++public class CopperCasingHiddenWindowMixin {
++	@Inject(method = "<init>", at = @At(value = "INVOKE", target =
++		"Lnet/neoforged/fml/loading/ImmediateWindowHandler;setupMinecraftWindow(Ljava/util/function/IntSupplier;Ljava/util/function/IntSupplier;Ljava/util/function/Supplier;Ljava/util/function/LongSupplier;)J"))
++	private void hideCopperCasingProbeWindow(CallbackInfo ci) {
++		if (Boolean.getBoolean("parity.copperCasing"))
++			GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
++	}
++}
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/CopperCasingProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/CopperCasingProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/CopperCasingProbe.java
+@@ -0,0 +1,168 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.stream.Collectors;
++
++import org.lwjgl.glfw.GLFW;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.AllSpriteShifts;
++import com.simibubi.create.content.fluids.pipes.EncasedPipeBlock;
++import com.simibubi.create.foundation.model.BakedQuadHelper;
++
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.renderer.block.model.BakedQuad;
++import net.minecraft.client.renderer.texture.TextureAtlasSprite;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.util.RandomSource;
++import net.minecraft.world.level.BlockAndTintGetter;
++import net.minecraft.world.level.ColorResolver;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.entity.BlockEntity;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.level.lighting.LevelLightEngine;
++import net.minecraft.world.level.material.FluidState;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import net.neoforged.neoforge.client.model.data.ModelData;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class CopperCasingProbe {
++    private static boolean done;
++    private static final BlockPos ORIGIN = BlockPos.ZERO;
++    private static final String CASING = "create:copper_casing";
++    private static final String PIPE = "create:encased_fluid_pipe";
++    private static final String INTERFACE = "create:portable_fluid_interface";
++
++    private static final class Scene implements BlockAndTintGetter {
++        final Map<BlockPos, BlockState> blocks = new HashMap<>();
++        public BlockState getBlockState(BlockPos position) { return blocks.getOrDefault(position, Blocks.AIR.defaultBlockState()); }
++        public BlockEntity getBlockEntity(BlockPos position) { return null; }
++        public FluidState getFluidState(BlockPos position) { return getBlockState(position).getFluidState(); }
++        public int getHeight() { return 384; }
++        public int getMinBuildHeight() { return -64; }
++        public float getShade(Direction direction, boolean shaded) { return 1; }
++        public LevelLightEngine getLightEngine() { return null; }
++        public int getBlockTint(BlockPos position, ColorResolver resolver) { return -1; }
++    }
++
++    private record Piece(BlockPos position, String id, Direction open) {
++        BlockState state() {
++            return switch (id) {
++                case CASING -> AllBlocks.COPPER_CASING.getDefaultState();
++                case PIPE -> {
++                    var state = AllBlocks.ENCASED_FLUID_PIPE.getDefaultState();
++                    yield open == null ? state : state.setValue(EncasedPipeBlock.FACING_TO_PROPERTY_MAP.get(open), true);
++                }
++                case INTERFACE -> AllBlocks.PORTABLE_FLUID_INTERFACE.getDefaultState();
++                default -> Blocks.STONE.defaultBlockState();
++            };
++        }
++
++        String fixture() {
++            return position.getX() + ":" + position.getY() + ":" + position.getZ() + "=" + id
++                + (open == null ? "" : "[" + open.getName() + "=true]");
++        }
++    }
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) {
++        if (!Boolean.getBoolean("parity.copperCasing") || done)
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.screen == null || mc.getOverlay() != null)
++            return;
++        done = true;
++        try {
++            if (GLFW.glfwGetWindowAttrib(mc.getWindow().getWindow(), GLFW.GLFW_VISIBLE) != GLFW.GLFW_FALSE)
++                throw new IllegalStateException("Expected a hidden Java reference window");
++            for (Direction face : Direction.values())
++                measureFace(mc, face);
++            System.out.println("CREATE_COPPER_CASING_DONE");
++        } finally {
++            mc.stop();
++        }
++    }
++
++    private static void measureFace(Minecraft mc, Direction face) {
++        Direction right = switch (face) {
++            case UP, DOWN, SOUTH -> Direction.EAST;
++            case NORTH -> Direction.WEST;
++            case WEST -> Direction.SOUTH;
++            case EAST -> Direction.NORTH;
++        };
++        Direction up = switch (face) {
++            case UP -> Direction.NORTH;
++            case DOWN -> Direction.SOUTH;
++            default -> Direction.UP;
++        };
++        var left = ORIGIN.relative(right.getOpposite());
++        var top = ORIGIN.relative(up);
++        var corner = left.relative(up);
++        var covering = left.relative(face);
++        var casing = new Piece(ORIGIN, CASING, null);
++        var pipe = new Piece(ORIGIN, PIPE, null);
++        var leftCasing = new Piece(left, CASING, null);
++        var leftPipe = new Piece(left, PIPE, null);
++
++        measure(mc, "isolated_casing", face, casing);
++        measure(mc, "isolated_pipe", face, pipe);
++        measure(mc, "casing_to_pipe", face, casing, leftPipe);
++        measure(mc, "pipe_to_casing", face, pipe, new Piece(ORIGIN.relative(right), CASING, null));
++        measure(mc, "port_toward_viewer", face, pipe, new Piece(left, PIPE, face));
++        measure(mc, "port_in_plane", face, pipe, new Piece(left, PIPE, up));
++        measure(mc, "viewed_port", face, new Piece(ORIGIN, PIPE, face), leftCasing);
++        measure(mc, "unregistered_copper_artwork", face, pipe, new Piece(left, INTERFACE, null));
++        measure(mc, "occluded_by_casing", face, pipe, leftCasing, new Piece(covering, CASING, null));
++        measure(mc, "occluded_by_stone", face, pipe, leftCasing, new Piece(covering, "minecraft:stone", null));
++        measure(mc, "covered_by_port", face, pipe, leftCasing, new Piece(covering, PIPE, face));
++        measure(mc, "diagonal_only", face, pipe, new Piece(corner, PIPE, null));
++        measure(mc, "connected_corner", face, pipe, leftCasing, new Piece(top, PIPE, null),
++            new Piece(corner, PIPE, null));
++        measure(mc, "disconnected_corner", face, pipe, leftCasing, new Piece(top, PIPE, null),
++            new Piece(corner, PIPE, face));
++    }
++
++    private static void measure(Minecraft mc, String name, Direction face, Piece... pieces) {
++        var scene = new Scene();
++        for (var piece : pieces)
++            scene.blocks.put(piece.position, piece.state());
++        var state = pieces[0].state();
++        var model = mc.getBlockRenderer().getBlockModel(state);
++        var data = model.getModelData(scene, ORIGIN, state, ModelData.EMPTY);
++        var random = RandomSource.create(state.getSeed(ORIGIN));
++        List<BakedQuad> quads = new ArrayList<>(model.getQuads(state, face, random, data, null));
++        quads.addAll(model.getQuads(state, null, random, data, null));
++        var target = AllSpriteShifts.COPPER_CASING.getTarget();
++        var selected = quads.stream().filter(quad -> quad.getDirection() == face).toList();
++        var shifted = selected.stream().map(quad -> tile(quad, target)).filter(index -> index >= 0).distinct().toList();
++        boolean open = selected.stream().anyMatch(quad -> quad.getSprite().contents().name().toString()
++            .equals("create:block/encased_pipe"));
++        if ((open && !shifted.isEmpty()) || (!open && shifted.size() != 1))
++            throw new IllegalStateException(name + "/" + face + " yielded " + selected.size()
++                + " quads, tiles " + shifted + " and open " + open);
++        var layout = List.of(pieces).stream().map(Piece::fixture).collect(Collectors.joining("|"));
++        System.out.printf("CREATE_COPPER_CASING %s,%s,%s,%s%n", name, face.getName(),
++            open ? "open" : shifted.getFirst(), layout);
++    }
++
++    private static int tile(BakedQuad quad, TextureAtlasSprite target) {
++        float u = 0;
++        float v = 0;
++        for (int vertex = 0; vertex < 4; vertex++) {
++            u += BakedQuadHelper.getU(quad.getVertices(), vertex) / 4;
++            v += BakedQuadHelper.getV(quad.getVertices(), vertex) / 4;
++        }
++        if (u <= target.getU0() || u >= target.getU1() || v <= target.getV0() || v >= target.getV1())
++            return -1;
++        int x = (int) (8 * (u - target.getU0()) / (target.getU1() - target.getU0()));
++        int y = (int) (8 * (v - target.getV0()) / (target.getV1() - target.getV0()));
++        return x + 8 * y;
++    }
++}

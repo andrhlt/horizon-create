@@ -1,0 +1,76 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {
+    "occludes": false,
+    "hardness": 3.0,
+    "requires_tool": true,
+    "sounds": "minecraft:stone"
+  },
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "south",
+        "east",
+        "west"
+      ]
+    },
+    "wall": {
+      "type": "boolean"
+    },
+    "powered": {
+      "type": "boolean"
+    },
+    "size": {
+      "type": "enum",
+      "values": [
+        "small",
+        "medium",
+        "large"
+      ]
+    }
+  },
+  "default_state": {
+    "facing": "north",
+    "wall": "false",
+    "powered": "false",
+    "size": "medium"
+  },
+  "shapes": {
+    "property": "size",
+    "values": {
+      "small": [
+        [
+          0.25,
+          0,
+          0.25,
+          0.75,
+          1,
+          0.75
+        ]
+      ],
+      "medium": [
+        [
+          0.1875,
+          0,
+          0.1875,
+          0.8125,
+          1,
+          0.8125
+        ]
+      ],
+      "large": [
+        [
+          0.125,
+          0,
+          0.125,
+          0.875,
+          1,
+          0.875
+        ]
+      ]
+    }
+  }
+}

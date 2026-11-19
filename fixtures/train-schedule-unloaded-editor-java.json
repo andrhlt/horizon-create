@@ -1,0 +1,21 @@
+{
+  "Cyclic": 1,
+  "Entries": [
+    {
+      "Conditions": [
+        [
+          {
+            "Data": {},
+            "Id": "create:unloaded"
+          }
+        ]
+      ],
+      "Instruction": {
+        "Data": {
+          "Text": "Waiting Station"
+        },
+        "Id": "create:destination"
+      }
+    }
+  ]
+}

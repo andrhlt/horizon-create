@@ -1,0 +1,9 @@
+case,dx,dy,dz,valid,facing,horizontal,vertical
+0,4,0,0,true,east,4,0
+1,0,2,-5,true,north,5,2
+2,-3,-2,0,true,west,3,-2
+3,0,1,9,true,south,9,1
+4,2,0,2,false,north,1,0
+5,0,3,0,false,north,1,0
+6,33,0,0,false,north,1,0
+7,32,0,0,true,east,32,0

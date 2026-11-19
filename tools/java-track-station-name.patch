@@ -1,0 +1,76 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.stationRename"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,61 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 100)
++	public static void stationRename(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var item = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) com.simibubi.create.AllBlocks.TRACK_STATION.asItem();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var track = com.simibubi.create.AllBlocks.TRACK.get();
++		var straight = track.defaultBlockState().setValue(
++			com.simibubi.create.content.trains.track.TrackBlock.SHAPE,
++			com.simibubi.create.content.trains.track.TrackShape.XO);
++		var origin = helper.absolutePos(new BlockPos(1, 8, 0));
++		var pos = origin.south(2);
++		for (int i = -3; i <= 3; i++) {
++			level.setBlockAndUpdate(origin.east(i).below(), Blocks.SMOOTH_STONE.defaultBlockState());
++			level.setBlockAndUpdate(origin.east(i), straight);
++		}
++		level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++		level.setBlockAndUpdate(pos.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++		helper.runAfterDelay(7, () -> {
++			var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++			player.setItemInHand(hand, new ItemStack(item));
++			player.setYRot(90);
++			player.setXRot(20);
++			for (var hitPos : java.util.List.of(origin, pos.below())) {
++				var target = new net.minecraft.world.phys.BlockHitResult(
++					net.minecraft.world.phys.Vec3.atCenterOf(hitPos), net.minecraft.core.Direction.UP, hitPos, false);
++				item.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, target));
++			}
++		});
++		helper.runAfterDelay(15, () -> {
++			var be = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(pos);
++			helper.assertTrue(be != null && be.getStation() != null, "Station is registered on track graph");
++			var station = be.getStation();
++			System.out.println("CREATE_STATION_RENAME default," + station.name);
++			try {
++				var packetClass = com.simibubi.create.content.trains.station.StationEditPacket.class;
++				var apply = packetClass.getDeclaredMethod("applySettings",
++					net.minecraft.server.level.ServerPlayer.class, be.getClass());
++				apply.setAccessible(true);
++				var inputs = new String[][]{{"first", "Main Platform"}, {"blank", "    "},
++					{"unicode", "  Gare du Nord ★  "}, {"boundary", "1234567890123456789012345"}};
++				for (var input : inputs) {
++					var packet = com.simibubi.create.content.trains.station.StationEditPacket.configure(pos, false, input[1], null);
++					apply.invoke(packet, null, be);
++					var tag = new net.minecraft.nbt.CompoundTag();
++					var palette = new com.simibubi.create.content.trains.graph.DimensionPalette();
++					station.write(tag, level.registryAccess(), palette);
++					var restored = new com.simibubi.create.content.trains.station.GlobalStation();
++					restored.read(tag, level.registryAccess(), false, palette);
++					System.out.printf("CREATE_STATION_RENAME %s,%s,%s%n", input[0], station.name, restored.name);
++				}
++			} catch (ReflectiveOperationException e) {
++				throw new RuntimeException(e);
++			}
++			helper.succeed();
++		});
++	}
+ }

@@ -1,0 +1,22 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -208,6 +208,8 @@
+ 				var dest = (ChainConveyorBlockEntity) world.getBlockEntity(end);
+ 				var port = reverse ? null : (FrogportBlockEntity) world.getBlockEntity(portPos);
+ 				if (tick == 0 && port != null) {
++					System.out.printf(Locale.ROOT, "CREATE_FROGPORT_ANTICIPATE_START %d,%d,%d,%d%n",
++						world.getGameTime(), portPos.getX(), portPos.getY(), portPos.getZ());
+ 					port.target = new ChainConveyorFrogportTarget(end.subtract(portPos), 150, (BlockPos) null, false);
+ 					port.addressFilter = "Lab-In";
+ 					port.target.setup(port, world, portPos);
+--- a/src/main/java/com/simibubi/create/content/logistics/packagePort/frogport/FrogportBlockEntity.java
++++ b/src/main/java/com/simibubi/create/content/logistics/packagePort/frogport/FrogportBlockEntity.java
+@@ -141,6 +141,8 @@
+ 			if (inventory.getStackInSlot(i)
+ 				.isEmpty()) {
+ 				sendAnticipate = true;
++				System.out.printf(java.util.Locale.ROOT, "CREATE_FROGPORT_ANTICIPATE %d,%d,%d,%d%n",
++					level.getGameTime(), worldPosition.getX(), worldPosition.getY(), worldPosition.getZ());
+ 				sendData();
+ 				return;
+ 			}

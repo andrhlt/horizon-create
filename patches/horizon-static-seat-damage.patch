@@ -1,0 +1,79 @@
+--- a/crates/horizon-client/src/mobs.rs
++++ b/crates/horizon-client/src/mobs.rs
+@@ -1328,6 +1328,8 @@
+     pub max_swell: i32,
+     pub ambient_timer: i32,
+     pub fall_distance: f64,
++    /// Use the original 1.21 fall rule for a mod-propelled flight, until touchdown.
++    pub legacy_fall_damage_until_landing: bool,
+     /// `Entity.stuckSpeedMultiplier`: the next move is scaled by it.
+     pub stuck_multiplier: Vec3,
+     /// `Entity.pistonDeltas` and `pistonDeltasGameTime`: how far a moving
+@@ -3090,6 +3092,7 @@
+             // Mob.ambientSoundTime starts at 0.
+             ambient_timer: 0,
+             fall_distance: 0.0,
++            legacy_fall_damage_until_landing: false,
+             stuck_multiplier: Vec3::ZERO,
+             piston: Default::default(),
+             persistent: false,
+--- a/crates/horizon-client/src/mobs/living.rs
++++ b/crates/horizon-client/src/mobs/living.rs
+@@ -1037,9 +1037,16 @@
+         // no dust, and walks out of it owing nothing.
+         if self.species() == super::Species::Strider && self.fluids.in_lava {
+             self.fall_distance = 0.0;
++            self.legacy_fall_damage_until_landing = false;
+             return;
+         }
+-        if !self.fluids.in_water && moved.y < 0.0 {
++        if self.fluids.in_water {
++            self.legacy_fall_damage_until_landing = false;
++        }
++        let legacy_landing = self.on_ground
++            && (self.legacy_fall_damage_until_landing
++                || self.supporting.is_some_and(|pos| uses_legacy_landing(w, pos)));
++        if !self.fluids.in_water && moved.y < 0.0 && !legacy_landing {
+             self.fall_distance -= f64::from(moved.y as f32);
+         }
+         if self.on_ground {
+@@ -1048,6 +1055,7 @@
+                 self.fall_on_block(w, events);
+             }
+             self.fall_distance = 0.0;
++            self.legacy_fall_damage_until_landing = false;
+         }
+     }
+     /// The block particles `LivingEntity.checkFallDamage` sends up from the
+@@ -1454,8 +1462,15 @@
+             self.mod_block_fall(contact, landed, 0.0);
+             return false;
+         }
+-        let power = distance + 1.0e-6 - self.kind.safe_fall_distance;
+-        let mut damage = (power * f64::from(modifier) * self.kind.fall_damage_multiplier).floor();
++        let legacy_landing = self.legacy_fall_damage_until_landing
++            || contact.is_some_and(|(world, pos)| uses_legacy_landing(world, pos));
++        let mut damage = if legacy_landing {
++            let power = (distance - self.kind.safe_fall_distance) as f32;
++            f64::from((power * modifier * self.kind.fall_damage_multiplier as f32).ceil())
++        } else {
++            let power = distance + 1.0e-6 - self.kind.safe_fall_distance;
++            (power * f64::from(modifier) * self.kind.fall_damage_multiplier).floor()
++        };
+         // Frog.calculateFallDamage: five points less than the base damage;
+         // Goat.calculateFallDamage: ten, so a long jump down a ledge is safe.
+         match self.species() {
+@@ -2188,6 +2203,13 @@
+         });
+         Ok(())
+     }
++}
++
++fn uses_legacy_landing(world: &MobWorld<'_>, [x, y, z]: [i32; 3]) -> bool {
++    world
++        .movement
++        .get(world.world.block(x, y, z))
++        .is_ok_and(|block| block.coefficients.legacy_bounce_restitution.is_some())
+ }
+ 
+ /// `Entity.getEyePosition(partialTick)` as the cell the renderer lights an

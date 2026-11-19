@@ -1,0 +1,124 @@
+diff --git a/src/main/java/com/simibubi/create/content/kinetics/gauge/GaugeBlockEntity.java b/src/main/java/com/simibubi/create/content/kinetics/gauge/GaugeBlockEntity.java
+index e5db2b9..d47fb5f 100644
+--- a/src/main/java/com/simibubi/create/content/kinetics/gauge/GaugeBlockEntity.java
++++ b/src/main/java/com/simibubi/create/content/kinetics/gauge/GaugeBlockEntity.java
+@@ -15,6 +15,7 @@ import net.minecraft.world.level.block.state.BlockState;
+ 
+ public abstract class GaugeBlockEntity extends KineticBlockEntity implements IHaveGoggleInformation {
+ 
++	public net.minecraft.util.RandomSource loadedStressFixtureRandom;
+ 	public float dialTarget;
+ 	public float dialState;
+ 	public float prevDialState;
+@@ -43,8 +44,9 @@ public abstract class GaugeBlockEntity extends KineticBlockEntity implements IHa
+ 		super.tick();
+ 		prevDialState = dialState;
+ 		dialState += (dialTarget - dialState) * .125f;
+-		if (dialState > 1 && level.random.nextFloat() < 1 / 2f)
+-			dialState -= (dialState - 1) * level.random.nextFloat();
++		var random = loadedStressFixtureRandom == null ? level.random : loadedStressFixtureRandom;
++		if (dialState > 1 && random.nextFloat() < 1 / 2f)
++			dialState -= (dialState - 1) * random.nextFloat();
+ 	}
+ 
+ 	@Override
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..e7dfb15 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.loadedStressometer"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+index 4102b83..57163ce 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -7,15 +7,19 @@ import java.util.stream.Collectors;
+ import org.apache.commons.lang3.mutable.MutableBoolean;
+ 
+ import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.content.fluids.hosePulley.HosePulleyFluidHandler;
+ import com.simibubi.create.content.fluids.pipes.valve.FluidValveBlock;
++import com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock;
+ import com.simibubi.create.content.kinetics.gauge.SpeedGaugeBlockEntity;
+ import com.simibubi.create.content.kinetics.gauge.StressGaugeBlockEntity;
++import com.simibubi.create.content.kinetics.waterwheel.WaterWheelBlock;
+ import com.simibubi.create.content.kinetics.waterwheel.WaterWheelBlockEntity;
+ import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
+ import com.simibubi.create.infrastructure.gametest.GameTestGroup;
+ 
+ import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
+ import net.minecraft.core.Holder;
+ import net.minecraft.core.registries.BuiltInRegistries;
+ import net.minecraft.gametest.framework.GameTest;
+@@ -36,6 +40,7 @@ import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.FarmBlock;
+ import net.minecraft.world.level.block.LeverBlock;
+ import net.minecraft.world.level.block.RedstoneLampBlock;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+ import net.minecraft.world.level.material.Fluids;
+ 
+ import net.neoforged.neoforge.fluids.FluidStack;
+@@ -215,6 +220,53 @@ public class TestFluids {
+ 		});
+ 	}
+ 
++	@GameTest(template = "small_waterwheel", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void loadedStressometer(CreateGameTestHelper helper) {
++		// Build a separate vertical-axle wheel beside the original structure.
++		for (int z = -1; z <= 4; z++) {
++			helper.setBlock(new BlockPos(13, 1, z), Blocks.SMOOTH_STONE);
++			helper.setBlock(new BlockPos(12, 2, z), Blocks.SMOOTH_STONE);
++			helper.setBlock(new BlockPos(14, 2, z), Blocks.SMOOTH_STONE);
++		}
++		helper.setBlock(new BlockPos(13, 2, -1), Blocks.SMOOTH_STONE);
++		helper.setBlock(new BlockPos(13, 2, 4), Blocks.SMOOTH_STONE);
++		helper.setBlock(new BlockPos(12, 2, 2), AllBlocks.WATER_WHEEL.getDefaultState()
++			.setValue(WaterWheelBlock.FACING, Direction.UP));
++		helper.setBlock(new BlockPos(12, 3, 2), AllBlocks.COGWHEEL.getDefaultState()
++			.setValue(BlockStateProperties.AXIS, Direction.Axis.Y));
++		var gaugePos = new BlockPos(12, 4, 2);
++		helper.setBlock(gaugePos, AllBlocks.STRESSOMETER.getDefaultState()
++			.setValue(DirectionalAxisKineticBlock.FACING, Direction.EAST)
++			.setValue(DirectionalAxisKineticBlock.AXIS_ALONG_FIRST_COORDINATE, true));
++		helper.getBlockEntity(AllBlockEntityTypes.STRESSOMETER.get(), gaugePos).loadedStressFixtureRandom =
++			net.minecraft.util.RandomSource.create(2L);
++		helper.setBlock(new BlockPos(13, 2, 3), Blocks.WATER);
++
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick() - 70;
++			helper.assertTrue(tick >= 0, "Waiting for the unloaded wheel to settle");
++
++			var gauge = helper.getBlockEntity(AllBlockEntityTypes.STRESSOMETER.get(), gaugePos);
++			helper.assertCloseEnoughTo(gauge.getNetworkCapacity(), 256);
++			float expectedStress = tick > 0 && tick <= 12 ? 128 : tick > 24 && tick <= 36 ? 64
++				: tick > 48 && tick <= 96 ? 288 : 0;
++			helper.assertCloseEnoughTo(gauge.getNetworkStress(), expectedStress);
++			helper.assertTrue(gauge.isOverStressed() == (expectedStress > 256), "Unexpected overload state");
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_LOADED_DIAL %d %.1f %.1f %.9f %.9f %.9f %.9f%n",
++				tick, gauge.getNetworkCapacity(), gauge.getNetworkStress(), gauge.dialTarget,
++				gauge.prevDialState, gauge.dialState,
++				-90f * Mth.lerp(.5f, gauge.prevDialState, gauge.dialState));
++			if (tick == 0 || tick == 12 || tick == 24 || tick == 36 || tick == 48 || tick == 96) {
++				boolean adding = tick == 0 || tick == 24 || tick == 48;
++				int lastMill = tick < 24 ? 6 : tick < 48 ? 4 : 11;
++				for (int z = 3; z <= lastMill; z++)
++					helper.setBlock(new BlockPos(12, 3, z), adding ? AllBlocks.MILLSTONE.get() : Blocks.AIR);
++			}
++			helper.assertTrue(tick >= 104, "Sampling the needle");
++		});
++	}
++
+ 	@GameTest(template = "waterwheel_materials", timeoutTicks = CreateGameTestHelper.FIFTEEN_SECONDS)
+ 	public static void waterwheelMaterials(CreateGameTestHelper helper) {
+ 		List<Item> planks = BuiltInRegistries.BLOCK.getOrCreateTag(BlockTags.PLANKS).stream()

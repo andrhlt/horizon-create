@@ -1,0 +1,39 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..a6416e5 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.deadVillagerPickability")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..463dd6f 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,22 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 100)
++	public static void deadVillagerPickability(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var villager = net.minecraft.world.entity.EntityType.VILLAGER.create(level);
++		var pos = helper.absolutePos(new BlockPos(3, 4, 3));
++		villager.setPos(pos.getX()+.5, pos.getY(), pos.getZ()+.5);
++		villager.setNoAi(true);
++		level.addFreshEntity(villager);
++		villager.kill();
++		for (int t = 0; t <= 23; t++) {
++			int tick = t;
++			helper.runAfterDelay(t, () -> {
++				System.out.printf("CREATE_SEAT_CORPSE,%d,%s,%s,%s,%d%n", tick, villager.isAlive(), villager.isRemoved(), villager.isPickable(), villager.deathTime);
++				if (tick == 23) helper.succeed();
++			});
++		}
++	}
+ }

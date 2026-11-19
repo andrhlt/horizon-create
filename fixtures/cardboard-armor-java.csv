@@ -1,0 +1,5 @@
+name,recipe,pattern,ingredients,count,max_stack,max_damage,defense,modifiers
+create:cardboard_helmet,create:crafting/appliances/cardboard_helmet,PPP/P P,5,1,1,44,1,
+create:cardboard_chestplate,create:crafting/appliances/cardboard_chestplate,P P/PPP/PPP,8,1,1,64,1,
+create:cardboard_leggings,create:crafting/appliances/cardboard_leggings,PPP/P P/P P,7,1,1,60,1,
+create:cardboard_boots,create:crafting/appliances/cardboard_boots,P P/P P,4,1,1,52,1,

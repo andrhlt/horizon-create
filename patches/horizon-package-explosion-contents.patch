@@ -1,0 +1,30 @@
+--- a/crates/horizon-client/src/game/explosion.rs
++++ b/crates/horizon-client/src/game/explosion.rs
+@@ -700,6 +700,15 @@
+             self.after_block(outcome, (None, false), source);
+         }
+         pushed
++    }
++
++    /// A mob's custom cargo joins the normal drops staged until the blast ends.
++    fn native_explosion_mob_contents(
++        &mut self,
++        _victim: u32,
++        _hurtable: bool,
++        _destroyed_contents: &mut Vec<(ItemStack, Vec3)>,
++    ) {
+     }
+ 
+     /// Where a blast at `center` reaches `entity`, unless it ignores the blast
+@@ -942,6 +951,11 @@
+                         // ravagers are pushed.
+                         let victim = m.id;
+                         let hurt = hurt_mob(m, hurtable, cause, (amount, source));
++                        self.native_explosion_mob_contents(
++                            victim,
++                            hurtable,
++                            &mut destroyed_contents,
++                        );
+                         if hurt {
+                             if source.attacker == Some(Who::Player) {
+                                 let guest = self.combat.blast_guest;

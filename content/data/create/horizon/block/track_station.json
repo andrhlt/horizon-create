@@ -1,0 +1,60 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {
+    "waterloggable": true,
+    "occludes": false
+  },
+  "state_properties": {
+    "assembling": {
+      "type": "boolean"
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "assembling": "false",
+    "waterlogged": "false"
+  },
+  "shapes": {
+    "default": [
+      [
+        0,
+        0,
+        0,
+        1,
+        0.125,
+        1
+      ],
+      [
+        0.0625,
+        0,
+        0.0625,
+        0.9375,
+        0.8125,
+        0.9375
+      ]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [
+        0,
+        0,
+        0,
+        1,
+        0.125,
+        1
+      ],
+      [
+        0.0625,
+        0,
+        0.0625,
+        0.9375,
+        0.8125,
+        0.9375
+      ]
+    ]
+  }
+}

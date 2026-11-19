@@ -1,0 +1,9 @@
+case,dx,dy,dz,placed,axis,remaining,java_result
+0,1,0,0,small,y,1,SUCCESS
+1,1,0,-1,large,y,1,SUCCESS
+2,1,0,-1,small,y,1,SUCCESS
+3,1,1,0,large,x,1,SUCCESS
+4,0,1,0,small,y,1,PASS
+5,1,0,0,small,x,1,PASS
+6,1,0,1,large,y,1,SUCCESS
+7,0,1,0,large,y,1,PASS

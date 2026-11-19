@@ -1,0 +1,100 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -2,6 +2,7 @@
+ 
+ import java.util.Collection;
+ 
++import com.simibubi.create.infrastructure.gametest.tests.ControllerWirelessProbe;
+ import com.simibubi.create.infrastructure.gametest.tests.TestContraptions;
+ import com.simibubi.create.infrastructure.gametest.tests.TestFluids;
+ import com.simibubi.create.infrastructure.gametest.tests.TestItems;
+@@ -19,6 +20,7 @@
+ @EventBusSubscriber
+ public class CreateGameTests {
+ 	private static final Class<?>[] testHolders = {
++			ControllerWirelessProbe.class,
+ 			TestContraptions.class,
+ 			TestFluids.class,
+ 			TestItems.class,
+@@ -34,6 +36,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("ControllerWirelessProbe.wireless")).toList();
+ 	}
+ }
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/ControllerWirelessProbe.java
+@@ -0,0 +1,71 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import java.util.List;
++import java.util.UUID;
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.redstone.link.LinkBehaviour;
++import com.simibubi.create.content.redstone.link.RedstoneLinkBlock;
++import com.simibubi.create.content.redstone.link.RedstoneLinkBlockEntity;
++import com.simibubi.create.content.redstone.link.RedstoneLinkNetworkHandler.Frequency;
++import com.simibubi.create.content.redstone.link.controller.LinkedControllerServerHandler;
++import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
++import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
++import com.simibubi.create.infrastructure.gametest.GameTestGroup;
++import net.createmod.catnip.data.Couple;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.gametest.framework.GameTest;
++import net.minecraft.world.item.ItemStack;
++import net.minecraft.world.item.Items;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.RedStoneWireBlock;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++
++@GameTestGroup(path = "misc")
++public class ControllerWirelessProbe {
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 100)
++    public static void wireless(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var rx = new BlockPos(8, 180, 8);
++        level.setChunkForced(0, 0, true);
++        var wire = rx.east();
++        var source = rx.south(2);
++        var id = UUID.fromString("10000000-0000-0000-0000-000000000001");
++        var pair = Couple.create(Frequency.of(new ItemStack(Items.DIAMOND)), Frequency.of(new ItemStack(Items.EMERALD)));
++        level.setBlockAndUpdate(rx.below(), Blocks.STONE.defaultBlockState());
++        level.setBlockAndUpdate(wire.below(), Blocks.STONE.defaultBlockState());
++        level.setBlockAndUpdate(rx, AllBlocks.REDSTONE_LINK.getDefaultState()
++            .setValue(BlockStateProperties.FACING, Direction.UP).setValue(RedstoneLinkBlock.RECEIVER, false));
++        level.setBlockAndUpdate(wire, Blocks.REDSTONE_WIRE.defaultBlockState());
++        helper.runAfterDelay(2, () -> level.setBlockAndUpdate(rx,
++            level.getBlockState(rx).setValue(RedstoneLinkBlock.RECEIVER, true)));
++        helper.runAfterDelay(6, () -> {
++            var link = BlockEntityBehaviour.get(level, rx, LinkBehaviour.TYPE);
++            link.setFrequency(true, new ItemStack(Items.DIAMOND));
++            link.setFrequency(false, new ItemStack(Items.EMERALD));
++        });
++        for (int tick = 8; tick <= 60; tick++) {
++            int t = tick;
++            helper.runAfterDelay(t, () -> {
++                sample(helper, rx, wire, t, "before");
++                if (t == 10 || t == 20) {
++                    LinkedControllerServerHandler.receivePressed(level, source, id, List.of(pair), true);
++                    sample(helper, rx, wire, t, "press");
++                }
++                if (t == 15) {
++                    LinkedControllerServerHandler.receivePressed(level, source, id, List.of(pair), false);
++                    sample(helper, rx, wire, t, "release");
++                }
++                if (t == 60) helper.succeed();
++            });
++        }
++    }
++    private static void sample(CreateGameTestHelper helper, BlockPos rx, BlockPos wire, int tick, String phase) {
++        var level = helper.getLevel();
++        var be = (RedstoneLinkBlockEntity) level.getBlockEntity(rx);
++        System.out.printf("CONTROLLER_WIRELESS tick=%d game=%d phase=%s receive=%d powered=%s wire=%d%n",
++            tick, level.getGameTime(), phase, be.getReceivedSignal(),
++            level.getBlockState(rx).getValue(RedstoneLinkBlock.POWERED),
++            level.getBlockState(wire).getValue(RedStoneWireBlock.POWER));
++    }
++}

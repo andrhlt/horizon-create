@@ -1,0 +1,4 @@
+block,ingredient,recipe,count,color
+create:andesite_ladder,create:andesite_alloy,create:andesite_ladder_from_andesite_alloy_stonecutting,2,11
+create:brass_ladder,create:brass_ingot,create:brass_ladder_from_ingots_brass_stonecutting,2,40
+create:copper_ladder,minecraft:copper_ingot,create:copper_ladder_from_ingots_copper_stonecutting,2,15

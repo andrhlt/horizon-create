@@ -1,0 +1,5 @@
+scenario,action,offhand_count,main_empty
+rising_reversal,insufficient,1,true
+rising_reversal,connected,13,true
+straight,insufficient,1,true
+straight,connected,13,true

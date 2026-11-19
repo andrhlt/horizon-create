@@ -1,0 +1,139 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..b2e7303dc 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,9 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> java.util.Set.of("TestContraptions.mountedItemExtract", "TestContraptions.mountedFluidDrain").contains(test.testName()))
++			.sorted(java.util.Comparator.comparing(TestFunction::testName))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+index e74ff27e4..708f1230e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -64,6 +64,7 @@ public class TestContraptions {
+ 		helper.pullLever(lever);
+ 		BlockPos outputPos = new BlockPos(4, 2, 1);
+ 		helper.succeedWhen(() -> {
++			traceMounted(helper, "mounted_item_extract", barrel, outputPos);
+ 			helper.assertContentPresent(content, outputPos); // verify all extracted
+ 			helper.powerLever(lever);
+ 			helper.assertContainerEmpty(barrel); // verify nothing left
+@@ -80,6 +81,7 @@ public class TestContraptions {
+ 		helper.pullLever(lever);
+ 		BlockPos output = new BlockPos(4, 2, 1);
+ 		helper.succeedWhen(() -> {
++			traceMounted(helper, "mounted_fluid_drain", tank, output);
+ 			helper.assertFluidPresent(fluid, output); // verify all extracted
+ 			helper.powerLever(lever); // disassemble contraption
+ 			helper.assertTankEmpty(tank); // verify nothing left
+@@ -278,4 +280,68 @@ public class TestContraptions {
+ 			helper.assertBlockProperty(vaultLamp, RedstoneLampBlock.LIT, true);
+ 		});
+ 	}
++	private static String formatCargo(java.util.Map<?, Long> items) {
++		return items.entrySet().stream().map(entry -> {
++			Object item = entry.getKey();
++			String name = item instanceof Item i
++				? net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(i).toString() : item.toString();
++			return name + "=" + entry.getValue();
++		}).sorted().collect(java.util.stream.Collectors.joining("|"));
++	}
++
++	private static void traceMounted(CreateGameTestHelper helper, String name, BlockPos source, BlockPos target) {
++		BlockPos origin = helper.absolutePos(new BlockPos(0, 1, 0));
++		if (helper.getTick() == 0)
++			System.out.printf("MOUNTED_ORIGIN %s %s%n", name, origin.toShortString());
++		var box = new net.minecraft.world.phys.AABB(
++			net.minecraft.world.phys.Vec3.atLowerCornerOf(origin.offset(-1, 0, 0)),
++			net.minecraft.world.phys.Vec3.atLowerCornerOf(origin.offset(9, 9, 9)));
++		var moving = helper.getLevel().getEntitiesOfClass(
++			com.simibubi.create.content.contraptions.ControlledContraptionEntity.class, box);
++		var entity = moving.isEmpty() ? null : moving.getFirst();
++		var store = entity == null ? null : entity.getContraption().getStorage();
++		String amountIn;
++		String amountOut;
++		if (name.equals("mounted_item_extract")) {
++			if (store == null) {
++				amountIn = Long.toString(helper.getTotalItems(source));
++			} else {
++				var info = store.getAllItems();
++				amountIn = Integer.toString(java.util.stream.IntStream.range(0, info.getSlots())
++					.map(i -> info.getStackInSlot(i).getCount()).sum());
++			}
++			amountOut = Long.toString(helper.getTotalItems(target));
++			var sourceItems = new java.util.TreeMap<String, Long>();
++			if (store == null) {
++				helper.getItemContent(source).forEach((item, count) ->
++					sourceItems.put(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item).toString(), count));
++			} else {
++				var inventory = store.getAllItems();
++				for (int slot = 0; slot < inventory.getSlots(); slot++) {
++					ItemStack stack = inventory.getStackInSlot(slot);
++					if (!stack.isEmpty()) {
++						String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
++						sourceItems.merge(id, (long) stack.getCount(), Long::sum);
++					}
++				}
++			}
++			var hopper = helper.getItemContent(target.south());
++			var received = helper.getItemContent(target);
++			System.out.printf("MOUNTED_CONTENT %d,%s,%s,%s%n", helper.getTick(),
++				formatCargo(sourceItems), formatCargo(hopper), formatCargo(received));
++		} else {
++			if (store == null) {
++				amountIn = Integer.toString(helper.getTankContents(source).getAmount());
++			} else {
++				var info = store.getFluids();
++				amountIn = Integer.toString(java.util.stream.IntStream.range(0, info.getTanks())
++					.map(i -> info.getFluidInTank(i).getAmount()).sum());
++			}
++			amountOut = Integer.toString(helper.getTankContents(target).getAmount());
++		}
++		String angle = entity == null ? "" : String.format(java.util.Locale.ROOT, "%.6f", entity.getAngle(1.0f));
++		System.out.printf("MOUNTED_TRACE %s,%d,%d,%d,%s,%s,%s%n", name, helper.getTick(),
++			helper.getLevel().getGameTime() % 20, moving.size(), angle, amountIn, amountOut);
++	}
++
+ }
+diff --git a/src/main/resources/create.mixins.json b/src/main/resources/create.mixins.json
+index b5ea0067a..d831a4b82 100644
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -19,6 +19,7 @@
+     "MapItemSavedDataMixin",
+     "MobMixin",
+     "PlayerMixin",
++    "ParityGameTestOriginMixin",
+     "ProjectileUtilMixin",
+     "SmithingMenuMixin",
+     "WaterWheelFluidSpreadMixin",
+diff --git a/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+new file mode 100644
+index 000000000..29d8cc4a6
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/ParityGameTestOriginMixin.java
+@@ -0,0 +1,17 @@
++package com.simibubi.create.foundation.mixin;
++
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.ModifyArg;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.gametest.framework.GameTestServer;
++
++@Mixin(GameTestServer.class)
++public class ParityGameTestOriginMixin {
++	@ModifyArg(method = "startTests", at = @At(value = "INVOKE",
++		target = "Lnet/minecraft/gametest/framework/StructureGridSpawner;<init>(Lnet/minecraft/core/BlockPos;IZ)V"), index = 0)
++	private BlockPos parityOrigin(BlockPos vanillaOrigin) {
++		return new BlockPos(3, vanillaOrigin.getY(), -12);
++	}
++}

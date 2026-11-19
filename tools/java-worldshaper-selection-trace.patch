@@ -1,0 +1,62 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..695bb2c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.worldshaperSelection"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..0e1a482 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,43 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void worldshaperSelection(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var target = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var stack = com.simibubi.create.AllItems.WORLDSHAPER.asStack();
++		var component = com.simibubi.create.AllDataComponents.SHAPER_BLOCK_USED;
++		var componentId = net.minecraft.core.registries.BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(component).toString();
++		player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack);
++		player.setPos(target.getX() + 0.5, target.getY(), target.getZ() + 2.5);
++		player.setYRot(180);
++		player.setXRot(25);
++		helper.runAtTickTime(4, () -> {
++			for (BlockPos delta : BlockPos.betweenClosed(-2, -1, -3, 2, 4, 3))
++				level.setBlock(target.offset(delta), Blocks.AIR.defaultBlockState(), 2);
++			var props = net.minecraft.world.level.block.state.properties.BlockStateProperties.class;
++			var stairs = Blocks.OAK_STAIRS.defaultBlockState()
++				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, net.minecraft.core.Direction.EAST)
++				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HALF, net.minecraft.world.level.block.state.properties.Half.TOP)
++				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.STAIRS_SHAPE, net.minecraft.world.level.block.state.properties.StairsShape.INNER_LEFT)
++				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED, true);
++			var inputs = new net.minecraft.world.level.block.state.BlockState[] {Blocks.STONE.defaultBlockState(), stairs};
++			for (int index = 0; index < inputs.length; index++) {
++				level.setBlock(target, inputs[index], 2);
++				var before = level.getBlockState(target);
++				boolean selected = com.simibubi.create.content.equipment.zapper.ZapperInteractionHandler.trySelect(stack, player);
++				var serialized = (net.minecraft.nbt.CompoundTag) stack.saveOptional(level.registryAccess());
++				var chosen = serialized.getCompound("components").getCompound(componentId);
++				var properties = chosen.getCompound("Properties");
++				boolean repeat = com.simibubi.create.content.equipment.zapper.ZapperInteractionHandler.trySelect(stack, player);
++				System.out.printf("CREATE_WORLDSHAPER_SELECT,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s%n",
++					index == 0 ? "stone" : "stairs", selected, repeat, componentId, chosen.getString("Name"),
++					properties.getString("facing"), properties.getString("half"), properties.getString("shape"),
++					properties.getString("waterlogged"), before == inputs[index], stack.getCount(), stack.has(component));
++			}
++			helper.succeed();
++		});
++	}
+ }

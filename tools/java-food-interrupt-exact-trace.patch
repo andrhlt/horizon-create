@@ -1,0 +1,70 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.foodsUse"))
++            .toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,55 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 50)
++    public static void foodsUse(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        for (String name : java.util.List.of("sweet_roll", "chocolate_glazed_berries", "honeyed_apple")) {
++            for (String scenario : java.util.List.of("release", "swap")) {
++                int[] schedule = switch (name + ":" + scenario) {
++                    case "sweet_roll:release" -> new int[]{9, 9, 13};
++                    case "sweet_roll:swap" -> new int[]{9, 18, 21};
++                    case "chocolate_glazed_berries:release" -> new int[]{8, 8, 12};
++                    case "chocolate_glazed_berries:swap" -> new int[]{8, 11, 15};
++                    case "honeyed_apple:release" -> new int[]{8, 8, 14};
++                    case "honeyed_apple:swap" -> new int[]{11, 14, 17};
++                    default -> throw new AssertionError();
++                };
++                int boundary = schedule[0], back = schedule[1], restart = schedule[2];
++                var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++                    new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "FoodTester"));
++                player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
++                player.getFoodData().setFoodLevel(10);
++                player.getFoodData().setSaturation(0);
++                var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
++                    net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", name));
++                player.getInventory().setItem(0, new net.minecraft.world.item.ItemStack(item));
++                player.getInventory().selected = 0;
++                player.getMainHandItem().use(world, player, hand);
++                for (int tick = 0; tick <= restart + 35; tick++) {
++                    if (tick > 0) player.doTick();
++                    if (tick == boundary) {
++                        if (scenario.equals("release")) player.releaseUsingItem();
++                        else { player.stopUsingItem(); player.getInventory().selected = 1; }
++                    }
++                    if (tick == back) player.getInventory().selected = 0;
++                    if (tick == restart) {
++                        player.getInventory().selected = 0;
++                        player.getMainHandItem().use(world, player, hand);
++                    }
++                    var held = player.getInventory().getItem(0);
++                    System.out.printf(java.util.Locale.ROOT,
++                        "CREATE_FOOD_EXACT,%s,%s,%d,%d,%s,%d,%d,%d,%.9f%n", name, scenario, tick,
++                        player.getInventory().selected,
++                        net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(held.getItem()),
++                        held.getCount(), player.getUseItemRemainingTicks(), player.getFoodData().getFoodLevel(),
++                        player.getFoodData().getSaturationLevel());
++                }
++                helper.assertTrue(player.getInventory().getItem(0).isEmpty(), "Restarted food must be consumed");
++            }
++        }
++        helper.succeed();
++    }
+ }

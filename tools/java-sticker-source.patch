@@ -1,0 +1,140 @@
+--- a/src/main/java/com/simibubi/create/content/contraptions/chassis/StickerBlockEntity.java
++++ b/src/main/java/com/simibubi/create/content/contraptions/chassis/StickerBlockEntity.java
+@@ -77,23 +77,28 @@
+ 		super.tick();
+ 		if (!level.isClientSide)
+ 			return;
+-		piston.tickChaser();
++        int events = advanceAnimation(isBlockStateExtended(), isAttachedToBlock());
++        if ((events & 1) != 0) {
++            SuperGlueItem.spawnParticles(level, worldPosition, getBlockState().getValue(StickerBlock.FACING), true);
++            CatnipServices.PLATFORM.executeOnClientOnly(() -> () -> playSound(true));
++        }
++        if ((events & 2) != 0) CatnipServices.PLATFORM.executeOnClientOnly(() -> () -> playSound(false));
++        if ((events & 4) != 0) CatnipServices.PLATFORM.executeOnClientOnly(() -> () -> VisualizationHelper.queueUpdate(this));
++    }
+ 
+-		if (isAttachedToBlock() && piston.getValue(0) != piston.getValue() && piston.getValue() == 1) {
+-			SuperGlueItem.spawnParticles(level, worldPosition, getBlockState().getValue(StickerBlock.FACING), true);
+-			CatnipServices.PLATFORM.executeOnClientOnly(() -> () -> playSound(true));
+-		}
+-
+-		if (!update)
+-			return;
+-		update = false;
+-		int target = isBlockStateExtended() ? 1 : 0;
+-		if (isAttachedToBlock() && target == 0 && piston.getChaseTarget() == 1)
+-			CatnipServices.PLATFORM.executeOnClientOnly(() -> () -> playSound(false));
+-		piston.chase(target, .4f, Chaser.LINEAR);
+-
+-		CatnipServices.PLATFORM.executeOnClientOnly(() -> () -> VisualizationHelper.queueUpdate(this));
+-	}
++    // The original client algorithm factored without its platform callbacks;
++    // both production tick() and the dedicated-server source oracle call it.
++    public int advanceAnimation(boolean extended, boolean attached) {
++        piston.tickChaser();
++        int events = 0;
++        if (attached && piston.getValue(0) != piston.getValue() && piston.getValue() == 1) events |= 1;
++        if (!update) return events;
++        update = false;
++        int target = extended ? 1 : 0;
++        if (attached && target == 0 && piston.getChaseTarget() == 1) events |= 2;
++        piston.chase(target, .4f, Chaser.LINEAR);
++        return events | 4;
++    }
+ 
+ 	public boolean isAttachedToBlock() {
+ 		BlockState blockState = getBlockState();
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(t -> t.testName().equals("TestMisc.stickerSourceBench")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,80 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "shearing", timeoutTicks = 100)
++    public static void stickerSourceBench(CreateGameTestHelper helper) throws Exception {
++        var level = helper.getLevel();
++        var origin = helper.absolutePos(new BlockPos(3, 16, 3));
++        var block = com.simibubi.create.AllBlocks.STICKER.get();
++        var pistonField = com.simibubi.create.content.contraptions.chassis.StickerBlockEntity.class.getDeclaredField("piston");
++        var updateField = com.simibubi.create.content.contraptions.chassis.StickerBlockEntity.class.getDeclaredField("update");
++        pistonField.setAccessible(true); updateField.setAccessible(true);
++        int[][] times = {{1,8}, {1,2,4,5,6,7}, {1,2,5,6,10}};
++        boolean[][] targets = {{true,false},{true,false,true,false,true,false},{true,true,false,false,true}};
++        int scenario = 0;
++        for (boolean initial : new boolean[]{false,true})
++        for (boolean attached : new boolean[]{false,true})
++        for (int schedule=0;schedule<times.length;schedule++) {
++            var state = block.defaultBlockState().setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED,initial);
++            var be = new com.simibubi.create.content.contraptions.chassis.StickerBlockEntity(com.simibubi.create.AllBlockEntityTypes.STICKER.get(),origin,state);
++            var piston = (net.createmod.catnip.animation.LerpedFloat)pistonField.get(be);
++            piston.startWithValue(initial ? 1 : 0);
++            boolean extended=initial;
++            for (int tick=0;tick<16;tick++) {
++                if(tick==0) updateField.setBoolean(be,true);
++                for(int input=0;input<times[schedule].length;input++) if(times[schedule][input]==tick) {
++                    extended=targets[schedule][input]; updateField.setBoolean(be,true);
++                }
++                int events=be.advanceAnimation(extended,attached);
++                var row=new com.google.gson.JsonObject(); row.addProperty("kind","animation"); row.addProperty("case",scenario); row.addProperty("tick",tick);
++                row.addProperty("previous",Float.floatToRawIntBits(piston.getValue(0))); row.addProperty("value",Float.floatToRawIntBits(piston.getValue()));
++                row.addProperty("target",Float.floatToRawIntBits(piston.getChaseTarget())); row.addProperty("events",events);
++                var frames=new com.google.gson.JsonArray();
++                for(float partial:new float[]{0,.25f,.5f,.75f,1}) { float offset=piston.getValue(partial); frames.add(Float.floatToRawIntBits(offset*offset*4/16f)); }
++                row.add("frames",frames);System.out.println("STICKER_SOURCE "+row);
++            }
++            scenario++;
++        }
++        int rig=0;
++        for(var direction:net.minecraft.core.Direction.values()) {
++            var pos=origin.offset(rig*4,0,0);rig++;
++            var face=com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING;
++            level.setBlock(pos,block.defaultBlockState().setValue(face,direction),3);
++            level.setBlock(pos.relative(direction),net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(),3);
++            for(int stage=0;stage<6;stage++) {
++                boolean powered=stage==1||stage==2||stage==4;
++                level.setBlock(pos.relative(direction.getOpposite()),(powered?net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK:net.minecraft.world.level.block.Blocks.AIR).defaultBlockState(),3);
++                var state=level.getBlockState(pos);
++                var be=(com.simibubi.create.content.contraptions.chassis.StickerBlockEntity)level.getBlockEntity(pos);
++                var row=new com.google.gson.JsonObject();row.addProperty("kind","world");row.addProperty("facing",direction.getSerializedName());row.addProperty("stage",stage);
++                row.addProperty("powered",state.getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.POWERED));
++                row.addProperty("extended",state.getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED));row.addProperty("attached",be.isAttachedToBlock());
++                System.out.println("STICKER_SOURCE "+row);
++            }
++        }
++        rig=0;
++        for(var direction:net.minecraft.core.Direction.values()) {
++            for(int variant=0;variant<3;variant++) {
++                var pos=origin.offset(0,5,0);rig++;
++                for(var clear:net.minecraft.core.Direction.values())level.setBlock(pos.relative(clear),net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(),3);
++                var state=block.defaultBlockState().setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING,direction)
++                    .setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED,variant!=0);
++                level.setBlock(pos.below(),com.simibubi.create.AllBlocks.MECHANICAL_BEARING.getDefaultState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING,net.minecraft.core.Direction.UP),3);
++                level.setBlock(pos,state,3);
++                var target=variant==2?com.simibubi.create.AllBlocks.MECHANICAL_DRILL.getDefaultState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING,direction.getOpposite()):net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++                // Vertical targets must not replace the bearing controller.
++                if(direction==net.minecraft.core.Direction.DOWN) { level.setBlock(pos.below(),target,3); }
++                else level.setBlock(pos.relative(direction),target,3);
++                var contraption=new com.simibubi.create.content.contraptions.bearing.BearingContraption(false,net.minecraft.core.Direction.UP);
++                try {contraption.assemble(level,pos.below());} catch(Exception failure) {throw new RuntimeException(failure);}
++                var coords=new java.util.ArrayList<String>();
++                for(var entry:contraption.getBlocks().keySet())coords.add(entry.getX()+","+entry.getY()+","+entry.getZ());
++                java.util.Collections.sort(coords);
++                var row=new com.google.gson.JsonObject();row.addProperty("kind","capture");row.addProperty("facing",direction.getSerializedName());row.addProperty("variant",variant);
++                var list=new com.google.gson.JsonArray();for(var value:coords)list.add(value);row.add("positions",list);System.out.println("STICKER_SOURCE "+row);
++            }
++        }
++        helper.succeed();
++    }
+ }

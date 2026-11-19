@@ -1,0 +1,91 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -116,7 +116,7 @@
+ 		});
+ 	}
+ 
+-	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 250)
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 330)
+ 	public static void scheduledStationApproach(CreateGameTestHelper helper) {
+ 		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+ 		var level = helper.getLevel();
+@@ -139,7 +139,7 @@
+ 		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
+         var stationType = com.simibubi.create.AllBlocks.TRACK_STATION;
+         var arrivalRail = origin.west(13);
+-        var wrongWayRail = origin.west(6);
++        var wrongWayRail = origin.east(18);
+         var arrivalStation = arrivalRail.south(2);
+         var wrongWayStation = wrongWayRail.south(2);
+         helper.runAfterDelay(10, () -> {
+@@ -185,6 +185,10 @@
+ 			level.setBlockAndUpdate(origin.east().above(3), controls);
+             var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.WHITE).get().defaultBlockState();
+             level.setBlockAndUpdate(origin.east(2).above(3), seat);
++            level.setBlockAndUpdate(origin.east(3).above(3), seat);
++            level.setBlockAndUpdate(origin.east(4).above(3),
++                controls.setValue(com.simibubi.create.content.contraptions.actors.trainControls.ControlsBlock.FACING,
++                    net.minecraft.core.Direction.WEST));
+ 			var area = com.simibubi.create.content.contraptions.glue.SuperGlueEntity.span(origin.east().above(), origin.east(4).above(3));
+ 			level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, area));
+ 			station.assemble(player.getUUID());
+@@ -202,21 +206,27 @@
+             level.addFreshEntity(driver);
+             carriage.addSittingPassenger(driver, contraption.getSeats().indexOf(new BlockPos(1, 2, 0)));
+             helper.assertTrue(driver.getRootVehicle() == carriage, "Expected a seated conductor");
++            var opposite = EntityType.VILLAGER.create(level);
++            opposite.setNoAi(true);
++            opposite.setPos(at.x, at.y + 2, at.z);
++            level.addFreshEntity(opposite);
++            carriage.addSittingPassenger(opposite, contraption.getSeats().indexOf(new BlockPos(2, 2, 0)));
++            helper.assertTrue(opposite.getRootVehicle() == carriage, "Expected a seated reverse conductor");
+             var start = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(destination);
+             var finish = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(arrivalStation);
+             var other = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(wrongWayStation);
+             start.getStation().name = "Origin";
+-            finish.getStation().name = "Terminal";
+-            other.getStation().name = "Wrong way";
++            finish.getStation().name = "West";
++            other.getStation().name = "East";
+             var schedule = new com.simibubi.create.content.trains.schedule.Schedule();
+             schedule.cyclic = false;
+-            for (String name : java.util.List.of("Origin", "Terminal")) {
++            for (String name : java.util.List.of("West", "East")) {
+                 var entry = new com.simibubi.create.content.trains.schedule.ScheduleEntry();
+                 var instruction = new com.simibubi.create.content.trains.schedule.destination.DestinationInstruction();
+                 instruction.getData().putString("Text", name);
+                 entry.instruction = instruction;
+                 var delay = new com.simibubi.create.content.trains.schedule.condition.ScheduledDelay();
+-                delay.getData().putInt("Value", name.equals("Origin") ? 3 : 5);
++                delay.getData().putInt("Value", 5);
+                 delay.getData().putInt("TimeUnit", 0);
+                 entry.conditions.add(java.util.List.of(delay));
+                 schedule.entries.add(entry);
+@@ -231,7 +241,7 @@
+             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(click);
+             helper.assertTrue(click.isCanceled() && train.runtime.getSchedule() != null, "Conductor must accept the schedule");
+         });
+-        for (int tick = 23; tick <= 145; tick++) {
++        for (int tick = 23; tick <= 285; tick++) {
+ 			int t = tick;
+ 			helper.runAfterDelay(t, () -> {
+ 				var railway = com.simibubi.create.Create.RAILWAYS;
+@@ -252,8 +262,16 @@
+                     t, train.speed, a, b, d, e, approaching ? 1 : 0, stopped ? 1 : 0,
+                     approaching ? train.navigation.distanceToDestination : 0, atOrigin ? 1 : 0,
+                     train.runtime.state, train.runtime.currentEntry, train.runtime.paused ? 1 : 0, train.runtime.completed ? 1 : 0);
+-                if (t == 145) {
+-                    helper.assertTrue(stopped && train.runtime.completed, "Schedule must finish at Terminal");
++                var east = ((com.simibubi.create.content.trains.station.StationBlockEntity) level
++                    .getBlockEntity(wrongWayStation)).getStation();
++                int route = train.navigation.destination == east ? 2 : approaching ? 1 : 0;
++                int station = train.getCurrentStation() == east ? 2 : stopped ? 1 : 0;
++                System.out.printf(java.util.Locale.ROOT, "CREATE_SCHEDULED_REVERSE %d;%d;%d;%s;%.9f;%s;%s%n",
++                    t, route, station, (route != 0 && train.navigation.destinationBehindTrain),
++                    route != 0 ? train.navigation.distanceToDestination : 0,
++                    train.hasForwardConductor(), train.hasBackwardConductor());
++                if (t == 285) {
++                    helper.assertTrue(station == 2 && train.runtime.completed, "Schedule must finish at East");
+                     helper.succeed();
+                 }
+ 			});

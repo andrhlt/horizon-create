@@ -1,0 +1,58 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1342,4 +1342,44 @@
+ 		}
+ 	}
+ 
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stockTickerSummary(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(4, 16, 4));
++		var bin = at.east(4);
++		var iron = net.minecraft.world.item.Items.IRON_INGOT.getDefaultInstance();
++		var frequency = new java.util.UUID(476, 91);
++		helper.runAtTickTime(2, () -> {
++			level.setBlockAndUpdate(at, AllBlocks.STOCK_TICKER.getDefaultState());
++			var ticker = level.getBlockEntity(at, com.simibubi.create.AllBlockEntityTypes.STOCK_TICKER.get())
++				.orElseThrow();
++			ticker.behaviour.freqId = frequency;
++			level.setBlockAndUpdate(bin, net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState());
++			((net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(bin))
++				.setItem(0, iron.copyWithCount(12));
++			level.setBlockAndUpdate(bin.east(), AllBlocks.PACKAGER.getDefaultState()
++				.setValue(net.minecraft.world.level.block.DirectionalBlock.FACING, net.minecraft.core.Direction.EAST));
++			level.setBlockAndUpdate(bin.east().above(), AllBlocks.STOCK_LINK.getDefaultState());
++			level.getBlockEntity(bin.east().above(), com.simibubi.create.AllBlockEntityTypes.PACKAGER_LINK.get())
++				.orElseThrow().behaviour.freqId = frequency;
++		});
++		for (int tick = 4; tick <= 27; tick++) {
++			final int atTick = tick;
++			helper.runAtTickTime(tick, () -> {
++				var ticker = level.getBlockEntity(at, com.simibubi.create.AllBlockEntityTypes.STOCK_TICKER.get())
++					.orElseThrow();
++				if (atTick == 5)
++					((net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(bin))
++						.setItem(0, iron.copyWithCount(3));
++				var recent = ticker.getRecentSummary();
++				var accurate = ticker.getAccurateSummary();
++				System.out.printf("CREATE_STOCK_TICKER_SUMMARY %d,%d,%d,%d,%d%n", atTick, recent.getCountOf(iron),
++					recent.contributingLinks, accurate.getCountOf(iron), accurate.contributingLinks);
++				if (atTick == 27)
++					helper.succeed();
++			});
++		}
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().equals("TestMisc.stockTickerKeeper"))
++			.filter(test -> test.testName().equals("TestMisc.stockTickerSummary"))
+ 			.toList();
+ 	}
+ }

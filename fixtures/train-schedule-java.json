@@ -1,0 +1,12 @@
+{
+  "craft_count": 4,
+  "sneak_opens": false,
+  "title": "Train Schedule",
+  "entries": 0,
+  "loop_default": true,
+  "loop_toggled": false,
+  "close_is_open": false,
+  "close_count": 4,
+  "close_has_component": false,
+  "block_loop": true
+}

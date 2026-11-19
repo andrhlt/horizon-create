@@ -1,0 +1,53 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..90c09f8 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.foodsUse"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..e64471c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,34 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 50)
++    public static void foodsUse(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        for (String name : java.util.List.of("sweet_roll", "chocolate_glazed_berries", "honeyed_apple")) {
++            var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "FoodTester"));
++            player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
++            player.getFoodData().setFoodLevel(10);
++            player.getFoodData().setSaturation(0);
++            var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
++                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", name));
++            var stack = new net.minecraft.world.item.ItemStack(item);
++            player.setItemInHand(hand, stack);
++            stack.use(world, player, hand);
++            helper.assertTrue(player.isUsingItem(), "Food must start use");
++            for (int tick = 0; tick <= 35; tick++) {
++                if (tick > 0) player.doTick();
++                var held = player.getItemInHand(hand);
++                System.out.printf(java.util.Locale.ROOT,
++                    "CREATE_FOOD_USE,%s,%d,%s,%d,%d,%d,%.9f%n", name, tick,
++                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(held.getItem()),
++                    held.getCount(), player.getUseItemRemainingTicks(), player.getFoodData().getFoodLevel(),
++                    player.getFoodData().getSaturationLevel());
++            }
++            helper.assertTrue(player.getItemInHand(hand).isEmpty(), "Food must be consumed");
++        }
++        helper.succeed();
++    }
+ }

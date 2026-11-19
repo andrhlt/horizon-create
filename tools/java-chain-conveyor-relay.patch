@@ -1,0 +1,29 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -151,7 +151,7 @@
+ 		var end = start.offset(edge);
+ 		var portPos = end.east(2).below(2);
+ 		var motorPos = start.below();
+-		var sidePos = start.south(7);
++		var sidePos = end.south(7);
+ 		var sidePortPos = sidePos.east(2).below(2);
+ 		int startTick = 8;
+ 		int last = reverse ? 66 : 79;
+@@ -184,7 +184,7 @@
+ 			chainConnectionLine(scenario, "connected", source, dest, player, edge);
+ 			if (!reverse) {
+ 				player.getInventory().setItem(0, new ItemStack(Items.CHAIN, 16));
+-				new ChainConveyorConnectionPacket(start, sidePos, chain, true).handle(player);
++				new ChainConveyorConnectionPacket(end, sidePos, chain, true).handle(player);
+ 			}
+ 			if (!source.connections.contains(edge) || !dest.connections.contains(edge.multiply(-1)))
+ 				throw new IllegalStateException("Connection packet did not link both conveyors");
+@@ -252,6 +252,8 @@
+ 						chainOffset(source.routingTable.getExitFor(chainPackage("Side", Items.STRING, 2))),
+ 						side.getSpeed(), port.animationProgress.getValue(), receipt,
+ 						sidePort.animationProgress.getValue(), chainReceipt(sidePort));
++					System.out.printf(Locale.ROOT, "CREATE_CHAIN_RELAY %d,%s%n", tick,
++						chainOffset(dest.routingTable.getExitFor(chainPackage("Side", Items.STRING, 2))));
+ 					chainPackages(world, scenario, tick, "C", side, start);
+ 				}
+ 				if (tick == last) {

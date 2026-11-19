@@ -1,0 +1,24 @@
+diff --git a/crates/horizon-client-render/src/mesher.rs b/crates/horizon-client-render/src/mesher.rs
+--- a/crates/horizon-client-render/src/mesher.rs
++++ b/crates/horizon-client-render/src/mesher.rs
+@@ -2036,6 +2036,20 @@
+                             }
+                             _ => false,
+                         };
++                        // The rear surface of a painted Copycat Panel hides a shared
++                        // face if its actual material skips the block at the interface.
++                        let neighbour_cell = (cell as isize + OFFSETS[d as usize]) as usize;
++                        if let Some(&material) = pad.copycat_panels.get(&neighbour_cell)
++                            && let Some(panel) = self.assets.registry.state(BlockStateId(neighbor))
++                            && panel.name == crate::chunk::COPYCAT_PANEL
++                            && panel.properties.get("facing").map(String::as_str)
++                                == Some(ModelDirection::ALL[d as usize].name())
++                            && self.visibility.skip_rendering(material, BlockStateId(id), d, true)
++                                .unwrap_or(false)
++                        {
++                            visible[d as usize] = false;
++                            continue;
++                        }
+                         visible[d as usize] = !opaque_leaves
+                             && !opaque_ice
+                             && !culled_leaf

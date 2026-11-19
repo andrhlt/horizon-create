@@ -1,0 +1,104 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -6,6 +6,7 @@
+ import com.simibubi.create.infrastructure.gametest.tests.TestFluids;
+ import com.simibubi.create.infrastructure.gametest.tests.TestItems;
+ import com.simibubi.create.infrastructure.gametest.tests.TestMisc;
++import com.simibubi.create.infrastructure.gametest.tests.TestToolboxMultiPickup;
+ import com.simibubi.create.infrastructure.gametest.tests.TestProcessing;
+ import com.simibubi.create.infrastructure.gametest.tests.TestRegressions;
+ 
+@@ -23,6 +24,7 @@
+ 			TestFluids.class,
+ 			TestItems.class,
+ 			TestMisc.class,
++			TestToolboxMultiPickup.class,
+ 			TestProcessing.class,
+ 			TestRegressions.class
+ 	};
+@@ -34,6 +36,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestToolboxMultiPickup.pickup"))
++			.toList();
+ 	}
+ }
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestToolboxMultiPickup.java
+@@ -0,0 +1,73 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.content.equipment.toolbox.ToolboxBlockEntity;
++import com.simibubi.create.content.equipment.toolbox.ToolboxInventory;
++import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
++import com.simibubi.create.infrastructure.gametest.GameTestGroup;
++import net.minecraft.core.BlockPos;
++import net.minecraft.gametest.framework.GameTest;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.nbt.NbtUtils;
++import net.minecraft.world.item.DyeColor;
++import net.minecraft.world.item.ItemStack;
++import net.minecraft.world.item.Items;
++import net.minecraft.world.level.GameType;
++
++@GameTestGroup(path = "misc")
++public class TestToolboxMultiPickup {
++    @GameTest(template = "shearing")
++    public static void pickup(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var pos = helper.absolutePos(new BlockPos(1, 16, 1));
++        var block = AllBlocks.TOOLBOXES.get(DyeColor.BROWN).get();
++        level.setBlockAndUpdate(pos, block.defaultBlockState());
++        var box = (ToolboxBlockEntity) level.getBlockEntity(pos);
++        var inventory = new ToolboxInventory(null);
++        inventory.setStackInSlot(0, new ItemStack(Items.COBBLESTONE, 64));
++        boolean same = Boolean.getBoolean("toolbox.sameCompartment");
++        inventory.setStackInSlot(same ? 1 : 4, new ItemStack(Items.COBBLESTONE, 64));
++        box.readInventory(inventory);
++        var first = helper.makeMockPlayer(GameType.SURVIVAL);
++        var second = helper.makeMockPlayer(GameType.SURVIVAL);
++        int index = 0;
++        for (var player : new net.minecraft.world.entity.player.Player[] {first, second}) {
++            int compartment = same ? 0 : index++;
++            player.setPos(pos.getX() + .5, pos.getY(), pos.getZ() + 2.5);
++            player.getInventory().setItem(0, new ItemStack(Items.COBBLESTONE, 32));
++            var entry = new CompoundTag();
++            entry.putInt("Slot", compartment);
++            entry.put("Pos", NbtUtils.writeBlockPos(pos));
++            var links = new CompoundTag();
++            links.put("0", entry);
++            player.getPersistentData().put("CreateToolboxData", links);
++            box.connectPlayer(compartment, player, 0);
++        }
++        var state = level.getBlockState(pos);
++        try {
++            state.attack(level, pos, first);
++        } catch (java.util.ConcurrentModificationException failure) {
++            if (!same) throw failure;
++            failure.printStackTrace();
++            System.out.printf("CREATE_TOOLBOX_MULTI_SAME error=%s,first=%d,second=%d,block=%s%n",
++                failure.getClass().getSimpleName(), first.getInventory().getItem(0).getCount(),
++                second.getInventory().getItem(0).getCount(), level.getBlockState(pos).is(block));
++            helper.succeed();
++            return;
++        }
++        if (same) throw new AssertionError("Expected same-compartment iterator failure");
++        var packed = first.getInventory().getItem(0);
++        var contents = packed.get(AllDataComponents.TOOLBOX_INVENTORY);
++        int total = 0;
++        for (int slot = 0; slot < contents.getSlots(); slot++)
++            total += contents.getStackInSlot(slot).getCount();
++        int heldSecond = second.getInventory().getItem(0).getCount();
++        System.out.printf("CREATE_TOOLBOX_MULTI_PICKUP packed=%d,other=%d,firstLinked=%s,secondLinked=%s%n", total,
++            heldSecond, first.getPersistentData().getCompound("CreateToolboxData").contains("0"),
++            second.getPersistentData().getCompound("CreateToolboxData").contains("0"));
++        if (total != 192 || heldSecond != 0)
++            throw new AssertionError("Toolbox pickup did not return both linked stacks");
++        helper.succeed();
++    }
++}

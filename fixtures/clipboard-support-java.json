@@ -1,0 +1,86 @@
+[
+  {
+    "scenario": "dry_support",
+    "placed": {
+      "face": "floor",
+      "facing": "north",
+      "waterlogged": "false",
+      "written": "false"
+    },
+    "collision": [
+      0.18750000000000006,
+      0.0,
+      0.062499999999999944,
+      0.8125,
+      0.0625,
+      0.9375
+    ],
+    "removed": "minecraft:air",
+    "held": 0,
+    "tick": 5,
+    "after": "minecraft:air"
+  },
+  {
+    "scenario": "wet_support",
+    "placed": {
+      "face": "floor",
+      "facing": "north",
+      "waterlogged": "true",
+      "written": "false"
+    },
+    "collision": [
+      0.18750000000000006,
+      0.0,
+      0.062499999999999944,
+      0.8125,
+      0.0625,
+      0.9375
+    ],
+    "removed": "minecraft:water[level=0]",
+    "held": 0,
+    "tick": 5,
+    "after": "minecraft:water[level=0]"
+  },
+  {
+    "scenario": "dry_attack",
+    "placed": {
+      "face": "floor",
+      "facing": "north",
+      "waterlogged": "false",
+      "written": "false"
+    },
+    "collision": [
+      0.18750000000000006,
+      0.0,
+      0.062499999999999944,
+      0.8125,
+      0.0625,
+      0.9375
+    ],
+    "removed": "minecraft:air",
+    "held": 1,
+    "tick": 5,
+    "after": "minecraft:air"
+  },
+  {
+    "scenario": "wet_attack",
+    "placed": {
+      "face": "floor",
+      "facing": "north",
+      "waterlogged": "true",
+      "written": "false"
+    },
+    "collision": [
+      0.18750000000000006,
+      0.0,
+      0.062499999999999944,
+      0.8125,
+      0.0625,
+      0.9375
+    ],
+    "removed": "minecraft:water[level=0]",
+    "held": 1,
+    "tick": 5,
+    "after": "minecraft:water[level=0]"
+  }
+]

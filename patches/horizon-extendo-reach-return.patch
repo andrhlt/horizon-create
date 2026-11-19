@@ -1,0 +1,16 @@
+--- a/crates/horizon-client/src/game/hand.rs
++++ b/crates/horizon-client/src/game/hand.rs
+@@ -119,10 +119,11 @@
+         creative: f64,
+     ) -> f64 {
+         let otherwise = if self.creative { creative } else { survival };
+-        self.player
++        let range = self.player
+             .as_mut()
+             .and_then(|p| p.attribute(attribute).ok())
+-            .unwrap_or(otherwise)
++            .unwrap_or(otherwise);
++        range
+     }
+ 
+     /// A stack's `minecraft:attack_range` component, falling back to the spear's

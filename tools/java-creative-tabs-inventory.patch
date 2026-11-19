@@ -1,0 +1,44 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..98ae3eb 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.creativeTabInventory")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..3eb13e0 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,26 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley")
++    public static void creativeTabInventory(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var parameters = new net.minecraft.world.item.CreativeModeTab.ItemDisplayParameters(
++            level.enabledFeatures(), false, level.registryAccess());
++        var palette = com.simibubi.create.AllCreativeModeTabs.PALETTES_CREATIVE_TAB.get();
++        var base = com.simibubi.create.AllCreativeModeTabs.BASE_CREATIVE_TAB.get();
++        for (var entry : java.util.Map.of("palettes", palette, "base", base).entrySet()) {
++            var tab = entry.getValue();
++            tab.buildContents(parameters);
++            var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++            System.out.printf("CREATE_TAB_INFO,%s,%s,%s%n", entry.getKey(),
++                ((net.minecraft.network.chat.contents.TranslatableContents) tab.getDisplayName().getContents()).getKey(),
++                items.getKey(tab.getIconItem().getItem()));
++            for (var stack : tab.getDisplayItems())
++                System.out.printf("CREATE_TAB_ITEM,%s,display,%s%n", entry.getKey(), items.getKey(stack.getItem()));
++            for (var stack : tab.getSearchTabDisplayItems())
++                System.out.printf("CREATE_TAB_ITEM,%s,search,%s%n", entry.getKey(), items.getKey(stack.getItem()));
++        }
++        helper.succeed();
++    }
+ }

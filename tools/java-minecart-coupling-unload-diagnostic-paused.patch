@@ -1,0 +1,113 @@
+diff --git a/src/main/java/com/simibubi/create/content/contraptions/minecart/CouplingPhysics.java b/src/main/java/com/simibubi/create/content/contraptions/minecart/CouplingPhysics.java
+index ab8552c..91e57ed 100644
+--- a/src/main/java/com/simibubi/create/content/contraptions/minecart/CouplingPhysics.java
++++ b/src/main/java/com/simibubi/create/content/contraptions/minecart/CouplingPhysics.java
+@@ -19,6 +19,7 @@ import net.minecraft.world.level.block.state.properties.RailShape;
+ import net.minecraft.world.phys.Vec3;
+ 
+ public class CouplingPhysics {
++ public static boolean TEST_PAUSE_UNLOAD = false;
+ 
+ 	public static void tick(Level world) {
+ 		CouplingHandler.forEachLoadedCoupling(world, c -> tickCoupling(world, c));
+@@ -26,6 +27,7 @@ public class CouplingPhysics {
+ 
+ 	public static void tickCoupling(Level world, Couple<MinecartController> c) {
+ 		Couple<AbstractMinecart> carts = c.map(MinecartController::cart);
++        if (TEST_PAUSE_UNLOAD && carts.getFirst().getUUID().getLeastSignificantBits() == 1101) return;
+ 
+ 		TickRateManager trm = world.tickRateManager();
+ 		if (trm.isEntityFrozen(carts.getFirst()) && trm.isEntityFrozen(carts.getSecond())) {
+@@ -34,10 +36,19 @@ public class CouplingPhysics {
+ 
+ 		float couplingLength = c.getFirst()
+ 			.getCouplingLength(true);
++		traceTwoCurves(world, carts, "pre");
+ 		softCollisionStep(world, carts, couplingLength);
++		traceTwoCurves(world, carts, "soft");
+ 		if (world.isClientSide)
+ 			return;
+ 		hardCollisionStep(world, carts, couplingLength);
++		traceTwoCurves(world, carts, "hard");
++	}
++
++	private static void traceTwoCurves(Level world, Couple<AbstractMinecart> carts, String phase) {
++		if (world.isClientSide || carts.getFirst().getUUID().getMostSignificantBits() != 0 || carts.getFirst().getUUID().getLeastSignificantBits() != 1) return;
++		AbstractMinecart a = carts.getFirst(), b = carts.getSecond();
++		System.out.printf(java.util.Locale.ROOT, "TWO_CURVE_PHASE %d %s %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f%n", world.getGameTime(), phase, a.getX(), a.getZ(), a.getDeltaMovement().x, a.getDeltaMovement().z, b.getX(), b.getZ(), b.getDeltaMovement().x, b.getDeltaMovement().z);
+ 	}
+ 
+ 	public static void hardCollisionStep(Level world, Couple<AbstractMinecart> carts, double couplingLength) {
+@@ -81,6 +92,7 @@ public class CouplingPhysics {
+ 
+ 			float maxResolveSpeed = 1.75f;
+ 			correction = VecHelper.clamp(correction, Math.min(maxResolveSpeed, maxSpeed.get(current)));
++			if (cart.getUUID().getMostSignificantBits() == 0 && cart.getUUID().getLeastSignificantBits() <= 2) System.out.printf(java.util.Locale.ROOT, "TWO_CURVE_HARD %d cart=%d stress=%.9f railPos=%s state=%s shape=%s correction=(%.9f,%.9f,%.9f)%n", world.getGameTime(), cart.getUUID().getLeastSignificantBits(), stress, railPosition, railState, shape, correction.x, correction.y, correction.z);
+ 
+ 			if (corrections.get(current) == null)
+ 				corrections.set(current, correction);
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..2d04283 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.couplingProbe"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..9391cdb 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,46 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++ @GameTest(template = "threshold_switch_pulley", timeoutTicks = 1000)
++ public static void couplingProbe(CreateGameTestHelper h) {
++  var w=h.getLevel();
++  int az=24; int ax=1615; int bx=1648;
++  w.setChunkForced(ax >> 4,az >> 4,true);w.setChunkForced(bx >> 4,az >> 4,true);
++  var shape=net.minecraft.world.level.block.state.properties.BlockStateProperties.RAIL_SHAPE;
++  for(int x:new int[]{ax,bx}){w.setBlock(new BlockPos(x,169,az),Blocks.STONE.defaultBlockState(),2);w.setBlock(new BlockPos(x,170,az),Blocks.RAIL.defaultBlockState().setValue(shape,net.minecraft.world.level.block.state.properties.RailShape.EAST_WEST),2);}
++  w.getEntitiesOfClass(net.minecraft.world.entity.vehicle.AbstractMinecart.class,new net.minecraft.world.phys.AABB(1600,160,16,1660,180,32)).forEach(e->e.discard());
++  var a=new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART,w);var b=new net.minecraft.world.entity.vehicle.Minecart(EntityType.MINECART,w);
++  a.setUUID(new java.util.UUID(0,1101));b.setUUID(new java.util.UUID(0,1102));a.setPos(1615.999999,170.0625,24.5);b.setPos(1648.000001,170.0625,24.5);w.addFreshEntity(a);w.addFreshEntity(b);
++  var player=h.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,com.simibubi.create.AllItems.MINECART_COUPLING.asStack(2));
++  final int[] state={0};
++  h.runAtTickTime(60,()->{
++   a.setPos(1615.999999,170.0625,24.5);b.setPos(1648.000001,170.0625,24.5);a.setDeltaMovement(0,0,0);b.setDeltaMovement(0,0,0);
++   h.assertTrue(com.simibubi.create.content.contraptions.minecart.CouplingHandler.tryToCoupleCarts(player,w,a.getId(),b.getId()),"link failed");
++   var ca=com.simibubi.create.content.contraptions.minecart.capability.CapabilityMinecartController.getIfPresent(w,a.getUUID());
++   var cb=com.simibubi.create.content.contraptions.minecart.capability.CapabilityMinecartController.getIfPresent(w,b.getUUID());
++   h.assertTrue(ca!=null && cb!=null && ca.isLeadingCoupling() && cb.isConnectedToCoupling(),"initial link missing");
++   System.out.printf("COUPLING_UNLOAD initial len=%.1f a=%s b=%s held=%d%n",ca.getCouplingLength(true),ca.getCoupledCart(true),cb.getCoupledCart(false),player.getMainHandItem().getCount());state[0]=1;
++  });
++  h.runAtTickTime(80,()->{com.simibubi.create.content.contraptions.minecart.CouplingPhysics.TEST_PAUSE_UNLOAD=true;a.setPos(1615.999999,170.0625,24.5);a.setDeltaMovement(0,0,0);b.setPos(1648.000001,170.0625,24.5);b.setDeltaMovement(0,0,0);w.setChunkForced(bx >> 4,az >> 4,false);System.out.println("COUPLING_UNLOAD ticket_released");state[0]=2;});
++  for(int t=81;t<=900;t++){final int tick=t;h.runAtTickTime(t,()->{
++   var cap=com.simibubi.create.content.contraptions.minecart.capability.CapabilityMinecartController.class;
++   var ca=com.simibubi.create.content.contraptions.minecart.capability.CapabilityMinecartController.getIfPresent(w,a.getUUID());
++   var cb=com.simibubi.create.content.contraptions.minecart.capability.CapabilityMinecartController.getIfPresent(w,b.getUUID());
++   if(state[0]==2 || state[0]==3){try{Thread.sleep(10);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
++   if(state[0]==2 && tick==100){
++    try {var manager=w.getChunkSource().chunkMap.getDistanceManager();var method=net.minecraft.server.level.DistanceManager.class.getDeclaredMethod("getTicketDebugString",long.class);method.setAccessible(true);long key=net.minecraft.world.level.ChunkPos.asLong(bx >> 4,az >> 4);System.out.printf("COUPLING_UNLOAD debug forced=%s ticket=%s holder=%s%n",w.getForcedChunks().contains(key),method.invoke(manager,key),w.getChunkSource().chunkMap.getChunkDebugData(new net.minecraft.world.level.ChunkPos(bx >> 4,az >> 4)).replace('\n',';'));}catch(Exception e){System.out.println("COUPLING_UNLOAD debug_error="+e);}
++   }
++   if(state[0]==2 && tick % 100 == 0) System.out.printf("COUPLING_UNLOAD poll tick=%d a=%s b=%s bEntity=%s loaded=%s%n",tick,ca==null?"missing":ca.cart().position(),cb==null?"missing":cb.cart().position(),w.getEntity(b.getUUID())!=null,w.hasChunk(bx >> 4,az >> 4));
++   if(state[0]==2 && cb==null && w.getEntity(b.getUUID())==null){
++    h.assertTrue(ca!=null && ca.isLeadingCoupling() && ca.getCoupledCart(true).equals(b.getUUID()),"survivor link lost on unload");
++    System.out.printf("COUPLING_UNLOAD unloaded tick=%d aLeading=%s target=%s bLoaded=%s%n",tick,ca.isLeadingCoupling(),ca.getCoupledCart(true),cb!=null);
++    w.setChunkForced(bx >> 4,az >> 4,true);state[0]=3;
++   } else if(state[0]==3 && tick % 100 == 0){System.out.printf("COUPLING_UNLOAD reloadpoll tick=%d cap=%s entity=%s chunk=%s%n",tick,cb!=null,w.getEntity(b.getUUID())!=null,w.hasChunk(bx >> 4,az >> 4));
++   } else if(state[0]==3 && cb!=null && w.getEntity(b.getUUID())!=null){
++    h.assertTrue(ca!=null && ca.isLeadingCoupling() && cb.isConnectedToCoupling() && ca.getCoupledCart(true).equals(b.getUUID()) && cb.getCoupledCart(false).equals(a.getUUID()),"link lost after reload");
++    System.out.printf("COUPLING_UNLOAD reloaded tick=%d aLeading=%s bConnected=%s len=%.1f%n",tick,ca.isLeadingCoupling(),cb.isConnectedToCoupling(),ca.getCouplingLength(true));com.simibubi.create.content.contraptions.minecart.CouplingPhysics.TEST_PAUSE_UNLOAD=false;w.setChunkForced(ax >> 4,az >> 4,false);w.setChunkForced(bx >> 4,az >> 4,false);state[0]=4;h.succeed();
++   }
++   if(tick==900 && state[0]!=4)h.fail("did not observe unload and reload, state="+state[0]);
++  });}
++ }
+ }

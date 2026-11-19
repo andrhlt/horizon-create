@@ -1,0 +1,42 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -36,6 +36,7 @@
+     let (velocity, reload, damage, knockback) = match item {
+         "minecraft:potato" => (1.25, 15, 5.0, 1.5),
+         "minecraft:baked_potato" => (1.25, 15, 5.0, 0.5),
++        "minecraft:poisonous_potato" => (1.25, 15, 5.0, 0.05),
+         "minecraft:carrot" => (1.45, 12, 4.0, 0.3),
+         "minecraft:apple" => (1.45, 10, 5.0, 0.5),
+         "minecraft:beetroot" => (1.6, 5, 2.0, 0.1),
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5596,6 +5596,16 @@
+                                     -push[1],
+                                     &source,
+                                 );
++                            }
++                            if p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:poisonous_potato") {
++                                let tags = &self.res.stations().enchantments.entity_tags;
++                                if let Some(m) = self.mobs.iter_mut().find(|m| m.id == id)
++                                    && super::potions::mob_can_be_affected(tags, &m.kind.id, "poison")
++                                {
++                                    let new = !m.has_effect("minecraft:poison");
++                                    m.add_effect("minecraft:poison", 160, 0);
++                                    self.mod_effect_added("minecraft:poison", Some(id as i32), 0, new);
++                                }
+                             }
+                             self.player_hurt_mob(p, id);
+                         }
+@@ -5621,7 +5631,11 @@
+                             player.set_remaining_fire_ticks(60);
+                         }
+                         let from = [p.previous.x, p.previous.y, p.previous.z];
+-                        self.mob_hits_player(damage, from, "minecraft:thrown");
++                        if self.mob_hits_player(damage, from, "minecraft:thrown")
++                            && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:poisonous_potato")
++                        {
++                            self.give_player_effect("minecraft:poison", 160, 0);
++                        }
+                     }
+                     _ => {}
+                 }

@@ -1,0 +1,28 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "state_properties": {
+    "axis": {
+      "type": "enum",
+      "values": [
+        "x",
+        "y",
+        "z"
+      ]
+    },
+    "top_shaft": {
+      "type": "boolean"
+    },
+    "bottom_shaft": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "axis": "y",
+    "top_shaft": "false",
+    "bottom_shaft": "false"
+  },
+  "properties": {
+    "occludes": false
+  }
+}

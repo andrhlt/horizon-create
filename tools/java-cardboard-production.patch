@@ -1,0 +1,102 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..8a59deba7 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(fixture -> fixture.testName().equals("TestProcessing.cardboardProduction"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d3c..8c10d45b4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,83 @@ public class TestProcessing {
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++    @GameTest(template = "wheat_milling", timeoutTicks = 140)
++    public static void cardboardProduction(CreateGameTestHelper helper) {
++        var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++        var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++        var up = net.minecraft.core.Direction.UP;
++        var east = net.minecraft.core.Direction.EAST;
++        var execute = net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE;
++        var ingredients = new net.minecraft.world.item.Item[]{Items.BAMBOO, Items.SUGAR_CANE, Items.OAK_SAPLING, Items.BAMBOO};
++        var water = new int[]{250, 500, 250, 249};
++        var mixers = new com.simibubi.create.content.kinetics.mixer.MechanicalMixerBlockEntity[4];
++        var basins = new com.simibubi.create.content.processing.basin.BasinBlockEntity[4];
++        for (int rig = 0; rig < 4; rig++) {
++            var motor = new BlockPos(1, 10, rig * 5 + 1);
++            var cog = motor.above();
++            var mixer = cog.east();
++            var basin = mixer.below(2);
++            helper.setBlock(motor, AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, up));
++            helper.setBlock(cog, AllBlocks.COGWHEEL.getDefaultState().setValue(axis, up.getAxis()));
++            helper.setBlock(mixer, AllBlocks.MECHANICAL_MIXER.getDefaultState());
++            helper.setBlock(basin, AllBlocks.BASIN.getDefaultState());
++            ((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(motor))
++                .generatedSpeed.setValue(256);
++            mixers[rig] = (com.simibubi.create.content.kinetics.mixer.MechanicalMixerBlockEntity) helper.getBlockEntity(mixer);
++            basins[rig] = (com.simibubi.create.content.processing.basin.BasinBlockEntity) helper.getBlockEntity(basin);
++        }
++        var motor = new BlockPos(5, 11, 1);
++        var press = motor.east();
++        var depotAt = press.below(2);
++        helper.setBlock(motor, AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east));
++        ((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(motor))
++            .generatedSpeed.setValue(128);
++        helper.setBlock(press, AllBlocks.MECHANICAL_PRESS.getDefaultState()
++            .setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, east));
++        helper.setBlock(depotAt, AllBlocks.DEPOT.getDefaultState());
++        var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) helper.getBlockEntity(depotAt);
++        helper.succeedWhen(() -> {
++            long tick = helper.getTick();
++            for (int rig = 0; rig < mixers.length; rig++) {
++                var mixer = mixers[rig];
++                var basin = basins[rig];
++                System.out.printf(java.util.Locale.ROOT, "CREATE_PULP %d,%d,%d,%d,%d,%d,%d,%d,%d%n",
++                    tick, rig, (int) mixer.getSpeed(), mixer.running ? 1 : 0, mixer.runningTicks, mixer.processingTicks,
++                    cardboardCount(basin.getInputInventory(), ingredients[rig]),
++                    basin.inputTank.getCapability().getFluidInTank(0).getAmount(),
++                    cardboardCount(basin.getOutputInventory(), AllItems.PULP.get()));
++                if (tick == 4) {
++                    basin.inputTank.getCapability().fill(new net.neoforged.neoforge.fluids.FluidStack(
++                        net.minecraft.world.level.material.Fluids.WATER, water[rig]), execute);
++                    basin.getInputInventory().insertItem(0, new ItemStack(ingredients[rig], 4), false);
++                }
++            }
++            var held = depot.getHeldItem();
++            System.out.printf("CREATE_CARDBOARD_PRESS %d,%d,%d%n", tick,
++                held.is(AllItems.PULP.get()) ? held.getCount() : 0,
++                held.is(AllItems.CARDBOARD.get()) ? held.getCount() : 0);
++            if (tick == 4)
++                depot.setHeldItem(new ItemStack(AllItems.PULP.get()));
++            helper.assertTrue(tick >= 90, "Waiting for the cardboard production cycles");
++            for (int rig = 0; rig < 3; rig++) {
++                helper.assertTrue(cardboardCount(basins[rig].getOutputInventory(), AllItems.PULP.get()) == 1,
++                    "Expected one Pulp in basin " + rig);
++            }
++            helper.assertTrue(cardboardCount(basins[3].getInputInventory(), Items.BAMBOO) == 4,
++                "249 mB must leave Bamboo untouched");
++            helper.assertTrue(held.is(AllItems.CARDBOARD.get()), "Expected Cardboard on the Depot");
++        });
++    }
++
++    private static int cardboardCount(net.neoforged.neoforge.items.IItemHandler inventory,
++        net.minecraft.world.item.Item item) {
++        int count = 0;
++        for (int slot = 0; slot < inventory.getSlots(); slot++) {
++            var stack = inventory.getStackInSlot(slot);
++            if (stack.is(item))
++                count += stack.getCount();
++        }
++        return count;
++    }
+ }

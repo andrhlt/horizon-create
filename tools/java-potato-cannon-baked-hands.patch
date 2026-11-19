@@ -1,0 +1,64 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..4ded967 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.potatoCannon")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..aabda63 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,45 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
+-}
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void potatoCannon(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var fixture = helper.absolutePos(new BlockPos(2, 24, 2));
++		var origin = new BlockPos((fixture.getX() & ~15) + 6, fixture.getY(), (fixture.getZ() & ~15) + 6);
++		helper.runAtTickTime(2, () -> {
++			for (var name : new String[]{"main_cannon", "off_cannon"}) {
++				boolean main = name.equals("main_cannon");
++				var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++					new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "BakedCooldown"));
++				player.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++				player.setPos(origin.getX() + .5, origin.getY(), origin.getZ() + .5);
++				player.setYRot(0); player.setXRot(0);
++				var cannon = com.simibubi.create.AllItems.POTATO_CANNON.asStack();
++				var hand = main ? net.minecraft.world.InteractionHand.MAIN_HAND : net.minecraft.world.InteractionHand.OFF_HAND;
++				player.setItemInHand(hand, cannon);
++				if (main) player.getInventory().setItem(1, new ItemStack(Items.BAKED_POTATO, 3));
++				else player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.BAKED_POTATO, 3));
++				var result = cannon.use(world, player, hand);
++				var shots = world.getEntitiesOfClass(com.simibubi.create.content.equipment.potatoCannon.PotatoProjectileEntity.class,
++					new net.minecraft.world.phys.AABB(origin).inflate(6)).stream().filter(shot -> shot.getOwner() == player).toList();
++				helper.assertTrue(shots.size() == 1, "Expected baked projectile");
++				var shot = shots.get(0); var pos = shot.position(); var vel = shot.getDeltaMovement();
++				System.out.printf(java.util.Locale.ROOT,"BAKED_HAND,%s,%s,%d,%d,%d,%b,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%s%n",
++					name, result.getResult(), player.getMainHandItem().getCount(), player.getInventory().getItem(1).getCount(),
++					cannon.getDamageValue(), player.getCooldowns().isOnCooldown(cannon.getItem()),
++					pos.x-player.getX(), pos.y-player.getY(), pos.z-player.getZ(), vel.x, vel.y, vel.z, shot.getItem().getItem());
++				for (int tick = 0; tick <= 16; tick++) {
++					if (tick > 0) player.getCooldowns().tick();
++					boolean cooling = player.getCooldowns().isOnCooldown(cannon.getItem());
++					boolean attempt = tick == 14 || tick == 15;
++					if (attempt && !cooling) cannon.use(world, player, hand);
++					System.out.printf("BAKED_COOLDOWN,%s,%d,%b,%b,%d,%d,%d,%b%n", name, tick, cooling, attempt,
++						player.getMainHandItem().getCount(), player.getInventory().getItem(1).getCount(), cannon.getDamageValue(),
++						player.getCooldowns().isOnCooldown(cannon.getItem()));
++				}
++			}
++			helper.succeed();
++		});
++	}
++
++}
+\ No newline at end of file

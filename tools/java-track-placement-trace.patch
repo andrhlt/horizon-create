@@ -1,0 +1,58 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.trackPlacement"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,43 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "track_crafting")
++	public static void trackPlacement(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
++		var track = AllBlocks.TRACK.get();
++		var stack = new ItemStack(track);
++		var relative = new BlockPos(1,5,1);
++		var floor = helper.absolutePos(relative.below());
++		var position = floor.above();
++		var up = net.minecraft.core.Direction.UP;
++		var ray = new net.minecraft.world.phys.BlockHitResult(
++			new net.minecraft.world.phys.Vec3(floor.getX()+0.5, floor.getY()+1, floor.getZ()+0.5), up, floor, false);
++		level.setBlockAndUpdate(floor, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++		int index = 0;
++		float[][] angles = {{0,0},{90,0},{45,0},{-45,0},{135,0},{-135,0},{0,90},{135,-90},
++			{0,0},{0,0},{90,0},{90,0},{-70,0},{20,0},{44.5f,0}};
++		for (var angle : angles) {
++			for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL)
++				level.setBlockAndUpdate(position.relative(d), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
++			var step = switch (index) {
++				case 8 -> net.minecraft.core.Direction.SOUTH;
++				case 9 -> net.minecraft.core.Direction.NORTH;
++				case 10 -> net.minecraft.core.Direction.EAST;
++				case 11 -> net.minecraft.core.Direction.WEST;
++				default -> null;
++			};
++			if (step != null)
++				level.setBlockAndUpdate(position.relative(step), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++			player.setYRot(angle[0]);
++			player.setXRot(angle[1]);
++			var context = new net.minecraft.world.item.context.BlockPlaceContext(player, net.minecraft.world.InteractionHand.MAIN_HAND, stack, ray);
++			var state = track.getStateForPlacement(context);
++			var shape = state.getValue(com.simibubi.create.content.trains.track.TrackBlock.SHAPE).getSerializedName();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_TRACK_PLACEMENT %d %.1f %.1f %s %s%n",
++				index++, angle[0], angle[1], step == null ? "-" : step.getSerializedName(), shape);
++		}
++		helper.succeed();
++	}
+ }

@@ -1,0 +1,44 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.spoutCrafting"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -58,7 +58,28 @@
+ 	public static void spoutCrafting(CreateGameTestHelper helper) {
+ 		BlockPos chest = new BlockPos(5, 3, 1);
+ 		helper.pullLever(2, 3, 2);
+-		helper.succeedWhen(() -> helper.assertContainerContains(chest, Items.REDSTONE));
++		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			var belt = helper.getBlockEntity(new BlockPos(2, 2, 1)).saveWithoutMetadata(access);
++			var spout = helper.getBlockEntity(new BlockPos(3, 4, 1)).saveWithoutMetadata(access);
++			var pump = helper.getBlockEntity(new BlockPos(3, 5, 1)).saveWithoutMetadata(access);
++			var items = belt.getCompound("Inventory").getList("Items", 10);
++			var tanks = spout.getList("Tanks", 10);
++			var fluid = tanks.getCompound(0).getCompound("TankContent").getCompound("Fluid");
++			int flour = 0, redstone = 0;
++			float first = 0;
++			for (int i = 0; i < items.size(); i++) {
++				var entry = items.getCompound(i);
++				var stack = entry.getCompound("Item");
++				if (stack.getInt("count") > 0) first = Math.max(first, entry.getFloat("Pos"));
++				if (stack.getString("id").equals("create:cinder_flour")) flour += stack.getInt("count");
++				if (stack.getString("id").equals("minecraft:redstone")) redstone += stack.getInt("count");
++			}
++			System.out.printf(java.util.Locale.ROOT, "CREATE_SPOUT %d %.4f %.4f %d %d %d %d %.7f %d%n", helper.getTick(),
++				belt.getFloat("Speed"), pump.getFloat("Speed"), spout.getInt("ProcessingTicks"),
++				fluid.getInt("amount"), flour, redstone, first, helper.getTotalItems(chest));
++			helper.assertContainerContains(chest, Items.REDSTONE);
++		});
+ 	}
+ 
+ 	@GameTest(template = "crushing_wheel_crafting", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)

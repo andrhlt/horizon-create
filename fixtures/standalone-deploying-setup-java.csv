@@ -1,0 +1,7 @@
+scenario,input,held,held_count,held_damage
+shaft_planks,create:shaft,minecraft:spruce_planks,2,0
+cog_planks,create:cogwheel,minecraft:oak_planks,2,0
+wax,minecraft:copper_block,minecraft:honeycomb_block,1,0
+dewax,minecraft:waxed_exposed_cut_copper_stairs,minecraft:iron_axe,1,7
+deoxidise,minecraft:weathered_copper,minecraft:iron_axe,1,17
+create_copper_deoxidise,create:weathered_copper_tile_slab,minecraft:iron_axe,1,25

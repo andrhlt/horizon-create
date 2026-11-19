@@ -1,0 +1,72 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.sturdySheet"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,57 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void sturdySheet(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var spoutPos = new BlockPos(2, 11, 1);
++		var sourcePos = spoutPos.below(2);
++		var motorPos = new BlockPos(4, 11, 1);
++		var pressPos = new BlockPos(5, 11, 1);
++		var destinationPos = pressPos.below(2);
++		level.setBlockAndUpdate(helper.absolutePos(sourcePos), AllBlocks.DEPOT.getDefaultState());
++		level.setBlockAndUpdate(helper.absolutePos(spoutPos), AllBlocks.SPOUT.getDefaultState());
++		level.setBlockAndUpdate(helper.absolutePos(destinationPos), AllBlocks.DEPOT.getDefaultState());
++		level.setBlockAndUpdate(helper.absolutePos(pressPos),
++			AllBlocks.MECHANICAL_PRESS.getDefaultState().setValue(horizontal, east));
++		level.setBlockAndUpdate(helper.absolutePos(motorPos),
++			AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east));
++		var motor = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(motorPos);
++		motor.generatedSpeed.setValue(128);
++		var press = (com.simibubi.create.content.kinetics.press.MechanicalPressBlockEntity) helper.getBlockEntity(pressPos);
++		var spout = helper.getBlockEntity(spoutPos);
++		var source = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) helper.getBlockEntity(sourcePos);
++		var destination = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) helper.getBlockEntity(destinationPos);
++		var tank = helper.fluidStorageAt(spoutPos);
++		tank.fill(new net.neoforged.neoforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.LAVA, 1000),
++			net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
++		source.setHeldItem(new ItemStack(AllItems.POWDERED_OBSIDIAN.get()));
++		helper.succeedWhen(() -> {
++			int tick = (int) helper.getTick();
++			var behaviour = press.getPressingBehaviour();
++			var fluid = tank.getFluidInTank(0);
++			var heldSource = source.getHeldItem();
++			var heldDestination = destination.getHeldItem();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_STURDY %d %d %d %d %d %d %d %s %d %s %d%n",
++				tick, spout.saveWithoutMetadata(level.registryAccess()).getInt("ProcessingTicks"), fluid.getAmount(),
++				(int) press.getSpeed(), behaviour.running ? 1 : 0, behaviour.finished ? 1 : 0, behaviour.runningTicks,
++				net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(heldSource.getItem()), sturdyStep(heldSource),
++				net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(heldDestination.getItem()), sturdyStep(heldDestination));
++			if (tick == 30) {
++				helper.assertTrue(sturdyStep(heldSource) == 1, "Spout should prepare the sheet");
++				source.setHeldItem(ItemStack.EMPTY);
++				destination.setHeldItem(heldSource);
++			}
++			helper.assertTrue(heldDestination.is(AllItems.STURDY_SHEET.get()), "Waiting for the stamped Sturdy Sheet");
++		});
++	}
++
++	private static int sturdyStep(ItemStack stack) {
++		var assembly = stack.get(com.simibubi.create.AllDataComponents.SEQUENCED_ASSEMBLY);
++		return assembly == null ? 0 : assembly.step();
++	}
+ }

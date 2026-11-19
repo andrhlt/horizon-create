@@ -1,0 +1,176 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..faa3941 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.scheduledTrainDoors")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..128cfce 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,159 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 250)
++	public static void scheduledTrainDoors(CreateGameTestHelper helper) {
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var level = helper.getLevel();
++		var track = com.simibubi.create.AllBlocks.TRACK.get();
++		var casing = com.simibubi.create.AllBlocks.RAILWAY_CASING.asItem();
++		var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
++		var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
++		var origin = new BlockPos(9, 112, -8);
++		for (int x = -20; x <= 24; x++) {
++			var cell = origin.east(x);
++			level.setChunkForced(cell.getX() >> 4, cell.getZ() >> 4, true);
++			level.setBlockAndUpdate(origin.offset(x,-1,0), Blocks.SMOOTH_STONE.defaultBlockState());
++			level.setBlockAndUpdate(origin.east(x), rail);
++			level.setBlockAndUpdate(origin.east(x).above(), Blocks.AIR.defaultBlockState());
++		}
++		var destination = origin.south(2);
++		level.setBlockAndUpdate(destination, Blocks.AIR.defaultBlockState());
++		level.setBlockAndUpdate(destination.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++		var item = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) com.simibubi.create.AllBlocks.TRACK_STATION.asItem();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        var stationType = com.simibubi.create.AllBlocks.TRACK_STATION;
++        var arrivalRail = origin.west(13);
++        var wrongWayRail = origin.west(6);
++        var arrivalStation = arrivalRail.south(2);
++        var wrongWayStation = wrongWayRail.south(2);
++        helper.runAfterDelay(10, () -> {
++            var locations = java.util.List.of(arrivalStation, wrongWayStation);
++            var targets = java.util.List.of(arrivalRail, wrongWayRail);
++            for (int index = 0; index < 2; index++) {
++                var target = targets.get(index);
++                var at = locations.get(index);
++                var support = at.below();
++                level.setChunkForced(at.getX() >> 4, at.getZ() >> 4, true);
++                level.setBlockAndUpdate(at, Blocks.AIR.defaultBlockState());
++                level.setBlockAndUpdate(at.above(), Blocks.AIR.defaultBlockState());
++                level.setBlockAndUpdate(support, Blocks.SMOOTH_STONE.defaultBlockState());
++                player.setItemInHand(hand, new ItemStack(item));
++                player.setYRot(index == 0 ? 90 : -90);
++                player.setXRot(20);
++                player.setPos(target.getX() + .5, target.getY() + 1, target.getZ() + .5);
++                clickTrackForAssembly(item, player, target);
++                player.setPos(support.getX() + .5, support.getY() + 1, support.getZ() + .5);
++                clickTrackForAssembly(item, player, support);
++                helper.assertTrue(stationType.has(level.getBlockState(at)), "Station placement failed at " + at);
++            }
++        });
++        helper.runAfterDelay(4, () -> {
++            for (int x = -20; x <= 24; x++) {
++                var cell = origin.east(x);
++                com.simibubi.create.content.trains.track.TrackPropagator.onRailAdded(level, cell, level.getBlockState(cell));
++            }
++        });
++		helper.runAfterDelay(7, () -> {
++
++			player.setItemInHand(hand, new ItemStack(item));
++			player.setYRot(90);
++			player.setXRot(20);
++			player.setPos(origin.getX() + .5, origin.getY() + 1, origin.getZ() + .5);
++			clickTrackForAssembly(item, player, origin);
++            player.setPos(destination.getX() + .5, destination.getY() + 1, destination.getZ() + .5);
++			clickTrackForAssembly(item, player, destination.below());
++		});
++		helper.runAfterDelay(12, () -> {
++			var station = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(destination);
++			helper.assertTrue(station != null && station.enterAssemblyMode(null), "Station must enter assembly mode");
++			player.setItemInHand(hand, new ItemStack(casing, 3));
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east()), "Expected first bogey");
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east(4)), "Expected rear bogey");
++			for (int x = 1; x <= 4; x++)
++				level.setBlockAndUpdate(origin.east(x).above(2), Blocks.OAK_PLANKS.defaultBlockState());
++			var controls = com.simibubi.create.AllBlocks.TRAIN_CONTROLS.get().defaultBlockState()
++				.setValue(com.simibubi.create.content.contraptions.actors.trainControls.ControlsBlock.FACING,
++					net.minecraft.core.Direction.EAST);
++			level.setBlockAndUpdate(origin.east().above(3), controls);
++            var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.WHITE).get().defaultBlockState();
++            level.setBlockAndUpdate(origin.east(2).above(3), seat);
++            var chestPos = origin.east(3).above(3);
++            level.setBlockAndUpdate(chestPos, Blocks.CHEST.defaultBlockState());
++            var chest = (net.minecraft.world.level.block.entity.ChestBlockEntity) level.getBlockEntity(chestPos);
++            chest.setItem(0, new ItemStack(Items.PAPER, 64));
++            chest.setItem(1, new ItemStack(Items.PAPER, 7));
++            chest.setItem(2, new ItemStack(Items.REDSTONE, 64));
++            var door = com.simibubi.create.AllBlocks.TRAIN_DOOR.get();
++            for (var direction : java.util.List.of(net.minecraft.core.Direction.NORTH, net.minecraft.core.Direction.SOUTH)) {
++                var pos = origin.east(4).above(3).relative(direction);
++                level.setBlockAndUpdate(pos.below(), Blocks.OAK_PLANKS.defaultBlockState());
++                var state = door.defaultBlockState().setValue(net.minecraft.world.level.block.DoorBlock.FACING, direction);
++                level.setBlockAndUpdate(pos, state);
++                level.setBlockAndUpdate(pos.above(), state.setValue(net.minecraft.world.level.block.DoorBlock.HALF,
++                    net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER));
++            }
++            level.setBlockAndUpdate(origin.east(3).above(3).north(),
++                com.simibubi.create.AllBlocks.TRAIN_TRAPDOOR.getDefaultState());
++            level.setBlockAndUpdate(origin.east(3).above(3).south(),
++                com.simibubi.create.AllBlocks.FRAMED_GLASS_TRAPDOOR.getDefaultState());
++			var area = com.simibubi.create.content.contraptions.glue.SuperGlueEntity.span(
++                origin.east().above().north(), origin.east(4).above(4).south());
++
++			level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, area));
++			station.assemble(player.getUUID());
++            helper.assertTrue(station.exitAssemblyMode(), "Expected the normal assembly exit");
++		});
++		helper.runAfterDelay(22, () -> {
++            var train = com.simibubi.create.Create.RAILWAYS.trains.values().stream()
++                .filter(candidate -> candidate.owner.equals(player.getUUID())).findFirst().orElseThrow();
++            var carriage = train.carriages.getFirst().anyAvailableEntity();
++            var contraption = (com.simibubi.create.content.trains.entity.CarriageContraption) carriage.getContraption();
++            var driver = EntityType.VILLAGER.create(level);
++            driver.setNoAi(true);
++            var at = carriage.position();
++            driver.setPos(at.x, at.y + 2, at.z);
++            level.addFreshEntity(driver);
++            carriage.addSittingPassenger(driver, contraption.getSeats().indexOf(new BlockPos(1, 2, 0)));
++            helper.assertTrue(driver.getRootVehicle() == carriage, "Expected a seated conductor");
++            var start = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(destination);
++            var finish = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(arrivalStation);
++            var other = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(wrongWayStation);
++            start.getStation().name = "Origin";
++            finish.getStation().name = "Terminal";
++            other.getStation().name = "Wrong way";
++            var touches = new com.simibubi.create.content.contraptions.behaviour.TrapdoorMovingInteraction();
++            for (var entry : contraption.getBlocks().entrySet()) {
++                var pos = entry.getKey();
++                var state = entry.getValue().state();
++                if (!com.simibubi.create.AllBlocks.TRAIN_TRAPDOOR.has(state) &&
++                    !com.simibubi.create.AllBlocks.FRAMED_GLASS_TRAPDOOR.has(state))
++                    continue;
++                var type = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock());
++                for (int clickIndex = 0; clickIndex <= 2; clickIndex++) {
++                    if (clickIndex > 0)
++                        helper.assertTrue(touches.handlePlayerInteraction(player, hand, pos, carriage), "Expected trapdoor click handled");
++                    var result = contraption.getBlocks().get(pos).state();
++                    boolean open = result.getValue(net.minecraft.world.level.block.TrapDoorBlock.OPEN);
++                    helper.assertTrue(open == (clickIndex == 1), "Expected toggle across both clicks");
++                    System.out.printf("CREATE_MOUNTED_TRAPDOOR,%s,%s,%d,%s,%s,%s%n", type, pos, clickIndex, open,
++                        result.getValue(net.minecraft.world.level.block.TrapDoorBlock.FACING),
++                        result.getValue(net.minecraft.world.level.block.TrapDoorBlock.HALF));
++                }
++            }
++            helper.assertTrue(contraption.getBlocks().values().stream().filter(info ->
++                com.simibubi.create.AllBlocks.TRAIN_TRAPDOOR.has(info.state()) ||
++                com.simibubi.create.AllBlocks.FRAMED_GLASS_TRAPDOOR.has(info.state())).count() == 2, "Expected both mounted variants");
++            helper.succeed();
++        });
++
++	}
++
++	private static void clickTrackForAssembly(com.simibubi.create.content.trains.track.TrackTargetingBlockItem item,
++			net.minecraft.world.entity.player.Player player, BlockPos pos) {
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(pos).add(0,.5,0), net.minecraft.core.Direction.UP, pos, false);
++		item.useOn(new net.minecraft.world.item.context.UseOnContext(player,
++			net.minecraft.world.InteractionHand.MAIN_HAND, hit));
++	}
+ }

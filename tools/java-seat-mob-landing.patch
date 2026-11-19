@@ -1,0 +1,58 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.seatMobLanding"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,30 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void seatMobLanding(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(2, 6, 2));
++		var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.RED).getDefaultState();
++		level.setBlockAndUpdate(at.below(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++		level.setBlockAndUpdate(at, seat);
++		var pig = EntityType.PIG.create(level);
++		pig.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED).setBaseValue(0);
++		pig.setPos(at.getX() + .5, at.getY() + 3.25, at.getZ() + .5);
++		helper.runAtTickTime(1, () -> level.addFreshEntity(pig));
++		for (int tick = 0; tick < 32; tick++) {
++			int sample = tick;
++			helper.runAtTickTime(tick + 1, () -> {
++				System.out.printf(java.util.Locale.ROOT,
++					"CREATE_SEAT_PIG %d,%.9f,%.9f,%.9f,%.9f,%.1f,%b,%b%n",
++					sample, pig.getX() - at.getX(), pig.getY() - at.getY(), pig.getZ() - at.getZ(),
++					pig.getDeltaMovement().y, pig.getHealth(), pig.onGround(), pig.isPassenger());
++				if (sample == 24)
++					level.removeBlock(at, false);
++				if (sample == 31)
++					helper.succeed();
++			});
++		}
++	}
+ }

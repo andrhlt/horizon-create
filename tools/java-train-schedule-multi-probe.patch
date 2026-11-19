@@ -1,0 +1,130 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleMultiProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleMultiProbe.java
+new file mode 100644
+index 0000000..5a30084
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleMultiProbe.java
+@@ -0,0 +1,124 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.trains.schedule.Schedule;
++import com.simibubi.create.content.trains.schedule.ScheduleScreen;
++import com.simibubi.create.content.trains.schedule.destination.DestinationInstruction;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.Screenshot;
++import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaScheduleMultiProbe {
++    private static int phase;
++    private static int elapsed;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.scheduleMulti"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.getOverlay() != null
++            || !AllItems.SCHEDULE.isIn(mc.player.getMainHandItem()) || ++elapsed < 8)
++            return;
++        if (mc.screen == null) {
++            if (phase == 0 || phase == 7 || phase == 10) {
++                use(mc);
++                advance();
++            }
++            return;
++        }
++        if (!(mc.screen instanceof ScheduleScreen screen))
++            return;
++        var schedule = (Schedule) field(ScheduleScreen.class, "schedule", screen);
++        switch (phase) {
++            case 1 -> click(screen, 50, 31);
++            case 2 -> type(screen, "Main Platform *", false);
++            case 3 -> click(screen, 50, 104);
++            case 4 -> type(screen, "Harbor", false);
++            case 5 -> {
++                expect(schedule, true, "Main Platform *", "Harbor");
++                System.out.println("CREATE_SCHEDULE_TWO " + schedule.write(mc.level.registryAccess()));
++                Screenshot.grab(mc.gameDirectory, "schedule-two.png", mc.getMainRenderTarget(),
++                    message -> System.out.println(message.getString()));
++                click(screen, 28, 205);
++                click(screen, 92, 110);
++            }
++            case 6 -> {
++                type(screen, "East Pier *", true);
++                expect(schedule, false, "Main Platform *", "East Pier *");
++                System.out.println("CREATE_SCHEDULE_EDIT " + schedule.write(mc.level.registryAccess()));
++                click(screen, 222, 204);
++            }
++            case 8 -> {
++                expect(schedule, false, "Main Platform *", "East Pier *");
++                System.out.println("CREATE_SCHEDULE_REOPEN_TWO " + mc.player.getMainHandItem().get(AllDataComponents.TRAIN_SCHEDULE));
++                click(screen, 212, 31);
++            }
++            case 9 -> {
++                expect(schedule, false, "East Pier *");
++                System.out.println("CREATE_SCHEDULE_DELETE " + schedule.write(mc.level.registryAccess()));
++                click(screen, 222, 204);
++            }
++            case 11 -> {
++                expect(schedule, false, "East Pier *");
++                System.out.println("CREATE_SCHEDULE_REOPEN_DELETE " + mc.player.getMainHandItem().get(AllDataComponents.TRAIN_SCHEDULE));
++                System.out.println("CREATE_SCHEDULE_MULTI_DONE");
++            }
++            default -> { return; }
++        }
++        advance();
++    }
++
++    private static void expect(Schedule schedule, boolean cyclic, String... filters) {
++        if (schedule.cyclic != cyclic || schedule.entries.size() != filters.length)
++            throw new AssertionError("Unexpected Schedule size or cyclic flag");
++        for (int i = 0; i < filters.length; i++) {
++            if (!(schedule.entries.get(i).instruction instanceof DestinationInstruction target)
++                || !filters[i].equals(target.getFilter()))
++                throw new AssertionError("Unexpected destination at index " + i);
++        }
++    }
++
++    private static void type(ScheduleScreen screen, String text, boolean replace) throws ReflectiveOperationException {
++        var editing = field(ScheduleScreen.class, "editingDestination", screen);
++        if (!(editing instanceof DestinationInstruction))
++            throw new AssertionError("No destination editor");
++        click(screen, 188, 93);
++        if (replace) {
++            for (int i = 0; i < 32; i++)
++                screen.keyPressed(259, 0, 0);
++        }
++        for (char c : text.toCharArray())
++            screen.charTyped(c, 0);
++        click(screen, 230, 94);
++    }
++
++    private static void use(Minecraft mc) throws ReflectiveOperationException {
++        var method = Minecraft.class.getDeclaredMethod("startUseItem");
++        method.setAccessible(true);
++        method.invoke(mc);
++    }
++
++    private static Object field(Class<?> owner, String name, Object target) throws ReflectiveOperationException {
++        var field = owner.getDeclaredField(name);
++        field.setAccessible(true);
++        return field.get(target);
++    }
++
++    private static void click(ScheduleScreen screen, int dx, int dy) throws ReflectiveOperationException {
++        int left = (int) field(AbstractContainerScreen.class, "leftPos", screen);
++        int top = (int) field(AbstractContainerScreen.class, "topPos", screen);
++        screen.mouseClicked(left + dx, top + dy, 0);
++    }
++
++    private static void advance() {
++        phase++;
++        elapsed = 0;
++    }
++}

@@ -1,0 +1,9 @@
+case,selected,result,offhand,slot1,slot2,damage
+off_carrot,minecraft:carrot,SUCCESS,2,3,0,1
+off_potato,minecraft:potato,SUCCESS,2,3,0,1
+first_carrot,minecraft:carrot,SUCCESS,0,2,3,1
+first_potato,minecraft:potato,SUCCESS,0,2,3,1
+first_apple,minecraft:apple,SUCCESS,0,2,3,1
+off_beetroot,minecraft:beetroot,SUCCESS,2,3,0,1
+first_golden_carrot,minecraft:golden_carrot,SUCCESS,0,2,3,1
+first_melon,minecraft:melon_slice,SUCCESS,0,2,3,1

@@ -1,0 +1,28 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(t -> t.testName().equals("TestMisc.stickerDefaultsBench")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,15 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "shearing", timeoutTicks = 100)
++    public static void stickerDefaultsBench(CreateGameTestHelper helper) {
++        var level=helper.getLevel();var pos=helper.absolutePos(new BlockPos(3,16,3));
++        var block=com.simibubi.create.AllBlocks.STICKER.get();var state=block.defaultBlockState();level.setBlock(pos,state,2);
++        var row=new com.google.gson.JsonObject();row.addProperty("facing",state.getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING).getSerializedName());row.addProperty("powered",state.getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.POWERED));row.addProperty("extended",state.getValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED));
++        row.addProperty("hardness",state.getDestroySpeed(level,pos));row.addProperty("explosion_resistance",block.getExplosionResistance());row.addProperty("friction",block.getFriction());row.addProperty("speed_factor",block.getSpeedFactor());row.addProperty("jump_factor",block.getJumpFactor());
++        row.addProperty("occludes",state.canOcclude());row.addProperty("collision_full_cube",net.minecraft.world.level.block.Block.isShapeFullBlock(state.getCollisionShape(level,pos)));
++        var boxes=new com.google.gson.JsonArray();for(var box:state.getCollisionShape(level,pos).toAabbs()) {var bounds=new com.google.gson.JsonArray();for(double v:new double[]{box.minX,box.minY,box.minZ,box.maxX,box.maxY,box.maxZ})bounds.add(v);boxes.add(bounds);}row.add("collision_boxes",boxes);
++        System.out.println("STICKER_DEFAULTS "+row);helper.succeed();
++    }
+ }

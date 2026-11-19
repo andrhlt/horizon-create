@@ -1,0 +1,54 @@
+diff --git a/src/main/java/com/simibubi/create/content/logistics/funnel/FunnelBlockEntity.java b/src/main/java/com/simibubi/create/content/logistics/funnel/FunnelBlockEntity.java
+--- a/src/main/java/com/simibubi/create/content/logistics/funnel/FunnelBlockEntity.java
++++ b/src/main/java/com/simibubi/create/content/logistics/funnel/FunnelBlockEntity.java
+@@ -54,6 +54,31 @@
+ 	private WeakReference<Entity> lastObserved; // In-world Extractors only
+ 
+ 	LerpedFloat flap;
++	private int parityFlapAge = -1;
++
++	private boolean parityFlapProbe() {
++		return Boolean.getBoolean("parity.ejector.funnel_flap")
++			&& level.isClientSide && worldPosition.getX() == 5 && worldPosition.getY() == 105
++			&& worldPosition.getZ() == -11;
++	}
++
++	private void parityFlapFrame() {
++		if (!parityFlapProbe() || parityFlapAge < 0)
++			return;
++		float previous = flap.getValue(0);
++		float current = flap.getValue(1);
++		float halfway = flap.getValue(.5f);
++		System.out.printf(java.util.Locale.ROOT, "CREATE_JAVA_FUNNEL_POSE %d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n",
++			parityFlapAge, previous, halfway, current,
++			com.simibubi.create.content.logistics.FlapStuffs.flapAngle(halfway, 0),
++			com.simibubi.create.content.logistics.FlapStuffs.flapAngle(halfway, 1),
++			com.simibubi.create.content.logistics.FlapStuffs.flapAngle(halfway, 2),
++			com.simibubi.create.content.logistics.FlapStuffs.flapAngle(halfway, 3));
++		if (++parityFlapAge > 20) {
++			parityFlapAge = -1;
++			System.out.println("CREATE_JAVA_FUNNEL_COMPLETE");
++		}
++	}
+ 
+ 	enum Mode {
+ 		INVALID, PAUSED, COLLECT, PUSHING_TO_BELT, TAKING_FROM_BELT, EXTRACT
+@@ -96,6 +121,7 @@
+ 	public void tick() {
+ 		super.tick();
+ 		flap.tickChaser();
++		parityFlapFrame();
+ 		Mode mode = determineCurrentMode();
+ 		if (level.isClientSide)
+ 			return;
+@@ -319,6 +345,10 @@
+ 			CatnipServices.NETWORK.sendToClientsTrackingChunk(serverLevel, new ChunkPos(worldPosition), new FunnelFlapPacket(this, inward));
+ 		} else {
+ 			flap.setValue(inward ? -1 : 1);
++			if (parityFlapProbe()) {
++				parityFlapAge = 0;
++				System.out.printf("CREATE_JAVA_FUNNEL_CUE %s,%s,%d%n", inward, getFlapOffset(), level.getGameTime());
++			}
+ 			AllSoundEvents.FUNNEL_FLAP.playAt(level, worldPosition, 1, 1, true);
+ 		}
+ 	}

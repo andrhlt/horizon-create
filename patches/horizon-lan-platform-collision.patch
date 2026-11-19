@@ -1,0 +1,92 @@
+diff --git a/crates/horizon-client/src/game/lan.rs b/crates/horizon-client/src/game/lan.rs
+--- a/crates/horizon-client/src/game/lan.rs
++++ b/crates/horizon-client/src/game/lan.rs
+@@ -2403,6 +2403,10 @@
+         Some(host)
+     }
+ 
++    /// Moving collision boxes supplied by platform native mods for the current level.
++    fn append_lan_platform_collisions(&self, boxes: &mut Vec<horizon_core::geometry::Aabb>) {
++        let _ = boxes;
++    }
+     /// Handle this level's player packets before scheduled block ticks
+     /// (`ServerGamePacketListenerImpl` ahead of `ServerLevel`'s block phase).
+     /// A sand place in the same tick as another sand's fall schedule still
+@@ -2416,6 +2420,8 @@
+             return;
+         };
+         let holding = lan::Holding::start();
++        host.hub.platform_collisions.clear();
++        self.append_lan_platform_collisions(&mut host.hub.platform_collisions);
+         // Last tick's tracked entities: enough for place collision and joins
+         // before this tick moves anyone.
+         let entities = std::mem::take(&mut host.states);
+@@ -2754,6 +2760,8 @@
+             }
+             host.hub.far_level(&self.save);
+             let spawn = self.world_spawn_position();
++            host.hub.platform_collisions.clear();
++            self.append_lan_platform_collisions(&mut host.hub.platform_collisions);
+             let events = {
+                 let clock_rate = self.network_clock_rate();
+                 let mut ctx = TickCtx {
+diff --git a/crates/horizon-client/src/lan/hub.rs b/crates/horizon-client/src/lan/hub.rs
+--- a/crates/horizon-client/src/lan/hub.rs
++++ b/crates/horizon-client/src/lan/hub.rs
+@@ -349,6 +349,8 @@
+     /// The `player_movement_check` and `elytra_movement_check` game rules,
+     /// set by the game before each tick.
+     pub movement_checks: (bool, bool),
++    /// Native platform geometry in the level currently processing player movement.
++    pub platform_collisions: Vec<Aabb>,
+     /// The anticheat, when `server.toml` turns it on (dedicated servers).
+     pub anticheat: Option<Box<super::anticheat::Anticheat>>,
+     /// The chat filter, when `server.toml` turns it on (dedicated servers).
+@@ -736,6 +738,7 @@
+             reduced_debug_info: false,
+             limited_crafting: false,
+             movement_checks: (true, true),
++            platform_collisions: Vec::new(),
+             anticheat: None,
+             chat_filter: None,
+             far: None,
+@@ -4317,6 +4320,7 @@
+         }
+         let start = g.position;
+         let (wrongly, refused, stands) = self.collide(i, to, ctx);
++        let stands = stands || self.platform_support(i, to);
+         if wrongly {
+             let line = format!("{} moved wrongly!", self.guests[i].name);
+             events.push(HostEvent::Warn(line));
+@@ -4427,6 +4431,20 @@
+         }
+     }
+ 
++    /// The player's feet overlap the top of a native platform.
++    fn platform_support(&self, i: usize, at: [f64; 3]) -> bool {
++        let half = f64::from(self.guests[i].dimensions().width) / 2.0;
++        self.platform_collisions.iter().any(|bounds| {
++            let min = bounds.min_position();
++            let max = bounds.max_position();
++            (at[1] - max.y).abs() <= 1.0e-5
++                && at[0] + half > min.x
++                && at[0] - half < max.x
++                && at[2] + half > min.z
++                && at[2] - half < max.z
++        })
++    }
++
+     /// `ServerGamePacketListenerImpl.noBlocksAround`: every block of the
+     /// player's box grown by 0.0625 and stretched 0.55 down is air. Vanilla
+     /// loads a chunk it reads; a chunk not loaded here yet (a player's first
+@@ -4441,7 +4459,9 @@
+             at[1] + f64::from(d.height) + 0.0625,
+             at[2] + half,
+         ];
+-        no_blocks_in(world, lo, hi, &self.encoder)
++        !self.platform_collisions.iter().any(|bounds| {
++            bounds.intersects_corners(Vec3::new(lo[0], lo[1], lo[2]), Vec3::new(hi[0], hi[1], hi[2]))
++        }) && no_blocks_in(world, lo, hi, &self.encoder)
+     }
+ 
+     /// `ServerGamePacketListenerImpl.forceSendPlayerSupportBlocks`: the blocks just under the

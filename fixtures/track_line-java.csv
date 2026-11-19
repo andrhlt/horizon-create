@@ -1,0 +1,8 @@
+case,dx,dz,length,existing,obstacle,yaw,supplied,remaining,states
+0,1,0,5,0,0,-90.0,16,11,xo;xo;xo;xo;xo;xo
+1,0,1,5,1,0,0.0,16,12,zo;zo;zo;zo;zo;zo
+2,1,1,4,0,0,-45.0,16,12,pd;pd;pd;pd;pd
+3,1,0,6,0,1,-90.0,16,11,xo;xo;xo;stone;xo;xo;xo
+4,1,0,6,0,2,-90.0,16,11,xo;xo;xo;cr_o;xo;xo;xo
+5,1,0,5,0,3,-90.0,2,2,xo;-;-;-;-;-
+6,-1,1,4,0,0,45.0,16,12,nd;nd;nd;nd;nd

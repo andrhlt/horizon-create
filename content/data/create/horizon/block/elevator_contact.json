@@ -1,0 +1,33 @@
+{
+  "template": "minecraft:glass",
+  "item": true,
+  "properties": {
+    "occludes": false
+  },
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "south",
+        "west",
+        "east"
+      ]
+    },
+    "powered": {
+      "type": "boolean"
+    },
+    "calling": {
+      "type": "boolean"
+    },
+    "powering": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "facing": "north",
+    "powered": "false",
+    "calling": "false",
+    "powering": "false"
+  }
+}

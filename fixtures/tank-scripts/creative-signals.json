@@ -1,0 +1,193 @@
+{
+  "integration_only": true,
+  "include_signals": true,
+  "actions": [
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "configure",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "minecraft:lava",
+      "amount": 1000
+    },
+    {
+      "op": "probe",
+      "label": "configured",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "expanded",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "tick1",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "tick2",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "remove",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "split",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "split-tick",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ]
+    }
+  ]
+}

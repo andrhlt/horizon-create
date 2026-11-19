@@ -1,0 +1,77 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..036a339 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.shaftAndCogwheelRatios"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d..d4f302e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,58 @@ public class TestProcessing {
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++	@GameTest(template = "wheat_milling")
++	public static void shaftAndCogwheelRatios(CreateGameTestHelper helper) {
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var x = net.minecraft.core.Direction.Axis.X;
++		var z = net.minecraft.core.Direction.Axis.Z;
++		var level = helper.getLevel();
++		var motor = AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east);
++		var shaft = AllBlocks.SHAFT.getDefaultState().setValue(axis, x);
++		var large = AllBlocks.LARGE_COGWHEEL.getDefaultState().setValue(axis, x);
++		var small = AllBlocks.COGWHEEL.getDefaultState().setValue(axis, x);
++		BlockPos motorA = new BlockPos(1, 9, 1);
++		BlockPos shaftA = new BlockPos(2, 9, 1);
++		BlockPos largeA = new BlockPos(3, 9, 1);
++		BlockPos smallA = new BlockPos(3, 10, 2);
++		BlockPos afterSmall = new BlockPos(4, 10, 2);
++		BlockPos secondSmall = new BlockPos(3, 11, 2);
++		BlockPos bevel = new BlockPos(4, 9, 2);
++		BlockPos afterBevel = new BlockPos(4, 9, 3);
++		BlockPos motorB = new BlockPos(1, 9, 8);
++		BlockPos smallB = new BlockPos(2, 9, 8);
++		BlockPos largeB = new BlockPos(2, 10, 9);
++		BlockPos afterLarge = new BlockPos(3, 10, 9);
++		level.setBlockAndUpdate(helper.absolutePos(motorA), motor);
++		level.setBlockAndUpdate(helper.absolutePos(shaftA), shaft);
++		level.setBlockAndUpdate(helper.absolutePos(largeA), large);
++		level.setBlockAndUpdate(helper.absolutePos(smallA), small);
++		level.setBlockAndUpdate(helper.absolutePos(afterSmall), shaft);
++		level.setBlockAndUpdate(helper.absolutePos(secondSmall), small);
++		level.setBlockAndUpdate(helper.absolutePos(bevel), large.setValue(axis, z));
++		level.setBlockAndUpdate(helper.absolutePos(afterBevel), shaft.setValue(axis, z));
++		level.setBlockAndUpdate(helper.absolutePos(motorB), motor);
++		level.setBlockAndUpdate(helper.absolutePos(smallB), small);
++		level.setBlockAndUpdate(helper.absolutePos(largeB), large);
++		level.setBlockAndUpdate(helper.absolutePos(afterLarge), shaft);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			System.out.printf("CREATE_RELAY %d", tick);
++			for (BlockPos pos : List.of(shaftA, largeA, smallA, afterSmall, secondSmall, bevel, afterBevel,
++				smallB, largeB, afterLarge)) {
++				var entity = (com.simibubi.create.content.kinetics.base.KineticBlockEntity)
++					helper.getBlockEntity(pos);
++				System.out.printf(" %d", (int) entity.getSpeed());
++			}
++			System.out.println();
++			if (tick == 10)
++				level.setBlockAndUpdate(helper.absolutePos(motorA), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
++			if (tick == 24)
++				level.setBlockAndUpdate(helper.absolutePos(motorA), motor);
++			helper.assertTrue(tick >= 35, "Waiting for both gear trains to settle");
++		});
++	}
++
+ }

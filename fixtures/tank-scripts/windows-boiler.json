@@ -1,0 +1,144 @@
+{
+  "integration_only": true,
+  "include_shape": true,
+  "actions": [
+    {
+      "op": "place",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 4
+    },
+    {
+      "op": "probe",
+      "label": "before",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        1,
+        0,
+        0
+      ],
+      "state": "create:steam_engine[face=wall,facing=east]"
+    },
+    {
+      "op": "tick",
+      "count": 40
+    },
+    {
+      "op": "probe",
+      "label": "active",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "fill",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "minecraft:water",
+      "amount": 1250,
+      "simulate": true
+    },
+    {
+      "op": "fill",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "minecraft:water",
+      "amount": 1500
+    },
+    {
+      "op": "fill",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "minecraft:lava",
+      "amount": 1000
+    },
+    {
+      "op": "drain",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "amount": 1000
+    },
+    {
+      "op": "wrench",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "active-wrench",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        1,
+        0,
+        0
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "op": "tick",
+      "count": 40
+    },
+    {
+      "op": "wrench",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "probe",
+      "label": "inactive-wrench",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  ]
+}

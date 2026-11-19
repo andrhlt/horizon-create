@@ -1,0 +1,57 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.copycatBuckets"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,40 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 25)
++	public static void copycatBuckets(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var pos = new BlockPos(8, 170, 23);
++		world.setChunkForced(0, 1, true);
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		player.setPos(10.5, 169.0, 23.75);
++		player.setYRot(90.0f);
++		player.setYHeadRot(90.0f);
++		player.setXRot(18.0f);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var wrappers = java.util.List.of(
++			com.simibubi.create.AllBlocks.COPYCAT_PANEL.getDefaultState(),
++			com.simibubi.create.AllBlocks.COPYCAT_STEP.getDefaultState()
++		);
++		helper.runAtTickTime(4, () -> {
++			for (var wrapper : wrappers) {
++				world.setBlockAndUpdate(pos.east(), Blocks.AIR.defaultBlockState());
++				world.setBlockAndUpdate(pos, wrapper);
++				var copycat = (com.simibubi.create.content.decoration.copycat.CopycatBlockEntity) world.getBlockEntity(pos);
++				copycat.setMaterial(Blocks.OAK_LOG.defaultBlockState());
++				copycat.setConsumedItem(new ItemStack(Items.OAK_LOG));
++				for (var item : java.util.List.of(Items.WATER_BUCKET, Items.BUCKET, Items.LAVA_BUCKET, Items.BUCKET)) {
++					player.setItemInHand(hand, new ItemStack(item));
++					var use = item.use(world, player, hand);
++					var keys = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++					System.out.printf("COPYCAT_BUCKET %d;%s;%s;%s;%s;%s;%s;%d%n",
++						helper.getTick(), wrapper, keys.getKey(item), keys.getKey(use.getObject().getItem()),
++						world.getBlockState(pos), world.getBlockState(pos.east()),
++						copycat.getMaterial(), copycat.getConsumedItem().getCount());
++				}
++			}
++			helper.succeed();
++		});
++	}
+ }

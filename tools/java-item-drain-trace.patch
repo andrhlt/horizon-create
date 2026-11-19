@@ -1,0 +1,80 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..c6a77df11 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.itemDrainTrace"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..03a9de979 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,61 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 52)
++    public static void itemDrainTrace(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var origin = new BlockPos(8, 180, 23);
++        world.setChunkForced(0, 1, true);
++        var drain = com.simibubi.create.AllBlocks.ITEM_DRAIN.get();
++        var allItems = new net.minecraft.world.item.Item[] {
++            net.minecraft.world.item.Items.HONEY_BOTTLE,
++            net.minecraft.world.item.Items.WATER_BUCKET,
++            net.minecraft.world.item.Items.IRON_INGOT,
++        };
++        for (int rig = 0; rig < allItems.length; rig++) {
++            var pos = origin.offset(0, 0, rig * 2);
++            world.setBlockAndUpdate(pos.east(), Blocks.SMOOTH_STONE.defaultBlockState());
++            world.removeBlockEntity(pos);
++            world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++            world.setBlockAndUpdate(pos, drain.defaultBlockState());
++            var input = world.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
++                pos, net.minecraft.core.Direction.WEST);
++            var stack = new net.minecraft.world.item.ItemStack(allItems[rig], rig == 1 ? 1 : 3);
++            var remainder = input.insertItem(0, stack, false);
++            System.out.println("CREATE_DRAIN_INSERT " + rig + " " + remainder.getCount());
++        }
++        for (int tick = 1; tick <= 35; tick++) {
++            final int step = tick;
++            helper.runAtTickTime(tick, () -> {
++                for (int rig = 0; rig < allItems.length; rig++) {
++                    var pos = origin.offset(0, 0, rig * 2);
++                    var entity = (com.simibubi.create.content.fluids.drain.ItemDrainBlockEntity) world.getBlockEntity(pos);
++                    var nbt = entity.saveWithoutMetadata(world.registryAccess());
++                    var held = entity.getHeldItemStack();
++                    var tank = world.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK,
++                        pos, net.minecraft.core.Direction.DOWN);
++                    var fluid = tank.getFluidInTank(0);
++                    System.out.printf(java.util.Locale.ROOT, "CREATE_DRAIN %d,%d,%d,%s,%d,%.6f,%s,%d%n",
++                        step, rig, nbt.getInt("ProcessingTicks"),
++                        net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(held.getItem()),
++                        held.getCount(), nbt.getCompound("HeldItem").getFloat("Pos"),
++                        net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(fluid.getFluid()), fluid.getAmount());
++                    var behaviour = com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(
++                        world, pos,
++                        com.simibubi.create.foundation.blockEntity.behaviour.fluid.SmartFluidTankBehaviour.TYPE);
++                    for (float partial : new float[] {0, .5f, 1}) {
++                        float level = behaviour.getPrimaryTank().getFluidLevel().getValue(partial);
++                        float time = nbt.getInt("ProcessingTicks") - partial;
++                        float progress = Math.max(0, Math.min(1, 1 - (time - 5) / 10));
++                        float radius = (float) (Math.pow(2 * progress - 1, 2) - 1);
++                        System.out.printf(java.util.Locale.ROOT, "CREATE_DRAIN_VISUAL %d,%d,%.1f,%.9f,%.9f,%.9f%n",
++                            step, rig, partial, level, (7f / 16f) * level, -radius / 32);
++                    }
++                }
++                if (step == 35)
++                    helper.succeed();
++            });
++        }
++    }
+ }

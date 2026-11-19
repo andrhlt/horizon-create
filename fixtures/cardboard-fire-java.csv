@@ -1,0 +1,3 @@
+support,adjacent,tool_damage,action
+create:cardboard_block,minecraft:fire,1,CONSUME
+minecraft:stone,minecraft:air,0,FAIL

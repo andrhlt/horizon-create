@@ -1,0 +1,57 @@
+diff --git a/src/main/java/com/simibubi/create/content/fluids/tank/FluidTankBlock.java b/src/main/java/com/simibubi/create/content/fluids/tank/FluidTankBlock.java
+index e2bd34b..be197db 100644
+--- a/src/main/java/com/simibubi/create/content/fluids/tank/FluidTankBlock.java
++++ b/src/main/java/com/simibubi/create/content/fluids/tank/FluidTankBlock.java
+@@ -218,6 +218,7 @@ public class FluidTankBlock extends Block implements IWrenchable, IBE<FluidTankB
+ 			pitch /= 1.5f;
+ 			pitch += .5f;
+ 			pitch += (level.random.nextFloat() - .5f) / 4f;
++            System.out.printf("TANK_SOUND_EVENT %s|BLOCKS|0.5|%f%n", net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.getKey(soundevent), pitch);
+ 			level.playSound(null, pos, soundevent, SoundSource.BLOCKS, .5f, pitch);
+ 		}
+ 
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..3bf2493 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.tankBucketTrace")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..8e55978 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,28 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "shearing", timeoutTicks = 40)
++    public static void tankBucketTrace(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        helper.runAtTickTime(2, () -> {
++            for (boolean creativeTank : new boolean[]{false, true}) {
++                for (var mode : new net.minecraft.world.level.GameType[]{net.minecraft.world.level.GameType.SURVIVAL, net.minecraft.world.level.GameType.CREATIVE}) {
++                    var pos = helper.absolutePos(new BlockPos(3 + (creativeTank ? 4 : 0), 16, 3 + (mode == net.minecraft.world.level.GameType.CREATIVE ? 4 : 0)));
++                    level.setBlockAndUpdate(pos, (creativeTank ? com.simibubi.create.AllBlocks.CREATIVE_FLUID_TANK : com.simibubi.create.AllBlocks.FLUID_TANK).getDefaultState());
++                    var player = helper.makeMockPlayer(mode);
++                    var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(pos), net.minecraft.core.Direction.UP, pos, false);
++                    for (var item : new net.minecraft.world.item.Item[]{net.minecraft.world.item.Items.WATER_BUCKET, net.minecraft.world.item.Items.LAVA_BUCKET, net.minecraft.world.item.Items.BUCKET, net.minecraft.world.item.Items.BUCKET, net.minecraft.world.item.Items.LAVA_BUCKET, net.minecraft.world.item.Items.BUCKET, net.minecraft.world.item.Items.POTION, net.minecraft.world.item.Items.GLASS_BOTTLE}) {
++                        player.setItemInHand(hand, item == net.minecraft.world.item.Items.POTION ? net.minecraft.world.item.alchemy.PotionContents.createItemStack(item, net.minecraft.world.item.alchemy.Potions.HEALING) : new net.minecraft.world.item.ItemStack(item));
++                        System.out.printf("TANK_SOUND_CASE %s|%s|%s%n", creativeTank, mode, item);
++                        var result = level.getBlockState(pos).useItemOn(player.getItemInHand(hand), level, player, hand, hit);
++                        var fluid = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK, pos, null).getFluidInTank(0);
++                        System.out.printf("CREATE_TANK_BUCKET %s|%s|%s|%s|%s|%s%n", creativeTank, mode, item, result, player.getItemInHand(hand), fluid);
++                    }
++                }
++            }
++            helper.succeed();
++        });
++    }
+ }

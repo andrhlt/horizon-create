@@ -1,0 +1,12 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {"occludes": false, "waterloggable": true},
+  "state_properties": {
+    "facing": {"type": "enum", "values": ["north", "east", "south", "west"]},
+    "waterlogged": {"type": "boolean"}
+  },
+  "default_state": {"facing": "south", "waterlogged": "false"},
+  "shapes": {"default": [[0, 0, 0, 1, 0.8125, 1]]},
+  "collision_shapes": {"default": [[0, 0, 0, 1, 0.8125, 1]]}
+}

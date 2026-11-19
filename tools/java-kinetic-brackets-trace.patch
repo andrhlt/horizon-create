@@ -1,0 +1,108 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..6759c59b7 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.kineticBrackets"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..214d521d7 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,76 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 18)
++	public static void kineticBrackets(CreateGameTestHelper helper) {
++		var wood = com.simibubi.create.AllBlocks.WOODEN_BRACKET;
++		var metal = com.simibubi.create.AllBlocks.METAL_BRACKET;
++		var shaft = com.simibubi.create.AllBlocks.SHAFT;
++		var cog = com.simibubi.create.AllBlocks.COGWHEEL;
++		var wrench = com.simibubi.create.AllItems.WRENCH;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var up = net.minecraft.core.Direction.UP;
++		var south = net.minecraft.core.Direction.SOUTH;
++		var x = net.minecraft.core.Direction.Axis.X;
++		var y = net.minecraft.core.Direction.Axis.Y;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var horizontal = new BlockPos(12, 3, 2);
++		var vertical = new BlockPos(18, 3, 2);
++		var invalid = new BlockPos(22, 3, 2);
++		helper.setBlock(horizontal, shaft.getDefaultState().setValue(axis, x));
++		helper.setBlock(vertical, cog.getDefaultState().setValue(axis, y));
++		helper.setBlock(invalid, Blocks.STONE);
++		player.getInventory().clearContent();
++		player.getInventory().setItem(0, new ItemStack(wood.asItem(), 2));
++		player.getInventory().setItem(1, new ItemStack(metal.asItem(), 2));
++		player.getInventory().setItem(2, wrench.asStack());
++
++		var type = com.simibubi.create.content.decoration.bracket.BracketBlock.TYPE;
++		var along = com.simibubi.create.content.decoration.bracket.BracketBlock.AXIS_ALONG_FIRST_COORDINATE;
++		var decorator = com.simibubi.create.content.decoration.bracket.BracketedBlockEntityBehaviour.TYPE;
++		java.util.function.Function<BlockPos, String> bracketAt = at -> {
++			var behaviour = com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(
++				level, helper.absolutePos(at), decorator);
++			var state = behaviour == null ? null : behaviour.getBracket();
++			if (state == null)
++				return "none,none,none,false";
++			return (wood.has(state) ? "wood" : "metal") + "," + state.getValue(type).getSerializedName()
++				+ "," + state.getValue(facing).getSerializedName() + "," + state.getValue(along);
++		};
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var bounds = new net.minecraft.world.phys.AABB(helper.absolutePos(vertical)).inflate(2);
++			int dropped = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
++				bounds, item -> item.getItem().is(wood.asItem())).stream()
++				.mapToInt(item -> item.getItem().getCount()).sum();
++			System.out.printf("CREATE_BRACKETS,%d,%s,%s,%d,%d,%d%n", tick, bracketAt.apply(horizontal),
++				bracketAt.apply(vertical), player.getInventory().countItem(wood.asItem()),
++				player.getInventory().countItem(metal.asItem()), dropped);
++
++			if (tick == 10)
++				level.destroyBlock(helper.absolutePos(vertical), true);
++
++			int slot = switch ((int) tick) {
++				case 2, 3, 4, 8 -> 0;
++				case 5 -> 1;
++				case 7 -> 2;
++				default -> -1;
++			};
++			if (slot >= 0) {
++				player.getInventory().selected = slot;
++				var at = helper.absolutePos(tick == 2 ? invalid : tick == 8 ? vertical : horizontal);
++				var face = tick == 8 ? south : up;
++				player.setPos(at.getX() - 2, at.getY(), at.getZ());
++				var hit = new net.minecraft.world.phys.BlockHitResult(at.getCenter().relative(face, 0.4), face, at, false);
++				player.getItemInHand(hand).useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			}
++
++			if (tick < 13)
++				helper.fail("Waiting for complete wooden and metal bracket observations");
++		});
++	}
+ }

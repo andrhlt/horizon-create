@@ -1,0 +1,186 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleCargoThresholdProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleCargoThresholdProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleCargoThresholdProbe.java
+@@ -0,0 +1,181 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.trains.schedule.ScheduleScreen;
++import com.simibubi.create.content.trains.schedule.condition.FluidThresholdCondition;
++import com.simibubi.create.content.trains.schedule.condition.ItemThresholdCondition;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
++import net.minecraft.world.inventory.ClickType;
++import net.minecraft.world.inventory.Slot;
++import net.minecraft.world.item.ItemStack;
++import net.minecraft.world.item.Items;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaScheduleCargoThresholdProbe {
++    private static boolean supplied;
++    private static int phase;
++    private static int elapsed;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.scheduleCargoThreshold"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.getOverlay() != null)
++            return;
++        if (!supplied) {
++            var server = mc.getSingleplayerServer();
++            var playerId = mc.player.getUUID();
++            server.execute(() -> {
++                var player = server.getPlayerList().getPlayer(playerId);
++                var inventory = player.getInventory();
++                inventory.clearContent();
++                inventory.selected = 0;
++                inventory.setItem(0, AllItems.SCHEDULE.asStack());
++                inventory.setItem(1, new ItemStack(Items.PAPER, 7));
++                inventory.setItem(2, new ItemStack(Items.WATER_BUCKET));
++            });
++            supplied = true;
++        }
++        if (!AllItems.SCHEDULE.isIn(mc.player.getMainHandItem()) || ++elapsed < 12)
++            return;
++        if (mc.screen == null) {
++            switch (phase) {
++                case 0 -> use(mc);
++                case 7 -> {
++                    captureItem(mc, "ITEMS");
++                    use(mc);
++                }
++                case 13 -> {
++                    captureItem(mc, "FLUID");
++                    use(mc);
++                }
++                default -> { return; }
++            }
++        } else if (mc.screen instanceof ScheduleScreen screen) {
++            var menu = screen.getMenu();
++            switch (phase) {
++                case 1 -> click(screen, 52, 31);
++                case 2 -> {
++                    click(screen, 111, 94);
++                    for (char c : "Waiting Station".toCharArray())
++                        screen.charTyped(c, 0);
++                    click(screen, 233, 94);
++                }
++                case 3 -> {
++                    click(screen, 65, 60);
++                    for (int i=0; i<3; i++)
++                        scroll(screen, 130, 72, -1);
++                }
++                case 4 -> {
++                    require(screen, ItemThresholdCondition.class);
++                    quickMove(screen, 28);
++                    scroll(screen, 84, 94, -1);
++                    scroll(screen, 84, 94, -1);
++                    scroll(screen, 164, 94, -1);
++                    threshold(screen, "32");
++                }
++                case 5 -> {
++                    requireStack(menu.getSlot(36), Items.PAPER, 1);
++                    click(screen, 233, 94);
++                }
++                case 6, 12 -> click(screen, 222, 204);
++                case 8 -> {
++                    click(screen, 65, 60);
++                    var item = (ItemThresholdCondition) require(screen, ItemThresholdCondition.class);
++                    if (item.getThreshold() != 32 || item.getMeasure() != 1 || item.getOperator().ordinal() != 2)
++                        throw new AssertionError("Item Cargo settings did not reopen");
++                    requireStack(menu.getSlot(36), Items.PAPER, 1);
++                    scroll(screen, 130, 72, 1);
++                    quickMove(screen, 36);
++                }
++                case 9 -> {
++                    require(screen, FluidThresholdCondition.class);
++                    quickMove(screen, 29);
++                    scroll(screen, 84, 94, -1);
++                    threshold(screen, "12");
++                }
++                case 10 -> requireStack(menu.getSlot(36), Items.WATER_BUCKET, 1);
++                case 11 -> click(screen, 233, 94);
++                case 14 -> {
++                    click(screen, 65, 60);
++                    var fluid = (FluidThresholdCondition) require(screen, FluidThresholdCondition.class);
++                    if (fluid.getThreshold() != 12 || fluid.getMeasure() != 0 || fluid.getOperator().ordinal() != 1)
++                        throw new AssertionError("Fluid Cargo settings did not reopen");
++                    requireStack(menu.getSlot(36), Items.WATER_BUCKET, 1);
++                    System.out.println("CREATE_CARGO_THRESHOLD_DONE");
++                    mc.stop();
++                }
++                default -> { return; }
++            }
++        } else
++            return;
++        phase++;
++        elapsed = 0;
++    }
++
++    private static Object require(ScheduleScreen screen, Class<?> type) throws ReflectiveOperationException {
++        var field = ScheduleScreen.class.getDeclaredField("editingCondition");
++        field.setAccessible(true);
++        var actual = field.get(screen);
++        if (!type.isInstance(actual))
++            throw new AssertionError("Expected " + type.getSimpleName() + ", got " + actual);
++        return actual;
++    }
++
++    private static void requireStack(Slot slot, net.minecraft.world.item.Item item, int count) {
++        var stack = slot.getItem();
++        if (!stack.is(item) || stack.getCount() != count)
++            throw new AssertionError("Expected " + item + " x" + count + ", got " + stack);
++    }
++
++    private static void threshold(ScheduleScreen screen, String number) throws ReflectiveOperationException {
++        click(screen, 119, 95);
++        screen.keyPressed(269, 0, 0);
++        screen.keyPressed(259, 0, 0);
++        screen.keyPressed(259, 0, 0);
++        for (char c : number.toCharArray())
++            screen.charTyped(c, 0);
++    }
++
++    private static void captureItem(Minecraft mc, String name) {
++        var inventory = mc.player.getInventory();
++        if (inventory.getItem(1).getCount() != 7 || inventory.getItem(2).getCount() != 1)
++            throw new AssertionError("Ghost samples changed the inventory.");
++        System.out.println("CREATE_CARGO_THRESHOLD_" + name + " " +
++            mc.player.getMainHandItem().get(AllDataComponents.TRAIN_SCHEDULE));
++    }
++
++    private static void use(Minecraft mc) throws ReflectiveOperationException {
++        var method = Minecraft.class.getDeclaredMethod("startUseItem");
++        method.setAccessible(true);
++        method.invoke(mc);
++    }
++
++    private static void quickMove(ScheduleScreen screen, int index) throws ReflectiveOperationException {
++        var method = AbstractContainerScreen.class.getDeclaredMethod("slotClicked",
++            Slot.class, int.class, int.class, ClickType.class);
++        method.setAccessible(true);
++        method.invoke(screen, screen.getMenu().getSlot(index), index, 0, ClickType.QUICK_MOVE);
++    }
++
++    private static void click(ScheduleScreen screen, int dx, int dy) throws ReflectiveOperationException {
++        screen.mouseClicked(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, 0);
++    }
++
++    private static void scroll(ScheduleScreen screen, int dx, int dy, double delta) throws ReflectiveOperationException {
++        screen.mouseScrolled(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, 0, delta);
++    }
++
++    private static int origin(ScheduleScreen screen, String fieldName) throws ReflectiveOperationException {
++        var field = AbstractContainerScreen.class.getDeclaredField(fieldName);
++        field.setAccessible(true);
++        return (int) field.get(screen);
++    }
++}

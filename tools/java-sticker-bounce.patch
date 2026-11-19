@@ -1,0 +1,86 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..9c3f2c1 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().startsWith("TestProcessing.sticker")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d..e74938c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,69 @@ public class TestProcessing {
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stickerBounceOracle(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(5, 11, 1));
++		var block = AllBlocks.STICKER.get();
++		var facing = com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING;
++		var extended = com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED;
++		for (var dir : new net.minecraft.core.Direction[]{net.minecraft.core.Direction.UP, net.minecraft.core.Direction.NORTH})
++		for (boolean ext : new boolean[]{false, true}) {
++			var state = block.defaultBlockState().setValue(facing, dir).setValue(extended, ext);
++			level.setBlock(pos, state, 3);
++			var pig = net.minecraft.world.entity.EntityType.PIG.create(level);
++			pig.setPos(pos.getX()+0.5, pos.getY()+1, pos.getZ()+0.5);
++			pig.setDeltaMovement(0.5, -0.6, 0.25);
++			block.updateEntityAfterFallOn(level, pig);
++			var v = pig.getDeltaMovement();
++			System.out.printf(java.util.Locale.ROOT, "STICKER_BOUNCE %s,%s,%.3f,%.3f,%.3f%n", dir, ext, v.x, v.y, v.z);
++			pig.setDeltaMovement(0.5, 0, 0.25);
++			block.stepOn(level, pos, state, pig);
++			v = pig.getDeltaMovement();
++			System.out.printf(java.util.Locale.ROOT, "STICKER_DRAG %s,%s,%.3f,%.3f,%.3f%n", dir, ext, v.x, v.y, v.z);
++		}
++		helper.succeed();
++	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stickerTrajectoryOracle(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(5, 11, 1));
++		var pos = new BlockPos((origin.getX() >> 4 << 4) + 2, origin.getY(), (origin.getZ() >> 4 << 4) + 2);
++		var pig = net.minecraft.world.entity.EntityType.PIG.create(level);
++		level.setBlock(pos, AllBlocks.STICKER.getDefaultState().setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING, net.minecraft.core.Direction.UP), 3);
++		pig.setPos(pos.getX() + .5, pos.getY() + 2, pos.getZ() + .5);
++		pig.setDeltaMovement(0, -.6, 0);
++		level.addFreshEntity(pig);
++		var stonePos = pos.offset(3, 0, 0);
++		level.setBlock(stonePos, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), 3);
++		var control = net.minecraft.world.entity.EntityType.PIG.create(level);
++		control.setPos(stonePos.getX() + .5, stonePos.getY() + 2, stonePos.getZ() + .5);
++		control.setDeltaMovement(0, -.6, 0);
++		level.addFreshEntity(control);
++		var northPos = pos.offset(6, 0, 0);
++		level.setBlock(northPos, AllBlocks.STICKER.getDefaultState().setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING, net.minecraft.core.Direction.NORTH), 3);
++		var north = net.minecraft.world.entity.EntityType.PIG.create(level);
++		north.setPos(northPos.getX() + .5, northPos.getY() + 2, northPos.getZ() + .5);
++		north.setDeltaMovement(0, -.6, 0);
++		level.addFreshEntity(north);
++		var extendedPos = pos.offset(9, 0, 0);
++		level.setBlock(extendedPos, AllBlocks.STICKER.getDefaultState().setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.FACING, net.minecraft.core.Direction.UP).setValue(com.simibubi.create.content.contraptions.chassis.StickerBlock.EXTENDED, true), 3);
++		var extended = net.minecraft.world.entity.EntityType.PIG.create(level);
++		extended.setPos(extendedPos.getX() + .5, extendedPos.getY() + 2, extendedPos.getZ() + .5);
++		extended.setDeltaMovement(0, -.6, 0);
++		level.addFreshEntity(extended);
++		for (int i = 1; i <= 5; i++) {
++			final int tick = i;
++			helper.runAfterDelay(i, () -> {
++				System.out.printf(java.util.Locale.ROOT, "STICKER_TRAJECTORY %d,%.9f,%.9f%n", tick, pig.getY() - pos.getY(), pig.getDeltaMovement().y);
++				System.out.printf(java.util.Locale.ROOT, "STONE_TRAJECTORY %d,%.9f,%.9f%n", tick, control.getY() - stonePos.getY(), control.getDeltaMovement().y);
++				System.out.printf(java.util.Locale.ROOT, "NORTH_TRAJECTORY %d,%.9f,%.9f%n", tick, north.getY() - northPos.getY(), north.getDeltaMovement().y);
++				System.out.printf(java.util.Locale.ROOT, "EXTENDED_TRAJECTORY %d,%.9f,%.9f%n", tick, extended.getY() - extendedPos.getY(), extended.getDeltaMovement().y);
++			});
++		}
++		helper.runAfterDelay(6, helper::succeed);
++	}
+ }

@@ -1,0 +1,75 @@
+{
+  "template": "minecraft:stone",
+  "item": false,
+  "properties": {
+    "waterloggable": true,
+    "occludes": false
+  },
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "south",
+        "east",
+        "west"
+      ]
+    },
+    "part": {
+      "type": "enum",
+      "values": [
+        "start",
+        "middle",
+        "pulley",
+        "end"
+      ]
+    },
+    "slope": {
+      "type": "enum",
+      "values": [
+        "horizontal",
+        "upward",
+        "downward",
+        "vertical",
+        "sideways"
+      ]
+    },
+    "casing": {
+      "type": "boolean"
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "facing": "north",
+    "part": "middle",
+    "slope": "horizontal",
+    "casing": "false",
+    "waterlogged": "false"
+  },
+  "shapes": {
+    "default": [
+      [
+        0,
+        0.1875,
+        0,
+        1,
+        0.8125,
+        1
+      ]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [
+        0,
+        0.1875,
+        0,
+        1,
+        0.8125,
+        1
+      ]
+    ]
+  }
+}

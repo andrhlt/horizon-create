@@ -1,0 +1,7 @@
+recipe,width,height,slots,output,count,remainder
+crafting/materials/electron_tube,1,2,"create:polished_rose_quartz,create:iron_sheet",create:electron_tube,1,
+crafting/materials/transmitter,3,3,"_,minecraft:lightning_rod,_,create:copper_sheet,create:copper_sheet,create:copper_sheet,_,minecraft:redstone,_",create:transmitter,1,
+crafting/materials/rose_quartz,3,3,"minecraft:redstone,minecraft:redstone,minecraft:redstone,minecraft:redstone,minecraft:quartz,minecraft:redstone,minecraft:redstone,minecraft:redstone,minecraft:redstone",create:rose_quartz,1,
+crafting/materials/sand_paper,2,1,"minecraft:paper,minecraft:sand",create:sand_paper,1,
+crafting/materials/red_sand_paper,2,1,"minecraft:paper,minecraft:red_sand",create:red_sand_paper,1,
+crafting/materials/andesite_alloy,2,2,"minecraft:iron_nugget,minecraft:andesite,minecraft:andesite,minecraft:iron_nugget",create:andesite_alloy,1,

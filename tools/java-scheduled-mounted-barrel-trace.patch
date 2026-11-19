@@ -1,0 +1,15 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -226,8 +226,10 @@
+ 				((net.minecraft.world.level.block.entity.HopperBlockEntity) level.getBlockEntity(hopperPos))
+ 					.setItem(0, new ItemStack(Items.PAPER, 1));
+ 			var chestPos = origin.east(4).above(3);
+-			level.setBlockAndUpdate(chestPos, Blocks.CHEST.defaultBlockState());
+-			var chest = (net.minecraft.world.level.block.entity.ChestBlockEntity) level.getBlockEntity(chestPos);
++			boolean barrel = "1".equals(System.getenv("CREATE_TRAIN_MOUNTED_BARREL"));
++			var storageBlock = barrel ? Blocks.BARREL : Blocks.CHEST;
++			level.setBlockAndUpdate(chestPos, storageBlock.defaultBlockState());
++			var chest = (net.minecraft.world.Container) level.getBlockEntity(chestPos);
+ 			chest.setItem(0, new ItemStack(Items.PAPER, inserting ? 63 : 64));
+ 			chest.setItem(1, new ItemStack(Items.PAPER, 7));
+ 			chest.setItem(2, new ItemStack(Items.REDSTONE, 64));

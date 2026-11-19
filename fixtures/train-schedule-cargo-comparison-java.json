@@ -1,0 +1,60 @@
+{
+  "items": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "Item": {
+                  "count": 1,
+                  "id": "minecraft:paper"
+                },
+                "Measure": 1,
+                "Operator": 2,
+                "Threshold": "32"
+              },
+              "Id": "create:item_threshold"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  },
+  "fluid": {
+    "Cyclic": 1,
+    "Entries": [
+      {
+        "Conditions": [
+          [
+            {
+              "Data": {
+                "Bucket": {
+                  "count": 1,
+                  "id": "minecraft:water_bucket"
+                },
+                "Measure": 0,
+                "Operator": 1,
+                "Threshold": "12"
+              },
+              "Id": "create:fluid_threshold"
+            }
+          ]
+        ],
+        "Instruction": {
+          "Data": {
+            "Text": "Waiting Station"
+          },
+          "Id": "create:destination"
+        }
+      }
+    ]
+  }
+}

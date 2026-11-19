@@ -1,0 +1,112 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..e307a38e7 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().startsWith("TestMisc.wrench"))
++            .toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..a076bad98 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,93 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 32)
++    public static void wrenchTrace(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var pos = new BlockPos(8, 180, 23);
++        world.setChunkForced(0, 1, true);
++        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        var wrench = com.simibubi.create.AllItems.WRENCH.asStack();
++        player.setItemInHand(hand, wrench);
++        var states = new net.minecraft.world.level.block.state.BlockState[] {
++            com.simibubi.create.AllBlocks.SHAFT.getDefaultState(),
++            com.simibubi.create.AllBlocks.COGWHEEL.getDefaultState(),
++            com.simibubi.create.AllBlocks.GEARBOX.getDefaultState(),
++            com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState(),
++            com.simibubi.create.AllBlocks.ENCASED_FAN.getDefaultState(),
++            com.simibubi.create.AllBlocks.ITEM_DRAIN.getDefaultState(),
++        };
++        var directions = net.minecraft.core.Direction.values();
++        helper.runAtTickTime(3, () -> {
++            for (int rig = 0; rig < states.length; rig++) {
++                world.removeBlockEntity(pos);
++                world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++                world.setBlockAndUpdate(pos, states[rig]);
++                player.setShiftKeyDown(false);
++                for (int action = 0; action <= directions.length; action++) {
++                    var face = directions[action % directions.length];
++                    if (action == directions.length)
++                        player.setShiftKeyDown(true);
++                    var hit = new net.minecraft.world.phys.BlockHitResult(
++                        net.minecraft.world.phys.Vec3.atCenterOf(pos), face, pos, false);
++                    var context = new net.minecraft.world.item.context.UseOnContext(player, hand, hit);
++                    var result = wrench.getItem().useOn(context);
++                    String inventory = player.getInventory().items.stream()
++                        .filter(stack -> !stack.isEmpty() && stack != wrench)
++                        .map(stack -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem())
++                            + "=" + stack.getCount())
++                        .sorted().collect(java.util.stream.Collectors.joining("|"));
++                    System.out.printf("CREATE_WRENCH %d;%d;%s;%s;%s;%s%n",
++                        rig, action, face.getName(), result, world.getBlockState(pos), inventory);
++                }
++            }
++            helper.succeed();
++        });
++    }
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 32)
++    public static void wrenchTaggedBlocks(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var pos = new BlockPos(8, 180, 29);
++        world.setChunkForced(0, 1, true);
++        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        var wrench = com.simibubi.create.AllItems.WRENCH.asStack();
++        var west = net.minecraft.core.Direction.WEST;
++        world.setBlockAndUpdate(pos.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++        world.setBlockAndUpdate(pos.west(), Blocks.SMOOTH_STONE.defaultBlockState());
++        var states = new net.minecraft.world.level.block.state.BlockState[] {
++            Blocks.RAIL.defaultBlockState(),
++            Blocks.REPEATER.defaultBlockState(),
++            Blocks.REDSTONE_WALL_TORCH.defaultBlockState().setValue(
++                net.minecraft.world.level.block.RedstoneWallTorchBlock.FACING,
++                net.minecraft.core.Direction.EAST),
++            Blocks.HOPPER.defaultBlockState(),
++            Blocks.STONE.defaultBlockState(),
++        };
++        helper.runAtTickTime(4, () -> {
++            for (int rig = 0; rig < states.length; rig++) {
++                world.removeBlockEntity(pos);
++                world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++                world.setBlockAndUpdate(pos, states[rig]);
++                player.getInventory().clearContent();
++                player.setItemInHand(hand, wrench.copy());
++                player.setShiftKeyDown(true);
++                var hit = new net.minecraft.world.phys.BlockHitResult(
++                    net.minecraft.world.phys.Vec3.atCenterOf(pos), west, pos, false);
++                var context = new net.minecraft.world.item.context.UseOnContext(player, hand, hit);
++                var result = wrench.getItem().useOn(context);
++                String inventory = player.getInventory().items.stream()
++                    .filter(stack -> !stack.isEmpty() && !com.simibubi.create.AllItems.WRENCH.isIn(stack))
++                    .map(stack -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem())
++                        + "=" + stack.getCount())
++                    .sorted().collect(java.util.stream.Collectors.joining("|"));
++                System.out.printf("CREATE_WRENCH_TAGGED %d;%s;%s;%s%n",
++                    rig, result, world.getBlockState(pos), inventory);
++            }
++            helper.succeed();
++        });
++    }
+ }

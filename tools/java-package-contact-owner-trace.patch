@@ -1,0 +1,81 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..5de2686 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageContactOwner"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..7d1e450 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,62 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 45)
++	public static void packageContactOwner(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var floor = helper.absolutePos(new BlockPos(4, 4, 2));
++		var origin = net.minecraft.world.phys.Vec3.atLowerCornerOf(floor).add(0.5, 1, 0.5);
++		for (int x = -2; x <= 2; x++) {
++			for (int z = -2; z <= 2; z++) {
++				world.setBlockAndUpdate(floor.offset(x, -1, z), Blocks.OBSIDIAN.defaultBlockState());
++				for (int y = 0; y < 4; y++)
++					world.setBlockAndUpdate(floor.offset(x, y, z), Blocks.AIR.defaultBlockState());
++			}
++		}
++		var owner = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		owner.setPos(origin.x, origin.y, origin.z);
++		owner.setYRot(0);
++		owner.setXRot(0);
++		var style = com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES.get(2);
++		for (String scenario : new String[]{"above", "level", "package", "clear"}) {
++			double dy = switch (scenario) {
++				case "above" -> 0.25;
++				case "clear" -> 0.55;
++				default -> 0;
++			};
++			net.minecraft.world.entity.LivingEntity contact;
++			var contactPosition = origin.add(0.375, dy, 0);
++			if (scenario.equals("package")) {
++				contact = com.simibubi.create.content.logistics.box.PackageEntity.fromItemStack(
++					world, contactPosition, new ItemStack(style));
++			} else {
++				var pig = EntityType.PIG.create(world);
++				pig.setNoAi(true);
++				pig.setPos(contactPosition);
++				contact = pig;
++			}
++			contact.setNoGravity(true);
++			world.addFreshEntity(contact);
++			var stack = new ItemStack(style);
++			style.releaseUsing(stack, world, owner, style.getUseDuration(stack, owner) - 20);
++			var box = world.getEntitiesOfClass(com.simibubi.create.content.logistics.box.PackageEntity.class,
++				new net.minecraft.world.phys.AABB(floor).inflate(4),
++				candidate -> candidate != contact && candidate.tossedBy.get() == owner).stream().findFirst().orElseThrow();
++			box.setPos(origin);
++			box.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
++			box.setNoGravity(true);
++			for (int tick = 0; tick < 8; tick++) {
++				if (tick > 0) {
++					world.tickNonPassenger(contact);
++					world.tickNonPassenger(box);
++				}
++				System.out.printf(java.util.Locale.ROOT, "PACKAGE_CONTACT_OWNER,%s,%d,%b%n",
++					scenario, tick, box.tossedBy.get() == owner);
++			}
++			box.discard();
++			contact.discard();
++		}
++		helper.succeed();
++	}
+ }

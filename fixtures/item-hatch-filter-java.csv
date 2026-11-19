@@ -1,0 +1,4 @@
+action,center_x,center_y,center_z,claimed,filter_item,filter_count,held_count
+set,0.500000,0.321875,0.406250,true,minecraft:paper,3,3
+clear,0.500000,0.321875,0.406250,true,-,0,0
+wrench,0.500000,0.321875,0.406250,true,-,0,1

@@ -1,0 +1,53 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -14,6 +14,7 @@
+ import com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity;
+ import com.simibubi.create.content.logistics.box.PackageItem;
+ import com.simibubi.create.content.logistics.box.PackageStyles;
++import com.simibubi.create.content.logistics.packagePort.PackagePortConfigurationPacket;
+ import com.simibubi.create.content.logistics.packagePort.PackagePortTarget.ChainConveyorFrogportTarget;
+ import com.simibubi.create.content.logistics.packagePort.frogport.FrogportBlockEntity;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+@@ -145,6 +146,42 @@
+ 		runChainConveyor(helper, "rising_reversal", new BlockPos(6, 2, 3), true);
+ 	}
+ 
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void chainConveyorFrogportSettings(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var wheelPos = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		var portPos = wheelPos.east(2).below(2);
++		for (int t = 2; t <= 8; t++) {
++			final int tick = t;
++			helper.runAtTickTime(tick, () -> {
++				if (tick == 2) {
++					world.setBlockAndUpdate(wheelPos, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
++					world.setBlockAndUpdate(portPos, AllBlocks.PACKAGE_FROGPORT.getDefaultState());
++				}
++				var wheel = (ChainConveyorBlockEntity) world.getBlockEntity(wheelPos);
++				var port = (FrogportBlockEntity) world.getBlockEntity(portPos);
++				if (tick == 3)
++					new PackagePortConfigurationPacket(portPos, "Warehouse", true).handle(chainPlayer(world, portPos, 0));
++				if (tick == 4) {
++					port.target = new ChainConveyorFrogportTarget(wheelPos.subtract(portPos), 150, (BlockPos) null, false);
++					port.target.setup(port, world, portPos);
++					port.target.register(port, world, portPos);
++				}
++				if (tick == 5)
++					new PackagePortConfigurationPacket(portPos, "Warehouse", false).handle(chainPlayer(world, portPos, 0));
++				if (tick == 7)
++					new PackagePortConfigurationPacket(portPos, "WarehouseABCDEFGHIJKLMNOP", true).handle(chainPlayer(world, portPos, 0));
++				var linked = wheel.loopPorts.get(portPos.subtract(wheelPos));
++				var saved = port.saveWithFullMetadata(world.registryAccess());
++				System.out.printf(Locale.ROOT, "CREATE_FROGPORT_SETTINGS %d,%s,%b,%b,%s,%s,%b%n",
++					tick, port.addressFilter, port.acceptsPackages, port.target != null,
++					linked == null ? "-" : linked.filter(), saved.getString("AddressFilter"), saved.getBoolean("AcceptsPackages"));
++				if (tick == 8)
++					helper.succeed();
++			});
++		}
++	}
++
+ 	private static void runChainConveyor(CreateGameTestHelper helper, String scenario, BlockPos edge, boolean reverse) {
+ 		var world = helper.getLevel();
+ 		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);

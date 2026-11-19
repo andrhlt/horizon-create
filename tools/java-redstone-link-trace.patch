@@ -1,0 +1,86 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.redstoneLinks"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,71 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 110)
++	public static void redstoneLinks(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var origin = new BlockPos(8, 180, 8);
++		level.setChunkForced(0, 0, true);
++		level.setChunkForced(1, 0, true);
++		for (int x = -3; x <= 23; x++)
++			for (int z = -3; z <= 3; z++)
++				level.setBlockAndUpdate(origin.offset(x, -1, z), Blocks.SMOOTH_STONE.defaultBlockState());
++		var sends = java.util.List.of(origin, origin.east(7));
++		var receives = java.util.List.of(origin.east(12), origin.east(16));
++		var all = new java.util.ArrayList<BlockPos>(sends);
++		all.addAll(receives);
++		var block = com.simibubi.create.AllBlocks.REDSTONE_LINK.get();
++		var mode = com.simibubi.create.content.redstone.link.RedstoneLinkBlock.RECEIVER;
++		var on = com.simibubi.create.content.redstone.link.RedstoneLinkBlock.POWERED;
++		for (var pos : all)
++			level.setBlockAndUpdate(pos, block.defaultBlockState()
++				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING, net.minecraft.core.Direction.UP)
++				.setValue(mode, receives.contains(pos)));
++		var lamp = receives.getFirst().west();
++		level.setBlockAndUpdate(lamp, Blocks.REDSTONE_LAMP.defaultBlockState());
++		var composter = sends.getLast().south(2);
++		level.setBlockAndUpdate(sends.getLast().south(), Blocks.COMPARATOR.defaultBlockState()
++			.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, net.minecraft.core.Direction.SOUTH));
++		level.setBlockAndUpdate(composter, Blocks.COMPOSTER.defaultBlockState());
++		helper.runAfterDelay(6, () -> {
++			for (var pos : all)
++				setLinkChannel(level, pos, !pos.equals(receives.getLast()));
++		});
++		for (int tick = 8; tick <= 90; tick++) {
++			int t = tick;
++			helper.runAfterDelay(t, () -> {
++				var row = new java.util.StringJoiner(" ").add("CREATE_REDSTONE_LINK").add(Integer.toString(t));
++				for (var pos : all) {
++					var link = (com.simibubi.create.content.redstone.link.RedstoneLinkBlockEntity) level.getBlockEntity(pos);
++					row.add(Integer.toString(receives.contains(pos) ? link.getReceivedSignal() : link.getSignal()));
++					row.add(Boolean.toString(level.getBlockState(pos).getValue(on)));
++				}
++				row.add(Boolean.toString(level.getBlockState(lamp)
++					.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)));
++				System.out.println(row);
++				if (t == 12)
++					level.setBlockAndUpdate(sends.getFirst().north(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++				if (t == 18)
++					level.setBlockAndUpdate(composter, Blocks.COMPOSTER.defaultBlockState().setValue(net.minecraft.world.level.block.ComposterBlock.LEVEL, 4));
++				if (t == 30)
++					level.setBlockAndUpdate(sends.getFirst().north(), Blocks.AIR.defaultBlockState());
++				if (t == 40)
++					setLinkChannel(level, receives.getFirst(), false);
++				if (t == 50)
++					setLinkChannel(level, receives.getFirst(), true);
++				if (t == 62)
++					level.setBlockAndUpdate(composter, Blocks.COMPOSTER.defaultBlockState());
++				if (t == 90)
++					helper.succeed();
++			});
++		}
++	}
++
++	private static void setLinkChannel(net.minecraft.world.level.Level level, BlockPos pos, boolean primary) {
++		var link = com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(level, pos,
++			com.simibubi.create.content.redstone.link.LinkBehaviour.TYPE);
++		link.setFrequency(true, new ItemStack(primary ? Items.QUARTZ : Items.IRON_INGOT));
++		link.setFrequency(false, new ItemStack(primary ? Items.IRON_INGOT : Items.QUARTZ));
++	}
+ }

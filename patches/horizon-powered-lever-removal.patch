@@ -1,0 +1,28 @@
+--- a/crates/horizon-world/src/level/update.rs
++++ b/crates/horizon-world/src/level/update.rs
+@@ -359,7 +359,25 @@
+             // BlockEntity.preRemoveSideEffects (unless UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS)
+             // and removeBlockEntity, before the neighbours hear of the removal.
+             let side_effects = update_flags & flags::UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS == 0;
++            // A mod may keep an attached lever's strength in its block entity.
++            // Capture that direct output before dropping the entity, then notify
++            // the support after the signal source is gone.
++            let powered_support = if self.b.instance_of(old, Class::Lever)
++                && self.level.has_mod_block_entity(pos)
++                && update_flags & flags::UPDATE_MOVE_BY_PISTON == 0
++            {
++                let connected = self.face_attached_connected(old);
++                (self.state_direct_signal(old, pos, connected) > 0)
++                    .then_some(rel(pos, connected.opposite()))
++            } else {
++                None
++            };
+             let updates = self.level.remove_block_entity(pos, old, side_effects);
++            if let Some(support) = powered_support {
++                let block = self.block_of(old);
++                self.update_neighbors_at(pos, block);
++                self.update_neighbors_at(support, block);
++            }
+             for _ in 0..updates {
+                 // JukeboxBlockEntity.onSongChanged.
+                 let block = self.block_of(old);

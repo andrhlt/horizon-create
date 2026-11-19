@@ -1,0 +1,17 @@
+diff --git a/crates/horizon-client/src/game/minecarts.rs b/crates/horizon-client/src/game/minecarts.rs
+--- a/crates/horizon-client/src/game/minecarts.rs
++++ b/crates/horizon-client/src/game/minecarts.rs
+@@ -847,7 +847,12 @@
+                 }
+             }
+         }
+-    }
++        self.native_legacy_rail_movement(c, pos);
++    }
++
++    #[inline(always)]
++    fn native_legacy_rail_movement(&self, _cart: &mut Minecart, _pos: [i32; 3]) {}
++
+     /// `Entity.checkInsideBlocks` for a recorded move of the cart from `from`
+     /// to `to`: the entity-sensing blocks (plates, buttons, tripwires, detector
+     /// rails) on the path run `entityInside` now, with the cart where the tick

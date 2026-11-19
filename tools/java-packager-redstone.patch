@@ -1,0 +1,209 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..29812a1c4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packagerRedstone"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..4ba4804bb 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,190 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 90)
++	public static void packagerRedstone(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var machine = helper.absolutePos(new BlockPos(2, 16, 2));
++		var side = net.minecraft.core.Direction.EAST;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var power = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWER;
++		var powered = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var packager = com.simibubi.create.AllBlocks.PACKAGER.get();
++		var target = machine.west();
++		var comparator = machine.east();
++		var wire = comparator.east();
++		var signal = machine.south();
++		for (var floor : java.util.List.of(machine, comparator, wire, machine.north(), target))
++			level.setBlockAndUpdate(floor.below(), stone);
++		level.setBlockAndUpdate(target, net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState());
++		level.setBlockAndUpdate(machine, packager.defaultBlockState().setValue(facing, side));
++		var defaultState = packager.defaultBlockState();
++		var shape = defaultState.getShape(level, machine).bounds();
++		var placeSound = net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.getKey(defaultState.getSoundType().getPlaceSound());
++		System.out.printf(java.util.Locale.ROOT, "PACKAGER_MATERIAL %.6f,%.6f,%d,%b,%b,%s,%s,%b,%b,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f%n",
++			defaultState.getDestroySpeed(level, machine), packager.getExplosionResistance(),
++			defaultState.getMapColor(level, machine).id, defaultState.requiresCorrectToolForDrops(),
++			defaultState.isRedstoneConductor(level, machine), placeSound, defaultState.getValue(facing).getName(),
++			defaultState.getValue(powered), defaultState.getValue(com.simibubi.create.content.logistics.packager.PackagerBlock.LINKED),
++			shape.minX, shape.minY, shape.minZ, shape.maxX, shape.maxY, shape.maxZ);
++		level.setBlockAndUpdate(comparator, net.minecraft.world.level.block.Blocks.COMPARATOR.defaultBlockState()
++			.setValue(net.minecraft.world.level.block.ComparatorBlock.FACING, side.getOpposite()));
++		level.setBlockAndUpdate(wire, net.minecraft.world.level.block.Blocks.REDSTONE_WIRE.defaultBlockState());
++		level.setBlockAndUpdate(machine.north(), net.minecraft.world.level.block.Blocks.OAK_SIGN.defaultBlockState());
++		if (level.getBlockEntity(machine.north()) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign) {
++			var front = sign.getFrontText()
++				.setMessage(0, net.minecraft.network.chat.Component.literal("Factory"))
++				.setMessage(1, net.minecraft.network.chat.Component.literal("A"));
++			sign.setText(front, true);
++		}
++		for (String example : java.util.List.of(
++			"3;3;_,minecraft:iron_ingot,_,minecraft:iron_ingot,create:cardboard_block,minecraft:iron_ingot,minecraft:redstone,minecraft:iron_ingot,minecraft:redstone",
++			"2;2;create:cardboard,create:cardboard,create:cardboard,create:cardboard",
++			"1;1;create:cardboard_block"
++		)) {
++			String[] fields = example.split(";");
++			var ingredients = new java.util.ArrayList<net.minecraft.world.item.ItemStack>();
++			for (String cell : fields[2].split(","))
++				ingredients.add(cell.equals("_") ? net.minecraft.world.item.ItemStack.EMPTY
++					: new net.minecraft.world.item.ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
++						net.minecraft.resources.ResourceLocation.parse(cell))));
++			var input = net.minecraft.world.item.crafting.CraftingInput.of(
++				Integer.parseInt(fields[0]), Integer.parseInt(fields[1]), ingredients);
++			var matched = level.getRecipeManager()
++				.getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level).orElseThrow();
++			var result = matched.value().assemble(input, level.registryAccess());
++			var remaining = matched.value().getRemainingItems(input).stream().filter(item -> !item.isEmpty())
++				.map(item -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item.getItem()) + ":" + item.getCount())
++				.sorted().toList();
++			System.out.printf(java.util.Locale.ROOT, "PACKAGER_RECIPE %s;%s;%s;%d;%s%n", matched.id(), example,
++				net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(result.getItem()), result.getCount(),
++				String.join(",", remaining));
++		}
++		var cardboard = com.simibubi.create.AllBlocks.CARDBOARD_BLOCK.get();
++		var material = cardboard.defaultBlockState();
++		System.out.printf(java.util.Locale.ROOT, "CARDBOARD_MATERIAL %.6f,%.6f,%d,%s,%b,%d,%d%n",
++			material.getDestroySpeed(level, machine), cardboard.getExplosionResistance(), material.getMapColor(level, machine).id,
++			material.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_AXIS).getName(),
++			material.requiresCorrectToolForDrops(), cardboard.getFireSpreadSpeed(material, level, machine, side),
++			cardboard.getFlammability(material, level, machine, side));
++
++		var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(target);
++		barrel.setItem(0, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_INGOT, 5));
++		barrel.setItem(3, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_INGOT, 2));
++		barrel.setItem(4, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.REDSTONE, 2));
++		var named = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_INGOT);
++		named.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal("Named"));
++		barrel.setItem(15, named);
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		player.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		player.setPos(machine.getX() + 2.5, machine.getY(), machine.getZ() + .5);
++		player.getInventory().clearContent();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var landing = machine.south(5);
++		var axisProperty = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_AXIS;
++		level.setBlockAndUpdate(landing.below(), stone);
++		for (float yaw : new float[]{180, 90}) {
++			level.removeBlock(landing, false);
++			player.setYRot(yaw);
++			player.setPos(landing.getX() + .5, landing.getY(), landing.getZ() + 2.5);
++			player.setItemInHand(hand, com.simibubi.create.AllBlocks.CARDBOARD_BLOCK.asStack());
++			var used = new net.minecraft.world.phys.BlockHitResult(
++				landing.below().getCenter().add(0, .5, 0), net.minecraft.core.Direction.UP, landing.below(), false);
++			var held = player.getItemInHand(hand);
++			var result = held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, used));
++			var placed = level.getBlockState(landing);
++			System.out.printf(java.util.Locale.ROOT, "CARDBOARD_PLACEMENT %.0f,%s,%d,%s%n", yaw,
++				placed.getOptionalValue(axisProperty).map(net.minecraft.core.Direction.Axis::getName).orElse("none"),
++				held.getCount(), result);
++		}
++		player.setYRot(0);
++		player.setPos(machine.getX() + 2.5, machine.getY(), machine.getZ() + .5);
++		player.getInventory().clearContent();
++		var hit = new net.minecraft.world.phys.BlockHitResult(machine.getCenter().relative(side, .5), side, machine, false);
++		for (int i = 0; i < 2; i++) {
++			var support = machine.south(7 + i * 4).above(4);
++			var firePos = support.east();
++			level.removeBlock(firePos, false);
++			for (var direction : net.minecraft.core.Direction.values())
++				level.removeBlock(firePos.relative(direction), false);
++			var supportState = i == 0 ? cardboard.defaultBlockState() : stone;
++			level.setBlockAndUpdate(support, supportState);
++			player.setItemInHand(hand, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.FLINT_AND_STEEL));
++			player.setPos(support.getX() + 3.5, support.getY() - 1, support.getZ() + .5);
++			var use = new net.minecraft.world.phys.BlockHitResult(
++				support.getCenter().add(.5, 0, 0), net.minecraft.core.Direction.EAST, support, false);
++			var tool = player.getItemInHand(hand);
++			var result = tool.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, use));
++			System.out.printf(java.util.Locale.ROOT, "CARDBOARD_FIRE %s,%s,%d,%s%n",
++				net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(supportState.getBlock()),
++				net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(firePos).getBlock()),
++				tool.getDamageValue(), result);
++		}
++		player.setPos(machine.getX() + 2.5, machine.getY(), machine.getZ() + .5);
++		player.getInventory().clearContent();
++
++		var issued = new net.minecraft.world.item.ItemStack[]{net.minecraft.world.item.ItemStack.EMPTY};
++		for (int step = 0; step < 67; step++) {
++			int tick = step;
++			helper.runAtTickTime(tick + 1, () -> {
++				if (tick == 4 || tick == 55)
++					level.setBlockAndUpdate(signal, net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState());
++				if (tick == 7 || tick == 59)
++					level.removeBlock(signal, false);
++				String action = "_";
++				if (tick == 9 || tick == 25 || tick == 31) {
++					var tool = tick == 31 ? issued[0].copy() : new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STICK);
++					player.setItemInHand(hand, tool);
++					action = player.gameMode.useItemOn(player, level, tool, hand, hit).toString();
++				}
++				var state = level.getBlockState(machine);
++				var be = (com.simibubi.create.content.logistics.packager.PackagerBlockEntity) level.getBlockEntity(machine);
++				var inventory = new java.util.ArrayList<String>();
++				for (int slot = 0; slot < barrel.getContainerSize(); slot++) {
++					var item = barrel.getItem(slot);
++					if (!item.isEmpty())
++						inventory.add(slot + ":" + packagerSampleStack(item));
++				}
++				if (tick == 9 || tick == 25) {
++					var own = java.util.stream.IntStream.range(0, player.getInventory().getContainerSize())
++						.mapToObj(player.getInventory()::getItem)
++						.filter(com.simibubi.create.content.logistics.box.PackageItem::isPackage)
++						.findFirst().orElse(net.minecraft.world.item.ItemStack.EMPTY);
++					issued[0] = own.copy();
++				}
++				var active = !be.heldBox.isEmpty() ? be.heldBox : be.previouslyUnwrapped;
++				var cargo = new java.util.ArrayList<String>();
++				if (!active.isEmpty()) {
++					var contents = com.simibubi.create.content.logistics.box.PackageItem.getContents(active);
++					for (int slot = 0; slot < contents.getSlots(); slot++)
++						if (!contents.getStackInSlot(slot).isEmpty())
++							cargo.add(slot + ":" + packagerSampleStack(contents.getStackInSlot(slot)));
++				}
++				System.out.printf(java.util.Locale.ROOT,
++					"PACKAGER_TRACE %d,%b,%b,%d,%d,%b,%d,%d,%b,%b,%d,%s,%s,%s,%s%n",
++					tick, state.getValue(powered), be.redstonePowered, be.buttonCooldown, be.animationTicks,
++					be.animationInward, packager.getAnalogOutputSignal(state, level, machine),
++					level.getBlockState(wire).getValue(power), !be.heldBox.isEmpty(), !be.previouslyUnwrapped.isEmpty(),
++					player.getItemInHand(hand).getCount(), be.signBasedAddress, String.join("|", inventory),
++					String.join("|", cargo), action);
++				boolean hatch = be.animationTicks > (be.animationInward ? 1 : 5)
++					&& be.animationTicks < 20 - (be.animationInward ? 5 : 1);
++				System.out.printf(java.util.Locale.ROOT, "PACKAGER_POSE %d,%b,%.8f,%.8f,%.8f,%b%n", tick, hatch,
++					be.getTrayOffset(0), be.getTrayOffset(.5f), be.getTrayOffset(1f), !be.getRenderedBox().isEmpty());
++				if (tick == 66) {
++					if (issued[0].isEmpty())
++						throw new IllegalStateException("The real Packager pickup never gave the player a Package.");
++					helper.succeed();
++				}
++			});
++		}
++	}
++
++	private static String packagerSampleStack(net.minecraft.world.item.ItemStack item) {
++		var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item.getItem());
++		var name = item.get(net.minecraft.core.component.DataComponents.CUSTOM_NAME);
++		return id + "=" + item.getCount() + (name == null ? "" : "@" + name.getString());
++	}
+ }

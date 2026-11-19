@@ -1,0 +1,11 @@
+case,tick,duration,amplifier
+stew,0,-1,-1
+stew,1,-1,-1
+stew,2,160,0
+stew,3,159,0
+stew,4,158,0
+invulnerable,0,-1,-1
+invulnerable,1,-1,-1
+invulnerable,2,-1,-1
+invulnerable,3,-1,-1
+invulnerable,4,-1,-1

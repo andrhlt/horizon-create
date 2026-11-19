@@ -1,0 +1,2 @@
+id,result,item_count,hardness,resistance,map_color,light,full_collision,correct_tool,pickaxe,beacon_base,block_rarity,nugget_max_stack,nugget_rarity,nugget_foil
+create:experience_block,CONSUME,0,3.00,6.00,7,15,true,true,true,true,UNCOMMON,64,UNCOMMON,true

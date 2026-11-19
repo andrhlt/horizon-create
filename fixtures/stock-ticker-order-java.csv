@@ -1,0 +1,7 @@
+tick,accepted,previous_address,held_package,queued_package,stored_iron,stored_copper,animation
+4,true,Warehouse,Warehouse:2:3,_:0:0,9,1,20
+5,false,Warehouse,Warehouse:2:3,_:0:0,4,1,19
+6,true,Smelting,Warehouse:2:3,Smelting:4:0,0,1,18
+7,false,Smelting,Warehouse:2:3,Smelting:4:0,0,1,17
+8,false,Smelting,Warehouse:2:3,Smelting:4:0,0,1,16
+9,false,Smelting,Warehouse:2:3,Smelting:4:0,0,1,15

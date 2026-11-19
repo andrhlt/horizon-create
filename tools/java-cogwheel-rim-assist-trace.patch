@@ -1,0 +1,86 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..3ffb7d5f4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.cogwheelRimPlacementAssist"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..820451c1e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,54 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing")
++	public static void cogwheelRimPlacementAssist(CreateGameTestHelper helper) {
++		var small = com.simibubi.create.AllBlocks.COGWHEEL;
++		var large = com.simibubi.create.AllBlocks.LARGE_COGWHEEL;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var east = net.minecraft.core.Direction.EAST;
++		var up = net.minecraft.core.Direction.UP;
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(helper.getLevel());
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		int[][] offsets = {
++			{1, 0, 0}, {1, 0, -1}, {1, 0, -1}, {1, 1, 0}, {0, 1, 0}, {1, 0, 0}, {1, 0, 1}, {0, 1, 0},
++		};
++		for (int index = 0; index < offsets.length; index++) {
++			var pos = new BlockPos(12 + index * 5, 3, 2);
++			var existing = index == 2 || index == 3 ? large : small;
++			var wheel = index == 1 || index == 3 || index >= 6 ? large : small;
++			helper.setBlock(pos, existing.getDefaultState().setValue(axis, net.minecraft.core.Direction.Axis.Y));
++			if (index >= 6)
++				helper.setBlock(pos.east().north(), Blocks.STONE);
++			if (index == 7)
++				helper.setBlock(pos.east().south(), Blocks.STONE);
++			var at = helper.absolutePos(pos);
++			player.setPos(at.getX() - 2, at.getY(), at.getZ());
++			player.setShiftKeyDown(index == 5);
++			var face = index == 0 || index == 5 ? east : up;
++			double hitX = index == 4 ? 0.5 : index == 0 || index == 5 ? 0.875 : index == 1 || index >= 6 ? 0.86 : 0.96;
++			double hitY = index == 4 ? 0.999 : index == 0 || index == 5 ? 0.53 : 0.625;
++			double hitZ = index == 1 || index == 2 || index >= 6 ? 0.20 : 0.5;
++			var hit = new net.minecraft.world.phys.BlockHitResult(
++				net.minecraft.world.phys.Vec3.atLowerCornerWithOffset(at, hitX, hitY, hitZ),
++				face, at, false);
++			var held = new ItemStack(wheel.asItem(), 2);
++			player.setItemInHand(hand, held);
++			var context = new net.minecraft.world.item.context.UseOnContext(player, hand, hit);
++			var item = (com.simibubi.create.content.kinetics.simpleRelays.CogwheelBlockItem) wheel.asItem();
++			var assisted = item.onItemUseFirst(held, context);
++			if (assisted == net.minecraft.world.InteractionResult.PASS)
++				held.useOn(context);
++
++			var delta = offsets[index];
++			var placed = helper.getBlockState(pos.offset(delta[0], delta[1], delta[2]));
++			var name = small.has(placed) ? "small" : large.has(placed) ? "large" : "none";
++			System.out.printf("CREATE_COG_ASSIST,%d,%d,%d,%d,%s,%s,%d,%s%n",
++				index, delta[0], delta[1], delta[2], name,
++				name.equals("none") ? "none" : placed.getValue(axis).getName(), held.getCount(), assisted);
++		}
++		player.setShiftKeyDown(false);
++		helper.succeed();
++	}
+ }

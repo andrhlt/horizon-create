@@ -1,0 +1,103 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..1646343d0 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.trainSignalChain")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..f87f86125 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,85 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 130)
++    public static void trainSignalChain(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var ground = Blocks.SMOOTH_STONE.defaultBlockState();
++        var origin = new BlockPos(9, 112, -40);
++        var track = com.simibubi.create.AllBlocks.TRACK.get();
++        var signal = com.simibubi.create.AllBlocks.TRACK_SIGNAL;
++        var wrench = com.simibubi.create.AllItems.WRENCH.get();
++        var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
++        var signalType = com.simibubi.create.content.trains.signal.SignalBlock.TYPE;
++        var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
++        for (int x = -8; x <= 14; x++) {
++            var cell = origin.east(x);
++            level.setChunkForced(cell.getX() >> 4, cell.getZ() >> 4, true);
++            level.setBlockAndUpdate(cell.below(), ground);
++            level.setBlockAndUpdate(cell, rail);
++            level.setBlockAndUpdate(cell.above(), Blocks.AIR.defaultBlockState());
++        }
++        var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++        var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++        var item = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) signal.asItem();
++        var targets = java.util.List.of(origin.west(4), origin, origin.east(5), origin);
++        var parts = java.util.List.of(targets.get(0).south(3), targets.get(1).south(3),
++            targets.get(2).south(3), targets.get(3).north(3));
++        java.util.function.Consumer<BlockPos> use = pos -> {
++            var face = net.minecraft.core.Direction.UP;
++            var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(face, .5), face, pos, false);
++            player.setPos(pos.getX() + .5, pos.getY() + 1, pos.getZ() + .5);
++            player.getMainHandItem().useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++        };
++        for (var pos : parts) {
++            level.setChunkForced(pos.getX() >> 4, pos.getZ() >> 4, true);
++            level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++            level.setBlockAndUpdate(pos.above(), Blocks.AIR.defaultBlockState());
++            level.setBlockAndUpdate(pos.below(), ground);
++        }
++        for (int t = 1; t <= 95; ++t) {
++            int tick = t;
++            helper.runAtTickTime(tick + 8, () -> {
++                if (tick == 1) {
++                    for (int index = 0; index < parts.size(); ++index) {
++                        player.setItemInHand(hand, new ItemStack(item));
++                        player.setYRot(index == 3 ? 90 : -90);
++                        player.setXRot(20);
++                        use.accept(targets.get(index));
++                        use.accept(parts.get(index).below());
++                        helper.assertTrue(signal.has(level.getBlockState(parts.get(index))), "Expected Signal " + index);
++                        // Java iterates signal boundaries through a UUID-keyed HashMap. Fix their bucket
++                        // order so that upstream-before-downstream evaluation is repeatable.
++                        var placed = (com.simibubi.create.content.trains.signal.SignalBlockEntity)
++                            level.getBlockEntity(parts.get(index));
++                        var tag = placed.saveWithoutMetadata(level.registryAccess());
++                        tag.putUUID("Id", new java.util.UUID(0, new int[] {1, 3, 7, 4}[index]));
++                        placed.edgePoint.read(tag, level.registryAccess(), false);
++                    }
++                }
++                if (tick == 8 || tick == 12 || tick == 71) {
++                    player.setItemInHand(hand, new ItemStack(wrench));
++                    use.accept(parts.get(tick == 12 ? 1 : 0));
++                }
++                if (tick == 20 || tick == 56)
++                    level.setBlockAndUpdate(parts.get(2).above(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++                if (tick == 39 || tick == 86)
++                    level.setBlockAndUpdate(parts.get(2).above(), Blocks.AIR.defaultBlockState());
++                if (tick == 53)
++                    level.setBlockAndUpdate(parts.get(3).above(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++                if (tick == 64)
++                    level.setBlockAndUpdate(parts.get(3).above(), Blocks.AIR.defaultBlockState());
++                var row = new StringBuilder("CREATE_SIGNAL_CHAIN ").append(tick);
++                for (var pos : parts) {
++                    var sig = (com.simibubi.create.content.trains.signal.SignalBlockEntity) level.getBlockEntity(pos);
++                    row.append(';').append(sig.getState().name())
++                        .append(';').append(level.getBlockState(pos).getValue(signalType).getSerializedName());
++                }
++                System.out.println(row);
++                if (tick == 95)
++                    helper.succeed();
++            });
++        }
++    }
+ }

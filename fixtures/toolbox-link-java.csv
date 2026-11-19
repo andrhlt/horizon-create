@@ -1,0 +1,8 @@
+action,tick,linked,held,slots
+equip,0,true,_,minecraft:cobblestone=64|minecraft:cobblestone=32|_|_
+initial_restock,1,true,minecraft:cobblestone=32,minecraft:cobblestone=64|_|_|_
+consumed,2,true,minecraft:cobblestone=32,minecraft:cobblestone=59|_|_|_
+surplus,3,true,minecraft:cobblestone=32,minecraft:cobblestone=64|minecraft:cobblestone=10|_|_
+out_of_range,4,true,minecraft:cobblestone=20,minecraft:cobblestone=64|minecraft:cobblestone=10|_|_
+back_in_range,5,true,minecraft:cobblestone=32,minecraft:cobblestone=62|_|_|_
+unequip,5,false,_,minecraft:cobblestone=64|minecraft:cobblestone=30|_|_

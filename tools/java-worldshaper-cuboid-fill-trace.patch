@@ -1,0 +1,70 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..d65e3c3 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.worldshaperCuboidFill"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..10d6f73 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,51 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void worldshaperCuboidFill(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var target = helper.absolutePos(new BlockPos(2, 2, 2)).above(20);
++		var modes = new com.simibubi.create.content.equipment.zapper.terrainzapper.PlacementOptions[] {
++			com.simibubi.create.content.equipment.zapper.terrainzapper.PlacementOptions.Merged,
++			com.simibubi.create.content.equipment.zapper.terrainzapper.PlacementOptions.Inserted,
++			com.simibubi.create.content.equipment.zapper.terrainzapper.PlacementOptions.Attached,
++		};
++		helper.runAtTickTime(4, () -> {
++			for (int scenario = 0; scenario < modes.length; scenario++) {
++				for (BlockPos delta : BlockPos.betweenClosed(-7, -4, -7, 7, 7, 7))
++					level.setBlock(target.offset(delta), Blocks.AIR.defaultBlockState(), 2);
++				var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++				var stack = com.simibubi.create.AllItems.WORLDSHAPER.asStack();
++				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack);
++				boolean north = scenario == 2;
++				player.setPos(target.getX() + .5, target.getY(), target.getZ() + (north ? -2.5 : 2.5));
++				player.setYRot(north ? 0 : 180);
++				player.setXRot(25);
++				level.setBlock(target, Blocks.GOLD_BLOCK.defaultBlockState(), 2);
++				boolean selected = com.simibubi.create.content.equipment.zapper.ZapperInteractionHandler.trySelect(stack, player);
++				level.setBlock(target, Blocks.STONE.defaultBlockState(), 2);
++				com.simibubi.create.content.equipment.zapper.terrainzapper.WorldshaperItem.configureSettings(stack,
++					com.simibubi.create.content.equipment.zapper.PlacementPatterns.Solid,
++					com.simibubi.create.content.equipment.zapper.terrainzapper.TerrainBrushes.Cuboid,
++					2, 3, 4, com.simibubi.create.content.equipment.zapper.terrainzapper.TerrainTools.Fill, modes[scenario]);
++				var eye = player.position().add(0, player.getEyeHeight(), 0);
++				var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, eye.add(player.getLookAngle().scale(128)),
++					net.minecraft.world.level.ClipContext.Block.OUTLINE, net.minecraft.world.level.ClipContext.Fluid.NONE, player));
++				var itemData = (net.minecraft.nbt.CompoundTag) stack.saveOptional(level.registryAccess());
++				System.out.printf("CREATE_WORLDSHAPER_CUBOID_COMPONENTS %s %s%n", modes[scenario], itemData.getCompound("components"));
++				var result = com.simibubi.create.AllItems.WORLDSHAPER.get().use(level, player, net.minecraft.world.InteractionHand.MAIN_HAND);
++				var changed = new java.util.ArrayList<String>();
++				for (int x = -7; x <= 7; x++)
++					for (int y = -4; y <= 7; y++)
++						for (int z = -7; z <= 7; z++)
++							if (level.getBlockState(target.offset(x, y, z)).is(Blocks.GOLD_BLOCK))
++								changed.add(x + ":" + y + ":" + z);
++				System.out.printf("CREATE_WORLDSHAPER_CUBOID,%s,%s,2,3,4,%s,%s,%d,%s,%d,%s%n",
++					modes[scenario], hit.getDirection(), selected, result.getResult(), changed.size(),
++					level.getBlockState(target).is(Blocks.STONE), stack.getCount(), String.join("|", changed));
++			}
++			helper.succeed();
++		});
++	}
+ }

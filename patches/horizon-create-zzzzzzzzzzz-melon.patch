@@ -1,0 +1,53 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -37,6 +37,7 @@
+         "minecraft:potato" => (1.25, 15, 5.0, 1.5),
+         "minecraft:baked_potato" => (1.25, 15, 5.0, 0.5),
+         "minecraft:poisonous_potato" => (1.25, 15, 5.0, 0.05),
++        "minecraft:melon" => (0.95, 20, 8.0, 2.0),
+         "create:honeyed_apple" => (1.35, 15, 6.0, 0.1),
+         "minecraft:golden_apple" | "minecraft:enchanted_golden_apple" => (1.45, 100, 1.0, 0.05),
+         "minecraft:carrot" => (1.45, 12, 4.0, 0.3),
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5696,6 +5696,40 @@
+                             }
+                             for &(effect, duration, amplifier) in effects {
+                                 self.add_player_effect(horizon_client::effects::EffectInstance::new(effect, duration, amplifier));
++                            }
++                        }
++                    }
++                    Hit::Block { pos, at, face }
++                        if t.id == "create:potato_projectile"
++                            && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:melon") =>
++                    {
++                        let place = [pos[0] + face[0], pos[1] + face[1], pos[2] + face[2]];
++                        let current = self.world.block(place[0], place[1], place[2]);
++                        if self.world.chunks.contains_key(&(pos[0] >> 4, pos[2] >> 4))
++                            && self.res.facts().get(current).replaceable
++                            && let Some(state) = self.pack.assets.registry.default_state("minecraft:melon")
++                        {
++                            let block_pos = BlockPos::new(place[0], place[1], place[2]);
++                            if face == [0, 1, 0] {
++                                self.with_level(|b, level, ticks| b.set_block(level, ticks, block_pos, state, 3));
++                                self.process_level_events()?;
++                            } else {
++                                let mut y = at.y - 0.5;
++                                let above = self.world.block(place[0], place[1] + 1, place[2]);
++                                let below = self.world.block(place[0], place[1] - 1, place[2]);
++                                if !self.res.facts().is_air(above) { y = y.min(f64::from(place[1])); }
++                                if !self.res.facts().is_air(below) { y = y.max(f64::from(place[1])); }
++                                let location = Vec3::new(f64::from(place[0]) + 0.5, y, f64::from(place[2]) + 0.5);
++                                let start_pos = BlockPos::new(place[0], y.floor() as i32, place[2]);
++                                self.next_entity += 1;
++                                self.falling.push(super::FallingBlock {
++                                    rotation: [0.0, 0.0], join: Default::default(), id: self.next_entity,
++                                    state, start_pos, position: location, previous: location, velocity: Vec3::ZERO,
++                                    age: 1, no_gravity: false, portal: Default::default(), drop_item: true,
++                                    fall_distance: 0.0, on_ground: false, stuck: Vec3::ZERO,
++                                    damage: horizon_client::falling_block::Damage::falling("minecraft:melon"),
++                                    saved: None,
++                                });
+                             }
+                         }
+                     }

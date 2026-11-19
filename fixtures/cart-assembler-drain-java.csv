@@ -1,0 +1,14 @@
+tick,block,waterlogged,bucket,drops
+0,create:cart_assembler,false,minecraft:water_bucket,
+1,create:cart_assembler,false,minecraft:water_bucket,
+2,create:cart_assembler,false,minecraft:water_bucket,
+3,create:cart_assembler,false,minecraft:water_bucket,
+4,create:cart_assembler,true,minecraft:bucket,
+5,create:cart_assembler,true,minecraft:bucket,
+6,create:cart_assembler,true,minecraft:bucket,
+7,create:cart_assembler,true,minecraft:bucket,
+8,create:cart_assembler,true,minecraft:bucket,
+9,create:cart_assembler,true,minecraft:bucket,
+10,minecraft:air,absent,minecraft:water_bucket,create:cart_assembler|minecraft:rail
+11,minecraft:air,absent,minecraft:water_bucket,create:cart_assembler|minecraft:rail
+12,minecraft:air,absent,minecraft:water_bucket,create:cart_assembler|minecraft:rail

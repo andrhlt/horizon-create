@@ -1,0 +1,84 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestItems.smartObserverCounting"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+@@ -285,28 +285,48 @@
+ 		helper.succeedWhen(() -> helper.assertBlockPresent(Blocks.DIAMOND_BLOCK, output));
+ 	}
+ 
+-	@GameTest(template = "smart_observer_counting")
++	@GameTest(template = "smart_observer_counting", timeoutTicks = 155)
+ 	public static void smartObserverCounting(CreateGameTestHelper helper) {
+-		BlockPos chest = new BlockPos(3, 2, 1);
+-		long totalChestItems = helper.getTotalItems(chest);
+-		BlockPos chestNixiePos = new BlockPos(2, 3, 1);
+-		NixieTubeBlockEntity chestNixie = helper.getBlockEntity(AllBlockEntityTypes.NIXIE_TUBE.get(), chestNixiePos);
+-
+-		BlockPos doubleChest = new BlockPos(2, 2, 3);
+-		long totalDoubleChestItems = helper.getTotalItems(doubleChest);
+-		BlockPos doubleChestNixiePos = new BlockPos(1, 3, 3);
+-		NixieTubeBlockEntity doubleChestNixie = helper.getBlockEntity(AllBlockEntityTypes.NIXIE_TUBE.get(), doubleChestNixiePos);
+-
+-		helper.succeedWhen(() -> {
+-			String chestNixieText = chestNixie.getFullText().getString();
+-			long chestNixieReading = Long.parseLong(chestNixieText);
+-			if (chestNixieReading != totalChestItems)
+-				helper.fail("Chest nixie detected %s, expected %s".formatted(chestNixieReading, totalChestItems));
+-			String doubleChestNixieText = doubleChestNixie.getFullText().getString();
+-			long doubleChestNixieReading = Long.parseLong(doubleChestNixieText);
+-			if (doubleChestNixieReading != totalDoubleChestItems)
+-				helper.fail("Double chest nixie detected %s, expected %s".formatted(doubleChestNixieReading, totalDoubleChestItems));
+-		});
++		var level = helper.getLevel();
++		var single = helper.absolutePos(new BlockPos(3, 2, 1));
++		var otherHalf = helper.absolutePos(new BlockPos(3, 2, 3));
++		var signal = helper.absolutePos(new BlockPos(3, 2, 2));
++		var singleNixie = helper.getBlockEntity(AllBlockEntityTypes.NIXIE_TUBE.get(), new BlockPos(2, 3, 1));
++		var doubleNixie = helper.getBlockEntity(AllBlockEntityTypes.NIXIE_TUBE.get(), new BlockPos(1, 3, 3));
++		var singleLink = helper.getBlockEntity(AllBlockEntityTypes.DISPLAY_LINK.get(), new BlockPos(2, 2, 2));
++		var doubleLink = helper.getBlockEntity(AllBlockEntityTypes.DISPLAY_LINK.get(), new BlockPos(1, 2, 2));
++		helper.assertTrue(singleNixie.getFullText().getString().equals("10"), "Original single chest reading");
++		helper.assertTrue(doubleNixie.getFullText().getString().equals("40"), "Original double chest reading");
++		singleLink.refreshTicks = 0;
++		doubleLink.refreshTicks = 0;
++		for (int tick = 0; tick <= 145; tick++) {
++			int t = tick;
++			Runnable sample = () -> {
++				System.out.printf("CREATE_DISPLAY_LINK %d %s %s %b %b%n", t,
++					singleNixie.getFullText().getString(), doubleNixie.getFullText().getString(),
++					singleLink.getBlockState().getValue(com.simibubi.create.content.redstone.displayLink.DisplayLinkBlock.POWERED),
++					doubleLink.getBlockState().getValue(com.simibubi.create.content.redstone.displayLink.DisplayLinkBlock.POWERED));
++				if (t == 5) {
++					((net.minecraft.world.Container) level.getBlockEntity(single)).setItem(0, new ItemStack(Items.IRON_INGOT, 7));
++					((net.minecraft.world.Container) level.getBlockEntity(otherHalf)).setItem(0, new ItemStack(Items.GOLD_INGOT, 13));
++				}
++				if (t == 108)
++					level.setBlockAndUpdate(signal, Blocks.REDSTONE_BLOCK.defaultBlockState());
++				if (t == 111)
++					((net.minecraft.world.Container) level.getBlockEntity(single)).setItem(0, new ItemStack(Items.IRON_INGOT, 4));
++				if (t == 125)
++					level.setBlockAndUpdate(signal, Blocks.AIR.defaultBlockState());
++				if (t == 145) {
++					helper.assertTrue(singleNixie.getFullText().getString().equals("14"), "Unpowered link refreshed");
++					helper.assertTrue(doubleNixie.getFullText().getString().equals("53"), "Count included other chest half");
++					helper.succeed();
++				}
++			};
++			if (t == 0)
++				sample.run();
++			else
++				helper.runAfterDelay(t, sample);
++		}
+ 	}
+ 
+ 	@GameTest(template = "smart_observer_filtered_storage")

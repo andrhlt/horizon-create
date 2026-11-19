@@ -1,0 +1,22 @@
+{
+  "opening": {
+    "item": "{components:{\"create:clipboard_content\":{pages:[],previously_opened_page:0,read_only:0b,type:\"editing\"}},count:1,id:\"create:clipboard\"}"
+  },
+  "blank_close": {
+    "item": "{count:1,id:\"create:clipboard\"}"
+  },
+  "written_close": {
+    "item": "{components:{\"create:clipboard_content\":{pages:[[{checked:1b,icon:{},item_amount:0,text:\"Sort brass\"},{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}],[{checked:0b,icon:{},item_amount:0,text:\"Visit station\"}]],previously_opened_page:1,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+  },
+  "reopen": {
+    "item": "{components:{\"create:clipboard_content\":{pages:[[{checked:1b,icon:{},item_amount:0,text:\"Sort brass\"},{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}],[{checked:0b,icon:{},item_amount:0,text:\"Visit station\"}]],previously_opened_page:1,read_only:0b,type:\"editing\"}},count:1,id:\"create:clipboard\"}"
+  },
+  "placed_close": {
+    "block": "Block{create:clipboard}[face=floor,facing=north,waterlogged=false,written=true]",
+    "item": "{components:{\"create:clipboard_content\":{pages:[[{checked:1b,icon:{},item_amount:0,text:\"Sort brass\"},{checked:0b,icon:{},item_amount:0,text:\"#Warehouse\"}],[{checked:0b,icon:{},item_amount:0,text:\"Visit station\"}]],previously_opened_page:1,read_only:0b,type:\"written\"}},count:1,id:\"create:clipboard\"}"
+  },
+  "placed_clear": {
+    "block": "Block{create:clipboard}[face=floor,facing=north,waterlogged=false,written=false]",
+    "item": "{count:1,id:\"create:clipboard\"}"
+  }
+}

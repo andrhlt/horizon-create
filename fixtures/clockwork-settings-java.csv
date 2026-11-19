@@ -1,0 +1,4 @@
+title,row,option0,option1,option2,max,step,held_ticks,initial,first_interval,second_interval,confirmed
+Clock Hand Arrangement,Select,Hour hand first,Minute hand first,24-Hour hand first,2,1,6,0,10.0,10.0,1
+Clock Hand Arrangement,Select,Hour hand first,Minute hand first,24-Hour hand first,2,1,6,1,10.0,10.0,2
+Clock Hand Arrangement,Select,Hour hand first,Minute hand first,24-Hour hand first,2,1,6,2,10.0,10.0,0

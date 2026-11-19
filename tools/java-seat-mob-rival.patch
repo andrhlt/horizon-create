@@ -1,0 +1,92 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..63666219f 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.seatMobRival"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..55654c90c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,60 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void seatMobLanding(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(2, 6, 2));
++		var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.RED).getDefaultState();
++		level.setBlockAndUpdate(at.below(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++		level.setBlockAndUpdate(at, seat);
++		var pig = EntityType.PIG.create(level);
++		pig.setPos(at.getX() + .5, at.getY() + 3.25, at.getZ() + .5);
++		helper.runAtTickTime(1, () -> level.addFreshEntity(pig));
++		for (int tick = 0; tick < 32; tick++) {
++			int sample = tick;
++			helper.runAtTickTime(tick + 1, () -> {
++				System.out.printf(java.util.Locale.ROOT,
++					"CREATE_SEAT_PIG %d,%.9f,%.9f,%.9f,%.9f,%.1f,%b,%b%n",
++					sample, pig.getX() - at.getX(), pig.getY() - at.getY(), pig.getZ() - at.getZ(),
++					pig.getDeltaMovement().y, pig.getHealth(), pig.onGround(), pig.isPassenger());
++				if (sample == 24)
++					level.removeBlock(at, false);
++				if (sample == 31)
++					helper.succeed();
++			});
++		}
++	}
++
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void seatMobRival(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(2, 16, 2));
++		var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.RED).getDefaultState();
++		level.setBlockAndUpdate(at.below(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++		level.setBlockAndUpdate(at, seat);
++		var occupant = EntityType.PIG.create(level);
++		var newcomer = EntityType.PIG.create(level);
++		occupant.setPos(at.getX() + .5, at.getY() + 9.25, at.getZ() + .5);
++		newcomer.setPos(at.getX() + .5, at.getY() + 3.25, at.getZ() + .5);
++		for (int tick = 0; tick < 42; tick++) {
++			int sample = tick;
++			helper.runAtTickTime(tick + 1, () -> {
++				if (sample == 0)
++					level.addFreshEntity(occupant);
++				if (sample == 22)
++					level.addFreshEntity(newcomer);
++				System.out.printf(java.util.Locale.ROOT,
++					"CREATE_SEAT_RIVAL %d,%.9f,%.9f,%.1f,%b,%b,%.9f,%.9f,%.1f,%b,%b%n",
++					sample, occupant.getY() - at.getY(), occupant.getDeltaMovement().y, occupant.getHealth(),
++					occupant.onGround(), occupant.isPassenger(),
++					newcomer.getY() - at.getY(), newcomer.getDeltaMovement().y, newcomer.getHealth(),
++					newcomer.onGround(), newcomer.isPassenger());
++				if (sample == 41)
++					helper.succeed();
++			});
++		}
++	}
+ }

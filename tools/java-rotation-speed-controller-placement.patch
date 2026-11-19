@@ -1,0 +1,102 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..9a3fd45e9 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.rotationSpeedControllerPlacement"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..572da1e62 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,70 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing")
++	public static void rotationSpeedControllerPlacement(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var controller = com.simibubi.create.AllBlocks.ROTATION_SPEED_CONTROLLER;
++		var cog = com.simibubi.create.AllBlocks.LARGE_COGWHEEL;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_AXIS;
++		var west = net.minecraft.core.Direction.WEST;
++		var up = net.minecraft.core.Direction.UP;
++		var x = net.minecraft.core.Direction.Axis.X;
++		var y = net.minecraft.core.Direction.Axis.Y;
++		var z = net.minecraft.core.Direction.Axis.Z;
++
++		for (int index = 0; index < 6; index++) {
++			var base = new BlockPos(12 + index * 4, 2, 2);
++			var hit = helper.absolutePos(base);
++			var clicked = new net.minecraft.world.phys.BlockHitResult(
++				net.minecraft.world.phys.Vec3.atLowerCornerWithOffset(hit, 0, 0.25, 0.5),
++				west, hit, false);
++			player.setPos(hit.getX() - 2, hit.getY(), hit.getZ());
++			player.setYRot(0);
++			var held = new ItemStack(cog.asItem(), 2);
++			player.setItemInHand(hand, held);
++
++			if (index < 4) {
++				helper.setBlock(base, controller.getDefaultState().setValue(horizontal, index == 1 ? z : x));
++				if (index == 2)
++					helper.setBlock(base.above(), Blocks.STONE);
++				if (index == 3)
++					helper.setBlock(base.above().east(), com.simibubi.create.AllBlocks.COGWHEEL.getDefaultState().setValue(axis, y));
++
++				var result = level.getBlockState(hit).useItemOn(held, level, player, hand, clicked);
++				if (!result.consumesAction())
++					held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, clicked));
++			} else {
++				helper.setBlock(base.below(), Blocks.STONE);
++				if (index == 4)
++					helper.setBlock(base.above(), cog.getDefaultState().setValue(axis, x));
++				else {
++					helper.setBlock(base.east(), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, x));
++					helper.setBlock(base.above(), com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, y));
++					player.setYRot(90);
++				}
++
++				held = new ItemStack(controller.asItem(), 2);
++				player.setItemInHand(hand, held);
++				hit = hit.below();
++				clicked = new net.minecraft.world.phys.BlockHitResult(
++					net.minecraft.world.phys.Vec3.atLowerCornerWithOffset(hit, 0.5, 1, 0.5),
++					up, hit, false);
++				held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, clicked));
++			}
++			var top = helper.getBlockState(base.above());
++			var side = helper.getBlockState(base.west());
++			var installed = helper.getBlockState(base);
++			String topAxis = cog.has(top) ? top.getValue(axis).getName() : "none";
++			String sideAxis = cog.has(side) ? side.getValue(axis).getName() : "none";
++			String installedAxis = controller.has(installed) ? installed.getValue(horizontal).getName() : "none";
++			System.out.printf("CREATE_SPEED_CONTROLLER_PLACEMENT,%d,%s,%s,%s,%d%n",
++				index, installedAxis, topAxis, sideAxis, held.getCount());
++		}
++		helper.succeed();
++	}
+ }

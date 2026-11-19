@@ -1,0 +1,64 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.sandpaperPolishing"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,49 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 80)
++	public static void sandpaperPolishing(CreateGameTestHelper helper) {
++		for (int trial = 0; trial < 3; trial++) {
++			int which = trial;
++			var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++			var main = net.minecraft.world.InteractionHand.MAIN_HAND;
++			var off = net.minecraft.world.InteractionHand.OFF_HAND;
++			var paperHand = trial == 2 ? off : main;
++			var quartzHand = paperHand == main ? off : main;
++			var paperItem = trial == 2 ? com.simibubi.create.AllItems.RED_SAND_PAPER : com.simibubi.create.AllItems.SAND_PAPER;
++			var paper = paperItem.asStack();
++			var quartz = com.simibubi.create.AllItems.ROSE_QUARTZ;
++			var polished = com.simibubi.create.AllItems.POLISHED_ROSE_QUARTZ;
++			player.setItemInHand(paperHand, paper);
++			player.setItemInHand(quartzHand, quartz.asStack(2));
++			paper.use(helper.getLevel(), player, paperHand);
++			for (int tick = 0; tick <= 36; tick++) {
++				int t = tick;
++				Runnable sample = () -> {
++					if (t > 0)
++						player.tick();
++					var input = player.getItemInHand(quartzHand).getCount();
++					var inventory = player.getInventory();
++					int total = (int) inventory.items.stream().filter(s -> s.is(quartz.get())).mapToLong(ItemStack::getCount).sum()
++						+ (int) inventory.offhand.stream().filter(s -> s.is(quartz.get())).mapToLong(ItemStack::getCount).sum();
++					int output = (int) inventory.items.stream().filter(s -> s.is(polished.get())).mapToLong(ItemStack::getCount).sum();
++					boolean pending = paper.has(com.simibubi.create.AllDataComponents.SAND_PAPER_POLISHING);
++					System.out.printf("CREATE_SANDPAPER %d %d %d %d %d %d %b%n", which, t, input, total, output, paper.getDamageValue(), pending);
++					if (which == 1 && t == 12)
++						player.releaseUsingItem();
++					if (t == 36) {
++						helper.assertTrue(output == (which == 1 ? 0 : 1), "Unexpected polishing output");
++						helper.assertTrue(paper.getDamageValue() == (which == 1 ? 0 : 1), "Unexpected sandpaper durability");
++						if (which == 2)
++							helper.succeed();
++					}
++				};
++				if (t == 0)
++					sample.run();
++				else
++					helper.runAfterDelay(t, sample);
++			}
++		}
++	}
+ }

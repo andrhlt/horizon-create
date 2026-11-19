@@ -1,0 +1,75 @@
+--- a/crates/horizon-client/src/game/lan_actions.rs
++++ b/crates/horizon-client/src/game/lan_actions.rs
+@@ -105,6 +105,8 @@
+     mining: Option<Mining>,
+     destroy_delay: u32,
+     using: Option<(usize, u32)>,
++    // The stack that began this guest's use, for LivingEntity.updatingUsingItem.
++    used_stack: Option<ItemStack>,
+     use_duration: i32,
+     use_ticks_set: bool,
+     use_delay: u32,
+@@ -1058,6 +1060,17 @@
+         self.right = right;
+         play.mining = std::mem::replace(&mut self.mining, mining);
+         play.destroy_delay = std::mem::replace(&mut self.destroy_delay, destroy_delay);
++        // Capture the used food in the action that started use, before another
++        // packet or command can replace the hand before the first player tick.
++        if self.using.is_none() {
++            play.used_stack = None;
++        } else if play.used_stack.is_none()
++            && let Some((slot, 0)) = self.using
++        {
++            play.used_stack = self.stack_in(slot).filter(|stack| matches!(&*stack.item,
++                "create:sweet_roll" | "create:chocolate_glazed_berries" | "create:honeyed_apple" | "create:bar_of_chocolate"
++            )).cloned();
++        }
+         play.using = std::mem::replace(&mut self.using, using);
+         play.use_duration = std::mem::replace(&mut self.use_duration, use_duration);
+         play.use_ticks_set = std::mem::replace(&mut self.use_ticks_set, use_ticks_set);
+@@ -4296,7 +4309,6 @@
+             // ServerGamePacketListenerImpl.tick's dropSpamThrottler.
+             play.creative_drops = play.creative_drops.saturating_sub(1);
+             let digging = play.digging;
+-            let using = play.using.is_some();
+             let delayed = play.destroy_delay > 0 || play.use_delay > 0 || play.attack_ticks < 100;
+             // Test-only observation at the guest player tick boundary, before item use advances.
+             // This is independent of the frozen world clock and never drives the player.
+@@ -4332,6 +4344,37 @@
+                     let _ = writeln!(file, "{row}");
+                 }
+             }
++            // Create's foods use NeoForge's default canContinueUsing: a
++            // different item ends use, while the same item continues it even
++            // if the stack count or components changed.
++            let replaced = {
++                let play = host.play.entry(conn).or_default();
++                if let Some((slot, _)) = play.using {
++                    let guest = &host.hub.guests[gi];
++                    let held = if slot == super::shield::OFFHAND_SLOT {
++                        guest.offhand.as_ref()
++                    } else {
++                        guest.inventory.get(slot).and_then(|s| s.as_ref())
++                    };
++                    if let Some(old) = play.used_stack.as_ref() {
++                        if held.is_none_or(|stack| old.item != stack.item) {
++                            play.used_stack.take()
++                        } else {
++                            play.used_stack = held.cloned();
++                            None
++                        }
++                    } else {
++                        None
++                    }
++                } else {
++                    play.used_stack = None;
++                    None
++                }
++            };
++            if let Some(old) = replaced {
++                self.as_guest(host, conn, |game| game.stop_using_item(&old));
++            }
++            let using = host.play.get(&conn).is_some_and(|play| play.using.is_some());
+             let mut tea_use = false;
+             if digging.is_some() || using || delayed {
+                 if pre_pending {

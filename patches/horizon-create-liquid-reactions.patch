@@ -1,0 +1,64 @@
+--- a/crates/horizon-world/src/level/fluids.rs
++++ b/crates/horizon-world/src/level/fluids.rs
+@@ -35,6 +35,18 @@
+ fn is_vanilla_lava(kind: FluidKind) -> bool {
+     kind.source() == FluidKind::Lava
+ }
++fn create_lava_contact_product(kind: FluidKind) -> Option<&'static str> {
++    match kind.source().name() {
++        "create:honey" => Some("create:limestone"),
++        "create:chocolate" => Some("create:scoria"),
++        _ => None,
++    }
++}
++fn lava_displaces_create_liquid(target: FluidKind, incoming: FluidKind, direction: Direction) -> bool {
++    direction == Direction::Down
++        && is_vanilla_lava(incoming)
++        && create_lava_contact_product(target).is_some()
++}
+ fn source_of(kind: FluidKind) -> FluidKind {
+     kind.source()
+ }
+@@ -179,6 +191,9 @@
+     ) -> bool {
+         let kind = fluid.kind();
+         if kind == FluidKind::Empty {
++            return true;
++        }
++        if lava_displaces_create_liquid(kind, other, direction) {
+             return true;
+         }
+         match kind.source() {
+@@ -436,7 +451,8 @@
+         test_fluid: FluidState,
+     ) -> bool {
+         !self.is_source_of(kind, test_fluid)
+-            && self.can_hold_any_fluid(test)
++            && (self.can_hold_any_fluid(test)
++                || lava_displaces_create_liquid(test_fluid.kind(), kind, direction))
+             && self.can_pass_through_wall(direction, source, test)
+     }
+     fn can_pass_through(
+@@ -714,6 +730,22 @@
+         let b = self.b;
+         if !b.is_lava_fluid(b.fluid(state).kind()) {
+             return true;
++        }
++        for direction in POSSIBLE_FLOW_DIRECTIONS {
++            let neighbour = rel(pos, direction.opposite());
++            let Some(product) = create_lava_contact_product(self.fluid_at(neighbour).kind()) else {
++                continue;
++            };
++            let block = if self.fluid_at(pos).is_source() {
++                b.named.obsidian
++            } else if let Some(block) = b.table.block_by_name(product) {
++                block
++            } else {
++                continue;
++            };
++            self.set_block_and_update(pos, b.default_of(block));
++            self.level_event(1501, pos, 0);
++            return false;
+         }
+         let over_soul_soil = b.is_block(self.below_state(pos), b.named.soul_soil);
+         for direction in POSSIBLE_FLOW_DIRECTIONS {

@@ -1,0 +1,41 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.thresholdSwitch"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -285,6 +285,26 @@
+ 		BlockPos lamp = new BlockPos(1, 3, 1);
+ 		BlockPos tank = new BlockPos(2, 2, 1);
+ 		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			var sensor = helper.getBlockEntity(new BlockPos(1, 2, 1)).saveWithoutMetadata(access);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_VALVE %d %d %d %d %d %d %d %d %d %d %d",
++				helper.getTick(),
++				helper.fluidStorageAt(leftTank).getFluidInTank(0).getAmount(),
++				helper.fluidStorageAt(rightTank).getFluidInTank(0).getAmount(),
++				helper.fluidStorageAt(tank).getFluidInTank(0).getAmount(),
++				sensor.getInt("CurrentAmount"),
++				sensor.getBoolean("Powered") ? 1 : 0,
++				sensor.getBoolean("PoweredAfterDelay") ? 1 : 0,
++				helper.getBlockState(lamp).getValue(RedstoneLampBlock.LIT) ? 1 : 0,
++				helper.getBlockState(leftValve).getValue(FluidValveBlock.ENABLED) ? 1 : 0,
++				helper.getBlockState(rightValve).getValue(FluidValveBlock.ENABLED) ? 1 : 0,
++				helper.getBlockState(drainValve).getValue(FluidValveBlock.ENABLED) ? 1 : 0);
++			for (var handle : new BlockPos[] {leftHandle, rightHandle, drainHandle}) {
++				var saved = helper.getBlockEntity(handle).saveWithoutMetadata(access);
++				System.out.printf(java.util.Locale.ROOT, " %d %d %.4f", saved.getBoolean("InUse") ? 1 : 0,
++					saved.getInt("TotalUseTicks"), saved.getFloat("Speed"));
++			}
++			System.out.println();
+ 			if (!helper.getBlockState(leftValve).getValue(FluidValveBlock.ENABLED)) { // step 1
+ 				helper.getBlockEntity(AllBlockEntityTypes.VALVE_HANDLE.get(), leftHandle)
+ 						.activate(false); // open the valve, fill 4 buckets

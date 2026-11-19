@@ -1,0 +1,5 @@
+scenario,path,tick,position,address,destination
+rising_reversal,loop,50,315,Inventory,main_hand
+rising_reversal,span,50,2.5,Pocket,inventory
+straight,loop,50,315,Inventory,main_hand
+straight,span,50,2.5,Pocket,inventory

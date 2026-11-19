@@ -1,0 +1,112 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleCopyProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleCopyProbe.java
+new file mode 100644
+index 0000000..270a8d5
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaScheduleCopyProbe.java
+@@ -0,0 +1,106 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.gui.screens.inventory.InventoryScreen;
++import net.minecraft.core.component.DataComponents;
++import net.minecraft.world.inventory.ClickType;
++import net.minecraft.world.item.ItemStack;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaScheduleCopyProbe {
++    private static int phase;
++    private static int elapsed;
++    private static ItemStack source;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) {
++        if (!Boolean.getBoolean("parity.scheduleCopy"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.getOverlay() != null || ++elapsed < 7)
++            return;
++        var inventory = mc.player.getInventory();
++        var menu = mc.player.inventoryMenu;
++        switch (phase) {
++            case 0 -> {
++                var stack = inventory.getItem(0);
++                if (!stack.has(AllDataComponents.TRAIN_SCHEDULE)
++                    || inventory.getItem(1).getCount() != 3
++                    || !inventory.getItem(3).has(AllDataComponents.TRAIN_SCHEDULE))
++                    return;
++                source = stack.copy();
++                mc.setScreen(new InventoryScreen(mc.player));
++                click(mc, 36, 0);
++                click(mc, 1, 0);
++                click(mc, 37, 0);
++                click(mc, 2, 0);
++            }
++            case 1 -> {
++                if (menu.getSlot(0).getItem().isEmpty() && elapsed < 30)
++                    return;
++                System.out.printf("CREATE_SCHEDULE_COPY_GRID %s,%s,%s,%s;%s%n",
++                    menu.getSlot(1).getItem(), menu.getSlot(2).getItem(),
++                    menu.getSlot(3).getItem(), menu.getSlot(4).getItem(), menu.getCarried());
++                expected(menu.getSlot(0).getItem(), 2);
++                click(mc, 2, 0);
++                click(mc, 2, 1);
++                click(mc, 3, 1);
++                click(mc, 37, 0);
++            }
++            case 2 -> {
++                expected(menu.getSlot(0).getItem(), 3);
++                click(mc, 38, 0);
++                click(mc, 4, 0);
++            }
++            case 3 -> {
++                System.out.println("CREATE_SCHEDULE_COPY_FOREIGN " + menu.getSlot(0).getItem().isEmpty());
++                click(mc, 4, 0);
++                click(mc, 38, 0);
++                click(mc, 39, 0);
++                click(mc, 4, 0);
++            }
++            case 4 -> {
++                System.out.println("CREATE_SCHEDULE_COPY_TWO_SOURCES " + menu.getSlot(0).getItem().isEmpty());
++                click(mc, 4, 0);
++                click(mc, 39, 0);
++            }
++            case 5 -> {
++                click(mc, 0, 0);
++                click(mc, 36, 0);
++            }
++            case 6 -> {
++                expected(inventory.getItem(0), 3);
++                boolean gridEmpty = true;
++                for (int slot = 1; slot <= 4; slot++)
++                    gridEmpty &= menu.getSlot(slot).getItem().isEmpty();
++                System.out.printf("CREATE_SCHEDULE_COPY_TAKEN %d,%d,%s%n",
++                    inventory.getItem(0).getCount(), inventory.getItem(1).getCount(), gridEmpty);
++                System.out.println("CREATE_SCHEDULE_COPY_DONE");
++            }
++            default -> { return; }
++        }
++        phase++;
++        elapsed = 0;
++    }
++
++    private static void expected(ItemStack result, int count) {
++        var schedule = source.get(AllDataComponents.TRAIN_SCHEDULE);
++        boolean component = schedule != null && schedule.equals(result.get(AllDataComponents.TRAIN_SCHEDULE));
++        var name = result.get(DataComponents.CUSTOM_NAME);
++        boolean nameKept = name != null && name.getString().equals("Route Master");
++        boolean enchant = !result.isEnchanted() && !result.has(DataComponents.STORED_ENCHANTMENTS);
++        System.out.printf("CREATE_SCHEDULE_COPY_RESULT %d,%s,%s,%s%n", result.getCount(), component, nameKept, enchant);
++        if (!AllItems.SCHEDULE.isIn(result) || result.getCount() != count || !component || !nameKept || !enchant)
++            throw new AssertionError("Unexpected copied stack " + result);
++    }
++
++    private static void click(Minecraft mc, int slot, int button) {
++        mc.gameMode.handleInventoryMouseClick(mc.player.inventoryMenu.containerId, slot, button, ClickType.PICKUP, mc.player);
++    }
++}

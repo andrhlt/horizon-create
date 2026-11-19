@@ -1,0 +1,91 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageFunnel"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,76 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 45)
++	public static void packageFunnel(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(4, 4, 2));
++		var origin = net.minecraft.world.phys.Vec3.atLowerCornerOf(pos);
++		var bounds = new net.minecraft.world.phys.AABB(pos).inflate(4);
++		var property = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		for (String scenario : new String[]{"wall", "wallAndesite", "full", "filtered", "powered", "extracting", "floor"}) {
++			for (int x = -2; x <= 2; x++)
++				for (int z = -2; z <= 2; z++) {
++					world.setBlockAndUpdate(pos.offset(x, -1, z), Blocks.OBSIDIAN.defaultBlockState());
++					for (int y = 0; y < 4; y++)
++						world.setBlockAndUpdate(pos.offset(x, y, z), Blocks.AIR.defaultBlockState());
++				}
++			world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, bounds)
++				.forEach(net.minecraft.world.entity.Entity::discard);
++			boolean floor = scenario.equals("floor");
++			var target = floor ? pos.below() : pos.east();
++			world.setBlockAndUpdate(target, Blocks.BARREL.defaultBlockState());
++			var barrel = (net.minecraft.world.level.block.entity.BarrelBlockEntity) world.getBlockEntity(target);
++			if (scenario.equals("full")) {
++				for (int slot = 0; slot < barrel.getContainerSize(); slot++)
++					barrel.setItem(slot, new ItemStack(Items.IRON_INGOT, 64));
++			}
++			var funnel = scenario.equals("wallAndesite") ? com.simibubi.create.AllBlocks.ANDESITE_FUNNEL
++				: com.simibubi.create.AllBlocks.BRASS_FUNNEL;
++			var face = floor ? net.minecraft.core.Direction.UP : net.minecraft.core.Direction.WEST;
++			if (scenario.equals("powered"))
++				world.setBlockAndUpdate(pos.south(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++			world.setBlockAndUpdate(pos, funnel.getDefaultState().setValue(property, face)
++				.setValue(com.simibubi.create.content.logistics.funnel.FunnelBlock.EXTRACTING, scenario.equals("extracting"))
++				.setValue(com.simibubi.create.content.logistics.funnel.FunnelBlock.POWERED, scenario.equals("powered")));
++			var entity = (com.simibubi.create.content.logistics.funnel.FunnelBlockEntity) world.getBlockEntity(pos);
++			if (scenario.equals("filtered")) {
++				var filter = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++				entity.getBehaviour(filter).setFilter(new ItemStack(Items.IRON_INGOT));
++			}
++			entity.tick();
++			var stack = new ItemStack(com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES.get(2));
++			var cargo = net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
++			cargo.set(6, new ItemStack(Items.CLAY_BALL, 3));
++			stack.set(com.simibubi.create.AllDataComponents.PACKAGE_CONTENTS,
++				net.minecraft.world.item.component.ItemContainerContents.fromItems(cargo));
++			stack.set(com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS, "Funnel fixture");
++			var point = floor ? origin.add(0.28, 2.05, 0.37) : origin.add(0.30, 0.15, 0.60);
++			var box = com.simibubi.create.content.logistics.box.PackageEntity.fromItemStack(world, point, stack);
++			box.setYRot(47);
++			box.setDeltaMovement(0, -0.12, 0);
++			world.addFreshEntity(box);
++			for (int tick = 0; tick <= 25; tick++) {
++				if (tick > 0 && !box.isRemoved())
++					world.tickNonPassenger(box);
++				var actual = box.position().subtract(origin);
++				var motion = box.getDeltaMovement();
++				var held = barrel.getItem(0);
++				int ingots = 0;
++				for (int slot = 0; slot < barrel.getContainerSize(); slot++)
++					if (barrel.getItem(slot).is(Items.IRON_INGOT))
++						ingots += barrel.getItem(slot).getCount();
++				var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(held.getItem());
++				var encoded = held.isEmpty() ? "" : java.util.HexFormat.of().formatHex(
++					held.save(world.registryAccess()).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
++				System.out.printf(java.util.Locale.ROOT,
++					"PACKAGE_FUNNEL,%s,%d,%b,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.6f,%s,%d,%d,%s%n",
++					scenario, tick, box.isRemoved(), actual.x, actual.y, actual.z, motion.x, motion.y, motion.z,
++					box.getYRot(), id, held.getCount(), ingots, encoded);
++			}
++			box.discard();
++		}
++		helper.succeed();
++	}
+ }

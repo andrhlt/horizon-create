@@ -1,0 +1,150 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaTrainScheduleProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaTrainScheduleProbe.java
+new file mode 100644
+index 0000000..60fb7a1
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaTrainScheduleProbe.java
+@@ -0,0 +1,144 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.trains.schedule.Schedule;
++import com.simibubi.create.content.trains.schedule.ScheduleScreen;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.Screenshot;
++import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
++import net.minecraft.client.gui.screens.inventory.InventoryScreen;
++import net.minecraft.world.inventory.ClickType;
++import net.minecraft.world.item.Items;
++import net.minecraft.world.phys.BlockHitResult;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaTrainScheduleProbe {
++    private static int phase;
++    private static int elapsed;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post ignored) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.trainSchedule"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.level == null || mc.gameMode == null || mc.getOverlay() != null)
++            return;
++        var inventory = mc.player.getInventory();
++        var menu = mc.player.inventoryMenu;
++        elapsed++;
++        switch (phase) {
++            case 0 -> {
++                if (mc.screen != null || !AllItems.STURDY_SHEET.isIn(inventory.getItem(0))
++                    || !inventory.getItem(1).is(Items.PAPER))
++                    return;
++                mc.setScreen(new InventoryScreen(mc.player));
++                click(mc, 36);
++                click(mc, 1);
++                click(mc, 37);
++                click(mc, 2);
++                advance();
++            }
++            case 1 -> {
++                var output = menu.getSlot(0).getItem();
++                if (!AllItems.SCHEDULE.isIn(output))
++                    return;
++                System.out.println("CREATE_SCHEDULE_CRAFT " + output.getCount());
++                click(mc, 0);
++                click(mc, 36);
++                mc.player.closeContainer();
++                advance();
++            }
++            case 2 -> {
++                if (!AllItems.SCHEDULE.isIn(inventory.getItem(0)) || elapsed < 10)
++                    return;
++                inventory.selected = 0;
++                mc.options.keyShift.setDown(true);
++                advance();
++            }
++            case 3 -> {
++                if (elapsed == 3)
++                    use(mc);
++                if (elapsed < 7)
++                    return;
++                System.out.println("CREATE_SCHEDULE_SNEAK " + (mc.screen instanceof ScheduleScreen));
++                mc.options.keyShift.setDown(false);
++                advance();
++            }
++            case 4 -> {
++                if (elapsed >= 3) {
++                    use(mc);
++                    advance();
++                }
++            }
++            case 5 -> {
++                if (!(mc.screen instanceof ScheduleScreen screen) || elapsed < 8)
++                    return;
++                var scheduleField = ScheduleScreen.class.getDeclaredField("schedule");
++                scheduleField.setAccessible(true);
++                var schedule = (Schedule) scheduleField.get(screen);
++                var gui = AbstractContainerScreen.class;
++                var leftField = gui.getDeclaredField("leftPos");
++                var topField = gui.getDeclaredField("topPos");
++                leftField.setAccessible(true);
++                topField.setAccessible(true);
++                int left = leftField.getInt(screen);
++                int top = topField.getInt(screen);
++                System.out.printf("CREATE_SCHEDULE_OPEN %s,%d,%s%n", screen.getTitle().getString(),
++                    schedule.entries.size(), schedule.cyclic);
++                Screenshot.grab(mc.gameDirectory, "schedule-empty.png", mc.getMainRenderTarget(),
++                    message -> System.out.println(message.getString()));
++                screen.mouseClicked(left + 28, top + 203, 0);
++                System.out.println("CREATE_SCHEDULE_TOGGLED " + schedule.cyclic);
++                screen.mouseClicked(left + 222, top + 204, 0);
++                advance();
++            }
++            case 6 -> {
++                if (elapsed < 10)
++                    return;
++                var held = mc.player.getMainHandItem();
++                System.out.printf("CREATE_SCHEDULE_CLOSE %s,%d,%s%n", mc.screen instanceof ScheduleScreen,
++                    held.getCount(), held.has(AllDataComponents.TRAIN_SCHEDULE));
++                mc.player.setXRot(65);
++                advance();
++            }
++            case 7 -> {
++                if (elapsed < 4 || !(mc.hitResult instanceof BlockHitResult))
++                    return;
++                use(mc);
++                advance();
++            }
++            case 8 -> {
++                if (!(mc.screen instanceof ScheduleScreen screen) || elapsed < 8)
++                    return;
++                var scheduleField = ScheduleScreen.class.getDeclaredField("schedule");
++                scheduleField.setAccessible(true);
++                var schedule = (Schedule) scheduleField.get(screen);
++                System.out.printf("CREATE_SCHEDULE_BLOCK %s,%d,%s%n", screen.getTitle().getString(),
++                    schedule.entries.size(), schedule.cyclic);
++                mc.player.closeContainer();
++                System.out.println("CREATE_SCHEDULE_DONE");
++                advance();
++            }
++        }
++    }
++
++    private static void use(Minecraft mc) throws ReflectiveOperationException {
++        var method = Minecraft.class.getDeclaredMethod("startUseItem");
++        method.setAccessible(true);
++        method.invoke(mc);
++    }
++
++    private static void click(Minecraft mc, int slot) {
++        mc.gameMode.handleInventoryMouseClick(mc.player.inventoryMenu.containerId, slot, 0, ClickType.PICKUP, mc.player);
++    }
++
++    private static void advance() {
++        phase++;
++        elapsed = 0;
++    }
++}

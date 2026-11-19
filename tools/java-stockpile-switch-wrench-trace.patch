@@ -1,0 +1,93 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..8a548b6ed 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.stockpileSwitchWrench"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..290d66639 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,74 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 32)
++	public static void stockpileSwitchWrench(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var target = com.simibubi.create.content.redstone.DirectedDirectionalBlock.TARGET;
++		var level = helper.getLevel();
++		var directions = net.minecraft.core.Direction.values();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var stockpile = com.simibubi.create.AllBlocks.THRESHOLD_SWITCH.get();
++		for (var start : directions) {
++			var mount = start == net.minecraft.core.Direction.UP ? net.minecraft.world.level.block.state.properties.AttachFace.CEILING
++				: start == net.minecraft.core.Direction.DOWN ? net.minecraft.world.level.block.state.properties.AttachFace.FLOOR
++				: net.minecraft.world.level.block.state.properties.AttachFace.WALL;
++			var horizontal = start.getAxis().isVertical() ? net.minecraft.core.Direction.SOUTH : start;
++			var state = stockpile.defaultBlockState().setValue(facing, horizontal).setValue(target, mount);
++			for (var click : directions) {
++				var transformed = stockpile.getRotatedBlockState(state, click);
++				System.out.printf("STOCKPILE_WRENCH_POSE,%s,%s,%s,%s,%s%n", start.getName(), click.getName(),
++					horizontal.getName(), transformed.getValue(facing).getName(), transformed.getValue(target).getSerializedName());
++			}
++		}
++		var at = new BlockPos(12, 7, 4);
++		var absolute = helper.absolutePos(at);
++		var barrelPositions = new BlockPos[] {at.south(), at.west(), at.below()};
++		var stock = new int[] {64, 32, 96};
++		for (int i = 0; i < barrelPositions.length; i++) {
++			var barrel = barrelPositions[i];
++			helper.setBlock(barrel, Blocks.BARREL);
++			var entity = (net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(helper.absolutePos(barrel));
++			entity.setItem(0, new ItemStack(Items.STONE, Math.min(stock[i], 64)));
++			if (stock[i] > 64)
++				entity.setItem(1, new ItemStack(Items.STONE, stock[i] - 64));
++		}
++		helper.setBlock(at, stockpile.defaultBlockState().setValue(facing, net.minecraft.core.Direction.SOUTH));
++		var be = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), at);
++		be.offWhenBelow = 32;
++		be.onWhenAbove = 64;
++		player.setItemInHand(hand, new ItemStack(com.simibubi.create.AllItems.WRENCH.get()));
++		var click = new java.util.HashMap<Long, net.minecraft.core.Direction>();
++		click.put(4L, net.minecraft.core.Direction.UP);
++		click.put(10L, net.minecraft.core.Direction.NORTH);
++		click.put(18L, net.minecraft.core.Direction.EAST);
++		click.put(23L, net.minecraft.core.Direction.EAST);
++		int initial = player.getInventory().countItem(stockpile.asItem());
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			if (click.containsKey(tick)) {
++				var side = click.get(tick);
++				var hit = new net.minecraft.world.phys.BlockHitResult(absolute.getCenter().relative(side, 0.5), side, absolute, false);
++				var context = new net.minecraft.world.item.context.UseOnContext(player, hand, hit);
++				player.setShiftKeyDown(tick == 23);
++				var changes = tick == 23 ? stockpile.onSneakWrenched(level.getBlockState(absolute), context)
++					: stockpile.onWrenched(level.getBlockState(absolute), context);
++				if (!changes.consumesAction())
++					helper.fail("The wrench should accept the click");
++			}
++			var state = level.getBlockState(absolute);
++			if (state.isAir()) {
++				System.out.printf("STOCKPILE_WRENCH_TICK,%d,-,-,-1,false,false,-1,%d%n",
++					tick, player.getInventory().countItem(stockpile.asItem()) - initial);
++			} else {
++				var current = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), at);
++				System.out.printf("STOCKPILE_WRENCH_TICK,%d,%s,%s,%d,%b,%b,%d,%d%n", tick,
++					state.getValue(facing).getName(), state.getValue(target).getSerializedName(), current.getStockLevel(),
++					current.getState(), current.isPowered(), state.getValue(com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlock.LEVEL),
++					player.getInventory().countItem(stockpile.asItem()) - initial);
++			}
++			helper.assertTrue(tick == 25, "sampling wrench ticks");
++		});
++	}
+ }

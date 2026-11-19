@@ -1,0 +1,57 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -33,7 +33,7 @@
+ }
+ 
+ pub fn create_cannon_sticky(item: &str) -> bool {
+-    matches!(item, "minecraft:pumpkin_pie" | "minecraft:cake" | "minecraft:cod" | "minecraft:cooked_cod" | "minecraft:salmon" | "minecraft:cooked_salmon" | "minecraft:tropical_fish" | "minecraft:pufferfish")
++    matches!(item, "minecraft:pumpkin_pie" | "minecraft:cake" | "minecraft:cod" | "minecraft:cooked_cod" | "minecraft:salmon" | "minecraft:cooked_salmon" | "minecraft:tropical_fish" | "minecraft:pufferfish" | "create:blaze_cake")
+ }
+ 
+ pub fn create_cannon_ammo(item: &str) -> Option<CreateCannonAmmo> {
+@@ -45,6 +45,7 @@
+         "minecraft:pumpkin_pie" => (1.1, 15, 7.0, 0.05),
+         "minecraft:cake" => (1.1, 15, 8.0, 0.1),
+         "minecraft:pufferfish" => (1.1, 10, 4.0, 0.4),
++        "create:blaze_cake" => (1.1, 20, 15.0, 0.3),
+         "minecraft:cod" | "minecraft:cooked_cod" | "minecraft:salmon" | "minecraft:cooked_salmon" | "minecraft:tropical_fish" => (1.3, 10, 4.0, 0.6),
+         "minecraft:pumpkin" => (0.95, 15, 6.0, 2.0),
+         "create:honeyed_apple" => (1.35, 15, 6.0, 0.1),
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5627,8 +5627,11 @@
+                     Some("minecraft:glistering_melon_slice") => Some(("minecraft:glowing", 100, 0)),
+                     _ => None,
+                 };
+-                let baked = cannon_ammo.is_some()
+-                    && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:baked_potato");
++                let cannon_fire = cannon_ammo.and_then(|_| match p.item.as_ref().map(|item| item.item.as_ref()) {
++                    Some("minecraft:baked_potato") => Some(60),
++                    Some("create:blaze_cake") => Some(240),
++                    _ => None,
++                });
+                 let apple = p.item.as_ref().map(|item| item.item.as_ref());
+                 let effects: &[(&str, i32, i32)] = match apple {
+                     Some("minecraft:pufferfish") => &[("poison", 1200, 1), ("hunger", 300, 2), ("nausea", 300, 0)],
+@@ -5644,8 +5647,8 @@
+                         let push = [p.velocity.x, p.velocity.z];
+                         // Create calls setRemainingFireTicks before damage, even
+                         // when that damage will be refused.
+-                        if baked && let Some(mob) = self.mobs.iter_mut().find(|m| m.id == id) {
+-                            mob.fire_ticks = 60;
++                        if let Some(fire_ticks) = cannon_fire && let Some(mob) = self.mobs.iter_mut().find(|m| m.id == id) {
++                            mob.fire_ticks = fire_ticks;
+                         }
+                         let hurt = self
+                             .mobs
+@@ -5732,8 +5735,8 @@
+                     Hit::Entity {
+                         who: Who::Player, ..
+                     } if damage > 0.0 => {
+-                        if baked && let Some(player) = self.player.as_mut() {
+-                            player.set_remaining_fire_ticks(60);
++                        if let Some(fire_ticks) = cannon_fire && let Some(player) = self.player.as_mut() {
++                            player.set_remaining_fire_ticks(fire_ticks);
+                         }
+                         let from = [p.previous.x, p.previous.y, p.previous.z];
+                         if self.mob_hits_player(damage, from, "minecraft:thrown") {

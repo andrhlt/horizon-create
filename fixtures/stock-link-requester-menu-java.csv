@@ -1,0 +1,5 @@
+tick,action,ghost_slots,carried_count,order,address,allow_partial
+2,initial,"minecraft:iron_ingot=1,minecraft:gold_ingot=1,_,_,_,_,_,_,_",0,"minecraft:iron_ingot=8,minecraft:gold_ingot=3",Smelting,false
+3,sample,"minecraft:copper_ingot=1,minecraft:gold_ingot=1,minecraft:copper_ingot=1,_,_,_,_,_,_",5,"minecraft:iron_ingot=8,minecraft:gold_ingot=3",Smelting,false
+4,close_slots,"minecraft:copper_ingot=1,_,minecraft:copper_ingot=1,_,_,_,_,_,_",0,"minecraft:copper_ingot=8,minecraft:copper_ingot=1",Smelting,false
+4,configure,"minecraft:copper_ingot=1,_,minecraft:copper_ingot=1,_,_,_,_,_,_",0,"minecraft:copper_ingot=12,minecraft:copper_ingot=2",Factory A,true

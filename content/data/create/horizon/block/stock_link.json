@@ -1,0 +1,84 @@
+{
+  "template": "minecraft:gold_block",
+  "item": true,
+  "properties": {
+    "map_color": 47,
+    "hardness": 3.0,
+    "explosion_resistance": 6.0,
+    "requires_tool": true,
+    "sounds": "minecraft:netherite_block",
+    "waterloggable": true,
+    "occludes": false
+  },
+  "state_properties": {
+    "face": {
+      "type": "enum",
+      "values": [
+        "floor",
+        "wall",
+        "ceiling"
+      ]
+    },
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "south",
+        "east",
+        "west"
+      ]
+    },
+    "powered": {
+      "type": "boolean"
+    },
+    "waterlogged": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "face": "floor",
+    "facing": "north",
+    "powered": "false",
+    "waterlogged": "false"
+  },
+  "shapes": {
+    "properties": [
+      "face",
+      "facing"
+    ],
+    "values": {
+      "floor,north": [[0.0625, 0.0, 0.0625, 0.9375, 0.3125, 0.9375]],
+      "floor,south": [[0.0625, 0.0, 0.0625, 0.9375, 0.3125, 0.9375]],
+      "floor,east": [[0.0625, 0.0, 0.0625, 0.9375, 0.3125, 0.9375]],
+      "floor,west": [[0.0625, 0.0, 0.0625, 0.9375, 0.3125, 0.9375]],
+      "wall,north": [[0.0625, 0.0625, 0.6875, 0.9375, 0.9375, 1.0]],
+      "wall,south": [[0.0625, 0.0625, 0.0, 0.9375, 0.9375, 0.3125]],
+      "wall,east": [[0.0, 0.0625, 0.0625, 0.3125, 0.9375, 0.9375]],
+      "wall,west": [[0.6875, 0.0625, 0.0625, 1.0, 0.9375, 0.9375]],
+      "ceiling,north": [[0.0625, 0.6875, 0.0625, 0.9375, 1.0, 0.9375]],
+      "ceiling,south": [[0.0625, 0.6875, 0.0625, 0.9375, 1.0, 0.9375]],
+      "ceiling,east": [[0.0625, 0.6875, 0.0625, 0.9375, 1.0, 0.9375]],
+      "ceiling,west": [[0.0625, 0.6875, 0.0625, 0.9375, 1.0, 0.9375]]
+    }
+  },
+  "collision_shapes": {
+    "properties": [
+      "face",
+      "facing"
+    ],
+    "values": {
+      "floor,north": [[0.0625, 0.0, 0.0625, 0.9375, 0.3125, 0.9375]],
+      "floor,south": [[0.0625, 0.0, 0.0625, 0.9375, 0.3125, 0.9375]],
+      "floor,east": [[0.0625, 0.0, 0.0625, 0.9375, 0.3125, 0.9375]],
+      "floor,west": [[0.0625, 0.0, 0.0625, 0.9375, 0.3125, 0.9375]],
+      "wall,north": [[0.0625, 0.0625, 0.6875, 0.9375, 0.9375, 1.0]],
+      "wall,south": [[0.0625, 0.0625, 0.0, 0.9375, 0.9375, 0.3125]],
+      "wall,east": [[0.0, 0.0625, 0.0625, 0.3125, 0.9375, 0.9375]],
+      "wall,west": [[0.6875, 0.0625, 0.0625, 1.0, 0.9375, 0.9375]],
+      "ceiling,north": [[0.0625, 0.6875, 0.0625, 0.9375, 1.0, 0.9375]],
+      "ceiling,south": [[0.0625, 0.6875, 0.0625, 0.9375, 1.0, 0.9375]],
+      "ceiling,east": [[0.0625, 0.6875, 0.0625, 0.9375, 1.0, 0.9375]],
+      "ceiling,west": [[0.0625, 0.6875, 0.0625, 0.9375, 1.0, 0.9375]]
+    }
+  }
+}

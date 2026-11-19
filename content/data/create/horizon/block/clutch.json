@@ -1,0 +1,21 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "state_properties": {
+    "axis": {
+      "type": "enum",
+      "values": [
+        "x",
+        "y",
+        "z"
+      ]
+    },
+    "powered": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "axis": "y",
+    "powered": "false"
+  }
+}

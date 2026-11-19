@@ -1,0 +1,194 @@
+{
+  "create_commit": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "recipes": [
+    {
+      "type": "minecraft:crafting_shaped",
+      "category": "misc",
+      "key": {
+        "C": {
+          "tag": "c:plates/brass"
+        },
+        "R": {
+          "item": "minecraft:amethyst_shard"
+        },
+        "S": {
+          "tag": "c:stones"
+        },
+        "T": {
+          "item": "minecraft:redstone_torch"
+        }
+      },
+      "pattern": [
+        "RCT",
+        "SSS"
+      ],
+      "result": {
+        "count": 1,
+        "id": "create:pulse_timer"
+      }
+    },
+    {
+      "type": "minecraft:crafting_shaped",
+      "category": "misc",
+      "key": {
+        "C": {
+          "tag": "c:plates/brass"
+        },
+        "R": {
+          "tag": "c:dusts/redstone"
+        },
+        "S": {
+          "tag": "c:stones"
+        },
+        "T": {
+          "item": "minecraft:redstone_torch"
+        }
+      },
+      "pattern": [
+        "  T",
+        "RCT",
+        "SSS"
+      ],
+      "result": {
+        "count": 1,
+        "id": "create:pulse_extender"
+      }
+    },
+    {
+      "type": "minecraft:crafting_shaped",
+      "category": "misc",
+      "key": {
+        "C": {
+          "tag": "c:plates/brass"
+        },
+        "R": {
+          "tag": "c:dusts/redstone"
+        },
+        "S": {
+          "tag": "c:stones"
+        },
+        "T": {
+          "item": "minecraft:redstone_torch"
+        }
+      },
+      "pattern": [
+        "RCT",
+        "SSS"
+      ],
+      "result": {
+        "count": 1,
+        "id": "create:pulse_repeater"
+      }
+    }
+  ],
+  "actions": [
+    {
+      "item": "create:pulse_timer",
+      "action": "place",
+      "facing": "south",
+      "powering": false,
+      "inverted": false,
+      "front_power": 0,
+      "side_power": 0
+    },
+    {
+      "item": "create:pulse_timer",
+      "action": "sneak-empty",
+      "facing": "south",
+      "powering": false,
+      "inverted": false,
+      "front_power": 0,
+      "side_power": 0
+    },
+    {
+      "item": "create:pulse_timer",
+      "action": "empty-hand",
+      "facing": "south",
+      "powering": false,
+      "inverted": true,
+      "front_power": 15,
+      "side_power": 0
+    },
+    {
+      "item": "create:pulse_timer",
+      "action": "stick",
+      "facing": "south",
+      "powering": false,
+      "inverted": false,
+      "front_power": 0,
+      "side_power": 0
+    },
+    {
+      "item": "create:pulse_extender",
+      "action": "place",
+      "facing": "south",
+      "powering": false,
+      "inverted": false,
+      "front_power": 0,
+      "side_power": 0
+    },
+    {
+      "item": "create:pulse_extender",
+      "action": "sneak-empty",
+      "facing": "south",
+      "powering": false,
+      "inverted": false,
+      "front_power": 0,
+      "side_power": 0
+    },
+    {
+      "item": "create:pulse_extender",
+      "action": "empty-hand",
+      "facing": "south",
+      "powering": false,
+      "inverted": true,
+      "front_power": 15,
+      "side_power": 0
+    },
+    {
+      "item": "create:pulse_extender",
+      "action": "stick",
+      "facing": "south",
+      "powering": false,
+      "inverted": false,
+      "front_power": 0,
+      "side_power": 0
+    },
+    {
+      "item": "create:pulse_repeater",
+      "action": "place",
+      "facing": "south",
+      "powering": false,
+      "inverted": false,
+      "front_power": 0,
+      "side_power": 0
+    },
+    {
+      "item": "create:pulse_repeater",
+      "action": "sneak-empty",
+      "facing": "south",
+      "powering": false,
+      "inverted": false,
+      "front_power": 0,
+      "side_power": 0
+    },
+    {
+      "item": "create:pulse_repeater",
+      "action": "empty-hand",
+      "facing": "south",
+      "powering": false,
+      "inverted": true,
+      "front_power": 15,
+      "side_power": 0
+    },
+    {
+      "item": "create:pulse_repeater",
+      "action": "stick",
+      "facing": "south",
+      "powering": false,
+      "inverted": false,
+      "front_power": 0,
+      "side_power": 0
+    }
+  ]
+}

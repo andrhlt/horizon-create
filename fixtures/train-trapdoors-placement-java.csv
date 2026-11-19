@@ -1,0 +1,13 @@
+id,placement,result,item_count,facing,half,open,powered,waterlogged
+create:train_trapdoor,floor,CONSUME,0,south,bottom,false,false,false
+create:train_trapdoor,ceiling,CONSUME,0,south,top,false,false,false
+create:train_trapdoor,side_low,CONSUME,0,east,bottom,false,false,false
+create:train_trapdoor,side_high,CONSUME,0,east,top,false,false,false
+create:train_trapdoor,wet_floor,CONSUME,0,south,bottom,false,false,true
+create:train_trapdoor,powered_floor,CONSUME,0,south,bottom,true,true,false
+create:framed_glass_trapdoor,floor,CONSUME,0,south,bottom,false,false,false
+create:framed_glass_trapdoor,ceiling,CONSUME,0,south,top,false,false,false
+create:framed_glass_trapdoor,side_low,CONSUME,0,east,bottom,false,false,false
+create:framed_glass_trapdoor,side_high,CONSUME,0,east,top,false,false,false
+create:framed_glass_trapdoor,wet_floor,CONSUME,0,south,bottom,false,false,true
+create:framed_glass_trapdoor,powered_floor,CONSUME,0,south,bottom,true,true,false

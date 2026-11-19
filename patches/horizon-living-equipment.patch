@@ -1,0 +1,190 @@
+--- a/crates/horizon-client/src/mobs.rs
++++ b/crates/horizon-client/src/mobs.rs
+@@ -2537,7 +2537,7 @@
+     /// Entity.isOnFire: fire-immune mobs never count as burning, even on the
+     /// tick a sun or fire check set their timer before `base_tick` clears it.
+     pub fn is_on_fire(&self) -> bool {
+-        !self.kind.flags.fire_immune && self.fire_ticks > 0
++        !self.fire_immune() && self.fire_ticks > 0
+     }
+     pub fn ignite_for_ticks(&mut self, ticks: i32) {
+         self.fire_ticks = self
+@@ -3033,6 +3033,15 @@
+     (EntityRandom::own(random), uuid)
+ }
+ impl Mob {
++    pub fn fire_immune(&self) -> bool {
++        let mut immune = self.kind.flags.fire_immune;
++        self.native_fire_immunity(&mut immune);
++        immune
++    }
++
++    #[allow(unused_variables)]
++    fn native_fire_immunity(&self, immune: &mut bool) {}
++
+     pub fn new(id: u32, kind: Arc<MobType>, position: Vec3, yaw: f32) -> Self {
+         Self::with_random(id, kind, position, yaw, entity_random(id, position))
+     }
+@@ -3419,7 +3428,7 @@
+         let reflected = &*self.kind.id == "minecraft:ghast"
+             && source.kind == DamageKind::Fireball
+             && source.attacker == Some(Who::Player);
+-        if source.is_fire() && (self.kind.flags.fire_immune) && !reflected {
++        if source.is_fire() && (self.fire_immune()) && !reflected {
+             return false;
+         }
+         let accepts = match player_uuid {
+--- a/crates/horizon-client/src/mobs/ai.rs
++++ b/crates/horizon-client/src/mobs/ai.rs
+@@ -51,7 +51,7 @@
+     w: &MobWorld,
+     events: &mut Vec<MobEvent>,
+ ) {
+-    if fire > 0.0 && !m.kind.flags.fire_immune {
++    if fire > 0.0 && !m.fire_immune() {
+         let multiplier = m.burning_time();
+         m.fire_ticks = crate::motion::environment::ignite_contact(
+             m.fire_ticks,
+@@ -61,7 +61,7 @@
+         );
+         hurt(m, w, events, fire, Damage::of(DamageKind::InFire));
+     }
+-    if lava && !m.kind.flags.fire_immune {
++    if lava && !m.fire_immune() {
+         m.ignite_for_ticks(300);
+         hurt(m, w, events, 4.0, Damage::of(DamageKind::Lava));
+     }
+@@ -1223,6 +1223,9 @@
+ 
+ /// Entity.baseTick + LivingEntity.baseTick + Mob.baseTick.
+ /// Returns the burning state immediately before block-contact ignition.
++#[allow(unused_variables)]
++fn native_mob_breathing(m: &mut Mob, w: &MobWorld) {}
++
+ fn base_tick(m: &mut Mob, w: &MobWorld, events: &mut Vec<MobEvent>) -> bool {
+     // LivingEntity.baseTick refreshes a loaded sleeper before Entity.baseTick.
+     if m.first_tick {
+@@ -1257,7 +1260,7 @@
+     }
+     // Entity.baseTick counts burn damage and the timer before a wet mob is put out.
+     if m.fire_ticks > 0 {
+-        if m.kind.flags.fire_immune {
++        if m.fire_immune() {
+             m.fire_ticks = 0;
+         } else {
+             if m.fire_ticks % 20 == 0 && !m.fluids.in_lava {
+@@ -1310,6 +1313,7 @@
+         {
+             hurt(m, w, events, 1.0, Damage::of(DamageKind::InWall));
+         }
++        native_mob_breathing(m, w);
+         air::tick_air(m, w, events);
+         freeze_tick(m, w, events);
+     }
+--- a/crates/horizon-client/src/mobs/control.rs
++++ b/crates/horizon-client/src/mobs/control.rs
+@@ -482,12 +482,19 @@
+ }
+ 
+ impl Mob {
++    #[allow(unused_variables)]
++    fn native_reset_unlit_fire(&self, reset: &mut bool) {}
++
+     /// The end of `Entity.applyEffectsFromBlocks`: an entity that is not burning
+     /// and was not just ignited gets `setRemainingFireTicks(-getFireImmuneTicks())`.
+     /// `getFireImmuneTicks` is 0 outside `Player`, so a negative `Fire` ends at 0;
+     /// a fresh ignition is positive and an extinguish already leaves 0.
+     pub(super) fn reset_unlit_fire(&mut self) {
+-        self.fire_ticks = self.fire_ticks.max(0);
++        let mut reset = true;
++        self.native_reset_unlit_fire(&mut reset);
++        if reset {
++            self.fire_ticks = self.fire_ticks.max(0);
++        }
+     }
+ }
+ 
+--- a/crates/horizon-client/src/mobs/drops.rs
++++ b/crates/horizon-client/src/mobs/drops.rs
+@@ -386,7 +386,7 @@
+     use Species as S;
+     let s = m.species();
+     let mut e = LootEntity::new(&m.kind.id);
+-    e.on_fire = m.fire_ticks > 0 && !m.kind.flags.fire_immune;
++    e.on_fire = m.fire_ticks > 0 && !m.fire_immune();
+     e.baby = m.is_baby();
+     e.vehicle = vehicle.map(Box::new);
+     if matches!(s, S::Slime | S::MagmaCube | S::SulfurCube) {
+--- a/crates/horizon-client/src/mobs/goals.rs
++++ b/crates/horizon-client/src/mobs/goals.rs
+@@ -902,7 +902,7 @@
+ pub fn should_panic(m: &Mob) -> bool {
+     m.last_damage
+         .is_some_and(|(d, t)| d.causes_panic() && i64::from(m.age) - t <= 40)
+-        || m.fire_ticks > 0 && !m.kind.flags.fire_immune
++        || m.fire_ticks > 0 && !m.fire_immune()
+ }
+ impl Goal for Panic {
+     goal_clone!();
+@@ -913,7 +913,7 @@
+         let wanted = if self.environmental {
+             m.last_damage.is_some_and(|(d, t)| {
+                 super::armadillo::environmental(d.kind) && i64::from(m.age) - t <= 40
+-            }) || m.fire_ticks > 0 && !m.kind.flags.fire_immune
++            }) || m.fire_ticks > 0 && !m.fire_immune()
+         } else {
+             should_panic(m)
+         };
+--- a/crates/horizon-client/src/mobs/living.rs
++++ b/crates/horizon-client/src/mobs/living.rs
+@@ -1777,6 +1777,9 @@
+             movement.z * f64::from(f),
+         );
+     }
++    #[allow(unused_variables)]
++    fn native_lava_movement(&mut self, w: &MobWorld) {}
++
+     fn travel_in_fluid(&mut self, w: &MobWorld, input: Vec3, events: &mut Vec<MobEvent>) {
+         let falling = self.velocity.y <= 0.0;
+         let old_y = self.position.y;
+@@ -1815,6 +1818,7 @@
+         } else {
+             self.move_relative(0.02, input);
+             self.do_move(w, events);
++            self.native_lava_movement(w);
+             if self.fluids.lava <= self.fluid_jump_threshold() {
+                 self.velocity = Vec3::new(
+                     self.velocity.x * 0.5,
+--- a/crates/horizon-client/src/mobs/panda.rs
++++ b/crates/horizon-client/src/mobs/panda.rs
+@@ -710,7 +710,7 @@
+ }
+ /// `DamageTypeTags.PANIC_ENVIRONMENTAL_CAUSES` (`armadillo::environmental`), or burning.
+ fn environmental(m: &Mob) -> bool {
+-    m.fire_ticks > 0 && !m.kind.flags.fire_immune
++    m.fire_ticks > 0 && !m.fire_immune()
+         || m.last_damage.is_some_and(|(d, t)| {
+             super::armadillo::environmental(d.kind) && i64::from(m.age) - t <= 40
+         })
+--- a/crates/horizon-client/src/mobs/polar_bear.rs
++++ b/crates/horizon-client/src/mobs/polar_bear.rs
+@@ -91,7 +91,7 @@
+ /// `DamageTypeTags.PANIC_ENVIRONMENTAL_CAUSES` (`armadillo::environmental`), or
+ /// burning.
+ fn environmental_panic(m: &Mob) -> bool {
+-    m.fire_ticks > 0 && !m.kind.flags.fire_immune
++    m.fire_ticks > 0 && !m.fire_immune()
+         || m.last_damage.is_some_and(|(d, t)| {
+             super::armadillo::environmental(d.kind) && i64::from(m.age) - t <= 40
+         })
+--- a/crates/horizon-client/src/game/native_entity_state.rs
++++ b/crates/horizon-client/src/game/native_entity_state.rs
+@@ -114,7 +114,7 @@
+     pub(super) fn native_entity_fire_immune(&self, entity: EntityRef) -> Option<bool> {
+         match self.native_entity_body(entity)? {
+             Body::Player(_) => Some(false),
+-            Body::Mob(m) => Some(horizon_client::mobs::spawn_rules::fire_immune(m.species())),
++            Body::Mob(m) => Some(m.fire_immune()),
+             Body::Other(_) => None,
+         }
+     }

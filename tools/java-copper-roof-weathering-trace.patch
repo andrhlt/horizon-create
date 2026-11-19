@@ -1,0 +1,131 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..169be94 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> java.util.Set.of("TestMisc.copperRoofOxidation", "TestMisc.copperRoofActions").contains(test.testName()))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..87450af 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,112 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void copperRoofInventory(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(1, 2, 1)).above(12);
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		for (var set : java.util.List.of(com.simibubi.create.AllBlocks.COPPER_SHINGLES,
++			com.simibubi.create.AllBlocks.COPPER_TILES)) {
++			for (var age : net.minecraft.world.level.block.WeatheringCopper.WeatherState.values()) {
++				for (boolean waxed : new boolean[] {false, true}) {
++					for (var shape : com.simibubi.create.foundation.block.CopperBlockSet.DEFAULT_VARIANTS) {
++						var state = set.get(shape, age, waxed).get().defaultBlockState();
++						var block = state.getBlock();
++						var tool = Items.STONE_PICKAXE.getDefaultInstance();
++						var drops = net.minecraft.world.level.block.Block.getDrops(state, level, pos, null, player, tool);
++						helper.assertTrue(drops.size() == 1, "Expected a single roof block from " + state);
++						var drop = drops.getFirst();
++						var properties = state.getValues().entrySet().stream()
++							.map(entry -> entry.getKey().getName() + "=" + entry.getValue().toString().toLowerCase(java.util.Locale.ROOT))
++							.sorted().collect(java.util.stream.Collectors.joining("|"));
++						System.out.printf(java.util.Locale.ROOT,
++							"CREATE_COPPER_ROOF %s,%s,%s,%.2f,%.2f,%b,%s,%d%n",
++							registry.getKey(block), age, properties, state.getDestroySpeed(level, pos),
++							block.getExplosionResistance(), state.requiresCorrectToolForDrops(),
++							items.getKey(drop.getItem()), drop.getCount());
++					}
++				}
++			}
++		}
++		helper.succeed();
++	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void copperRoofActions(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(1, 2, 1)).above(12);
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		level.setBlockAndUpdate(pos.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++		player.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 2.5);
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(pos), net.minecraft.core.Direction.SOUTH, pos, false);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		java.util.function.Supplier<net.minecraft.world.item.context.UseOnContext> context =
++			() -> new net.minecraft.world.item.context.UseOnContext(player, hand, hit);
++		var waterlogged = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		for (var set : java.util.List.of(com.simibubi.create.AllBlocks.COPPER_SHINGLES,
++			com.simibubi.create.AllBlocks.COPPER_TILES)) {
++			for (var age : net.minecraft.world.level.block.WeatheringCopper.WeatherState.values()) {
++				for (var shape : com.simibubi.create.foundation.block.CopperBlockSet.DEFAULT_VARIANTS) {
++					var state = set.get(shape, age, false).get().defaultBlockState();
++					if (state.hasProperty(waterlogged)) state = state.setValue(waterlogged, true);
++					if (state.hasProperty(facing)) state = state.setValue(facing, net.minecraft.core.Direction.WEST);
++					level.setBlockAndUpdate(pos, state);
++					player.setItemInHand(hand, new ItemStack(Items.HONEYCOMB, 2));
++					var wax = Items.HONEYCOMB.useOn(context.get());
++					var waxed = level.getBlockState(pos);
++					var honeycomb = player.getItemInHand(hand).getCount();
++					player.setItemInHand(hand, Items.IRON_AXE.getDefaultInstance());
++					var strip = Items.IRON_AXE.useOn(context.get());
++					var stripped = level.getBlockState(pos);
++					var afterStrip = player.getItemInHand(hand).getDamageValue();
++					var scratch = Items.IRON_AXE.useOn(context.get());
++					var scratched = level.getBlockState(pos);
++					var afterScratch = player.getItemInHand(hand).getDamageValue();
++					System.out.printf(java.util.Locale.ROOT,
++						"CREATE_COPPER_ACTION %s;%s;%s;%d;%s;%s;%d;%s;%s;%d%n",
++						state, wax, waxed, honeycomb, strip, stripped, afterStrip, scratch, scratched, afterScratch);
++				}
++			}
++		}
++		helper.succeed();
++	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void copperRoofOxidation(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(1, 2, 1)).above(12);
++		var random = net.minecraft.util.RandomSource.create(589234123149L);
++		var initial = net.minecraft.world.level.block.WeatheringCopper.WeatherState.UNAFFECTED;
++		var waterlogged = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var roof = com.simibubi.create.AllBlocks.COPPER_SHINGLES;
++		for (var shape : com.simibubi.create.foundation.block.CopperBlockSet.DEFAULT_VARIANTS) {
++			for (boolean waxed : new boolean[] { false, true }) {
++				var state = roof.get(shape, initial, waxed).get().defaultBlockState();
++				if (state.hasProperty(waterlogged)) state = state.setValue(waterlogged, true);
++				if (state.hasProperty(facing)) state = state.setValue(facing, net.minecraft.core.Direction.WEST);
++				level.setBlockAndUpdate(pos, state);
++				var phases = new java.util.ArrayList<String>();
++				phases.add(state.toString());
++				for (int i = 0; i < 4096; i++) {
++					if (state.isRandomlyTicking()) state.randomTick(level, pos, random);
++					var next = level.getBlockState(pos);
++					if (next != state) {
++						phases.add(next.toString());
++						state = next;
++					}
++				}
++				helper.assertTrue(phases.size() == (waxed ? 1 : 4), "Unexpected copper progression " + phases);
++				System.out.println("CREATE_COPPER_OXIDATION " + String.join(";", phases));
++			}
++		}
++		helper.succeed();
++	}
+ }

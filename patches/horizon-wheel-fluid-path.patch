@@ -1,0 +1,24 @@
+--- a/crates/horizon-world/src/level/fluids.rs
++++ b/crates/horizon-world/src/level/fluids.rs
+@@ -491,7 +491,9 @@
+             let test_pos = rel(pos, direction);
+             let test_state = self.context_state(context, test_pos);
+             let test_fluid = self.b.fluid(test_state);
+-            if self.can_pass_through(kind, state, direction, test_state, test_fluid) {
++            if self.can_pass_through(kind, state, direction, test_state, test_fluid)
++                && !crate::create_wheel_fluid_path::blocks(&self.b.table, pos, direction, |at| self.state(at))
++            {
+                 if self.context_is_hole(kind, context, test_pos) {
+                     return pass;
+                 }
+@@ -524,7 +526,9 @@
+             let test_pos = rel(pos, direction);
+             let test_state = self.state(test_pos);
+             let test_fluid = self.b.fluid(test_state);
+-            if !self.can_maybe_pass_through(kind, state, direction, test_state, test_fluid) {
++            if !self.can_maybe_pass_through(kind, state, direction, test_state, test_fluid)
++                || crate::create_wheel_fluid_path::blocks(&self.b.table, pos, direction, |at| self.state(at))
++            {
+                 continue;
+             }
+             let new_fluid = self.new_liquid(kind, test_pos, test_state);

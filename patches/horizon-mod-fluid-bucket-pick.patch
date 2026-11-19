@@ -1,0 +1,49 @@
+diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -7755,12 +7755,15 @@
+                 let state = self.world.block(b[0], b[1], b[2]);
+                 let f = self.res.facts().get(state);
+                 let face = [last[0] - b[0], last[1] - b[1], last[2] - b[2]];
+-                if f.fluid != Fluid::None
+-                    && f.fluid_level == 8
+-                    && !f.fluid_falling
+-                    && !f.waterlogged
+-                    && f.render_shape != horizon_client::blocks::RenderShape::Model
+-                {
++                let mod_fluid = horizon_world::fluid::FluidKind::of_liquid_block(&f.name);
++                let source = if mod_fluid.is_some() {
++                    self.res.behaviours().fluid(state).is_source()
++                } else {
++                    f.fluid != Fluid::None && f.fluid_level == 8 && !f.fluid_falling
++                        && !f.waterlogged
++                        && f.render_shape != horizon_client::blocks::RenderShape::Model
++                };
++                if source {
+                     if !first {
+                         return Some(Hit {
+                             pos: b,
+@@ -7769,7 +7772,11 @@
+                         });
+                     }
+                     let above = self.world.block(b[0], b[1] + 1, b[2]);
+-                    let same_above = self.res.facts().get(above).fluid == f.fluid;
++                    let same_above = if let Some(kind) = mod_fluid {
++                        self.res.behaviours().fluid(above).kind().same_family(kind)
++                    } else {
++                        self.res.facts().get(above).fluid == f.fluid
++                    };
+                     if let Some((face, point)) =
+                         clip_start_source(origin, dir, self.reach(), b, same_above)
+                     {
+@@ -7779,7 +7786,9 @@
+                             point,
+                         });
+                     }
+-                } else if !first && !self.res.facts().is_air(state) && f.fluid == Fluid::None {
++                } else if !first && !self.res.facts().is_air(state)
++                    && f.fluid == Fluid::None && mod_fluid.is_none()
++                {
+                     // `ClipContext.Block.OUTLINE`: the ray stops at the block's
+                     // outline, not its cell; it passes through the empty part
+                     // of a torch, a fence or a flower to the water behind.

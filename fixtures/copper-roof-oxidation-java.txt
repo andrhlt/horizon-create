@@ -1,0 +1,6 @@
+create:copper_shingles;create:exposed_copper_shingles;create:weathered_copper_shingles;create:oxidized_copper_shingles
+create:waxed_copper_shingles
+create:copper_shingle_slab[type=bottom,waterlogged=true];create:exposed_copper_shingle_slab[type=bottom,waterlogged=true];create:weathered_copper_shingle_slab[type=bottom,waterlogged=true];create:oxidized_copper_shingle_slab[type=bottom,waterlogged=true]
+create:waxed_copper_shingle_slab[type=bottom,waterlogged=true]
+create:copper_shingle_stairs[facing=west,half=bottom,shape=straight,waterlogged=true];create:exposed_copper_shingle_stairs[facing=west,half=bottom,shape=straight,waterlogged=true];create:weathered_copper_shingle_stairs[facing=west,half=bottom,shape=straight,waterlogged=true];create:oxidized_copper_shingle_stairs[facing=west,half=bottom,shape=straight,waterlogged=true]
+create:waxed_copper_shingle_stairs[facing=west,half=bottom,shape=straight,waterlogged=true]

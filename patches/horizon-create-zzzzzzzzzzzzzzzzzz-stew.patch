@@ -1,0 +1,48 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -46,6 +46,7 @@
+         "minecraft:cake" => (1.1, 15, 8.0, 0.1),
+         "minecraft:pufferfish" => (1.1, 10, 4.0, 0.4),
+         "create:blaze_cake" => (1.1, 20, 15.0, 0.3),
++        "minecraft:suspicious_stew" => (0.8, 40, 3.0, 0.2),
+         "minecraft:cod" | "minecraft:cooked_cod" | "minecraft:salmon" | "minecraft:cooked_salmon" | "minecraft:tropical_fish" => (1.3, 10, 4.0, 0.6),
+         "minecraft:pumpkin" => (0.95, 15, 6.0, 2.0),
+         "create:honeyed_apple" => (1.35, 15, 6.0, 0.1),
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5640,6 +5640,9 @@
+                     _ => &[],
+                 };
+                 let mut sticky_attached = false;
++                let mut stew_drop = cannon_ammo.is_some()
++                    && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:suspicious_stew")
++                    && matches!(hit, Hit::Block { .. });
+                 match hit {
+                     Hit::Entity {
+                         who: Who::Mob(id), ..
+@@ -5656,6 +5659,7 @@
+                             .find(|m| m.id == id)
+                             .is_some_and(|m| m.damage_projectile(damage, source, aim, push));
+                         if hurt {
++                            stew_drop |= cannon_ammo.is_some() && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:suspicious_stew");
+                             if let Some(ammo) = cannon_ammo
+                                 && let Some(m) = self.mobs.iter_mut().find(|m| m.id == id)
+                             {
+@@ -5740,6 +5744,7 @@
+                         }
+                         let from = [p.previous.x, p.previous.y, p.previous.z];
+                         if self.mob_hits_player(damage, from, "minecraft:thrown") {
++                            stew_drop |= cannon_ammo.is_some() && p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:suspicious_stew");
+                             if let Some((effect, duration, amplifier)) = cannon_effect {
+                                 self.give_player_effect(effect, duration, amplifier);
+                             }
+@@ -5796,6 +5801,9 @@
+                         }
+                     }
+                     _ => {}
++                }
++                if stew_drop {
++                    self.spawn_item_own(ItemStack::new("minecraft:bowl", 1), [p.position.x, p.position.y, p.position.z], 10);
+                 }
+                 if !sticky_attached {
+                     self.thrown_break_event(p.id, atp);

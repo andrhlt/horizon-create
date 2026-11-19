@@ -1,0 +1,83 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestItems.depotDisplay"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+@@ -329,34 +329,41 @@
+ 		helper.succeedWhen(() -> helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, true));
+ 	}
+ 
+-	@GameTest(template = "depot_display", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	@GameTest(template = "depot_display", timeoutTicks = 130)
+ 	public static void depotDisplay(CreateGameTestHelper helper) {
+-		BlockPos displayPos = new BlockPos(5, 3, 1);
+-		List<DepotBlockEntity> depots = Stream.of(
+-				new BlockPos(2, 2, 1),
+-				new BlockPos(1, 2, 1)
+-		).map(pos -> helper.getBlockEntity(AllBlockEntityTypes.DEPOT.get(), pos)).toList();
+-		List<BlockPos> levers = List.of(
+-				new BlockPos(2, 5, 0),
+-				new BlockPos(1, 5, 0)
+-		);
+-		levers.forEach(helper::pullLever);
+-		FlapDisplayBlockEntity display = helper.getBlockEntity(AllBlockEntityTypes.FLAP_DISPLAY.get(), displayPos).getController();
+-		helper.succeedWhen(() -> {
+-			for (int i = 0; i < 2; i++) {
+-				FlapDisplayLayout line = display.getLines().get(i);
+-                MutableComponent textComponent = Component.empty();
+-				line.getSections().stream().map(FlapDisplaySection::getText).forEach(textComponent::append);
+-				String text = textComponent.getString().toLowerCase(Locale.ROOT).trim();
+-
+-				DepotBlockEntity depot = depots.get(i);
+-				ItemStack item = depot.getHeldItem();
+-				String name = BuiltInRegistries.ITEM.getKey(item.getItem()).getPath();
+-
+-				if (!name.equals(text))
+-					helper.fail("Text mismatch: wanted [" + name + "], got: " + text);
+-			}
+-		});
++		var depots = List.of(new BlockPos(2, 2, 1), new BlockPos(1, 2, 1)).stream()
++			.map(pos -> helper.getBlockEntity(AllBlockEntityTypes.DEPOT.get(), pos)).toList();
++		List.of(new BlockPos(2, 5, 0), new BlockPos(1, 5, 0)).forEach(helper::pullLever);
++		var firstPart = helper.getBlockEntity(AllBlockEntityTypes.FLAP_DISPLAY.get(), new BlockPos(4, 3, 1));
++		var lastPart = helper.getBlockEntity(AllBlockEntityTypes.FLAP_DISPLAY.get(), new BlockPos(5, 3, 1));
++		var display = lastPart.getController();
++		for (int tick = 0; tick <= 120; tick++) {
++			int t = tick;
++			Runnable sample = () -> {
++				var trace = new java.util.StringJoiner(" ").add("CREATE_DEPOT_DISPLAY").add(Integer.toString(t));
++				for (var depot : depots) {
++					var item = depot.getHeldItem();
++					trace.add(item.isEmpty() ? "-" : BuiltInRegistries.ITEM.getKey(item.getItem()).getPath());
++				}
++				for (int i = 0; i < 2; i++) {
++					var text = Component.empty();
++					display.getLines().get(i).getSections().stream().map(FlapDisplaySection::getText)
++						.filter(java.util.Objects::nonNull).forEach(text::append);
++					String value = text.getString().toLowerCase(Locale.ROOT).trim();
++					trace.add(value.isEmpty() ? "-" : value.replace(' ', '_'));
++				}
++				trace.add(Float.toString(firstPart.getSpeed())).add(Float.toString(lastPart.getSpeed()));
++				System.out.println(trace);
++				if (t == 120) {
++					helper.assertTrue(trace.toString().contains("dirt stone dirt stone"), "Board must display both depot items");
++					helper.succeed();
++				}
++			};
++			if (t == 0)
++				sample.run();
++			else
++				helper.runAfterDelay(t, sample);
++		}
+ 	}
+ 
+ 	@GameTest(template = "threshold_switch")

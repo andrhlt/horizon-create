@@ -1,0 +1,2 @@
+hardness,resistance,map_color,requires_tool,conductor,place_sound,facing,powered,linked,min_x,min_y,min_z,max_x,max_y,max_z
+3.000000,6.000000,47,true,false,minecraft:block.netherite_block.place,north,false,false,0.000000,0.000000,0.000000,1.000000,1.000000,1.000000

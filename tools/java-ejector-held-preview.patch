@@ -1,0 +1,103 @@
+diff --git a/src/main/java/com/simibubi/create/content/logistics/depot/EjectorTargetHandler.java b/src/main/java/com/simibubi/create/content/logistics/depot/EjectorTargetHandler.java
+--- a/src/main/java/com/simibubi/create/content/logistics/depot/EjectorTargetHandler.java
++++ b/src/main/java/com/simibubi/create/content/logistics/depot/EjectorTargetHandler.java
+@@ -217,10 +217,17 @@
+ 			.colored(intColor)
+ 			.lineWidth(1 / 16f);
+ 
++		if ((wrench && Boolean.getBoolean("parity.ejector.wrench")) || Boolean.getBoolean("parity.ejector.held_preview"))
++			System.out.printf(java.util.Locale.ROOT, "JAVA_EJECTOR_ARC %d,%d,%d,%d,%d,%d,%d,%06x,%.9f,%.9f%n",
++				pos.getX(), pos.getY(), pos.getZ(), currentSelection.getX(), currentSelection.getY(), currentSelection.getZ(),
++				segments, intColor, AnimationTickHolder.getRenderTime(), tickOffset);
+ 		for (int i = 0; i < segments; i++) {
+ 			double ticks = ((AnimationTickHolder.getRenderTime() / 3) % tickOffset) + i * tickOffset;
+ 			Vec3 vec = launcher.getGlobalPos(ticks, d, pos)
+ 				.add(xDiff - validX, 0, zDiff - validZ);
++			if ((wrench && Boolean.getBoolean("parity.ejector.wrench")) || Boolean.getBoolean("parity.ejector.held_preview"))
++				System.out.printf(java.util.Locale.ROOT, "JAVA_EJECTOR_DUST %d,%d,%d,%d,%.9f,%.9f,%.9f,%.9f%n",
++					pos.getX(), pos.getY(), pos.getZ(), i, ticks, vec.x, vec.y, vec.z);
+ 			world.addParticle(data, vec.x, vec.y, vec.z, 0, 0, 0);
+ 		}
+ 	}
+@@ -262,6 +269,10 @@
+ 		BlockState state = world.getBlockState(pos);
+ 		VoxelShape shape = state.getShape(world, pos);
+ 		AABB boundingBox = shape.isEmpty() ? new AABB(BlockPos.ZERO) : shape.bounds();
++		if (Boolean.getBoolean("parity.ejector.wrench") || Boolean.getBoolean("parity.ejector.held_preview"))
++			System.out.printf(java.util.Locale.ROOT, "JAVA_EJECTOR_OUTLINE %d,%d,%d,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,ffcb74,0.06250%n",
++				pos.getX(), pos.getY(), pos.getZ(), boundingBox.minX, boundingBox.minY, boundingBox.minZ,
++				boundingBox.maxX, boundingBox.maxY, boundingBox.maxZ);
+ 		Outliner.getInstance().showAABB("target", boundingBox.move(pos))
+ 			.colored(0xffcb74)
+ 			.lineWidth(1 / 16f);
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaEjectorHeldPreviewProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaEjectorHeldPreviewProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaEjectorHeldPreviewProbe.java
+@@ -0,0 +1,66 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.logistics.depot.EjectorTargetHandler;
++import net.minecraft.client.Minecraft;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.phys.BlockHitResult;
++import net.minecraft.world.phys.Vec3;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaEjectorHeldPreviewProbe {
++    private static final BlockPos TARGET = new BlockPos(9, 104, -11);
++    private static final BlockPos[] SUPPORTS = {
++        new BlockPos(5, 103, -11), new BlockPos(5, 103, -13),
++        new BlockPos(7, 103, -13), TARGET,
++    };
++    private static final String[] NAMES = {"aligned", "diagonal", "tie", "vertical"};
++    private static boolean recorded;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) {
++        if (!Boolean.getBoolean("parity.ejector.held_preview") || recorded)
++            return;
++        var game = Minecraft.getInstance();
++        var player = game.player;
++        var level = game.level;
++        if (player == null || level == null || !AllBlocks.WEIGHTED_EJECTOR.isIn(player.getMainHandItem())
++                || !level.getBlockState(TARGET).is(Blocks.SMOOTH_STONE))
++            return;
++        var priorHit = game.hitResult;
++        var shift = player.input.shiftKeyDown;
++        EjectorTargetHandler.tick();
++        try {
++            player.input.shiftKeyDown = true;
++            var select = new PlayerInteractEvent.RightClickBlock(player, InteractionHand.MAIN_HAND, TARGET, hit(TARGET));
++            EjectorTargetHandler.rightClickingBlocksSelectsThem(select);
++            if (!select.isCanceled())
++                throw new IllegalStateException("Original held target wasn't selected");
++            player.input.shiftKeyDown = false;
++            for (int i = 0; i < SUPPORTS.length; i++) {
++                game.hitResult = hit(SUPPORTS[i]);
++                var candidate = SUPPORTS[i].above();
++                System.out.printf("JAVA_HELD_EJECTOR_CASE %s,%d,%d,%d%n", NAMES[i],
++                    candidate.getX(), candidate.getY(), candidate.getZ());
++                EjectorTargetHandler.tick();
++            }
++            System.out.println("JAVA_HELD_EJECTOR_COMPLETE");
++        } finally {
++            player.input.shiftKeyDown = shift;
++            game.hitResult = priorHit;
++            recorded = true;
++        }
++    }
++
++    private static BlockHitResult hit(BlockPos pos) {
++        return new BlockHitResult(Vec3.atCenterOf(pos).add(0, .5, 0), Direction.UP, pos, false);
++    }
++}

@@ -1,0 +1,104 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.roseQuartzLamp"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,76 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 75)
++	public static void roseQuartzLamp(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var left = helper.absolutePos(new BlockPos(2, 20, 2));
++		var lamp = com.simibubi.create.AllBlocks.ROSE_QUARTZ_LAMP.get();
++		var right = left.east(2);
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var wire = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWER;
++		var foundation = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		for (int x = -2; x < 5; x++)
++			level.setBlockAndUpdate(left.east(x).below(), foundation);
++		for (int x = 0; x < 3; x++)
++			level.setBlockAndUpdate(left.east(x), lamp.defaultBlockState());
++		var comparator = net.minecraft.world.level.block.Blocks.COMPARATOR.defaultBlockState();
++		level.setBlockAndUpdate(left.west(), comparator.setValue(facing, net.minecraft.core.Direction.EAST));
++		level.setBlockAndUpdate(right.east(), comparator.setValue(facing, net.minecraft.core.Direction.WEST));
++		var dust = net.minecraft.world.level.block.Blocks.REDSTONE_WIRE.defaultBlockState();
++		level.setBlockAndUpdate(left.west(2), dust);
++		level.setBlockAndUpdate(right.east(2), dust);
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var wrench = com.simibubi.create.AllItems.WRENCH.asStack();
++		player.setItemInHand(hand, wrench);
++		var extra = left.south(5);
++		var slab = extra.below();
++		level.setBlockAndUpdate(slab, foundation);
++		level.setBlockAndUpdate(extra.north(), net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState());
++		var click = new net.minecraft.world.phys.BlockHitResult(slab.getCenter().add(0, .5, 0),
++			net.minecraft.core.Direction.UP, slab, false);
++		var place = new net.minecraft.world.item.context.BlockPlaceContext(player, hand, lamp.asItem().getDefaultInstance(), click);
++		var placed = lamp.getStateForPlacement(place);
++		System.out.printf(java.util.Locale.ROOT, "CREATE_ROSE_MATERIAL %.1f,%.1f,%d,%b,%s,%b,%b,%b%n",
++			placed.getDestroySpeed(level, extra), lamp.getExplosionResistance(), placed.getMapColor(level, extra).id,
++			placed.requiresCorrectToolForDrops(),
++			net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.getKey(placed.getSoundType().getPlaceSound()),
++			placed.getValue(com.simibubi.create.content.redstone.RoseQuartzLampBlock.POWERED),
++			placed.getValue(com.simibubi.create.content.redstone.RoseQuartzLampBlock.POWERING),
++			placed.getValue(com.simibubi.create.content.redstone.RoseQuartzLampBlock.ACTIVATE));
++		for (int tick = 0; tick < 39; tick++) {
++			int sample = tick;
++			helper.runAtTickTime(tick + 1, () -> {
++				int lane = switch (sample) { case 3, 8 -> 2; case 10, 16 -> 0; case 19, 24 -> 1; default -> -1; };
++				if (lane >= 0) {
++					var source = sample == 3 || sample == 10 || sample == 19
++						? net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK
++						: net.minecraft.world.level.block.Blocks.AIR;
++					level.setBlockAndUpdate(left.east(lane).north(), source.defaultBlockState());
++				}
++				if (sample == 28 || sample == 32) {
++					var at = sample == 28 ? left.east() : left;
++					var side = net.minecraft.core.Direction.SOUTH;
++					var hit = new net.minecraft.world.phys.BlockHitResult(at.getCenter().relative(side, .5), side, at, false);
++					wrench.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++				}
++				var lampStates = new java.util.ArrayList<String>();
++				for (int x = 0; x < 3; x++) {
++					var state = level.getBlockState(left.east(x));
++					var powered = com.simibubi.create.content.redstone.RoseQuartzLampBlock.POWERED;
++					var powering = com.simibubi.create.content.redstone.RoseQuartzLampBlock.POWERING;
++					var activate = com.simibubi.create.content.redstone.RoseQuartzLampBlock.ACTIVATE;
++					lampStates.add(String.format("%d%d%d:%d", state.getValue(powered) ? 1 : 0,
++						state.getValue(powering) ? 1 : 0, state.getValue(activate) ? 1 : 0, state.getLightEmission()));
++				}
++				System.out.printf(java.util.Locale.ROOT, "CREATE_ROSE_LAMP %d,%s,%d,%d%n", sample,
++					String.join(",", lampStates), level.getBlockState(left.west(2)).getValue(wire),
++					level.getBlockState(right.east(2)).getValue(wire));
++				if (sample == 38)
++					helper.succeed();
++			});
++		}
++	}
+ }

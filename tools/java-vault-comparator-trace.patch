@@ -1,0 +1,37 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..0f08560 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestItems.vaultComparatorOutput"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+index 71d028a..c0d35c8 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+@@ -399,6 +399,18 @@ public class TestItems {
+ 		helper.whenSecondsPassed(3, () -> helper.spawnItems(bigInput, Items.BREAD, 64 * 240));
+ 
+ 		helper.succeedWhen(() -> {
++			var level = helper.getLevel();
++			var access = level.registryAccess();
++			var nixies = List.of(smallNixie, medNixie, bigNixie);
++			var vaults = List.of(new BlockPos(1, 2, 1), new BlockPos(1, 3, 4), new BlockPos(1, 4, 8));
++			for (int lane = 0; lane < 3; lane++) {
++				var nixie = nixies.get(lane);
++				var comp = helper.getBlockEntity(nixie.west()).saveWithoutMetadata(access);
++				var tube = helper.getBlockEntity(nixie).saveWithoutMetadata(access);
++				System.out.printf("CREATE_VAULT %d %d %d %d %d %d%n", helper.getTick(), lane,
++					helper.getTotalItems(vaults.get(lane)), helper.itemStorageAt(vaults.get(lane)).getSlots(),
++					comp.getInt("OutputSignal"), tube.getInt("RedstoneStrength"));
++			}
+ 			helper.assertNixiePower(smallNixie, 7);
+ 			helper.assertNixiePower(medNixie, 7);
+ 			helper.assertNixiePower(bigNixie, 7);

@@ -1,0 +1,31 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -164,7 +164,27 @@
+                 actor.travel(net.minecraft.world.phys.Vec3.ZERO);
+             }
+         }
+-        helper.succeed();
++        level.setBlockAndUpdate(at, state);
++        var dropped = new net.minecraft.world.entity.item.ItemEntity(level,
++            at.getX() + .5, at.getY() + 3.25, at.getZ() + .5,
++            net.minecraft.world.item.Items.IRON_INGOT.getDefaultInstance());
++        dropped.setDeltaMovement(0, 0, 0);
++        dropped.setPickUpDelay(32767);
++        int phase = Math.floorMod(dropped.getId(), 4);
++        helper.runAtTickTime(1, () -> {
++            level.addFreshEntity(dropped);
++            System.out.printf(java.util.Locale.ROOT, "CREATE_SEAT_ITEM_FALL 0,%d,%.9f,%.9f,%b%n",
++                phase, dropped.getY() - at.getY(), dropped.getDeltaMovement().y, dropped.onGround());
++        });
++        for (int tick = 1; tick <= 29; tick++) {
++            int sample = tick;
++            helper.runAtTickTime(tick + 1, () -> {
++                System.out.printf(java.util.Locale.ROOT, "CREATE_SEAT_ITEM_FALL %d,%d,%.9f,%.9f,%b%n",
++                    sample, phase, dropped.getY() - at.getY(), dropped.getDeltaMovement().y, dropped.onGround());
++                if (sample == 29)
++                    helper.succeed();
++            });
++        }
+     }
+ 
+ }

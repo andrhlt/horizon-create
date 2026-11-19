@@ -1,0 +1,11 @@
+scenario,phase,axis,sticky_top,sticky_bottom,adjacent_sticky_top,range,payload
+0,configuration,x,false,false,false,8,-
+0,capture,-,-,-,-,-,0:0:0=create:linear_chassis|0:1:0=create:linear_chassis
+1,configuration,y,true,false,false,8,-
+1,capture,-,-,-,-,-,0:0:0=create:linear_chassis|0:0:1=create:linear_chassis|0:1:0=minecraft:stone|0:2:0=minecraft:stone|0:3:0=minecraft:stone|0:4:0=minecraft:stone|0:5:0=minecraft:stone|0:6:0=minecraft:stone|0:7:0=minecraft:stone|0:8:0=minecraft:stone
+2,configuration,z,false,true,false,8,-
+2,capture,-,-,-,-,-,0:0:-1=minecraft:dirt|0:0:-2=minecraft:smooth_stone|0:0:0=create:linear_chassis|0:1:0=create:linear_chassis
+3,configuration,x,true,true,false,8,-
+3,capture,-,-,-,-,-,-1:0:0=minecraft:dirt|-2:0:0=minecraft:smooth_stone|0:0:0=create:linear_chassis|0:1:0=create:linear_chassis|1:0:0=minecraft:stone
+4,configuration,y,true,false,true,8,-
+4,capture,-,-,-,-,-,0:0:0=create:linear_chassis|0:0:1=create:linear_chassis|0:1:0=minecraft:stone|0:1:1=minecraft:oak_planks|0:2:0=minecraft:stone|0:3:0=minecraft:stone|0:4:0=minecraft:stone|0:5:0=minecraft:stone|0:6:0=minecraft:stone|0:7:0=minecraft:stone|0:8:0=minecraft:stone

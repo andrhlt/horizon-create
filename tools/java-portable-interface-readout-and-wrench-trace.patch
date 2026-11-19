@@ -1,0 +1,125 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -14,6 +14,7 @@
+ import com.simibubi.create.infrastructure.gametest.GameTestGroup;
+ 
+ import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
+ import net.minecraft.gametest.framework.GameTest;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.sounds.SoundSource;
+@@ -221,10 +222,21 @@
+ 			level.setBlockAndUpdate(origin.east().above(3), controls);
+ 			var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.WHITE).get().defaultBlockState();
+ 			level.setBlockAndUpdate(origin.east(2).above(3), seat);
+-			var port = com.simibubi.create.AllBlocks.PORTABLE_FLUID_INTERFACE.get().defaultBlockState();
++			var port = Boolean.getBoolean("parity.portableComparatorItem")
++				? com.simibubi.create.AllBlocks.PORTABLE_STORAGE_INTERFACE.get().defaultBlockState()
++				: com.simibubi.create.AllBlocks.PORTABLE_FLUID_INTERFACE.get().defaultBlockState();
+ 			var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
+ 			level.setBlockAndUpdate(mountedInterface, port.setValue(facing, net.minecraft.core.Direction.SOUTH));
+ 			level.setBlockAndUpdate(transferInterface, port.setValue(facing, net.minecraft.core.Direction.NORTH));
++			if (Boolean.getBoolean("parity.portableComparator")) {
++				level.setBlockAndUpdate(transferInterface.south(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++				var meter = transferInterface.west();
++				level.setBlockAndUpdate(meter.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++				level.setBlockAndUpdate(meter.west().below(), Blocks.SMOOTH_STONE.defaultBlockState());
++				level.setBlockAndUpdate(meter.west(), Blocks.REDSTONE_WIRE.defaultBlockState());
++				level.setBlockAndUpdate(meter, Blocks.COMPARATOR.defaultBlockState()
++					.setValue(net.minecraft.world.level.block.ComparatorBlock.FACING, Direction.EAST));
++			}
+ 			var fluidTank = com.simibubi.create.AllBlocks.FLUID_TANK.get().defaultBlockState();
+ 			var cargoPos = origin.east(4).above(3);
+ 			level.setBlockAndUpdate(cargoPos, fluidTank);
+@@ -334,6 +346,27 @@
+ 					System.out.printf(java.util.Locale.ROOT, "CREATE_TRAIN_FIXED_PORT %d;%d;%.6f%n",
+ 						t, rawPort.getInt("Timer"), rawPort.getFloat("Distance"));
+ 					traceFixedTrainPortRender(t, transfer, rawPort.getInt("Timer"));
++					if (Boolean.getBoolean("parity.portableComparator")) {
++						var meter = transferInterface.west();
++						var detector = (net.minecraft.world.level.block.entity.ComparatorBlockEntity) level.getBlockEntity(meter);
++						int direct = transfer.getBlockState().getAnalogOutputSignal(level, transferInterface);
++						var wire = level.getBlockState(meter.west()).getValue(net.minecraft.world.level.block.RedStoneWireBlock.POWER);
++						System.out.printf("CREATE_PORT_COMPARATOR %d;%d;%d;%d;%d%n", t,
++							rawPort.getInt("Timer"), direct, detector.getOutputSignal(), wire);
++					}
++				}
++				if (Boolean.getBoolean("parity.portableComparator")) {
++					if (t == 27)
++						train.runtime.paused = true;
++					if (t == 30 || t == 60)
++						level.setBlockAndUpdate(transferInterface.south(), Blocks.AIR.defaultBlockState());
++					if (t == 45 || t == 65)
++						level.setBlockAndUpdate(transferInterface.south(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++					if (t == 75) {
++						helper.succeed();
++						return;
++					}
++					return;
+ 				}
+ 				if (t == 27) {
+ 					helper.assertTrue(transfer.canTransfer() && source == (filling ? 0 : 2750) && stored == (filling ? 2750 : 0),
+@@ -385,4 +418,34 @@
+ 		item.useOn(new net.minecraft.world.item.context.UseOnContext(player,
+ 			net.minecraft.world.InteractionHand.MAIN_HAND, hit));
+ 	}
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void portableInterfaceWrench(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var wrench = com.simibubi.create.AllItems.WRENCH.asStack();
++		player.setItemInHand(hand, wrench);
++		var at = helper.absolutePos(new BlockPos(2, 3, 1));
++		var facing = net.minecraft.world.level.block.DirectionalBlock.FACING;
++		for (var block : java.util.List.of(com.simibubi.create.AllBlocks.PORTABLE_STORAGE_INTERFACE,
++			com.simibubi.create.AllBlocks.PORTABLE_FLUID_INTERFACE)) {
++			for (Direction before : Direction.values()) {
++				for (Direction hit : Direction.values()) {
++					level.setBlockAndUpdate(at, block.get().defaultBlockState().setValue(facing, before));
++					var target = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(at), hit, at, false);
++					var result = wrench.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, target));
++					System.out.printf("CREATE_PORT_WRENCH %s;%s;%s;%s;%s%n", block.getId().getPath(), before, hit,
++						level.getBlockState(at).getValue(facing), result);
++				}
++			}
++			player.setShiftKeyDown(true);
++			var target = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(at), Direction.UP, at, false);
++			var result = wrench.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, target));
++			System.out.printf("CREATE_PORT_WRENCH_PICKUP %s;%b;%b;%s%n", block.getId().getPath(),
++				level.isEmptyBlock(at), player.getInventory().contains(block.asStack()), result);
++			player.setShiftKeyDown(false);
++		}
++		helper.succeed();
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,10 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		var tests = CreateTestFunction.getTestsFrom(testHolders);
++		if (!Boolean.getBoolean("parity.portableComparator"))
++			return tests;
++		return tests.stream().filter(test -> test.testName().equals("TestMisc.scheduledTrainFixedPortLifecycle")
++			|| test.testName().equals("TestMisc.portableInterfaceWrench")).toList();
+ 	}
+ }
+--- a/build.gradle
++++ b/build.gradle
+@@ -91,6 +91,12 @@
+ 
+         gameTestServer {
+             type = "gameTestServer"
++            if (project.hasProperty("parityPortableComparator")) {
++                def item = project.findProperty("parityPortableComparator") == "item"
++                gameDirectory = project.file(item ? "run/portable-item-comparator-test-server" : "run/portable-fluid-comparator-test-server")
++                systemProperty("parity.portableComparator", "true")
++                systemProperty("parity.portableComparatorItem", item.toString())
++            }
+         }
+     }
+ }

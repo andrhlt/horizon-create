@@ -1,0 +1,35 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.thresholdSwitchPulley"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -92,6 +92,20 @@
+ 		helper.succeedWhen(() -> {
+ 			ThresholdSwitchBlockEntity switchBe = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), switchPos);
+ 			int level = switchBe.getStockLevel();
++			var registry = helper.getLevel().registryAccess();
++			var pulley = helper.getBlockEntity(new BlockPos(2, 6, 1));
++			var gearshift = helper.getBlockEntity(new BlockPos(3, 6, 1));
++			var pulleyData = pulley.saveWithoutMetadata(registry);
++			var gearshiftData = gearshift.saveWithoutMetadata(registry);
++			int floor = helper.absolutePos(new BlockPos(0, 1, 0)).getY();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_PULLEY %d %.4f %.4f %d %d %d %.5f %d %.4f %d %s %s%n",
++				helper.getTick(), gearshiftData.getFloat("Speed"), pulleyData.getFloat("Speed"),
++				gearshiftData.getInt("InstructionIndex"), gearshiftData.getInt("InstructionDuration"),
++				gearshiftData.getInt("Timer"), gearshiftData.getFloat("InstructionProgress"),
++				pulleyData.getBoolean("Running") ? 1 : 0, pulleyData.getFloat("Offset"), helper.getTick() == 0 ? 0 : level - floor,
++				helper.getBlockState(new BlockPos(2,2,1)).getBlock().getDescriptionId(),
++				helper.getBlockState(new BlockPos(3,6,1)).getValue(
++					com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftBlock.STATE));
+ 			int expectedLevel = helper.absolutePos(finalPos).getY();
+ 			if (level != expectedLevel)
+ 				helper.fail("Unexpected level: " + level);

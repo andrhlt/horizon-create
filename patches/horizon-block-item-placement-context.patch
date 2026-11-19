@@ -1,0 +1,46 @@
+diff --git a/crates/horizon-client/src/game/use_hand.rs b/crates/horizon-client/src/game/use_hand.rs
+--- a/crates/horizon-client/src/game/use_hand.rs
++++ b/crates/horizon-client/src/game/use_hand.rs
+@@ -3,6 +3,16 @@
+ use super::*;
+ 
+ impl Game<'_> {
++    // Some block items use their own placement before the clicked block reacts.
++    fn held_item_places_before_block_use(&self) -> bool {
++        false
++    }
++
++    // Some blocks redirect a held block item's placement after ItemStack.useOn.
++    fn retarget_block_item_placement(&mut self, context: &mut PlaceContext) {
++        let _ = context;
++    }
++
+     /// `Level.playSound(player, ...)`: a guest's client already predicted the
+     /// fire-starter sound, so play it locally on the server and forward it to
+     /// the other guests without leaving it in the broadcast capture.
+@@ -44,7 +54,7 @@
+         }
+         // MultiPlayerGameMode.useItemOn: blocks react first.
+         let block_phase = horizon_client::spans::guard("use_block");
+-        if !(sneaking && hands_full)
++        if !(sneaking && hands_full || self.held_item_places_before_block_use())
+             && let Some(hit) = block_hit
+         {
+             let held = self.held().cloned();
+@@ -454,7 +464,7 @@
+             _ => Direction::East,
+         };
+         // BlockItem.place through the vanilla placement rules.
+-        let ctx = PlaceContext {
++        let mut ctx = PlaceContext {
+             clicked_pos: BlockPos::new(hit.pos[0], hit.pos[1], hit.pos[2]),
+             face,
+             hit: Vec3::new(hit.point[0], hit.point[1], hit.point[2]),
+@@ -466,6 +476,7 @@
+             item: stack.item.to_string(),
+             can_use_game_master_blocks: self.can_use_game_master_blocks(),
+         };
++        self.retarget_block_item_placement(&mut ctx);
+         // The mods, once the position and state are known: a canceled
+         // placement is a failed one, and the client's prediction is undone.
+         if self.block_place_canceled(&stack, &ctx) {

@@ -1,0 +1,64 @@
+--- a/crates/horizon-world/src/level/mod.rs
++++ b/crates/horizon-world/src/level/mod.rs
+@@ -383,6 +383,9 @@
+ 
+ /// The world as seen by block behaviour. Implemented by the game and tests.
+ pub trait LevelAccess {
++    /// Create's 1.21.1 Tree Fertilizer uses the old dark-oak attachment position.
++    fn create_legacy_dark_oak_foliage(&self) -> bool { false }
++
+     /// `WorldBorder.isWithinBounds(BlockPos)` for block movement.
+     fn within_world_border(&self, _pos: BlockPos) -> bool {
+         true
+--- a/crates/horizon-world/src/level/feature_world.rs
++++ b/crates/horizon-world/src/level/feature_world.rs
+@@ -44,6 +44,9 @@
+ 
+ impl<L: LevelAccess + ?Sized> FeatureWorld for LevelFeatureWorld<'_, '_, L> {
+     type Error = PlacementQueryError;
++    fn create_legacy_dark_oak_foliage(&self) -> bool {
++        self.sim.level.create_legacy_dark_oak_foliage()
++    }
+     fn block(&mut self, position: [i32; 3]) -> Result<BlockStateId, Self::Error> {
+         Ok(self.sim.state(pos(position)))
+     }
+--- a/crates/horizon-world/src/level/bonemeal.rs
++++ b/crates/horizon-world/src/level/bonemeal.rs
+@@ -295,6 +295,8 @@
+ }
+ 
+ impl LevelAccess for TreeFertilizerLevel<'_> {
++    fn create_legacy_dark_oak_foliage(&self) -> bool { true }
++
+     fn block_state(&self, pos: BlockPos) -> BlockStateId {
+         if pos.y < 10 {
+             return self.soil;
+--- a/crates/horizon-world/src/worldgen/feature.rs
++++ b/crates/horizon-world/src/worldgen/feature.rs
+@@ -29,6 +29,7 @@
+ }
+ pub trait FeatureWorld {
+     type Error;
++    fn create_legacy_dark_oak_foliage(&self) -> bool { false }
+     fn block(&mut self, position: [i32; 3]) -> Result<BlockStateId, Self::Error>;
+     /// Walk the column from `position` by `step` (1 or -1) while `keep`
+     /// holds for the block there, reading at most `limit` blocks. Returns the
+--- a/crates/horizon-world/src/worldgen/tree/trunk.rs
++++ b/crates/horizon-world/src/worldgen/tree/trunk.rs
+@@ -497,8 +497,15 @@
+                             None,
+                         )?;
+                     }
++                    // 1.21.1 offsets side foliage from the leaned trunk tip;
++                    // current vanilla offsets it from the original trunk base.
++                    let (fx, fz) = if run.world.create_legacy_dark_oak_foliage() {
++                        (tx, tz)
++                    } else {
++                        (x, z)
++                    };
+                     attachments.push(FoliageAttachment::new(
+-                        [x.wrapping_add(ox), ey, z.wrapping_add(oz)],
++                        [fx.wrapping_add(ox), ey, fz.wrapping_add(oz)],
+                         0,
+                         false,
+                     ));

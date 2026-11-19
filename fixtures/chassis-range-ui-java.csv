@@ -1,0 +1,5 @@
+variant,title,row,last_column,milestone_interval,hold_ticks,selected_column,prior_range
+linear,Range of Sticky Sides,Distance,15,1,6,0,8
+linear,Range of Sticky Sides,Distance,15,1,6,15,1
+radial,Radius when Sticky,Distance,15,1,6,0,8
+radial,Radius when Sticky,Distance,15,1,6,15,1

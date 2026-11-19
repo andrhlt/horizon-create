@@ -1,0 +1,150 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -1,4 +1,6 @@
+ package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllBlocks;
+ 
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
+@@ -115,4 +117,140 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void trainTrapdoorsParity(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var water = net.minecraft.world.level.block.Blocks.WATER.defaultBlockState();
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var power = net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState();
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var itemRegistry = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var blocks = java.util.List.of(AllBlocks.TRAIN_TRAPDOOR.get(), AllBlocks.FRAMED_GLASS_TRAPDOOR.get());
++		var ingredients = java.util.List.of(AllBlocks.RAILWAY_CASING.asStack(), com.simibubi.create.content.decoration.palettes.AllPaletteBlocks.FRAMED_GLASS.asStack());
++		for (int i = 0; i < blocks.size(); i++) {
++			var block = blocks.get(i);
++			var id = registry.getKey(block);
++			var base = helper.absolutePos(new BlockPos(2, 12, 2 + 4 * i));
++			var initial = block.defaultBlockState();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_TRAPDOOR_DEFAULTS %s,%s,%.2f,%.2f,%d%n", id,
++				trapdoorState(initial), initial.getDestroySpeed(level, base), block.getExplosionResistance(),
++				initial.getMapColor(level, base).id);
++			var support = base;
++			level.setBlockAndUpdate(support, stone);
++			var faces = new net.minecraft.core.Direction[] {
++				net.minecraft.core.Direction.UP,
++				net.minecraft.core.Direction.DOWN,
++				net.minecraft.core.Direction.EAST,
++				net.minecraft.core.Direction.EAST,
++				net.minecraft.core.Direction.UP,
++				net.minecraft.core.Direction.UP
++			};
++			var cases = new String[] {"floor", "ceiling", "side_low", "side_high", "wet_floor", "powered_floor"};
++			for (int index = 0; index < cases.length; index++) {
++				var face = faces[index];
++				var destination = support.relative(face);
++				boolean wet = cases[index].equals("wet_floor");
++				boolean powered = cases[index].equals("powered_floor");
++				var wire = destination.south();
++				level.setBlockAndUpdate(wire, powered ? power : air);
++				level.setBlockAndUpdate(destination, wet ? water : air);
++				var hitPos = support.getCenter().relative(face, .5);
++				if (face == net.minecraft.core.Direction.EAST)
++					hitPos = hitPos.add(0, cases[index].equals("side_high") ? .25 : -.25, 0);
++				var hit = new net.minecraft.world.phys.BlockHitResult(hitPos, face, support, false);
++				player.setPos(support.getX() + .5, support.getY(), support.getZ() + 2.5);
++				player.setYRot(180);
++				player.setItemInHand(hand, block.asItem().getDefaultInstance());
++				var result = player.getItemInHand(hand).useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++				var placed = level.getBlockState(destination);
++				helper.assertTrue(placed.is(block), "Trapdoor failed ordinary survival placement");
++				System.out.printf(java.util.Locale.ROOT, "CREATE_TRAPDOOR_PLACEMENT %s,%s,%s,%d,%s%n", id,
++					cases[index], result, player.getItemInHand(hand).getCount(), trapdoorState(placed));
++				level.setBlockAndUpdate(destination, air);
++				level.setBlockAndUpdate(wire, air);
++			}
++
++			var at = support.above();
++			var signal = at.south();
++			var hit = new net.minecraft.world.phys.BlockHitResult(at.getCenter(), net.minecraft.core.Direction.UP, at, false);
++			level.setBlockAndUpdate(at, initial);
++			player.setItemInHand(hand, net.minecraft.world.item.ItemStack.EMPTY);
++			trapdoorTransition(level, at, id, 0, "default", "-");
++			for (int step = 1; step <= 9; step++) {
++				String action = switch (step) {
++					case 1, 2, 4 -> "empty_hand";
++					case 3, 6 -> "power_on";
++					case 5, 7 -> "power_off";
++					case 8 -> "waterlog";
++					default -> "empty_hand_wet";
++				};
++				String result = "-";
++				var sounds = new java.util.ArrayList<String>();
++				java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listen = event -> {
++					var sound = event.getSound();
++					if (event.getLevel() == level && sound != null
++						&& BlockPos.containing(event.getPosition()).equals(at)) {
++						var key = net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.getKey(sound.value());
++						if (key != null && key.getPath().contains("trapdoor"))
++							sounds.add(key.toString());
++					}
++				};
++				var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
++				bus.addListener(net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition.class, listen);
++				try {
++					switch (action) {
++						case "empty_hand", "empty_hand_wet" ->
++							result = level.getBlockState(at).useWithoutItem(level, player, hit).toString();
++						case "power_on" -> level.setBlockAndUpdate(signal, power);
++						case "power_off" -> level.setBlockAndUpdate(signal, air);
++						default -> level.setBlockAndUpdate(at, initial.setValue(
++							net.minecraft.world.level.block.TrapDoorBlock.WATERLOGGED, true));
++					}
++				} finally {
++					bus.unregister(listen);
++				}
++				System.out.printf(java.util.Locale.ROOT, "CREATE_TRAPDOOR_SOUND %s,%d,%s,%s%n", id, step, action,
++					sounds.isEmpty() ? "-" : String.join("|", sounds));
++				trapdoorTransition(level, at, id, step, action, result);
++			}
++
++			var wooden = itemRegistry.getTag(net.minecraft.tags.ItemTags.WOODEN_TRAPDOORS).orElseThrow()
++				.stream().map(holder -> holder.value()).sorted(java.util.Comparator.comparing(item -> itemRegistry.getKey(item).toString()))
++				.toList();
++			for (var material : wooden) {
++				var first = new net.minecraft.world.item.ItemStack(material);
++				var second = ingredients.get(i);
++				var grid = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(first, second));
++				var recipe = level.getRecipeManager().getRecipeFor(
++					net.minecraft.world.item.crafting.RecipeType.CRAFTING, grid, level).orElseThrow();
++				var reversed = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(second, first));
++				helper.assertTrue(recipe.value().matches(reversed, level), "Original trapdoor recipe is shapeless");
++				var output = recipe.value().assemble(grid, level.registryAccess());
++				helper.assertTrue(output.is(block.asItem()), "Wrong original trapdoor recipe result");
++				System.out.printf(java.util.Locale.ROOT, "CREATE_TRAPDOOR_CRAFTING %s,2,1,%s|%s,%s,%d%n", recipe.id(),
++					itemRegistry.getKey(material), itemRegistry.getKey(second.getItem()), itemRegistry.getKey(output.getItem()),
++					output.getCount());
++			}
++		}
++		helper.succeed();
++	}
++
++	private static String trapdoorState(net.minecraft.world.level.block.state.BlockState state) {
++		return String.join(",",
++			state.getValue(net.minecraft.world.level.block.TrapDoorBlock.FACING).getSerializedName(),
++			state.getValue(net.minecraft.world.level.block.TrapDoorBlock.HALF).getSerializedName(),
++			state.getValue(net.minecraft.world.level.block.TrapDoorBlock.OPEN).toString(),
++			state.getValue(net.minecraft.world.level.block.TrapDoorBlock.POWERED).toString(),
++			state.getValue(net.minecraft.world.level.block.TrapDoorBlock.WATERLOGGED).toString());
++	}
++
++	private static void trapdoorTransition(net.minecraft.world.level.Level level, BlockPos pos,
++			net.minecraft.resources.ResourceLocation id, int step, String action, String result) {
++		System.out.printf(java.util.Locale.ROOT, "CREATE_TRAPDOOR_TRANSITION %s,%d,%s,%s,%s%n", id, step, action, result,
++			trapdoorState(level.getBlockState(pos)));
++	}
+ }

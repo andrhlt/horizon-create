@@ -1,0 +1,33 @@
+--- a/crates/horizon-client/src/game/machines.rs
++++ b/crates/horizon-client/src/game/machines.rs
+@@ -863,6 +863,13 @@
+         }
+         let was_empty = (0..view.len()).all(|i| c.insertion_item(view, i).is_none());
+         let max = c.max_stack(&stack);
++        if view.kind == Kind::Mod && let Some(((x, y, z), _)) = view.locate(slot) {
++            let mut result = None;
++            self.native_mod_container_insert([x, y, z], &stack, face, &mut result);
++            if let Some(result) = result {
++                return result;
++            }
++        }
+         let mut success = false;
+         let mut filled_empty = false;
+         let mut pot = if view.kind == Kind::Pot {
+@@ -965,6 +972,16 @@
+             rest = self.try_move_in_item(from_hopper, view, stack, slot, face);
+         }
+         rest
++    }
++    /// A mod container whose side changes the meaning of stack insertion.
++    fn native_mod_container_insert(
++        &mut self,
++        pos: [i32; 3],
++        stack: &ItemStack,
++        face: Option<Direction>,
++        result: &mut Option<(Option<ItemStack>, bool)>,
++    ) {
++        let _ = (pos, stack, face, result);
+     }
+     /// Remove one item from a slot (`removeItem(slot, 1)`).
+     fn take_one(&mut self, view: &View, slot: usize) -> Option<ItemStack> {

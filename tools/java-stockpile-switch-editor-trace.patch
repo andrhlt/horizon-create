@@ -1,0 +1,61 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..22c5a98b8 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.stockpileSwitchConfiguration"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..4a2c49223 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,42 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 50)
++	public static void stockpileSwitchConfiguration(CreateGameTestHelper helper) {
++		var switchPos = new BlockPos(12, 7, 8);
++		var target = switchPos.south();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		helper.setBlock(target, Blocks.BARREL);
++		helper.setBlock(switchPos, com.simibubi.create.AllBlocks.THRESHOLD_SWITCH.getDefaultState()
++			.setValue(facing, net.minecraft.core.Direction.SOUTH));
++		var stock = (net.minecraft.world.level.block.entity.BarrelBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(target));
++		stock.setItem(0, new ItemStack(Items.STONE, 64));
++		var player = new net.minecraft.server.level.ServerPlayer(helper.getLevel().getServer(), helper.getLevel(),
++			new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "StockpileEditor"),
++			net.minecraft.server.level.ClientInformation.createDefault());
++		var absolute = helper.absolutePos(switchPos);
++		player.setPos(absolute.getX() + 0.5, absolute.getY(), absolute.getZ() - 2.5);
++		helper.succeedWhen(() -> {
++			var be = helper.getBlockEntity(AllBlockEntityTypes.THRESHOLD_SWITCH.get(), switchPos);
++			long tick = helper.getTick();
++			if (tick == 4)
++				new com.simibubi.create.content.redstone.thresholdSwitch.ConfigureThresholdSwitchPacket(absolute, 64, 128, true, true).handle(player);
++			if (tick == 8)
++				new com.simibubi.create.content.redstone.thresholdSwitch.ConfigureThresholdSwitchPacket(absolute, 32, 96, true, false).handle(player);
++			if (tick == 13)
++				stock.setItem(1, new ItemStack(Items.STONE, 64));
++			if (tick == 25)
++				new com.simibubi.create.content.redstone.thresholdSwitch.ConfigureThresholdSwitchPacket(absolute, 32, 96, false, false).handle(player);
++			if (tick == 27) {
++				stock.setItem(0, new ItemStack(Items.STONE, 32));
++				stock.removeItemNoUpdate(1);
++				stock.setChanged();
++			}
++			System.out.printf("STOCKPILE_EDITOR,%d,%d,%d,%d,%d,%b,%b,%b,%b,%d%n",
++				tick, be.getStockLevel(), be.getMaxLevel(), be.offWhenBelow, be.onWhenAbove,
++				be.inStacks, be.isInverted(), be.getState(), be.isPowered(),
++				be.getBlockState().getValue(com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlock.LEVEL));
++			helper.assertTrue(tick == 42, "sampling stockpile configuration ticks");
++		});
++	}
+ }

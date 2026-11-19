@@ -1,0 +1,29 @@
+--- a/crates/horizon-client/src/game/use_hand.rs
++++ b/crates/horizon-client/src/game/use_hand.rs
+@@ -13,6 +13,10 @@
+         let _ = context;
+     }
+ 
++    fn create_diode_board_claim(
++        &self, _pos: [i32; 3], _face: [i32; 3], _point: [f64; 3], _claimed: &mut bool,
++    ) {}
++
+     /// `Level.playSound(player, ...)`: a guest's client already predicted the
+     /// fire-starter sound, so play it locally on the server and forward it to
+     /// the other guests without leaving it in the broadcast capture.
+@@ -42,9 +46,12 @@
+         if let Some(hit) = block_hit {
+             let mut canceled = false;
+             horizon_client::spans::time("use_mods", || {
+-                self.native_right_click_block(hit.pos, hit.face, &mut canceled);
+-                let hand = self.hand;
+-                self.native_right_click_block_v2(hit.pos, hit.face, hand, &mut canceled);
++                self.create_diode_board_claim(hit.pos, hit.face, hit.point, &mut canceled);
++                if !canceled {
++                    self.native_right_click_block(hit.pos, hit.face, &mut canceled);
++                    let hand = self.hand;
++                    self.native_right_click_block_v2(hit.pos, hit.face, hand, &mut canceled);
++                }
+             });
+             if canceled {
+                 // Nothing was used, so nothing consumed the action.

@@ -1,0 +1,12 @@
+action,tick,cursor,filter0,filter1,count0,count1,first_eight_slots
+initial,0,_,_,_,0,0,_|_|_|_|_|_|_|_
+insert_first,0,_,minecraft:cobblestone=1,_,64,0,minecraft:cobblestone=64|_|_|_|_|_|_|_
+append,0,_,minecraft:cobblestone=1,_,115,0,minecraft:cobblestone=64|minecraft:cobblestone=51|_|_|_|_|_|_
+wrong_item,0,minecraft:stone=15,minecraft:cobblestone=1,_,115,0,minecraft:cobblestone=64|minecraft:cobblestone=51|_|_|_|_|_|_
+half_pickup,0,minecraft:cobblestone=32,minecraft:cobblestone=1,_,83,0,minecraft:cobblestone=64|minecraft:cobblestone=19|_|_|_|_|_|_
+pickup,0,minecraft:cobblestone=64,minecraft:cobblestone=1,_,19,0,minecraft:cobblestone=19|_|_|_|_|_|_|_
+deplete,0,minecraft:cobblestone=19,minecraft:cobblestone=1,_,0,0,_|_|_|_|_|_|_|_
+clear_filter,0,_,_,_,0,0,_|_|_|_|_|_|_|_
+insert_one,0,minecraft:dirt=6,minecraft:dirt=1,_,1,0,minecraft:dirt=1|_|_|_|_|_|_|_
+quick_move_in,0,_,minecraft:dirt=1,minecraft:stone=1,1,19,minecraft:dirt=1|_|_|_|minecraft:stone=19|_|_|_
+quick_move_out,0,_,minecraft:dirt=1,minecraft:stone=1,1,0,minecraft:dirt=1|_|_|_|_|_|_|_

@@ -1,0 +1,75 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -543,7 +543,72 @@
+ 			helper.succeed();
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void chainConveyorClipboardChute(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var source = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		var target = source.east(3);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var actor = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var stack = AllBlocks.CLIPBOARD.asStack();
++		actor.setItemInHand(hand, stack);
++		for (var pos : java.util.List.of(source, target)) {
++			level.setBlockAndUpdate(pos.below(), Blocks.BARREL.defaultBlockState());
++			level.setBlockAndUpdate(pos.above(), Blocks.BARREL.defaultBlockState());
++			level.setBlockAndUpdate(pos, AllBlocks.SMART_CHUTE.getDefaultState());
++		}
++		helper.runAtTickTime(6, () -> {
++			var type = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++			var from = ((com.simibubi.create.foundation.blockEntity.SmartBlockEntity) level.getBlockEntity(source))
++				.getBehaviour(type);
++			var to = ((com.simibubi.create.foundation.blockEntity.SmartBlockEntity) level.getBlockEntity(target))
++				.getBehaviour(type);
++			from.setFilter(new ItemStack(Items.QUARTZ));
++			from.count = 7;
++			from.upTo = false;
++			to.setFilter(new ItemStack(Items.GOLD_INGOT));
++			to.count = 3;
++			to.upTo = true;
+ 
++			var hit = new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(source), Direction.UP, source, false);
++			var plain = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock(actor, hand, source, hit);
++			com.simibubi.create.content.equipment.clipboard.ClipboardValueSettingsHandler.rightClickToCopy(plain);
++			System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_CHUTE_COPY plain|%b|%s%n", plain.isCanceled(), stack.save(level.registryAccess()));
++			clipboardChutePaste("plain", level, actor, target, to);
++
++			from.setFilter(com.simibubi.create.AllItems.FILTER.asStack());
++			from.count = 4;
++			from.upTo = true;
++			var special = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock(actor, hand, source, hit);
++			com.simibubi.create.content.equipment.clipboard.ClipboardValueSettingsHandler.rightClickToCopy(special);
++			System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_CHUTE_COPY filter|%b|%s%n", special.isCanceled(), stack.save(level.registryAccess()));
++			clipboardChutePaste("missing", level, actor, target, to);
++			actor.getInventory().setItem(1, com.simibubi.create.AllItems.FILTER.asStack());
++			clipboardChutePaste("supplied", level, actor, target, to);
++			level.setBlockAndUpdate(source.above(), Blocks.AIR.defaultBlockState());
++			from.setFilter(new ItemStack(Items.QUARTZ));
++			from.count = 7;
++			from.upTo = false;
++			var hidden = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock(actor, hand, source, hit);
++			com.simibubi.create.content.equipment.clipboard.ClipboardValueSettingsHandler.rightClickToCopy(hidden);
++			System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_CHUTE_COPY hidden_amount|%b|%s%n",
++				hidden.isCanceled(), stack.save(level.registryAccess()));
++			helper.succeed();
++		});
++	}
++
++	private static void clipboardChutePaste(String caseName, net.minecraft.server.level.ServerLevel level,
++			net.minecraft.world.entity.player.Player actor, BlockPos target,
++			com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour filter) {
++		var event = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(actor, target, Direction.UP,
++			net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
++		com.simibubi.create.content.equipment.clipboard.ClipboardValueSettingsHandler.leftClickToPaste(event);
++		System.out.printf(Locale.ROOT, "CREATE_CLIPBOARD_CHUTE_PASTE %s|%b|%s|%d|%b|%d%n",
++			caseName, event.isCanceled(), filter.getFilter().saveOptional(level.registryAccess()),
++			filter.count, filter.upTo, actor.getInventory().getItem(1).getCount());
++	}
++
+ 	private static void runChainConveyor(CreateGameTestHelper helper, String scenario, BlockPos edge, boolean reverse) {
+ 		var world = helper.getLevel();
+ 		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);

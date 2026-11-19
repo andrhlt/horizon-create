@@ -1,0 +1,8 @@
+ingredient,recipe,output,count
+create:cut_andesite,create:andesite_from_stone_types_andesite_stonecutting,minecraft:andesite,1
+create:cut_calcite,create:calcite_from_stone_types_calcite_stonecutting,minecraft:calcite,1
+create:cut_deepslate,create:deepslate_from_stone_types_deepslate_stonecutting,minecraft:deepslate,1
+create:cut_diorite,create:diorite_from_stone_types_diorite_stonecutting,minecraft:diorite,1
+create:cut_dripstone,create:dripstone_block_from_stone_types_dripstone_stonecutting,minecraft:dripstone_block,1
+create:cut_granite,create:granite_from_stone_types_granite_stonecutting,minecraft:granite,1
+create:cut_tuff,create:tuff_from_stone_types_tuff_stonecutting,minecraft:tuff,1

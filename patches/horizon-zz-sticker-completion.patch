@@ -1,0 +1,267 @@
+--- /dev/null
++++ b/crates/horizon-world/src/create_sticker.rs
+@@ -0,0 +1,15 @@
++//! Create 6.0.10 StickerBlock callbacks; no game or renderer dependencies.
++pub fn step(mut velocity: [f64;3], upright: bool, careful: bool) -> [f64;3] {
++    let dy=velocity[1].abs();
++    if upright && !careful && dy < 0.1 {
++        let scale=0.4+dy*0.2;
++        velocity[0]*=scale; velocity[2]*=scale;
++    }
++    velocity
++}
++pub fn bounce(mut velocity: [f64;3], upright: bool, living: bool, suppressed: bool) -> [f64;3] {
++    if !upright || suppressed { velocity[1]*=0.0; }
++    else if velocity[1]<0.0 { velocity[1] = -velocity[1] * if living {1.0} else {0.8}; }
++    velocity
++}
++pub fn fall_calls(upright: bool, suppressed: bool) -> usize { if !upright || suppressed {2} else {1} }
+--- a/crates/horizon-world/src/lib.rs
++++ b/crates/horizon-world/src/lib.rs
+@@ -13,6 +13,7 @@
+ pub mod block_entities;
+ pub mod block_entity_push;
+ pub mod block_landing;
++pub mod create_sticker;
+ pub mod block_placement;
+ pub mod block_properties;
+ pub mod block_render;
+--- a/crates/horizon-world/src/movement_restitution.rs
++++ b/crates/horizon-world/src/movement_restitution.rs
+@@ -70,8 +70,7 @@
+         && !world.suppressing_bounce()?
+         && let Some(factor) = world.legacy_block_bounce(input.block)?
+     {
+-        let entity_factor = if input.living { 1.0 } else { 0.8 };
+-        velocity.y = -old.y * f64::from(factor) * entity_factor;
++        velocity.y = crate::create_sticker::bounce([old.x, old.y, old.z], true, input.living, false)[1] * f64::from(factor);
+         return world.set_velocity(velocity);
+     }
+     let mut emit = bounce > 0.0 && (input.collided_x || input.collided_z);
+--- a/crates/horizon-client/src/mobs/living.rs
++++ b/crates/horizon-client/src/mobs/living.rs
+@@ -928,6 +928,13 @@
+         self.supporting = self.supporting_block(w, moved);
+         self.species_check_fall_damage(w, moved, events);
+         self.restitute_movement(w.world, w.movement, wanted, moved);
++        if self.on_ground {
++            let [x,y,z]=self.block_on_legacy(w);
++            if w.block_name(x,y,z)=="create:sticker" {
++                let v=horizon_world::create_sticker::step([self.velocity.x,self.velocity.y,self.velocity.z],w.prop(x,y,z,"facing")==Some("up"),self.extra.crouching);
++                self.velocity=Vec3::new(v[0],v[1],v[2]);
++            }
++        }
+         self.movement_emission(w, moved, events);
+         // Entity.move's last step: soul sand, honey and the like slow the
+         // horizontal speed of whatever the mob stands in or on.
+@@ -1074,7 +1081,9 @@
+         if w.facts.is_air(state) {
+             return;
+         }
+-        let at = landing_dust_at(self.position, pos);
++        let upright=w.block_name(pos[0],pos[1],pos[2])=="create:sticker" && w.prop(pos[0],pos[1],pos[2],"facing")==Some("up");
++        let state=if upright { w.registry.default_state("minecraft:slime_block").unwrap_or(state) } else {state};
++        let at = if upright {self.position} else {landing_dust_at(self.position, pos)};
+         events.push(MobEvent::LandingDust {
+             state,
+             at: [at.x, at.y, at.z],
+@@ -1351,6 +1360,13 @@
+             LandingEntityKind::Living
+         };
+         let distance = self.fall_distance;
++        if w.block_name(pos[0],pos[1],pos[2])=="create:sticker" {
++            let upright=w.prop(pos[0],pos[1],pos[2],"facing")==Some("up");
++            for _ in 0..horizon_world::create_sticker::fall_calls(upright,self.extra.crouching) {
++                self.cause_fall_damage_at(distance,1.0,events,Some((w,pos)),super::DamageKind::Fall);
++            }
++            return;
++        }
+         let result = w.landing.fall_on(
+             &mut super::landing::MobLanding {
+                 mob: self,
+@@ -2275,7 +2291,7 @@
+     /// The entity's own suppression is its sneak pose, and a mob never
+     /// sneaks; the block's tag is `block_suppresses_bounce` below.
+     fn suppressing_bounce(&mut self) -> Result<bool, ()> {
+-        Ok(false)
++        Ok(self.mob.extra.crouching)
+     }
+     /// `getAttributeValue(BOUNCINESS)`: a sulfur cube's.
+     fn entity_bounciness(&mut self) -> Result<f64, ()> {
+--- a/crates/horizon-client/src/entities.rs
++++ b/crates/horizon-client/src/entities.rs
+@@ -388,6 +388,7 @@
+ pub struct ItemStep {
+     old_velocity: Vec3,
+     did_move: bool,
++    sticker: bool,
+     /// The contact block for a clipped vertical move; idle ticks have none.
+     pub vertical_contact: Option<BlockPos>,
+     /// `Entity.move` with physics: where it started, what it moved, and
+@@ -792,17 +793,19 @@
+             return ItemStep {
+                 old_velocity,
+                 did_move: true,
++                sticker: self.upright_sticker(world,facts,blocks),
+                 vertical_contact,
+                 fall_move: (!no_physics).then_some((from, moved, applied)),
+             };
+         }
+         // applyEffectsFromBlocksForLastMovements: still lift/drag while idle.
+         if !no_physics {
+-            self.slime_step_on(world, facts);
++            self.slime_step_on(world, facts, self.upright_sticker(world,facts,blocks));
+         }
+         ItemStep {
+             old_velocity,
+             did_move: false,
++            sticker: false,
+             vertical_contact: None,
+             fall_move: None,
+         }
+@@ -893,7 +896,7 @@
+             // Entity.applyEffectsFromBlocks -> SlimeBlock.stepOn, with the
+             // vertical speed the bounce just left (before the air drag).
+             if !no_physics {
+-                self.slime_step_on(world, facts);
++                self.slime_step_on(world, facts, step.sticker);
+             }
+             // `float friction = getAirDrag()` (0.98F); on the ground, times
+             // the block's friction as a float, then widened for the scale.
+@@ -982,9 +985,14 @@
+         }
+         stuck
+     }
++    fn upright_sticker(&self,world: &World,facts: &BlockFacts,blocks: Option<&horizon_world::movement_properties::BoundMovementProperties>) -> bool {
++        let p=BlockPos::containing(self.position.add_vector(Vec3::new(0.0,-f64::from(0.2_f32),0.0)));
++        let state=world.block(p.x,p.y,p.z);
++        &*facts.get(state).name=="create:sticker" && blocks.and_then(|b|b.get(state).ok()).is_some_and(|b|b.coefficients.legacy_bounce_restitution.is_some())
++    }
+     /// `SlimeBlock.stepOn` for an item on the ground: slow vertical speed
+     /// drags the horizontal speed, on idle ticks too.
+-    fn slime_step_on(&mut self, world: &World, facts: &BlockFacts) {
++    fn slime_step_on(&mut self, world: &World, facts: &BlockFacts, sticker: bool) {
+         if !self.on_ground {
+             return;
+         }
+@@ -993,9 +1001,10 @@
+             -f64::from(0.2_f32),
+             0.0,
+         )));
+-        if &*facts.get(world.block(p.x, p.y, p.z)).name != "minecraft:slime_block" {
+-            return;
+-        }
++        let state=world.block(p.x,p.y,p.z);
++        let name=&*facts.get(state).name;
++        let sticker=name=="create:sticker" && sticker;
++        if name != "minecraft:slime_block" && !sticker { return; }
+         if let Some(scale) = slime_step_on_scale(self.velocity.y) {
+             self.velocity.x *= scale;
+             self.velocity.z *= scale;
+@@ -3822,6 +3831,7 @@
+             ItemStep {
+                 old_velocity: item.velocity,
+                 did_move: true,
++                sticker: false,
+                 vertical_contact: None,
+                 fall_move: None,
+             },
+--- a/crates/horizon-client/src/game/client_ambient.rs
++++ b/crates/horizon-client/src/game/client_ambient.rs
+@@ -172,22 +172,23 @@
+             None => [position.x.floor() as i32, below, position.z.floor() as i32],
+         };
+         let state = self.world.block(at[0], at[1], at[2]);
++        let sticker=self.native_block(at)=="create:sticker" && self.native_block_property(at,"facing").as_deref()==Some("up");
++        let state=if sticker {self.pack.assets.registry.default_state("minecraft:slime_block").unwrap_or(state)} else {state};
+         if self.res.facts().get(state).render_shape == RenderShape::Invisible {
+             return;
+         }
+         let Some((sprite, tint)) = self.particle_sprite(state, at) else {
+             return;
+         };
+-        let Some((rx, rz)) = offsets(self) else {
+-            return;
+-        };
++        let offsets=if sticker {Some((f64::from(self.world.random.next_float()),f64::from(self.world.random.next_float())))} else {offsets(self)};
++        let Some((rx, rz)) = offsets else {return;};
+         let mut x = position.x + (rx - 0.5) * width;
+         let mut z = position.z + (rz - 0.5) * width;
+         // Clamped into the block when the feet are in another column.
+-        if position.x.floor() as i32 != at[0] {
++        if !sticker && position.x.floor() as i32 != at[0] {
+             x = x.clamp(f64::from(at[0]), f64::from(at[0]) + 1.0);
+         }
+-        if position.z.floor() as i32 != at[2] {
++        if !sticker && position.z.floor() as i32 != at[2] {
+             z = z.clamp(f64::from(at[2]), f64::from(at[2]) + 1.0);
+         }
+         self.particles.add(
+--- a/crates/horizon-client/src/game/remote.rs
++++ b/crates/horizon-client/src/game/remote.rs
+@@ -2520,7 +2520,8 @@
+         if let Some(BlockEntity::Mod(m)) = self.world.block_entities.get_mut(&key) {
+             if *self.res.facts().get(block).name == *name {
+                 m.merge_update_tag(fields);
+-                if m.id == "create:copycat" {
++                if m.id == "create:sticker" { self.native_block_entity_data_loaded(pos); }
++                if self.native_block(pos) == "create:copycat" {
+                     self.refresh_copycat_panel_material(pos);
+                 }
+             }
+--- a/crates/horizon-client/src/motion.rs
++++ b/crates/horizon-client/src/motion.rs
+@@ -2484,7 +2484,15 @@
+             resolved_movement: resolved,
+             fall_distance: self.player.fall_distance,
+         };
+-        movement_restitution::restitute_movement(self, input)
++        movement_restitution::restitute_movement(self, input)?;
++        if self.player.ground.on_ground {
++            let state=self.assets.registry.state(state);
++            if state.is_some_and(|s|s.name=="create:sticker") {
++                let v=horizon_world::create_sticker::step([self.player.velocity.x,self.player.velocity.y,self.player.velocity.z],state.and_then(|s|s.properties.get("facing")).is_some_and(|s|s=="up"),self.player.shift_key_down);
++                self.player.velocity=Vec3::new(v[0],v[1],v[2]);
++            }
++        }
++        Ok(())
+     }
+     fn client_side(&mut self) -> Result<bool> {
+         Ok(false)
+--- a/crates/horizon-client/src/landing.rs
++++ b/crates/horizon-client/src/landing.rs
+@@ -387,6 +387,17 @@
+         if !block.starts_with("minecraft:") {
+             self.player.block_landing = Some((state, position, distance));
+         }
++        if block=="create:sticker" {
++            let upright=self.assets.registry.state(state).and_then(|s|s.properties.get("facing")).is_some_and(|s|s=="up");
++            let result=(|| -> Result<()> {
++                for _ in 0..horizon_world::create_sticker::fall_calls(upright,self.player.shift_key_down) {
++                    self.player_fall_damage(distance,1.0,LandingDamage::Fall,Some((state,position,distance)))?;
++                }
++                Ok(())
++            })();
++            self.player.block_landing=previous;
++            return result;
++        }
+         // Keep template landing rules (hay, honey, slime, etc.) in control.
+         let result = self
+             .resources
+@@ -448,12 +459,10 @@
+         count: i32,
+         speed: f64,
+     ) -> Result<()> {
+-        self.fall_event(FallEvent::Particles {
+-            state,
+-            position,
+-            count,
+-            speed,
+-        });
++        let upright=self.assets.registry.state(state).is_some_and(|s|s.name=="create:sticker" && s.properties.get("facing").is_some_and(|v|v=="up"));
++        let state=if upright {self.assets.registry.default_state("minecraft:slime_block").unwrap_or(state)} else {state};
++        let position=if upright {self.player.position} else {position};
++        self.fall_event(FallEvent::Particles {state,position,count,speed});
+         Ok(())
+     }
+     fn clear_last_climbable_position(&mut self) {

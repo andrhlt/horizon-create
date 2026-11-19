@@ -1,0 +1,78 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..f4c2b22f2 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.paletteMining"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..c2f4722ea 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,46 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void paletteMining(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var at = helper.absolutePos(new BlockPos(1, 11, 1));
++		var blocks = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var pick = net.minecraft.world.item.Items.WOODEN_PICKAXE.getDefaultInstance();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		player.setPos(at.getX() + .5, at.getY(), at.getZ() - 2.0);
++		for (String example : java.util.List.of(
++		    "andesite_alloy_block", "industrial_iron_block", "weathered_iron_block",
++		    "cut_andesite", "cut_andesite_slab/bottom", "cut_andesite_slab/double",
++		    "polished_cut_granite", "cut_calcite_brick_stairs", "cut_diorite_wall", "dripstone_pillar",
++		    "layered_deepslate", "small_tuff_bricks", "cut_asurine_bricks", "cut_crimsite_wall",
++		    "cut_limestone_slab/bottom", "cut_limestone_slab/double", "polished_cut_ochrum",
++		    "small_scoria_brick_stairs", "scorchia", "veridium_pillar"
++		)) {
++			var split = example.split("/");
++			var id = com.simibubi.create.Create.asResource(split[0]);
++			var state = blocks.get(id).defaultBlockState();
++			if (split.length > 1) {
++				var type = split[1].equals("bottom") ? net.minecraft.world.level.block.state.properties.SlabType.BOTTOM
++				    : net.minecraft.world.level.block.state.properties.SlabType.DOUBLE;
++				state = state.setValue(net.minecraft.world.level.block.SlabBlock.TYPE, type);
++			}
++			level.setBlockAndUpdate(at, state);
++			for (var tool : java.util.List.of(pick, net.minecraft.world.item.ItemStack.EMPTY)) {
++				boolean harvest = !state.requiresCorrectToolForDrops() || tool.isCorrectToolForDrops(state);
++				var drops = harvest ? net.minecraft.world.level.block.Block.getDrops(
++				    state, level, at, level.getBlockEntity(at), player, tool) : java.util.List.<net.minecraft.world.item.ItemStack>of();
++				var drop = drops.stream().filter(stack -> items.getKey(stack.getItem()).equals(id))
++				    .mapToInt(net.minecraft.world.item.ItemStack::getCount).sum();
++				helper.assertTrue(drop == drops.stream().mapToInt(net.minecraft.world.item.ItemStack::getCount).sum(),
++				    "Unexpected other drops from " + example);
++				System.out.printf("CREATE_PALETTE_MINING %s,%s,%s,%d%n", id,
++				    split.length > 1 ? split[1] : "_", items.getKey(tool.getItem()), drop);
++			}
++		}
++		helper.succeed();
++	}
++
+ }

@@ -1,0 +1,77 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "state_properties": {
+    "shape": {
+      "type": "enum",
+      "values": [
+        "ae",
+        "an",
+        "as",
+        "aw",
+        "cr_d",
+        "cr_ndx",
+        "cr_ndz",
+        "cr_o",
+        "cr_pdx",
+        "cr_pdz",
+        "nd",
+        "none",
+        "pd",
+        "te",
+        "tn",
+        "ts",
+        "tw",
+        "xo",
+        "zo"
+      ]
+    },
+    "waterlogged": {
+      "type": "boolean"
+    },
+    "turn": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "shape": "zo",
+    "waterlogged": "false",
+    "turn": "false"
+  },
+  "properties": {
+    "waterloggable": true,
+    "occludes": false,
+    "sounds": "minecraft:iron_block"
+  },
+  "shapes": {
+    "default": [
+      [
+        0,
+        0,
+        0,
+        1,
+        0.125,
+        1
+      ]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [
+        0,
+        0,
+        0,
+        1,
+        0.125,
+        1
+      ]
+    ],
+    "property": "shape",
+    "values": {
+      "an": [],
+      "as": [],
+      "aw": [],
+      "ae": []
+    }
+  }
+}

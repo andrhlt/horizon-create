@@ -1,0 +1,77 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..4ded967 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.potatoCannon")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..843eebd 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,58 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
+-}
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 50)
++	public static void potatoCannon(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 24, 2));
++		var action = new com.simibubi.create.content.equipment.potatoCannon.AllPotatoProjectileBlockHitActions.PlaceBlockOnGround(Blocks.PUMPKIN);
++		
++		var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++			new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "MelonBlock"));
++		player.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		player.setPos(origin.getX() + 1.25, origin.getY() - 1, origin.getZ() - 3);
++		player.setYRot(0); player.setXRot(0);
++		java.util.function.Consumer<net.neoforged.neoforge.event.entity.ProjectileImpactEvent> impact = event -> {
++			if (event.getProjectile().level() != world || !(event.getProjectile() instanceof com.simibubi.create.content.equipment.potatoCannon.PotatoProjectileEntity)) return;
++			if (event.getRayTraceResult() instanceof net.minecraft.world.phys.BlockHitResult hit) {
++				var delta = hit.getBlockPos().subtract(origin);
++				System.out.printf("PUMPKIN_SIDE_IMPACT,%d,%d,%d,%s,%s%n", delta.getX(), delta.getY(), delta.getZ(), hit.getDirection(), world.getBlockState(hit.getBlockPos()));
++			}
++		};
++		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(impact);
++		var cannon = com.simibubi.create.AllItems.POTATO_CANNON.asStack();
++		player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, cannon);
++		player.getInventory().setItem(1, new ItemStack(Items.PUMPKIN, 3));
++		helper.runAtTickTime(1, () -> {
++			world.setBlockAndUpdate(origin, Blocks.STONE.defaultBlockState());
++			for (int y = 1; y <= 5; y++) world.setBlockAndUpdate(origin.above(y), Blocks.AIR.defaultBlockState());
++			world.setBlockAndUpdate(origin.north(), Blocks.AIR.defaultBlockState());
++			world.setBlockAndUpdate(origin.north().below(), Blocks.STONE.defaultBlockState());
++			for (int z=-3;z<=-1;z++) for (int y=0;y<=2;y++) world.setBlockAndUpdate(origin.offset(0,y,z),Blocks.AIR.defaultBlockState());
++		});
++		helper.runAtTickTime(2, () -> {
++			var result = cannon.use(world, player, net.minecraft.world.InteractionHand.MAIN_HAND);
++			var shots = world.getEntitiesOfClass(com.simibubi.create.content.equipment.potatoCannon.PotatoProjectileEntity.class,
++				new net.minecraft.world.phys.AABB(origin).inflate(6));
++			helper.assertTrue(shots.size() == 1, "Expected one carrot projectile");
++			var pos = shots.get(0).position(); var velocity = shots.get(0).getDeltaMovement();
++			System.out.printf(java.util.Locale.ROOT, "PUMPKIN_SIDE_SHOT,%s,%d,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f%n", result.getResult(),
++				player.getInventory().getItem(1).getCount(), cannon.getDamageValue(), pos.x-origin.getX(), pos.y-origin.getY(), pos.z-origin.getZ(), velocity.x, velocity.y, velocity.z);
++		});
++		for (int tick = 0; tick <= 20; tick++) {
++			final int sample = tick;
++			helper.runAtTickTime(3 + tick, () -> {
++				var shots = world.getEntitiesOfClass(com.simibubi.create.content.equipment.potatoCannon.PotatoProjectileEntity.class,
++					new net.minecraft.world.phys.AABB(origin).inflate(6));
++				var fall=world.getEntitiesOfClass(net.minecraft.world.entity.item.FallingBlockEntity.class,new net.minecraft.world.phys.AABB(origin).inflate(5));
++				var f=fall.isEmpty()?null:fall.get(0); var v=f==null?net.minecraft.world.phys.Vec3.ZERO:f.getDeltaMovement();
++				System.out.printf(java.util.Locale.ROOT,"PUMPKIN_SIDE,%d,%s,%d,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%d%n",sample+1,world.getBlockState(origin.north()),shots.size(),fall.size(),f==null?0:f.getX()-origin.getX(),f==null?0:f.getY()-origin.getY(),f==null?0:f.getZ()-origin.getZ(),v.x,v.y,v.z,f==null?-1:f.time);
++				if (sample == 20) {
++					net.neoforged.neoforge.common.NeoForge.EVENT_BUS.unregister(impact);
++					helper.succeed();
++				}
++			});
++		}
++	}
++
++}
+\ No newline at end of file

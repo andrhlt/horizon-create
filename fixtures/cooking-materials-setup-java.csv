@@ -1,0 +1,4 @@
+scenario,block,input,output
+furnace_bread,minecraft:furnace,create:dough,minecraft:bread
+smoker_bread,minecraft:smoker,create:dough,minecraft:bread
+furnace_scoria,minecraft:furnace,minecraft:soul_sand,create:scoria

@@ -1,0 +1,106 @@
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.flywheel"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -145,4 +145,80 @@
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
+ 
++
++	@GameTest(template = "wheat_milling", timeoutTicks = 110)
++	public static void flywheel(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var east = net.minecraft.core.Direction.EAST;
++		var motorAt = new BlockPos(1, 11, 1);
++		var wheelAt = motorAt.east();
++		var shaftAt = wheelAt.east();
++		var cogAt = wheelAt.south();
++		var motorState = AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east);
++		var wheelState = AllBlocks.FLYWHEEL.getDefaultState();
++		var shaftState = AllBlocks.SHAFT.getDefaultState().setValue(axis, east.getAxis());
++		helper.setBlock(wheelAt, wheelState.setValue(axis, east.getAxis()));
++		helper.setBlock(shaftAt, shaftState);
++		helper.setBlock(cogAt, AllBlocks.COGWHEEL.getDefaultState().setValue(axis, east.getAxis()));
++		var wheel = (com.simibubi.create.content.kinetics.flywheel.FlywheelBlockEntity) helper.getBlockEntity(wheelAt);
++		var shaft = (com.simibubi.create.content.kinetics.base.KineticBlockEntity) helper.getBlockEntity(shaftAt);
++		var cog = (com.simibubi.create.content.kinetics.base.KineticBlockEntity) helper.getBlockEntity(cogAt);
++		System.out.printf(java.util.Locale.ROOT, "CREATE_FLYWHEEL_PROPS %.2f,%.2f,%d,%s,%b%n",
++			wheelState.getDestroySpeed(level, helper.absolutePos(wheelAt)), AllBlocks.FLYWHEEL.get().getExplosionResistance(),
++			wheelState.getMapColor(level, helper.absolutePos(wheelAt)).id,
++			wheelState.getValue(axis), wheelState.requiresCorrectToolForDrops());
++
++		var placeBase = new BlockPos(6, 8, 1);
++		helper.setBlock(placeBase, net.minecraft.world.level.block.Blocks.STONE);
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var below = helper.absolutePos(placeBase);
++		var up = net.minecraft.core.Direction.UP;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(below), up, below, false);
++		player.setYRot(180);
++		for (int choice = 0; choice < 4; choice++) {
++			if (choice == 2)
++				helper.setBlock(placeBase.above().east(), shaftState);
++			player.setXRot(choice == 1 ? 75 : 0);
++			player.setShiftKeyDown(choice == 3);
++			var context = new net.minecraft.world.item.context.BlockPlaceContext(
++				player, hand, AllBlocks.FLYWHEEL.asStack(), hit);
++			var state = AllBlocks.FLYWHEEL.get().getStateForPlacement(context);
++			System.out.printf("CREATE_FLYWHEEL_PLACEMENT %d,%s%n", choice, state.getValue(axis));
++		}
++
++		var speed = net.createmod.catnip.animation.LerpedFloat.linear()
++			.chase(0, 1f / 64f, net.createmod.catnip.animation.LerpedFloat.Chaser.EXP);
++		float[] angle = { 0 };
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			// Same Catnip chaser and client-only integration used by FlywheelBlockEntity.
++			speed.updateChaseTarget(wheel.getSpeed());
++			speed.tickChaser();
++			angle[0] = (angle[0] + speed.getValue() * 3 / 10f) % 360;
++			var network = wheel.saveWithoutMetadata(level.registryAccess()).getCompound("Network");
++			System.out.printf(java.util.Locale.ROOT, "CREATE_FLYWHEEL %d,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.9f,%.9f,%.9f%n",
++				tick, wheel.getSpeed(), shaft.getSpeed(), cog.getSpeed(), wheel.calculateStressApplied(),
++				wheel.calculateAddedStressCapacity(), network.getFloat("Stress"), network.getFloat("Capacity"),
++				speed.getValue(0), speed.getValue(), angle[0]);
++			if (tick == 3 || tick == 76) {
++				helper.setBlock(motorAt, motorState);
++				var motor = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(motorAt);
++				motor.generatedSpeed.setValue(tick == 3 ? 64 : 32);
++			}
++			if (tick == 26) {
++				var motor = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(motorAt);
++				motor.generatedSpeed.setValue(-64);
++			}
++			if (tick == 51)
++				helper.setBlock(motorAt, net.minecraft.world.level.block.Blocks.AIR);
++			helper.assertTrue(tick >= 95, "Wait for startup, reversal, coast and restart");
++			helper.assertTrue(wheel.getSpeed() == 32 && shaft.getSpeed() == 32 && cog.getSpeed() == 0,
++				"Flywheel must pass axial motion without meshing with the neighboring cogwheel");
++		});
++	}
++
+ }

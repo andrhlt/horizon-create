@@ -1,0 +1,69 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.earlyAdvancements"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,54 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++    public static void earlyAdvancements(CreateGameTestHelper helper) {
++        var player = riderPlayer(helper, "AdvancementProbe");
++        var server = helper.getLevel().getServer();
++        var root = server.getAdvancements().get(com.simibubi.create.Create.asResource("root"));
++        var alloy = server.getAdvancements().get(com.simibubi.create.Create.asResource("andesite_alloy"));
++        var progress = player.getAdvancements();
++        helper.assertTrue(root != null && alloy != null, "Expected both original advances");
++        for (int tick = 1; tick <= 14; tick++) {
++            int t = tick;
++            helper.runAfterDelay(t, () -> {
++                var rootDone = progress.getOrStartProgress(root).isDone();
++                var alloyDone = progress.getOrStartProgress(alloy).isDone();
++                System.out.printf(java.util.Locale.ROOT, "CREATE_FIRST_ADVANCEMENTS %d;%s;%s%n",
++                    t, rootDone, alloyDone);
++                if (t == 4 || t == 8) {
++                    var item = t == 4 ? new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STICK)
++                        : com.simibubi.create.AllItems.ANDESITE_ALLOY.asStack();
++                    player.getInventory().setItem(t == 4 ? 0 : 1, item);
++                    net.minecraft.advancements.CriteriaTriggers.INVENTORY_CHANGED.trigger(player, player.getInventory(), item);
++                }
++                if (t == 14) {
++                    helper.assertTrue(rootDone && alloyDone, "Original inventory criteria did not award");
++                    helper.succeed();
++                }
++            });
++        }
++    }
++
++    private static net.minecraft.server.level.ServerPlayer riderPlayer(CreateGameTestHelper helper, String name) {
++        var server = helper.getLevel().getServer();
++        var profile = new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), name);
++        var cookie = net.minecraft.server.network.CommonListenerCookie.createInitial(profile, false);
++        var rider = new net.minecraft.server.level.ServerPlayer(server, helper.getLevel(), cookie.gameProfile(), cookie.clientInformation());
++        var connection = new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
++        new io.netty.channel.embedded.EmbeddedChannel(connection);
++        new net.minecraft.server.network.ServerGamePacketListenerImpl(server, connection, rider, cookie) {
++            @Override
++            public void send(net.minecraft.network.protocol.Packet<?> packet, net.minecraft.network.PacketSendListener callback) {}
++        };
++        helper.getLevel().addNewPlayer(rider);
++        rider.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
++        rider.getAbilities().flying = true;
++        rider.onUpdateAbilities();
++        var start = helper.absolutePos(BlockPos.ZERO);
++        rider.moveTo(start.getX() + .5, start.getY() + 4, start.getZ() + .5, 0, 0);
++        return rider;
++    }
++
+ }

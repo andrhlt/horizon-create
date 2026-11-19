@@ -1,0 +1,79 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.trackCurveConnection"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,64 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "track_crafting")
++	public static void trackCurveConnection(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var origin = helper.absolutePos(new BlockPos(1,8,1));
++		var track = AllBlocks.TRACK.get();
++		var property = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
++		var shapeType = com.simibubi.create.content.trains.track.TrackShape.class;
++		int[][] cases = {{10,0,10,1,0,32},{14,0,10,1,0,32},{10,2,10,1,0,32},
++			{12,0,6,2,0,32},{16,0,3,0,0,32},{14,2,0,0,0,32},{7,0,7,1,0,32},
++			{10,0,10,1,1,32},{10,0,10,1,0,4},{-10,0,-10,1,0,32}};
++		String[] endShapes = {"XO","ZO","PD"};
++		for (int scenario = 0; scenario < cases.length; scenario++) {
++			var spec = cases[scenario];
++			int dx = spec[0], dy = spec[1], dz = spec[2], shape = spec[3], extended = spec[4], supplied = spec[5];
++			var start = origin.above(scenario * 4);
++			var end = start.offset(dx,dy,dz);
++			var first = track.defaultBlockState().setValue(property, Enum.valueOf(shapeType, "XO"));
++			var second = track.defaultBlockState().setValue(property, Enum.valueOf(shapeType, endShapes[shape]));
++			level.setBlockAndUpdate(start.below(), stone);
++			level.setBlockAndUpdate(end.below(), stone);
++			level.setBlockAndUpdate(start, first);
++			level.setBlockAndUpdate(end, air);
++			player.setYRot(dx >= 0 ? -90 : 90);
++			player.setXRot(20);
++			var stack = new ItemStack(track, supplied);
++			player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack);
++			com.simibubi.create.content.trains.track.TrackBlockItem.select(level, start, player.getLookAngle(), stack);
++			float yaw = shape == 0 ? (dx >= 0 ? -90 : 90) : shape == 1 ? (dz >= 0 ? 0 : 180) : -45;
++			player.setYRot(yaw);
++			com.simibubi.create.content.trains.track.TrackPlacement.tryConnect(level, player, end, second, stack, false, extended != 0);
++			var connection = (com.simibubi.create.content.trains.track.BezierConnection) null;
++			for (int x = -17; x <= 17; x++)
++				for (int y = 0; y <= 2; y++)
++					for (int z = -13; z <= 13; z++)
++						if (level.getBlockEntity(start.offset(x,y,z)) instanceof com.simibubi.create.content.trains.track.TrackBlockEntity be)
++							for (var c : be.getConnections().values())
++								if (c.primary)
++									connection = c;
++			System.out.printf(java.util.Locale.ROOT, "CREATE_TRACK_CURVE %d %d %d %d %s %d %d %d",
++				scenario, dx, dy, dz, endShapes[shape].toLowerCase(java.util.Locale.ROOT), extended,
++				supplied, player.getMainHandItem().getCount());
++			if (connection != null) {
++				var p1 = connection.bePositions.getFirst().subtract(start);
++				var p2 = connection.bePositions.getSecond().subtract(start);
++				System.out.printf(java.util.Locale.ROOT, " %d %d %d %d %d %d %d %.6f %.6f",
++					p1.getX(), p1.getY(), p1.getZ(), p2.getX(), p2.getY(), p2.getZ(),
++					connection.getSegmentCount(), connection.getHandleLength(), connection.getLength());
++				for (double t : new double[]{0,.25,.5,.75,1}) {
++					var p = connection.getPosition(t).subtract(start.getX(), start.getY(), start.getZ());
++					System.out.printf(java.util.Locale.ROOT, " %.6f %.6f %.6f", p.x, p.y, p.z);
++				}
++			}
++			System.out.println();
++		}
++		helper.succeed();
++	}
+ }

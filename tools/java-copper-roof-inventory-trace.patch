@@ -1,0 +1,56 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..93b0804 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.copperRoofInventory"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..b58e89d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,37 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void copperRoofInventory(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(1, 2, 1)).above(12);
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		for (var set : java.util.List.of(com.simibubi.create.AllBlocks.COPPER_SHINGLES,
++			com.simibubi.create.AllBlocks.COPPER_TILES)) {
++			for (var age : net.minecraft.world.level.block.WeatheringCopper.WeatherState.values()) {
++				for (boolean waxed : new boolean[] {false, true}) {
++					for (var shape : com.simibubi.create.foundation.block.CopperBlockSet.DEFAULT_VARIANTS) {
++						var state = set.get(shape, age, waxed).get().defaultBlockState();
++						var block = state.getBlock();
++						var tool = Items.STONE_PICKAXE.getDefaultInstance();
++						var drops = net.minecraft.world.level.block.Block.getDrops(state, level, pos, null, player, tool);
++						helper.assertTrue(drops.size() == 1, "Expected a single roof block from " + state);
++						var drop = drops.getFirst();
++						var properties = state.getValues().entrySet().stream()
++							.map(entry -> entry.getKey().getName() + "=" + entry.getValue().toString().toLowerCase(java.util.Locale.ROOT))
++							.sorted().collect(java.util.stream.Collectors.joining("|"));
++						System.out.printf(java.util.Locale.ROOT,
++							"CREATE_COPPER_ROOF %s,%s,%s,%.2f,%.2f,%b,%s,%d%n",
++							registry.getKey(block), age, properties, state.getDestroySpeed(level, pos),
++							block.getExplosionResistance(), state.requiresCorrectToolForDrops(),
++							items.getKey(drop.getItem()), drop.getCount());
++					}
++				}
++			}
++		}
++		helper.succeed();
++	}
+ }

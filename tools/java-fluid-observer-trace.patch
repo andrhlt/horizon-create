@@ -1,0 +1,29 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.smartObserverPipes"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -265,6 +265,14 @@
+ 		FluidStack expected = new FluidStack(Fluids.WATER, 2 * FluidType.BUCKET_VOLUME);
+ 		helper.pullLever(lever);
+ 		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			var sensor = new BlockPos(3,2,3);
++			var detector = helper.getBlockEntity(sensor).saveWithoutMetadata(access);
++			var piston = helper.getBlockState(new BlockPos(3,2,4));
++			System.out.printf(java.util.Locale.ROOT, "CREATE_FLUID_OBSERVER %d %d %d %d %b %b %b%n", helper.getTick(),
++				helper.getFluidInTanks(new BlockPos(5,2,4)), helper.getFluidInTanks(tankOutput),
++				detector.getInt("TurnOff"), helper.getBlockState(sensor).getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED),
++				piston.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.EXTENDED), helper.getBlockState(output).is(Blocks.DIAMOND_BLOCK));
+ 			helper.assertFluidPresent(expected, tankOutput);
+ 			helper.assertBlockPresent(Blocks.DIAMOND_BLOCK, output);
+ 		});

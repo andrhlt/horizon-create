@@ -1,0 +1,17 @@
+color,block,facing,waterlogged,dye_count,retained_block_entity,retained_uuid,stored_count
+white,create:white_toolbox,east,true,3,true,true,16
+orange,create:orange_toolbox,east,true,3,true,true,16
+magenta,create:magenta_toolbox,east,true,3,true,true,16
+light_blue,create:light_blue_toolbox,east,true,3,true,true,16
+yellow,create:yellow_toolbox,east,true,3,true,true,16
+lime,create:lime_toolbox,east,true,3,true,true,16
+pink,create:pink_toolbox,east,true,3,true,true,16
+gray,create:gray_toolbox,east,true,3,true,true,16
+light_gray,create:light_gray_toolbox,east,true,3,true,true,16
+cyan,create:cyan_toolbox,east,true,3,true,true,16
+purple,create:purple_toolbox,east,true,3,true,true,16
+blue,create:blue_toolbox,east,true,3,true,true,16
+brown,create:brown_toolbox,east,true,3,true,true,16
+green,create:green_toolbox,east,true,3,true,true,16
+red,create:red_toolbox,east,true,3,true,true,16
+black,create:black_toolbox,east,true,3,true,true,16

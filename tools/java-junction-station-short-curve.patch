@@ -1,0 +1,36 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -135,7 +135,7 @@
+ 		}
+ 		var bendStart = origin.west(3);
+ 		var bendEnd = origin.offset(-13, 0, -10);
+-		for (int z = -10; z >= -45; z--) {
++		for (int z = -10; z >= -22; z--) {
+ 			var at = origin.offset(-13,0,z);
+ 			level.setBlockAndUpdate(at.below(), Blocks.SMOOTH_STONE.defaultBlockState());
+ 			if (z < -10)
+@@ -225,7 +225,7 @@
+ 					var point = wheel.getPosition(train.graph).subtract(origin.getX(), origin.getY(), origin.getZ());
+ 					output.append(String.format(java.util.Locale.ROOT, " %.9f %.9f %.9f", point.x, point.y, point.z));
+ 				}
+-                var station = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(otherStation);
++                var station = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(arrival);
+                 var global = station.getStation();
+                 if (t == 42) {
+                     for (var pos : java.util.List.of(arrival, otherStation)) {
+@@ -255,11 +255,11 @@
+ 					helper.assertTrue(entity.control(controls, keys, player), "Train control was refused at " + t);
+ 				}
+                 if (t == 220) {
+-                    helper.assertTrue(stopped, "Expected the driver to reach the opposing straight branch station");
++                    helper.assertTrue(stopped, "Expected the driver to reach the nearer curved branch station");
+                     helper.assertTrue(station.tryDisassembleTrain(null), "Unable to disassemble at the curved destination");
+-                    var front = level.getBlockState(otherRail.east().above());
+-                    var rear = level.getBlockState(otherRail.east(4).above());
+-                    var rotated = level.getBlockState(otherRail.east().above(3));
++                    var front = level.getBlockState(arrivalRail.south().above());
++                    var rear = level.getBlockState(arrivalRail.south(4).above());
++                    var rotated = level.getBlockState(arrivalRail.south().above(3));
+                     System.out.println("CREATE_NEAREST_STATION_BLOCKS " + front + ";" + rear + ";" + rotated);
+                     helper.assertTrue(com.simibubi.create.AllBlocks.SMALL_BOGEY.has(front)
+                         && com.simibubi.create.AllBlocks.SMALL_BOGEY.has(rear), "The stopped train restored at the wrong position");

@@ -1,0 +1,34 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -11,6 +11,7 @@
+ import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorConnectionPacket;
+ import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorPackage;
+ import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorShape.ChainConveyorOBB;
++import com.simibubi.create.content.kinetics.chainConveyor.ChainPackageInteractionPacket;
+ import com.simibubi.create.content.kinetics.motor.CreativeMotorBlock;
+ import com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity;
+ import com.simibubi.create.content.logistics.box.PackageEntity;
+@@ -230,6 +231,23 @@
+ 					if (hit == null)
+ 						throw new IllegalStateException("Java ray missed " + scenario + " chain");
+ 					System.out.printf(Locale.ROOT, "CREATE_CHAIN_WRENCH_HIT %s,%.9f,%.9f,%.9f%n", scenario, hit.x, hit.y, hit.z);
++					var otherSpan = dest.connectionStats.get(negative);
++					var otherShape = new ChainConveyorOBB(negative, otherSpan.start().subtract(origin), otherSpan.end().subtract(origin));
++					var otherHit = otherShape.intersect(eye, aim.add(aim.subtract(eye).normalize()));
++					boolean atA = otherHit == null || hit.distanceToSqr(eye) <= otherHit.distanceToSqr(eye);
++					var selected = atA ? source : dest;
++					var selectedEdge = atA ? edge : negative;
++					float progress = atA ? shape.getChainPosition(hit) : otherShape.getChainPosition(otherHit);
++					player.getInventory().setItem(0, chainPackage("Selected", Items.PAPER, 3));
++					new ChainPackageInteractionPacket(selected.getBlockPos(), selectedEdge, progress, false).handle(player);
++					if (!player.getMainHandItem().isEmpty() || selected.getTravellingPackages().get(selectedEdge).getFirst().chainPosition != progress)
++						throw new IllegalStateException("Java did not insert at the selected span point");
++					System.out.printf(Locale.ROOT, "CREATE_CHAIN_SPAN_SELECTION %s,%s,%s,%.9f%n",
++						scenario, atA ? "A" : "B", chainOffset(selectedEdge), progress);
++					new ChainPackageInteractionPacket(selected.getBlockPos(), selectedEdge, progress, true).handle(player);
++					if (!PackageItem.getAddress(player.getMainHandItem()).equals("Selected"))
++						throw new IllegalStateException("Java could not retrieve the selected span package");
++					player.getInventory().setItem(0, new ItemStack(Items.CHAIN, 8));
+ 					source.addTravellingPackage(new ChainConveyorPackage(2, chainPackage(scenario + "-Removed-A", Items.PAPER, 3)), edge);
+ 					dest.addTravellingPackage(new ChainConveyorPackage(1.5f, chainPackage(scenario + "-Removed-B", Items.STRING, 2)), negative);
+ 					source.updateBoxWorldPositions();

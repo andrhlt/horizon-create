@@ -1,0 +1,7 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "patch_sha256": "35dfa084e2e2069da5ebfc483f7dfd0e98ca78947fdefd2289f4a1fe209327ed",
+  "records": 246,
+  "seconds": 20.924717500000042,
+  "scope": "Actual StickerBlock world behavior; original client tick factored into shared Java routine using actual LerpedFloat, without a Java client or GPU"
+}

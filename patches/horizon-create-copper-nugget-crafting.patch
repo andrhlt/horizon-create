@@ -1,0 +1,20 @@
+diff --git a/crates/horizon-client/src/crafting.rs b/crates/horizon-client/src/crafting.rs
+--- a/crates/horizon-client/src/crafting.rs
++++ b/crates/horizon-client/src/crafting.rs
+@@ -1637,7 +1637,15 @@
+     ) -> Result<Self> {
+         // Every table in registration order, whatever order the sources come
+         // in (the world's packs' files after the game's own).
+-        sources.sort_by_cached_key(|(name, _)| registration_key(name));
++        sources.sort_by_cached_key(|(name, _)| {
++            if name == "create:crafting/materials/copper_nugget" {
++                // Create 1.21.1 provides the copper ingot conversion. Place it
++                // before 26.3's otherwise identical vanilla ingredient grid.
++                ("copper_nugget.json".into(), "create".into())
++            } else {
++                registration_key(name)
++            }
++        });
+         let mut crafting = Vec::new();
+         let mut cooking = Vec::new();
+         let mut custom: HashMap<String, Vec<CustomRecipe>> = HashMap::new();

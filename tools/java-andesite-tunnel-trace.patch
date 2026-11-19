@@ -1,0 +1,46 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..d66ff91 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestItems.andesiteTunnelSplit"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+index 71d028a..323cfb1 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestItems.java
+@@ -53,7 +53,26 @@ public class TestItems {
+ 				new BlockPos(3, 2, 1), new ItemStack(AllItems.BRASS_INGOT.get(), 1),
+ 				new BlockPos(4, 2, 2), new ItemStack(AllItems.BRASS_INGOT.get(), 3)
+ 		);
+-		helper.succeedWhen(() -> outputs.forEach(helper::assertContainerContains));
++		helper.succeedWhen(() -> {
++			var level = helper.getLevel();
++			var access = level.registryAccess();
++			long tick = helper.getTick();
++			BlockPos chute = new BlockPos(1, 5, 2);
++			var chuteTag = helper.getBlockEntity(chute).saveWithoutMetadata(access);
++			var belt = (com.simibubi.create.content.kinetics.belt.BeltBlockEntity)
++				helper.getBlockEntity(new BlockPos(1, 2, 2));
++			var stacks = belt.getInventory().write(access).getList("Items", 10);
++			var stack = stacks.isEmpty() ? new net.minecraft.nbt.CompoundTag() : stacks.getCompound(0);
++			int[] counts = new int[3];
++			int index = 0;
++			for (BlockPos depot : List.of(new BlockPos(2, 2, 1), new BlockPos(3, 2, 1), new BlockPos(4, 2, 2)))
++				counts[index++] = (int) helper.getTotalItems(depot);
++			System.out.printf(java.util.Locale.ROOT, "CREATE_TUNNEL %d %d %d %d %.7f %d %d %d%n",
++				tick, helper.getTotalItems(chute.above()), chuteTag.getCompound("Item").getInt("count"),
++				stack.getCompound("Item").getInt("count"), stacks.isEmpty() ? -1 : stack.getFloat("Pos"),
++				counts[0], counts[1], counts[2]);
++			outputs.forEach(helper::assertContainerContains);
++		});
+ 	}
+ 
+ 	@GameTest(template = "arm_multi_output", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)

@@ -1,0 +1,20 @@
+{
+  "template": "minecraft:iron_block",
+  "item": true,
+  "state_properties": {
+    "axis": {
+      "type": "enum",
+      "values": [
+        "x",
+        "z"
+      ]
+    },
+    "large": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "axis": "x",
+    "large": "false"
+  }
+}

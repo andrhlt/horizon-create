@@ -1,0 +1,76 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..adbcfd4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.observerWatchingDepot"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..537706d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,57 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 32)
++	public static void observerWatchingDepot(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var registry = world.registryAccess();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var power = com.simibubi.create.content.redstone.smartObserver.SmartObserverBlock.POWERED;
++		var depotType = com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE;
++		var filterType = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var lanes = new BlockPos[] { new BlockPos(9, 8, 9), new BlockPos(13, 8, 9), new BlockPos(17, 8, 9) };
++		for (int index = 0; index < lanes.length; index++) {
++			var local = lanes[index];
++			helper.setBlock(local.south(), com.simibubi.create.AllBlocks.DEPOT.get());
++			helper.setBlock(local, com.simibubi.create.AllBlocks.SMART_OBSERVER.get().defaultBlockState().setValue(facing, net.minecraft.core.Direction.SOUTH));
++			var observer = helper.getBlockEntity(AllBlockEntityTypes.SMART_OBSERVER.get(), local);
++			observer.getBehaviour(filterType).setFilter(new ItemStack(Items.STONE));
++			if (index == 1) {
++				var output = new net.neoforged.neoforge.items.ItemStackHandler(8);
++				output.setStackInSlot(0, new ItemStack(Items.STONE, 4));
++				var data = new net.minecraft.nbt.CompoundTag();
++				data.put("OutputBuffer", output.serializeNBT(registry));
++				helper.getBlockEntity(AllBlockEntityTypes.DEPOT.get(), local.south()).getBehaviour(depotType).read(data, registry, false);
++			}
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int index = 0; index < lanes.length; index++) {
++				var local = lanes[index];
++				var pos = helper.absolutePos(local.south());
++				var depot = helper.getBlockEntity(AllBlockEntityTypes.DEPOT.get(), local.south());
++				var behaviour = depot.getBehaviour(depotType);
++				if (index == 0 && (tick == 4 || tick == 11 || tick == 16 || tick == 20)) {
++					var sample = tick == 4 ? new ItemStack(Items.STONE, 4) : tick == 16 ? new ItemStack(Items.OAK_PLANKS, 4) : ItemStack.EMPTY;
++					player.setItemInHand(hand, sample);
++					var side = net.minecraft.core.Direction.UP;
++					var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter().relative(side, 0.5), side, pos, false);
++					com.simibubi.create.content.logistics.depot.SharedDepotBlockMethods.onUse(sample, world.getBlockState(pos), world, pos, player, hand, hit);
++				}
++				if (index == 2 && tick == 5) {
++					var item = new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(new ItemStack(Items.STONE, 4));
++					item.beltPosition = 0;
++					behaviour.setHeldItem(item);
++				}
++				if (index == 2 && tick == 13)
++					behaviour.removeHeldItem();
++				var observer = helper.getBlockEntity(AllBlockEntityTypes.SMART_OBSERVER.get(), local);
++				System.out.printf("OBSERVER_DEPOT,%d,%d,%d,%d,%d,%b%n", tick, index, depot.getHeldItem().getCount(),
++					behaviour.getPresentStackSize(), observer.turnOffTicks, world.getBlockState(helper.absolutePos(local)).getValue(power));
++			}
++			helper.assertTrue(tick == 25, "watching transport and output storage");
++		});
++	}
+ }

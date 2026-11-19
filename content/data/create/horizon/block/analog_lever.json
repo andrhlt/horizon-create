@@ -1,0 +1,11 @@
+{
+  "template": "minecraft:lever",
+  "default_state": {
+    "face": "floor",
+    "facing": "north"
+  },
+  "item": true,
+  "properties": {
+    "occludes": false
+  }
+}

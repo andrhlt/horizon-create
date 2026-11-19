@@ -1,0 +1,15 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -228,7 +228,11 @@
+ 					.setItem(0, new ItemStack(Items.PAPER, 1));
+ 			var chestPos = origin.east(4).above(3);
+ 			boolean barrel = "1".equals(System.getenv("CREATE_TRAIN_MOUNTED_BARREL"));
+-			var storageBlock = rearVault ? com.simibubi.create.AllBlocks.ITEM_VAULT.get() : barrel ? Blocks.BARREL : Blocks.CHEST;
++			var storageBlock = switch (java.util.Objects.toString(System.getenv("CREATE_TRAIN_MOUNTED_VANILLA"), "")) {
++            case "trapped" -> Blocks.TRAPPED_CHEST;
++            case "shulker" -> Blocks.PURPLE_SHULKER_BOX;
++            default -> rearVault ? com.simibubi.create.AllBlocks.ITEM_VAULT.get() : barrel ? Blocks.BARREL : Blocks.CHEST;
++        };
+ 			level.setBlockAndUpdate(chestPos, storageBlock.defaultBlockState());
+ 			var papers = new ItemStack(Items.PAPER, inserting ? 63 : 64);
+ 			if (rearVault) {

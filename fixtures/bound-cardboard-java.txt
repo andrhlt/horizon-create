@@ -1,0 +1,14 @@
+PLACE create:cardboard_block,180,z,0
+PLACE create:cardboard_block,90,x,0
+RULES create:cardboard_block,4000,100,20
+DROPS create:cardboard_block,hand,create:cardboard_block*1
+DROPS create:cardboard_block,axe,create:cardboard_block*1
+DROPS create:cardboard_block,silk,create:cardboard_block*1
+FIRE create:cardboard_block,minecraft:fire,1
+PLACE create:bound_cardboard_block,180,z,0
+PLACE create:bound_cardboard_block,90,x,0
+RULES create:bound_cardboard_block,4000,100,20
+DROPS create:bound_cardboard_block,hand,create:cardboard_block*1;minecraft:string*1
+DROPS create:bound_cardboard_block,axe,create:cardboard_block*1;minecraft:string*1
+DROPS create:bound_cardboard_block,silk,create:bound_cardboard_block*1
+FIRE create:bound_cardboard_block,minecraft:fire,1

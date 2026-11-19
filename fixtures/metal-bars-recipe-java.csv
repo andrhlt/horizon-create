@@ -1,0 +1,4 @@
+block,ingredient,recipe,count,color
+create:andesite_bars,create:andesite_alloy,create:andesite_bars_from_andesite_alloy_stonecutting,4,11
+create:brass_bars,create:brass_ingot,create:brass_bars_from_ingots_brass_stonecutting,4,40
+create:copper_bars,minecraft:copper_ingot,create:copper_bars_from_ingots_copper_stonecutting,4,15

@@ -1,0 +1,78 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders)
++			.stream().filter(test -> test.testName().equals("TestProcessing.funnelWrenchModes")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,62 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void funnelWrenchModes(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var west = net.minecraft.core.Direction.WEST;
++		var east = net.minecraft.core.Direction.EAST;
++		var main = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var shape = com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.SHAPE;
++		var extracting = com.simibubi.create.content.logistics.funnel.FunnelBlock.EXTRACTING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var face = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var slope = com.simibubi.create.content.kinetics.belt.BeltSlope.HORIZONTAL;
++		for (int mode = 0; mode < 7; mode++) {
++			var target = new BlockPos(5, 105, -11 + mode * 3);
++			var chunk = new net.minecraft.world.level.ChunkPos(target);
++			level.setChunkForced(chunk.x, chunk.z, true);
++			level.getChunk(chunk.x, chunk.z);
++			level.setBlockAndUpdate(target.east(), net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState());
++			var below = mode >= 4
++				? AllBlocks.BELT.getDefaultState().setValue(horizontal, east)
++					.setValue(com.simibubi.create.content.kinetics.belt.BeltBlock.SLOPE,
++						mode == 6 ? com.simibubi.create.content.kinetics.belt.BeltSlope.UPWARD : slope)
++				: AllBlocks.DEPOT.getDefaultState();
++			level.setBlockAndUpdate(target.below(), below);
++			var initial = switch (mode) {
++				case 0, 1 -> AllBlocks.BRASS_FUNNEL.getDefaultState().setValue(face, west).setValue(extracting, mode == 1);
++				default -> AllBlocks.BRASS_BELT_FUNNEL.getDefaultState().setValue(horizontal, west).setValue(shape,
++					switch (mode) {
++						case 2 -> com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape.PULLING;
++						case 3 -> com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape.PUSHING;
++						case 4 -> com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape.EXTENDED;
++						default -> com.simibubi.create.content.logistics.funnel.BeltFunnelBlock.Shape.RETRACTED;
++					});
++			};
++			level.setBlockAndUpdate(target, initial);
++			var wrench = AllItems.WRENCH.asStack();
++			player.setItemInHand(main, wrench);
++			player.setPos(target.getX() - 1.5, target.getY() - 1, target.getZ() + .5);
++			player.setYRot(-90);
++			player.setXRot(2);
++			player.setShiftKeyDown(false);
++			var hit = new net.minecraft.world.phys.BlockHitResult(
++				new net.minecraft.world.phys.Vec3(target.getX() + .2, target.getY() + .5, target.getZ() + .5),
++				west, target, false);
++			var action = wrench.useOn(new net.minecraft.world.item.context.UseOnContext(player, main, hit));
++			var observed = level.getBlockState(target);
++			var variant = observed.hasProperty(shape) ? observed.getValue(shape).getSerializedName()
++				: observed.getValue(extracting).toString();
++			System.out.printf("CREATE_FUNNEL_WRENCH_MODE %d,%s,%d%n", mode, variant, wrench.getCount());
++			helper.assertTrue(action.consumesAction() && wrench.getCount() == 1, "The Wrench use is consumed but the tool remains");
++		}
++		for (int mode = 0; mode < 7; mode++) {
++			var chunk = new net.minecraft.world.level.ChunkPos(new BlockPos(5, 105, -11 + mode * 3));
++			level.setChunkForced(chunk.x, chunk.z, false);
++		}
++		helper.succeed();
++	}
+ }

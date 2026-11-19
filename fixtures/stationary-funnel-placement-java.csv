@@ -1,0 +1,7 @@
+case,block,facing,variant,held
+0,create:brass_funnel,west,true,0
+1,create:brass_funnel,west,false,0
+2,create:brass_belt_funnel,west,pushing,0
+3,create:brass_belt_funnel,west,pulling,0
+4,create:brass_belt_funnel,west,pushing,0
+5,create:brass_belt_funnel,west,pulling,0

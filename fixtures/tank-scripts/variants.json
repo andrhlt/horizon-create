@@ -1,0 +1,241 @@
+{
+  "include_components": true,
+  "actions": [
+    {
+      "op": "place",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        6,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        6,
+        2,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        12,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        12,
+        2,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 6
+    },
+    {
+      "op": "fill",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "create:potion",
+      "amount": 2000,
+      "components": {
+        "minecraft:potion_contents": {
+          "potion": "minecraft:healing"
+        },
+        "create:potion_fluid_bottle_type": "regular"
+      }
+    },
+    {
+      "op": "fill",
+      "pos": [
+        0,
+        2,
+        0
+      ],
+      "fluid": "create:potion",
+      "amount": 2000,
+      "components": {
+        "minecraft:potion_contents": {
+          "potion": "minecraft:healing"
+        },
+        "create:potion_fluid_bottle_type": "regular"
+      }
+    },
+    {
+      "op": "fill",
+      "pos": [
+        6,
+        0,
+        0
+      ],
+      "fluid": "create:potion",
+      "amount": 2000,
+      "components": {
+        "minecraft:potion_contents": {
+          "potion": "minecraft:healing"
+        },
+        "create:potion_fluid_bottle_type": "regular"
+      }
+    },
+    {
+      "op": "fill",
+      "pos": [
+        6,
+        2,
+        0
+      ],
+      "fluid": "create:potion",
+      "amount": 2000,
+      "components": {
+        "minecraft:potion_contents": {
+          "potion": "minecraft:strength"
+        },
+        "create:potion_fluid_bottle_type": "regular"
+      }
+    },
+    {
+      "op": "fill",
+      "pos": [
+        12,
+        0,
+        0
+      ],
+      "fluid": "create:honey",
+      "amount": 2000
+    },
+    {
+      "op": "fill",
+      "pos": [
+        12,
+        2,
+        0
+      ],
+      "fluid": "create:chocolate",
+      "amount": 3000
+    },
+    {
+      "op": "probe",
+      "label": "before",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          6,
+          0,
+          0
+        ],
+        [
+          6,
+          2,
+          0
+        ],
+        [
+          12,
+          0,
+          0
+        ],
+        [
+          12,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        6,
+        1,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        12,
+        1,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 6
+    },
+    {
+      "op": "probe",
+      "label": "after",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          6,
+          0,
+          0
+        ],
+        [
+          6,
+          2,
+          0
+        ],
+        [
+          12,
+          0,
+          0
+        ],
+        [
+          12,
+          2,
+          0
+        ]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,138 @@
+--- a/crates/horizon-mods/src/content.rs
++++ b/crates/horizon-mods/src/content.rs
+@@ -97,6 +97,10 @@
+     pub sounds: Option<String>,
+     /// Which states tick randomly, whatever the template does (`isRandomlyTicking`).
+     pub random_ticks: Option<RandomTicks>,
++    /// How much of the landing distance this block absorbs.
++    pub fall_distance_reduction: Option<f32>,
++    /// Vertical restitution before air travel applies gravity and drag.
++    pub legacy_bounce_restitution: Option<f32>,
+     /// How the block is drawn, whatever the template does (`BlockBehaviour.getRenderShape`).
+     pub render_shape: Option<RenderShape>,
+     /// `false`: the block occludes nothing, so its neighbours' faces are drawn and light passes
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -1955,6 +1955,18 @@
+                             (b.decl.properties.friction, v.get_mut("friction"))
+                         {
+                             *slot = Tag::Float(f.to_bits());
++                        }
++                        if let (Some(f), Some(slot)) = (
++                            b.decl.properties.fall_distance_reduction,
++                            v.get_mut("fallDistanceReduction"),
++                        ) {
++                            *slot = Tag::Float(f.to_bits());
++                        }
++                        if let (Some(f), Tag::Compound(fields)) =
++                            (b.decl.properties.legacy_bounce_restitution, &mut v)
++                            && fields.contains_key(&JavaString::from("bounceRestitution"))
++                        {
++                            fields.insert("legacyBounceRestitution".into(), Tag::Float(f.to_bits()));
+                         }
+                         map.insert(b.decl.id.as_str().into(), v);
+                     }
+--- a/crates/horizon-world/src/movement_properties.rs
++++ b/crates/horizon-world/src/movement_properties.rs
+@@ -18,6 +18,7 @@
+     pub speed_factor: f32,
+     pub jump_factor: f32,
+     pub bounce_restitution: f32,
++    pub legacy_bounce_restitution: Option<f32>,
+     pub fall_distance_reduction: f32,
+     pub fence_gate: bool,
+ }
+@@ -88,6 +89,10 @@
+                     speed_factor: float("speedFactor")?,
+                     jump_factor: float("jumpFactor")?,
+                     bounce_restitution: float("bounceRestitution")?,
++                    legacy_bounce_restitution: properties
++                        .get("legacyBounceRestitution")
++                        .map(|_| float("legacyBounceRestitution"))
++                        .transpose()?,
+                     fall_distance_reduction: float("fallDistanceReduction")?,
+                     fence_gate,
+                 },
+--- a/crates/horizon-world/src/movement_restitution.rs
++++ b/crates/horizon-world/src/movement_restitution.rs
+@@ -20,6 +20,9 @@
+     fn effective_gravity(&mut self) -> Result<f64, Self::Error>;
+     fn block_suppresses_bounce(&mut self, block: BlockStateId) -> Result<bool, Self::Error>;
+     fn block_bounce_restitution(&mut self, block: BlockStateId) -> Result<f32, Self::Error>;
++    fn legacy_block_bounce(&mut self, _block: BlockStateId) -> Result<Option<f32>, Self::Error> {
++        Ok(None)
++    }
+     fn air_drag(&mut self) -> Result<f32, Self::Error>;
+     fn movement_support_position(&mut self) -> Result<BlockPos, Self::Error>;
+     fn bounce_on(
+@@ -63,6 +66,14 @@
+     if input.collided_z {
+         velocity.z = -old.z * bounce;
+     }
++    if input.vertical_collision && input.collision_below && old.y < 0.0
++        && !world.suppressing_bounce()?
++        && let Some(factor) = world.legacy_block_bounce(input.block)?
++    {
++        let entity_factor = if input.living { 1.0 } else { 0.8 };
++        velocity.y = -old.y * f64::from(factor) * entity_factor;
++        return world.set_velocity(velocity);
++    }
+     let mut emit = bounce > 0.0 && (input.collided_x || input.collided_z);
+     if input.vertical_collision {
+         if input.collision_below {
+--- a/crates/horizon-client/src/motion.rs
++++ b/crates/horizon-client/src/motion.rs
+@@ -2701,6 +2701,9 @@
+             .coefficients
+             .bounce_restitution)
+     }
++    fn legacy_block_bounce(&mut self, state: BlockStateId) -> Result<Option<f32>> {
++        Ok(self.resources.blocks.get(state)?.coefficients.legacy_bounce_restitution)
++    }
+     fn air_drag(&mut self) -> Result<f32> {
+         living_motion::air_drag(self)
+     }
+--- a/crates/horizon-world/src/collision_context.rs
++++ b/crates/horizon-world/src/collision_context.rs
+@@ -109,6 +109,12 @@
+     /// shapes that read `isDescending` (scaffolding) see the difference.
+     pub const fn with_descending(mut self, descending: bool) -> Self {
+         self.descending = descending;
++        self
++    }
++
++    /// Use a specific entity's shape without providing a live entity handle.
++    pub const fn with_kind(mut self, kind: EntityContextKind) -> Self {
++        self.kind = kind;
+         self
+     }
+ 
+--- a/crates/horizon-client/src/lan/hub.rs
++++ b/crates/horizon-client/src/lan/hub.rs
+@@ -4590,6 +4590,9 @@
+             to[1] - g.position[1],
+             to[2] - g.position[2],
+         );
++        let context = CollisionContext::position(g.position[1])
++            .with_kind(horizon_world::collision_context::EntityContextKind::Player)
++            .with_descending(g.sneaking);
+         let done = scene
+             .resolve_with_context(
+                 old,
+@@ -4598,7 +4601,7 @@
+                 g.on_ground,
+                 // The mover's own sneaking, as CollisionContext.of(player):
+                 // a sneaking player descends through scaffolding.
+-                CollisionContext::position(g.position[1]).with_descending(g.sneaking),
++                context,
+             )
+             .ok();
+         let fail = !g.creative()
+@@ -4618,7 +4621,6 @@
+         let Ok(old_shape) = VoxelShape::from_box(old.deflate(shrink)) else {
+             return (fail, false, stands);
+         };
+-        let context = CollisionContext::position(g.position[1]).with_descending(g.sneaking);
+         let Ok(scan) =
+             BlockCollisionScan::new(&mut scene, context, new.deflate(shrink), false, 1 << 20)
+         else {

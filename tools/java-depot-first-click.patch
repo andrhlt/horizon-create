@@ -1,0 +1,83 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,67 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	private static net.minecraft.server.level.ServerPlayer pressFixturePlayer(CreateGameTestHelper helper, String name) {
++		var server = helper.getLevel().getServer();
++		var profile = new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), name);
++		var cookie = net.minecraft.server.network.CommonListenerCookie.createInitial(profile, false);
++		var player = new net.minecraft.server.level.ServerPlayer(server, helper.getLevel(),
++			cookie.gameProfile(), cookie.clientInformation());
++		var connection = new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
++		new io.netty.channel.embedded.EmbeddedChannel(connection);
++		new net.minecraft.server.network.ServerGamePacketListenerImpl(server, connection, player, cookie) {
++			@Override
++			public void send(net.minecraft.network.protocol.Packet<?> packet,
++				net.minecraft.network.PacketSendListener callback) {}
++		};
++		helper.getLevel().addNewPlayer(player);
++		player.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
++		player.getAbilities().flying = true;
++		player.onUpdateAbilities();
++		return player;
++	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void depotFirstClick(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = pressFixturePlayer(helper, "DepotFirstClick");
++		player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
++		var position = new BlockPos(4, 9, 2);
++		var worldPosition = helper.absolutePos(position);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var up = net.minecraft.core.Direction.UP;
++		var state = AllBlocks.DEPOT.getDefaultState();
++		var ingots = new ItemStack(Items.IRON_INGOT, 3);
++		player.setItemInHand(hand, ingots);
++		level.setBlockAndUpdate(worldPosition, state);
++		var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) helper.getBlockEntity(position);
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			worldPosition.getCenter().relative(up, .5), up, worldPosition, false);
++		long tick = level.getGameTime();
++		java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listen = event -> {
++			if (event.getLevel() != level || event.getSound() == null)
++				return;
++			var id = event.getSound().value().getLocation();
++			if (id.toString().equals("create:depot_slide"))
++				System.out.printf(java.util.Locale.ROOT, "CREATE_DEPOT_SLIDE %d,%s,%s,%.6f,%.6f%n",
++					level.getGameTime() - tick, id, event.getSource().getName(),
++					event.getNewVolume(), event.getNewPitch());
++		};
++		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(listen);
++		System.out.printf("CREATE_DEPOT_FIRST_CLICK placed,%d,%d,%d%n",
++			level.getGameTime() - tick, player.getInventory().countItem(Items.IRON_INGOT), depot.getHeldItem().getCount());
++		state.useItemOn(ingots, level, player, hand, hit);
++		System.out.printf("CREATE_DEPOT_FIRST_CLICK deposited,%d,%d,%d%n",
++			level.getGameTime() - tick, player.getInventory().countItem(Items.IRON_INGOT), depot.getHeldItem().getCount());
++		helper.assertTrue(depot.getHeldItem().getCount() == 3, "New Depot must accept its first stack immediately.");
++		state.useItemOn(ItemStack.EMPTY, level, player, hand, hit);
++		System.out.printf("CREATE_DEPOT_FIRST_CLICK retrieved,%d,%d,%d%n",
++			level.getGameTime() - tick, player.getInventory().countItem(Items.IRON_INGOT), depot.getHeldItem().getCount());
++		helper.assertTrue(depot.getHeldItem().isEmpty() && player.getInventory().countItem(Items.IRON_INGOT) == 3
++			&& level.getGameTime() == tick, "All three ingots must return on the placement tick.");
++		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.unregister(listen);
++		helper.succeed();
++	}
++
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.depotFirstClick")).toList();
+ 	}
+ }

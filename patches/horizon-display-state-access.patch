@@ -1,0 +1,14 @@
+--- a/crates/horizon-client/src/game/text_displays.rs
++++ b/crates/horizon-client/src/game/text_displays.rs
+@@ -102,7 +102,11 @@
+         self.position = at;
+         self.target = at;
+         self.steps = 0;
++    }
++    pub(super) fn block_state(&self) -> Option<BlockStateId> {
++        self.block
+     }
++
+     pub(super) fn position(&self) -> glam::DVec3 {
+         self.position
+     }

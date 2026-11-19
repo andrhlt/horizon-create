@@ -1,0 +1,90 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,74 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void depotWeightedEjectorThreshold(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		var south = net.minecraft.core.Direction.SOUTH;
++		// The GameTest grid is randomly placed millions of blocks from the origin,
++		// where EntityLauncher's absolute float centers can lose half a block.
++		var at = new BlockPos(5, 105, -11);
++		var powerPos = at.west();
++		var motorPos = at.north();
++		var depotPos = at.east(4);
++		var chunk = new net.minecraft.world.level.ChunkPos(at);
++		level.setChunkForced(chunk.x, chunk.z, true);
++		level.getChunk(chunk.x, chunk.z);
++		for (int x = -1; x <= 5; x++)
++			for (int z = -2; z <= 2; z++) {
++				level.setBlockAndUpdate(at.offset(x, -1, z),
++					net.minecraft.world.level.block.Blocks.SMOOTH_STONE.defaultBlockState());
++				for (int y = 0; y < 7; y++)
++					level.removeBlock(at.offset(x, y, z), false);
++			}
++		level.setBlockAndUpdate(powerPos,
++			net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK.defaultBlockState());
++		level.setBlockAndUpdate(at, AllBlocks.WEIGHTED_EJECTOR.getDefaultState().setValue(horizontal, east));
++		level.setBlockAndUpdate(depotPos, AllBlocks.DEPOT.getDefaultState());
++		level.setBlockAndUpdate(motorPos,
++			AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, south));
++		((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(motorPos))
++			.generatedSpeed.setValue(128);
++		var ejector = (com.simibubi.create.content.logistics.depot.EjectorBlockEntity) level.getBlockEntity(at);
++		ejector.setTarget(4, 0);
++		var value = ejector.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE);
++		value.setValue(3);
++		var region = new net.minecraft.world.phys.AABB(at).inflate(10);
++		level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, region)
++			.forEach(net.minecraft.world.entity.Entity::discard);
++		var input = ejector.getBehaviour(com.simibubi.create.content.logistics.depot.DepotBehaviour.TYPE);
++		var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) level.getBlockEntity(depotPos);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			if (tick == 12) {
++				helper.assertTrue(ejector.getState().name().equals("CHARGED"), "Ejector must be charged");
++				var stack = new com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack(
++					new ItemStack(Items.IRON_INGOT, 2));
++				stack.beltPosition = .5f;
++				input.setHeldItem(stack);
++				level.removeBlock(powerPos, false);
++			}
++			if (tick == 20) {
++				helper.assertTrue(input.getHeldItemStack().getCount() == 2 && ejector.getState().name().equals("CHARGED"),
++					"Two ingots must wait for the configured minimum of three.");
++				value.setValueSettings(null,
++					new com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBehaviour.ValueSettings(0, 2),
++					false);
++			}
++			var saved = ejector.saveWithoutMetadata(level.registryAccess());
++			var flight = saved.getList("LaunchedItems", net.minecraft.nbt.Tag.TAG_COMPOUND);
++			var held = depot.getHeldItem();
++			var age = flight.isEmpty() ? -1 : flight.getCompound(0).getInt("Location");
++			System.out.printf(java.util.Locale.ROOT, "CREATE_EJECTOR_THRESHOLD %d,%d,%s,%d,%d,%d%n",
++				tick, value.getValue(), ejector.getState(), input.getHeldItemStack().getCount(), age, held.getCount());
++			helper.assertTrue(tick >= 46 && held.is(Items.IRON_INGOT) && held.getCount() == 2,
++				"Lowering the minimum must let both ingots reach the Depot.");
++			level.setChunkForced(chunk.x, chunk.z, false);
++		});
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.depotWeightedEjectorThreshold")).toList();
+ 	}
+ }

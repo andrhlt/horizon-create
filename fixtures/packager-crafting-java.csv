@@ -1,0 +1,4 @@
+recipe,width,height,slots,output,count,remainder
+crafting/logistics/packager,3,3,"_,minecraft:iron_ingot,_,minecraft:iron_ingot,create:cardboard_block,minecraft:iron_ingot,minecraft:redstone,minecraft:iron_ingot,minecraft:redstone",create:packager,1,
+crafting/materials/cardboard_block,2,2,"create:cardboard,create:cardboard,create:cardboard,create:cardboard",create:cardboard_block,1,
+crafting/materials/cardboard_from_block,1,1,create:cardboard_block,create:cardboard,4,

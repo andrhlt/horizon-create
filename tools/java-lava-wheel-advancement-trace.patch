@@ -1,0 +1,55 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -35,7 +35,7 @@
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+ 		return CreateTestFunction.getTestsFrom(testHolders).stream()
+-			.filter(test -> test.testName().equals("TestFluids.largeWaterwheel"))
++			.filter(test -> test.testName().equals("TestFluids.lavaWheelAward"))
+ 			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -393,6 +393,41 @@
+ 		});
+ 	}
+ 
++    @GameTest(template = "small_waterwheel", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++    public static void lavaWheelAward(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var owner = riderPlayer(helper, "LavaWheelOwner");
++        var witness = riderPlayer(helper, "LavaWheelWitness");
++        var water = level.getServer().getAdvancements().get(com.simibubi.create.Create.asResource("water_wheel"));
++        var magma = level.getServer().getAdvancements().get(com.simibubi.create.Create.asResource("lava_wheel_00000"));
++        var hub = helper.absolutePos(new BlockPos(3, 9, 2));
++        var wheelState = com.simibubi.create.AllBlocks.WATER_WHEEL.getDefaultState().setValue(
++            net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING, net.minecraft.core.Direction.NORTH);
++        level.setBlockAndUpdate(hub, wheelState);
++        wheelState.getBlock().setPlacedBy(level, hub, wheelState, owner, com.simibubi.create.AllBlocks.WATER_WHEEL.asStack());
++        level.setBlockAndUpdate(hub.east(2), Blocks.STONE.defaultBlockState());
++        level.setBlockAndUpdate(hub.east(2).above(), Blocks.STONE.defaultBlockState());
++        for (int tick = 1; tick <= 18; tick++) {
++            int t = tick;
++            helper.runAfterDelay(t, () -> {
++                var source = (WaterWheelBlockEntity) level.getBlockEntity(hub);
++                var waterDone = owner.getAdvancements().getOrStartProgress(water).isDone();
++                var lavaDone = owner.getAdvancements().getOrStartProgress(magma).isDone();
++                var witnessDone = witness.getAdvancements().getOrStartProgress(magma).isDone();
++                System.out.printf(java.util.Locale.ROOT, "CREATE_LAVA_WHEEL %d;%d;%s;%s;%s%n",
++                    t, source.flowScore, waterDone, lavaDone, witnessDone);
++                if (t == 4)
++                    level.setBlockAndUpdate(hub.east(), Blocks.LAVA.defaultBlockState().setValue(
++                        net.minecraft.world.level.block.LiquidBlock.LEVEL, 8));
++                if (t == 18) {
++                    helper.assertTrue(source.flowScore != 0 && lavaDone && !waterDone && !witnessDone,
++                        "Lava must turn the wheel and grant only Magma Wheel to the original placer");
++                    helper.succeed();
++                }
++            });
++        }
++    }
++
+     private static net.minecraft.server.level.ServerPlayer riderPlayer(CreateGameTestHelper helper, String name) {
+         var server = helper.getLevel().getServer();
+         var profile = new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), name);

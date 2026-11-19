@@ -1,0 +1,22 @@
+--- a/crates/horizon-client/src/game/advancements.rs
++++ b/crates/horizon-client/src/game/advancements.rs
+@@ -1154,6 +1154,7 @@
+             s.as_ref().map(|s| (&s.item, s.count)).hash(&mut h);
+         }
+         let key = h.finish();
++        let first_inventory_snapshot = self.adv.last_inventory == 0;
+         if key == self.adv.last_inventory {
+             return;
+         }
+@@ -1177,6 +1178,11 @@
+             .flatten()
+             .map(item_view)
+             .collect();
++        // InventoryChangeTrigger observes changed menu slots. The first
++        // snapshot of a completely empty inventory changed no slot.
++        if first_inventory_snapshot && stacks.is_empty() {
++            return;
++        }
+         // InventoryChangeTrigger slots: occupied, full and empty counts.
+         let all: Vec<&Option<ItemStack>> = self
+             .inventory

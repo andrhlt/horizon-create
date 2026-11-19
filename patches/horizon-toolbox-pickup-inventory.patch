@@ -1,0 +1,128 @@
+diff --git a/crates/horizon-client/src/game/lan_actions.rs b/crates/horizon-client/src/game/lan_actions.rs
+index dfbbe5e080..5a6f08d0ef 100644
+--- a/crates/horizon-client/src/game/lan_actions.rs
++++ b/crates/horizon-client/src/game/lan_actions.rs
+@@ -40,6 +40,61 @@ use horizon_protocol::{
+ use horizon_world::entity_move::EntityMoveWorld;
+ use winit::keyboard::KeyCode;
+ 
++// Other live players' main inventories during an admitted block attack.
++// The hub is borrowed by packet dispatch while the acting player's state is
++// swapped in. Move the inventories here for the duration of the attack so a
++// native block can synchronously update them before creating its drop.
++struct AttackInventory {
++    player: horizon_client::mod_api::NativeServerPlayer,
++    items: Vec<Option<ItemStack>>,
++    changed: bool,
++}
++
++thread_local! {
++    static ATTACK_INVENTORIES: std::cell::RefCell<Vec<AttackInventory>> = const { std::cell::RefCell::new(Vec::new()) };
++}
++
++impl Game<'_> {
++    pub(super) fn native_attack_players(&self) -> Vec<horizon_client::mod_api::NativeServerPlayer> {
++        ATTACK_INVENTORIES
++            .with_borrow(|entries| entries.iter().map(|entry| entry.player.clone()).collect())
++    }
++
++    pub(super) fn native_attack_stack(&self, player: u128, slot: usize) -> Option<ItemStack> {
++        ATTACK_INVENTORIES.with_borrow(|entries| {
++            entries
++                .iter()
++                .find(|entry| entry.player.uuid == player)?
++                .items
++                .get(slot)?
++                .clone()
++        })
++    }
++
++    pub(super) fn native_attack_set_stack(
++        &mut self,
++        player: u128,
++        slot: usize,
++        expected: Option<&ItemStack>,
++        new: Option<ItemStack>,
++    ) -> bool {
++        ATTACK_INVENTORIES.with_borrow_mut(|entries| {
++            let Some(entry) = entries.iter_mut().find(|entry| entry.player.uuid == player) else {
++                return false;
++            };
++            let Some(current) = entry.items.get_mut(slot) else {
++                return false;
++            };
++            if current.as_ref() != expected {
++                return false;
++            }
++            *current = new;
++            entry.changed = true;
++            true
++        })
++    }
++}
++
+ mod guest_body;
+ mod horizon_channels;
+ 
+@@ -2160,6 +2215,30 @@ impl Game<'_> {
+                     // attacks the block at once, so a tap released in the same tick
+                     // still plays a note. The dig is marked begun for tick_mining.
+                     let pos = a.pos;
++                    // Give an attack hook synchronous access to the other players'
++                    // main inventories while this packet owns the hub.
++                    let others: Vec<_> = if !host.hub.guests[gi].creative()
++                        && super::create_toolbox::block(&self.native_block(pos))
++                    {
++                        host.hub
++                            .guests
++                            .iter()
++                            .enumerate()
++                            .filter(|(_, guest)| guest.conn != conn && guest.placed && !guest.dead)
++                            .map(|(i, guest)| (i, super::native_server::server_player(host, guest)))
++                            .collect()
++                    } else {
++                        Vec::new()
++                    };
++                    ATTACK_INVENTORIES.with_borrow_mut(|entries| {
++                        for (i, player) in &others {
++                            entries.push(AttackInventory {
++                                player: player.clone(),
++                                items: std::mem::take(&mut host.hub.guests[*i].inventory),
++                                changed: false,
++                            });
++                        }
++                    });
+                     let destroyed = self.as_guest(host, conn, |g| {
+                         if g.creative {
+                             let _ = g.break_block(pos);
+@@ -2174,6 +2253,14 @@ impl Game<'_> {
+                         });
+                         false
+                     });
++                    ATTACK_INVENTORIES.with_borrow_mut(|entries| {
++                        for ((i, _), entry) in others.iter().zip(entries.drain(..)) {
++                            host.hub.guests[*i].inventory = entry.items;
++                            if entry.changed {
++                                host.hub.send_inventory(*i);
++                            }
++                        }
++                    });
+                     if destroyed == Some(true)
+                         && let Some(play) = host.play.get_mut(&conn)
+                     {
+diff --git a/crates/horizon-client/src/game/native_server.rs b/crates/horizon-client/src/game/native_server.rs
+index 95ccdfa023..53d92b0584 100644
+--- a/crates/horizon-client/src/game/native_server.rs
++++ b/crates/horizon-client/src/game/native_server.rs
+@@ -339,7 +339,10 @@ fn vanilla_command_info(d: &Dispatcher, label: &str) -> Option<NativeCommandInfo
+ }
+ 
+ /// A guest as server hooks see them, from the hub's record.
+-fn server_player(host: &LanHost, g: &horizon_client::lan::guest::Guest) -> NativeServerPlayer {
++pub(super) fn server_player(
++    host: &LanHost,
++    g: &horizon_client::lan::guest::Guest,
++) -> NativeServerPlayer {
+     // Abilities.invulnerable, flying and mayfly, as `ServerPlayer.onUpdateAbilities` sends them.
+     let abilities = g.ability_flags();
+     // LivingEntity.DATA_LIVING_ENTITY_FLAGS: 1 while using, 2 when it is the off hand's item.

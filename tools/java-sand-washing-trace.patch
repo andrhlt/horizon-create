@@ -1,0 +1,68 @@
+diff --git a/src/main/java/com/simibubi/create/foundation/recipe/RecipeApplier.java b/src/main/java/com/simibubi/create/foundation/recipe/RecipeApplier.java
+index f4e0cb7..eacbf2e 100644
+--- a/src/main/java/com/simibubi/create/foundation/recipe/RecipeApplier.java
++++ b/src/main/java/com/simibubi/create/foundation/recipe/RecipeApplier.java
+@@ -14,6 +14,7 @@ import net.minecraft.world.item.crafting.Recipe;
+ import net.minecraft.world.level.Level;
+ 
+ public class RecipeApplier {
++	public static net.minecraft.util.RandomSource sandFixtureRandom;
+ 	public static void applyRecipeOn(ItemEntity entity, Recipe<?> recipe, boolean returnProcessingRemainder) {
+ 		List<ItemStack> stacks = applyRecipeOn(entity.level(), entity.getItem(), recipe, returnProcessingRemainder);
+ 		if (stacks.isEmpty()) {
+@@ -36,7 +37,7 @@ public class RecipeApplier {
+ 			for (int i = 0; i < stackIn.getCount(); i++) {
+ 				List<ProcessingOutput> outputs =
+ 					pr instanceof ManualApplicationRecipe mar ? mar.getRollableResults() : pr.getRollableResults();
+-				for (ItemStack stack : pr.rollResults(outputs, level.random)) {
++				for (ItemStack stack : pr.rollResults(outputs, sandFixtureRandom == null ? level.random : sandFixtureRandom)) {
+ 					for (ItemStack previouslyRolled : stacks) {
+ 						if (stack.isEmpty())
+ 							continue;
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..6736268 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.sandWashing"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d..fdebfff 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -98,10 +98,27 @@ public class TestProcessing {
+ 
+ 	@GameTest(template = "sand_washing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
+ 	public static void sandWashing(CreateGameTestHelper helper) {
++		com.simibubi.create.foundation.recipe.RecipeApplier.sandFixtureRandom = net.minecraft.util.RandomSource.create(4096L);
+ 		BlockPos leverPos = new BlockPos(5, 3, 1);
+ 		helper.pullLever(leverPos);
+ 		BlockPos chestPos = new BlockPos(8, 3, 2);
+-		helper.succeedWhen(() -> helper.assertContainerContains(chestPos, Items.CLAY_BALL));
++		helper.succeedWhen(() -> {
++			var access = helper.getLevel().registryAccess();
++			var belt = (com.simibubi.create.content.kinetics.belt.BeltBlockEntity) helper.getBlockEntity(new BlockPos(7, 2, 2));
++			var input = helper.getBlockEntity(new BlockPos(5, 3, 2)).saveWithoutMetadata(access);
++			var stacks = belt.getInventory().write(access).getList("Items", 10);
++			long tick = helper.getTick();
++			System.out.printf("CREATE_SAND %d %d %d %d%n", tick, input.getInt("TransferCooldown"),
++				stacks.size(), helper.getTotalItems(chestPos));
++			for (int index = 0; index < stacks.size(); index++) {
++				var carried = stacks.getCompound(index);
++				var stack = carried.getCompound("Item");
++				System.out.printf(java.util.Locale.ROOT, "CREATE_SAND_STACK %d %d %s %d %.7f %d%n",
++					tick, index, stack.getString("id"), stack.getInt("count"), carried.getFloat("Pos"),
++					carried.contains("FanProcessingTime") ? carried.getInt("FanProcessingTime") : -2);
++			}
++			helper.assertContainerContains(chestPos, Items.CLAY_BALL);
++		});
+ 	}
+ 
+ 	@GameTest(template = "stone_cobble_sand_crushing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)

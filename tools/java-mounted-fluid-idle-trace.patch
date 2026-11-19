@@ -1,0 +1,34 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -96,11 +96,19 @@
+ 			helper.fail("Tank empty");
+ 		BlockPos lever = new BlockPos(1, 5, 1);
+ 		var port = setupMountedComparator(helper, com.simibubi.create.AllBlocks.PORTABLE_FLUID_INTERFACE.get());
++		boolean idle = Boolean.getBoolean("parity.mountedFluidIdle");
++		if (idle)
++			helper.setBlock(new BlockPos(3, 2, 1), Blocks.AIR);
+ 		helper.pullLever(lever);
+ 		BlockPos output = new BlockPos(4, 2, 1);
+ 		helper.succeedWhen(() -> {
+ 			traceMounted(helper, "mounted_fluid_drain", tank, output);
+ 			boolean settled = traceMountedComparator(helper, port);
++			if (idle) {
++				helper.assertTankEmpty(output);
++				helper.assertSecondsPassed(7);
++				return;
++			}
+ 			helper.assertFluidPresent(fluid, output); // verify all extracted
+ 			helper.powerLever(lever); // disassemble contraption
+ 			helper.assertTankEmpty(tank); // verify nothing left
+--- a/build.gradle
++++ b/build.gradle
+@@ -92,7 +92,8 @@
+         gameTestServer {
+             type = "gameTestServer"
+             def mode = project.findProperty("parityMountedComparator")
+-            def fluid = mode == "fluid"
++            def fluid = mode == "fluid" || mode == "fluid_idle"
++            systemProperty("parity.mountedFluidIdle", (mode == "fluid_idle").toString())
+             def rescue = mode == "rescue"
+             def idle = mode == "idle" || rescue
+             gameDirectory = project.file("run/bearing-${mode}-port-readout-test-server")

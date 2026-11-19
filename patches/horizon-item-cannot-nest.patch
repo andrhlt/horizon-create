@@ -1,0 +1,97 @@
+diff --git a/crates/horizon-client/src/game/commands/items/contents.rs b/crates/horizon-client/src/game/commands/items/contents.rs
+index 5a96e53..67029e0 100644
+--- a/crates/horizon-client/src/game/commands/items/contents.rs
++++ b/crates/horizon-client/src/game/commands/items/contents.rs
+@@ -157,7 +157,7 @@ impl Game<'_> {
+             return true;
+         }
+         let Some(item) = item else { return true };
+-        if !horizon_client::bundle::can_be_in_bundle(item) {
++        if !horizon_client::bundle::can_be_in_bundle(self.res.items(), item) {
+             return false;
+         }
+         let rest = slots
+diff --git a/crates/horizon-client/src/lan/menu.rs b/crates/horizon-client/src/lan/menu.rs
+index 260a6fa..6c82cab 100644
+--- a/crates/horizon-client/src/lan/menu.rs
++++ b/crates/horizon-client/src/lan/menu.rs
+@@ -525,7 +525,7 @@ impl View<'_> {
+         }
+         if self.shulker
+             && self.container.as_ref().is_some_and(|c| i < c.len())
+-            && !crate::menu::fits_inside_container_items(stack)
++            && !crate::bundle::fits_inside_container_items(rules.items(), stack)
+         {
+             return false;
+         }
+@@ -892,7 +892,7 @@ fn bundle_click(view: &mut View, i: usize, right: bool, rules: &dyn Rules) -> bo
+         match other {
+             // tryTransfer: as much as fits, through `safeTake`.
+             Some(mut other) => {
+-                if can_be_in_bundle(&other) {
++                if can_be_in_bundle(items, &other) {
+                     let amount = other.count.min(contents.room_for(items, &other));
+                     if amount > 0 {
+                         let mut taken = other.clone();
+diff --git a/crates/horizon-client/src/menu.rs b/crates/horizon-client/src/menu.rs
+index 356c536..b4e13bc 100644
+--- a/crates/horizon-client/src/menu.rs
++++ b/crates/horizon-client/src/menu.rs
+@@ -1450,7 +1450,7 @@ impl Menu {
+             Role::MountEquip(slot) => Self::equippable(env, stack).is_some_and(|e| {
+                 e.slot == slot && self.mount.as_deref().is_some_and(|m| e.allows(m))
+             }),
+-            Role::Shulker => fits_inside_container_items(stack),
++            Role::Shulker => crate::bundle::fits_inside_container_items(env.items, stack),
+             Role::Mod | Role::ModResult => self.mod_slot(s, stack).0,
+             Role::Hidden => false,
+             Role::Fuel => Self::is_fuel(env, stack) || Self::is_bucket(stack),
+diff --git a/crates/horizon-client/src/menu/bundle.rs b/crates/horizon-client/src/menu/bundle.rs
+index 78a5265..3e6ba3a 100644
+--- a/crates/horizon-client/src/menu/bundle.rs
++++ b/crates/horizon-client/src/menu/bundle.rs
+@@ -30,7 +30,7 @@ impl Menu {
+             (Some(other), true) => {
+                 // tryTransfer: what fits, taken by the slot's rules.
+                 let mut moved = 0;
+-                if can_be_in_bundle(&other) {
++                if can_be_in_bundle(env.items, &other) {
+                     let room = contents.room_for(env.items, &other);
+                     if let Some(mut taken) = self.safe_take(env, s, other.count, room) {
+                         moved = contents.try_insert(env.items, &mut taken);
+diff --git a/crates/horizon-items/src/bundle.rs b/crates/horizon-items/src/bundle.rs
+index c5aaf56..859f2bf 100644
+--- a/crates/horizon-items/src/bundle.rs
++++ b/crates/horizon-items/src/bundle.rs
+@@ -91,9 +91,19 @@ fn contents_weight(items: &Items, inside: &[ItemStack]) -> Weight {
+     })
+ }
+ 
+-/// `BundleContents.canItemBeInBundle`: shulker boxes don't fit.
+-pub fn can_be_in_bundle(stack: &ItemStack) -> bool {
+-    stack.count > 0 && !stack.item.ends_with("shulker_box")
++/// `Item.canFitInsideContainerItems`: shulker boxes and content items with the
++/// non-nesting tag cannot go into a bundle or shulker slot.
++pub fn fits_inside_container_items(items: &Items, stack: &ItemStack) -> bool {
++    !stack.item.ends_with("shulker_box")
++        && !items
++            .item_tags
++            .get("c:cannot_fit_inside_container_items")
++            .is_some_and(|group| group.contains(stack.item.as_ref()))
++}
++
++/// `BundleContents.canItemBeInBundle`.
++pub fn can_be_in_bundle(items: &Items, stack: &ItemStack) -> bool {
++    stack.count > 0 && fits_inside_container_items(items, stack)
+ }
+ 
+ /// `BundleItem.onDestroyed` (`ItemStack.onDestroyed` for a bundle): the stack
+@@ -154,7 +164,7 @@ impl Contents {
+ 
+     /// `tryInsert`: what fits moves to the front, merged with its kind.
+     pub fn try_insert(&mut self, items: &Items, stack: &mut ItemStack) -> u32 {
+-        if !can_be_in_bundle(stack) {
++        if !can_be_in_bundle(items, stack) {
+             return 0;
+         }
+         let weight = item_weight(items, stack);

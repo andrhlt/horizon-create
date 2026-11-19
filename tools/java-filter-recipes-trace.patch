@@ -1,0 +1,72 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..e530ed4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.filterRecipes"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..2cf0d13 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,53 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void filterRecipes(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var brass = com.simibubi.create.AllItems.BRASS_INGOT.get();
++		var brassNugget = com.simibubi.create.AllItems.BRASS_NUGGET.get();
++		var zinc = com.simibubi.create.AllItems.ZINC_NUGGET.get();
++		var attribute = com.simibubi.create.AllItems.ATTRIBUTE_FILTER.asStack();
++		var address = com.simibubi.create.AllItems.PACKAGE_FILTER.asStack();
++		attribute.set(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE,
++			com.simibubi.create.content.logistics.filter.AttributeFilterWhitelistMode.BLACKLIST);
++		address.set(com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS, "Workshop");
++		for (var stack : new ItemStack[] {attribute, address}) {
++			stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal("Configured part"));
++			var data = new net.minecraft.nbt.CompoundTag();
++			data.putInt("marker", 7);
++			stack.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(data));
++		}
++		for (int scenario = 0; scenario < 6; scenario++) {
++			var grid = new java.util.ArrayList<ItemStack>(java.util.Collections.nCopies(9, ItemStack.EMPTY));
++			switch (scenario) {
++				case 0 -> grid.set(4, new ItemStack(brass));
++				case 1 -> {
++					for (int i = 0; i < 9; i++) grid.set(i, new ItemStack(brassNugget));
++				}
++				case 2 -> {
++					grid.set(3, new ItemStack(brassNugget));
++					grid.set(4, new ItemStack(Items.BLUE_WOOL));
++					grid.set(5, new ItemStack(brassNugget));
++				}
++				case 3 -> {
++					grid.set(3, new ItemStack(zinc));
++					grid.set(4, new ItemStack(Items.GREEN_WOOL));
++					grid.set(5, new ItemStack(zinc));
++				}
++				case 4 -> grid.set(4, attribute);
++				case 5 -> grid.set(4, address);
++			}
++			var input = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, grid);
++			var recipe = level.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level).orElseThrow();
++			var result = recipe.value().assemble(input, level.registryAccess());
++			long remaining = recipe.value().getRemainingItems(input).stream().filter(stack -> !stack.isEmpty()).count();
++			boolean configured = result.has(com.simibubi.create.AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE)
++				|| result.has(com.simibubi.create.AllDataComponents.PACKAGE_ADDRESS);
++			System.out.printf("FILTER_RECIPE,%d,%s,%s,%d,%b,%b,%b,%d%n", scenario, recipe.id(),
++				net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(result.getItem()), result.getCount(),
++				result.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME), result.has(net.minecraft.core.component.DataComponents.CUSTOM_DATA), configured, remaining);
++		}
++		helper.succeed();
++	}
+ }

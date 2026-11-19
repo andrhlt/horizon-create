@@ -1,0 +1,48 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -141,6 +141,7 @@
+ 			level.setBlockAndUpdate(origin.east(x), rail);
+ 			level.setBlockAndUpdate(origin.east(x).above(), Blocks.AIR.defaultBlockState());
+ 		}
++		boolean rearVault = "1".equals(System.getenv("CREATE_TRAIN_MOUNTED_VAULT"));
+ 		var order = inserting ? "" : java.util.Objects.toString(System.getenv("CREATE_TWO_CHEST_ORDER"), "");
+ 		boolean competing = order.equals("front") || order.equals("deck");
+ 		boolean takeLeading = order.equals("deck");
+@@ -227,12 +228,21 @@
+ 					.setItem(0, new ItemStack(Items.PAPER, 1));
+ 			var chestPos = origin.east(4).above(3);
+ 			boolean barrel = "1".equals(System.getenv("CREATE_TRAIN_MOUNTED_BARREL"));
+-			var storageBlock = barrel ? Blocks.BARREL : Blocks.CHEST;
++			var storageBlock = rearVault ? com.simibubi.create.AllBlocks.ITEM_VAULT.get() : barrel ? Blocks.BARREL : Blocks.CHEST;
+ 			level.setBlockAndUpdate(chestPos, storageBlock.defaultBlockState());
+-			var chest = (net.minecraft.world.Container) level.getBlockEntity(chestPos);
+-			chest.setItem(0, new ItemStack(Items.PAPER, inserting ? 63 : 64));
+-			chest.setItem(1, new ItemStack(Items.PAPER, 7));
+-			chest.setItem(2, new ItemStack(Items.REDSTONE, 64));
++			var papers = new ItemStack(Items.PAPER, inserting ? 63 : 64);
++			if (rearVault) {
++				var vault = (com.simibubi.create.content.logistics.vault.ItemVaultBlockEntity) level.getBlockEntity(chestPos);
++				var items = vault.getInventoryOfBlock();
++				items.setStackInSlot(0, papers);
++				items.setStackInSlot(1, new ItemStack(Items.PAPER, 7));
++				items.setStackInSlot(2, new ItemStack(Items.REDSTONE, 64));
++			} else {
++				var chest = (net.minecraft.world.Container) level.getBlockEntity(chestPos);
++				chest.setItem(0, papers);
++				chest.setItem(1, new ItemStack(Items.PAPER, 7));
++				chest.setItem(2, new ItemStack(Items.REDSTONE, 64));
++			}
+ 			var leadingPos = origin.east(leadingOffset).above(2);
+ 			level.setBlockAndUpdate(leadingPos, Blocks.CHEST.defaultBlockState());
+ 			var leadingChest = (net.minecraft.world.level.block.entity.ChestBlockEntity) level.getBlockEntity(leadingPos);
+@@ -269,8 +279,8 @@
+ 			var mounted = storage.getAllItems();
+ 			var loaded = storage.getAllItemStorages().get(new BlockPos(3, 2, 0));
+ 			var leading = storage.getAllItemStorages().get(new BlockPos(leadingOffset - 1, 1, 0));
+-			helper.assertTrue(mounted != null && mounted.getSlots() == 54 && loaded != null && leading != null,
+-				"The Portable Storage Interface must expose two independent 27-slot chests");
++			helper.assertTrue(mounted != null && mounted.getSlots() == (rearVault ? 47 : 54) && loaded != null && leading != null,
++				"The Portable Storage Interface must expose both independent storage ranges");
+ 			helper.assertTrue(loaded.getStackInSlot(0).is(Items.PAPER)
+ 				&& loaded.getStackInSlot(0).getCount() == (inserting ? 63 : 64)
+ 				&& loaded.getStackInSlot(1).is(Items.PAPER) && loaded.getStackInSlot(1).getCount() == 7

@@ -1,0 +1,133 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaSchedulePackageEditorProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaSchedulePackageEditorProbe.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaSchedulePackageEditorProbe.java
+@@ -0,0 +1,128 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.trains.schedule.ScheduleScreen;
++import com.simibubi.create.content.trains.schedule.destination.DeliverPackagesInstruction;
++import com.simibubi.create.content.trains.schedule.destination.FetchPackagesInstruction;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaSchedulePackageEditorProbe {
++    private static boolean supplied;
++    private static int phase;
++    private static int elapsed;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.schedulePackageEditor"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.getOverlay() != null)
++            return;
++        if (!supplied) {
++            var server = mc.getSingleplayerServer();
++            var playerId = mc.player.getUUID();
++            server.execute(() -> server.getPlayerList().getPlayer(playerId)
++                .setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, AllItems.SCHEDULE.asStack()));
++            supplied = true;
++        }
++        if (!AllItems.SCHEDULE.isIn(mc.player.getMainHandItem()) || ++elapsed < 8)
++            return;
++        if (mc.screen == null) {
++            switch (phase) {
++                case 0 -> use(mc);
++                case 6 -> {
++                    capture(mc, "DELIVER");
++                    use(mc);
++                }
++                case 11 -> {
++                    capture(mc, "RETRIEVE");
++                    use(mc);
++                }
++                default -> { return; }
++            }
++        } else if (mc.screen instanceof ScheduleScreen screen) {
++            switch (phase) {
++                case 1 -> {
++                    click(screen, 52, 31);
++                    scroll(screen, 129, 72, -1);
++                }
++                case 2 -> {
++                    require(screen, DeliverPackagesInstruction.class);
++                    click(screen, 233, 94);
++                }
++                case 3 -> {
++                    click(screen, 65, 60);
++                    for (int i=0; i<2; i++)
++                        scroll(screen, 85, 94, 1);
++                }
++                case 4 -> click(screen, 233, 94);
++                case 5, 10 -> click(screen, 222, 204);
++                case 7 -> {
++                    click(screen, 90, 37);
++                    require(screen, DeliverPackagesInstruction.class);
++                    scroll(screen, 129, 72, -1);
++                }
++                case 8 -> {
++                    require(screen, FetchPackagesInstruction.class);
++                    click(screen, 111, 94);
++                    for (char c : "Warehouse ****".toCharArray())
++                        screen.charTyped(c, 0);
++                }
++                case 9 -> click(screen, 233, 94);
++                case 12 -> {
++                    click(screen, 90, 37);
++                    var instruction = (FetchPackagesInstruction) require(screen, FetchPackagesInstruction.class);
++                    if (!instruction.getFilter().equals("Warehouse ***"))
++                        throw new AssertionError("Expected the three-wildcard address, got " + instruction.getFilter());
++                    System.out.println("CREATE_PACKAGE_EDITOR_DONE");
++                    mc.stop();
++                }
++                default -> { return; }
++            }
++        } else
++            return;
++        phase++;
++        elapsed = 0;
++    }
++
++    private static Object require(ScheduleScreen screen, Class<?> kind) throws ReflectiveOperationException {
++        var field = ScheduleScreen.class.getDeclaredField("editingDestination");
++        field.setAccessible(true);
++        var actual = field.get(screen);
++        if (!kind.isInstance(actual))
++            throw new AssertionError("Expected " + kind.getSimpleName() + ", got " + actual);
++        return actual;
++    }
++
++    private static void capture(Minecraft mc, String name) {
++        System.out.println("CREATE_PACKAGE_EDITOR_" + name + " " +
++            mc.player.getMainHandItem().get(AllDataComponents.TRAIN_SCHEDULE));
++    }
++
++    private static void use(Minecraft mc) throws ReflectiveOperationException {
++        var method = Minecraft.class.getDeclaredMethod("startUseItem");
++        method.setAccessible(true);
++        method.invoke(mc);
++    }
++
++    private static void click(ScheduleScreen screen, int dx, int dy) throws ReflectiveOperationException {
++        screen.mouseClicked(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, 0);
++    }
++
++    private static void scroll(ScheduleScreen screen, int dx, int dy, double delta) throws ReflectiveOperationException {
++        screen.mouseScrolled(origin(screen, "leftPos") + dx, origin(screen, "topPos") + dy, 0, delta);
++    }
++
++    private static int origin(ScheduleScreen screen, String fieldName) throws ReflectiveOperationException {
++        var field = AbstractContainerScreen.class.getDeclaredField(fieldName);
++        field.setAccessible(true);
++        return (int) field.get(screen);
++    }
++}

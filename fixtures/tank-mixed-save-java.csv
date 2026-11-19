@@ -1,0 +1,7 @@
+rig,y,fluid,amount,size,height,controller_y
+0,0,minecraft:water,4000,1,1,0
+0,1,minecraft:lava,5000,1,2,1
+0,2,minecraft:empty,0,,,1
+1,0,minecraft:lava,4000,1,1,0
+1,1,minecraft:water,5000,1,2,1
+1,2,minecraft:empty,0,,,1

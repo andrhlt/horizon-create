@@ -1,0 +1,76 @@
+--- a/crates/horizon-client/src/block_transform.rs
++++ b/crates/horizon-client/src/block_transform.rs
+@@ -176,6 +176,25 @@
+             }
+         }
+     }
++}
++
++fn copper_roof_path(name: &str) -> Option<&str> {
++    let path = name.strip_prefix("create:")?;
++    let unwaxed = path.strip_prefix("waxed_").unwrap_or(path);
++    let family = ["exposed_", "weathered_", "oxidized_"]
++        .iter()
++        .find_map(|prefix| unwaxed.strip_prefix(*prefix))
++        .unwrap_or(unwaxed);
++    matches!(
++        family,
++        "copper_shingles" | "copper_shingle_slab" | "copper_shingle_stairs" |
++        "copper_tiles" | "copper_tile_slab" | "copper_tile_stairs"
++    ).then_some(path)
++}
++
++fn copper_roof_state(registry: &BlockRegistry, old: &BlockState, path: &str) -> Option<BlockState> {
++    let target = registry.default_state(&format!("create:{path}"))?;
++    with_properties_of(registry, registry.state(target)?.clone(), old)
+ }
+ 
+ impl Transformers {
+@@ -231,18 +250,45 @@
+         face: &str,
+         around: &dyn Around,
+     ) -> Option<(usize, &'a Transform, BlockState)> {
+-        self.transformers
+-            .get(id)?
++        let transforms = self.transformers.get(id)?;
++        transforms
+             .iter()
+             .enumerate()
+             .filter(|(_, t)| !t.disallowed_faces.iter().any(|f| f == face))
+             .find_map(|(i, t)| Some((i, t, t.provider.state(items, registry, around)?)))
++            .or_else(|| {
++                if id != "minecraft:axe" {
++                    return None;
++                }
++                let old = around.state([0, 0, 0]);
++                let path = copper_roof_path(&old.name)?;
++                let (particle, target) = if let Some(bare) = path.strip_prefix("waxed_") {
++                    ("wax_off", bare.to_owned())
++                } else {
++                    let previous = [("exposed_", ""), ("weathered_", "exposed_"),
++                        ("oxidized_", "weathered_")]
++                        .iter()
++                        .find_map(|(age, previous)| {
++                            path.strip_prefix(*age).map(|part| format!("{previous}{part}"))
++                        })?;
++                    ("scrape", previous)
++                };
++                // Use the same drops, durability and sound as a regular copper block.
++                let (index, transform) = transforms.iter().enumerate().find(|(_, transform)|
++                    transform.particle == particle && transform.transform_type == "single_block"
++                        && transform.update_from_neighbors
++                        && !transform.disallowed_faces.iter().any(|f| f == face))?;
++                Some((index, transform, copper_roof_state(registry, &old, &target)?))
++            })
+     }
+ 
+     /// `HoneycombItem.getWaxed`: the waxed twin of a copper block, found from
+     /// the axe's wax-off transforms (`WAX_OFF_BY_BLOCK` is the inverse of
+     /// `WAXABLES`).
+     pub fn waxed(&self, registry: &BlockRegistry, old: &BlockState) -> Option<BlockState> {
++        if let Some(path) = copper_roof_path(&old.name).filter(|path| !path.starts_with("waxed_")) {
++            return copper_roof_state(registry, old, &format!("waxed_{path}"));
++        }
+         for transform in self.transformers.get("minecraft:axe")? {
+             if transform.particle != "wax_off" {
+                 continue;

@@ -1,0 +1,63 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,49 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void whistleContract(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var base = helper.absolutePos(new BlockPos(3, 16, 3));
++		var whistle = com.simibubi.create.AllBlocks.STEAM_WHISTLE.get();
++		var extender = com.simibubi.create.AllBlocks.STEAM_WHISTLE_EXTENSION.get();
++		var tank = com.simibubi.create.AllBlocks.FLUID_TANK.get();
++		var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		helper.runAtTickTime(2, () -> {
++			for (var side : net.minecraft.core.Direction.values()) {
++				var support = base.east(side.ordinal() * 3);
++				world.setBlockAndUpdate(support, tank.defaultBlockState());
++				var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++				var held = com.simibubi.create.AllBlocks.STEAM_WHISTLE.asStack();
++				player.setItemInHand(hand, held);
++				player.setYRot(0);
++				var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(support).relative(side, .5), side, support, false);
++				var action = held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++				var at = support.relative(side);
++				System.out.printf("CREATE_WHISTLE_PLACE %s|%s|%s|%d%n", side, action, world.getBlockState(at), held.getCount());
++			}
++			var support = base.south(8);
++			var at = support.east();
++			world.setBlockAndUpdate(support, tank.defaultBlockState());
++			world.setBlockAndUpdate(at, whistle.defaultBlockState().setValue(whistle.WALL, true).setValue(whistle.FACING, net.minecraft.core.Direction.WEST));
++			for (int i = 1; i <= 12; i++) {
++				whistle.incrementSize(world, at);
++				System.out.printf("CREATE_WHISTLE_GROW %d|%s|%s|%s%n", i, world.getBlockState(at.above()), world.getBlockState(at.above(2)), world.getBlockState(at.above(3)));
++			}
++			var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++			var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(at), net.minecraft.core.Direction.UP, at, false);
++			var context = new net.minecraft.world.item.context.UseOnContext(player, hand, hit);
++			for (int i = 1; i <= 3; i++) {
++				var action = whistle.onWrenched(world.getBlockState(at), context);
++				System.out.printf("CREATE_WHISTLE_WRENCH %d|%s|%s|%s%n", i, action, world.getBlockState(at), world.getBlockState(at.above()));
++			}
++			world.setBlockAndUpdate(at.above(3), air);
++			System.out.printf("CREATE_WHISTLE_DETACH_UPPER %s|%s%n", world.getBlockState(at.above()), world.getBlockState(at.above(2)));
++			world.setBlockAndUpdate(support, air);
++			System.out.printf("CREATE_WHISTLE_DETACH_TANK %s|%s|%s%n", world.getBlockState(at), world.getBlockState(at.above()), world.getBlockState(at.above(2)));
++			helper.succeed();
++		});
++	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++            .filter(test -> test.testName().equals("TestMisc.whistleContract")).toList();
+ 	}
+ }

@@ -1,0 +1,382 @@
+diff --git a/crates/horizon-assets/src/blockstate/choice.rs b/crates/horizon-assets/src/blockstate/choice.rs
+--- a/crates/horizon-assets/src/blockstate/choice.rs
++++ b/crates/horizon-assets/src/blockstate/choice.rs
+@@ -57,19 +57,23 @@
+             },
+         }
+     }
+-    fn select(&self, random: &mut impl RandomSource) -> &T {
++    fn select(&self, random: &mut impl RandomSource, legacy_weighted: bool) -> Option<&T> {
+         match self {
+-            Self::Single(value) => value,
++            Self::Single(value) => Some(value),
+             Self::Weighted {
+                 variants,
+                 ends,
+                 total,
+             } => {
+-                // A singleton weighted list still consumes the bounded draw.
+-                let index = random
+-                    .next_int_bound(*total)
+-                    .expect("validated positive model weight");
+-                &variants[ends.partition_point(|end| *end <= index)]
++                let index = if legacy_weighted {
++                    // Minecraft 1.21.1's WeightedBakedModel uses a signed long draw.
++                    (random.next_long() as i32).wrapping_abs() % *total
++                } else {
++                    random
++                        .next_int_bound(*total)
++                        .expect("validated positive model weight")
++                };
++                (index >= 0).then(|| &variants[ends.partition_point(|end| *end <= index)])
+             }
+         }
+     }
+@@ -147,6 +151,16 @@
+         &'a self,
+         selected: &SelectedModels,
+         random: &mut impl RandomSource,
++        f: impl FnMut(&'a T),
++    ) -> Result<()> {
++        self.for_each_with_legacy_weighted(selected, random, false, f)
++    }
++
++    pub fn for_each_with_legacy_weighted<'a>(
++        &'a self,
++        selected: &SelectedModels,
++        random: &mut impl RandomSource,
++        legacy_weighted: bool,
+         mut f: impl FnMut(&'a T),
+     ) -> Result<()> {
+         match selected {
+@@ -155,7 +169,9 @@
+                     .variants
+                     .get(*index)
+                     .ok_or_else(|| error("invalid variant selection"))?;
+-                f(choice.select(random));
++                if let Some(model) = choice.select(random, legacy_weighted) {
++                    f(model);
++                }
+             }
+             SelectedModels::Multipart(indices) => {
+                 if indices.iter().any(|index| *index >= self.multipart.len()) {
+@@ -164,7 +180,9 @@
+                 let seed = random.next_long();
+                 for index in indices {
+                     random.set_seed(seed);
+-                    f(self.multipart[*index].select(random));
++                    if let Some(model) = self.multipart[*index].select(random, legacy_weighted) {
++                        f(model);
++                    }
+                 }
+             }
+         }
+diff --git a/crates/horizon-client-render/src/connected.rs b/crates/horizon-client-render/src/connected.rs
+--- a/crates/horizon-client-render/src/connected.rs
++++ b/crates/horizon-client-render/src/connected.rs
+@@ -87,6 +87,7 @@
+     arms: u8,
+     /// Rules name the state or one of its sides' sprites ([`ConnectedTextures::stacked_pane_hides`]).
+     has_rules: bool,
++    java_model_random: bool,
+ }
+ 
+ /// A pane's arm properties, in [`StateInfo::arms`]' bit order.
+@@ -378,6 +379,7 @@
+                     .fold(0, |bits, (i, _)| bits | 1 << i),
+                 // Set below, with the state's rule list.
+                 has_rules: false,
++                java_model_random: false,
+             });
+             list.clear();
+             if let Some(candidates) = by_block.get(name) {
+@@ -387,7 +389,11 @@
+                         .filter(|&&i| out.rules[usize::from(i)].rule.matches_block(name, prop)),
+                 );
+             }
+-            out.states.last_mut().expect("pushed above").has_rules = !list.is_empty();
++            let info = out.states.last_mut().expect("pushed above");
++            info.has_rules = !list.is_empty();
++            info.java_model_random = list
++                .iter()
++                .any(|&i| out.rules[usize::from(i)].rule.java_model_random);
+             let range = push_list(&mut out.lists, &list);
+             out.by_state.push(range);
+         }
+@@ -399,6 +405,12 @@
+ 
+     pub fn is_empty(&self) -> bool {
+         self.rules.is_empty()
++    }
++
++    pub fn uses_java_model_random(&self, state: u32) -> bool {
++        self.states
++            .get(state as usize)
++            .is_some_and(|info| info.java_model_random)
+     }
+ 
+     /// Whether a pane's top or bottom strip, centred at `centre` (block-local x, z), is hidden by
+@@ -451,7 +463,25 @@
+         neighbour: impl Fn([i32; 3]) -> u32,
+         biome: impl Fn() -> Option<&'b str>,
+         texture: impl Fn() -> Option<Axes>,
++        overlay: impl FnMut(Overlay),
++    ) -> Pick {
++        self.pick_with_model_variant(
++            state, layer, face, pos, neighbour, biome, texture, overlay, 0,
++        )
++    }
++
++    #[allow(clippy::too_many_arguments)]
++    pub fn pick_with_model_variant<'b>(
++        &self,
++        state: u32,
++        layer: u16,
++        face: Face,
++        pos: [i32; 3],
++        neighbour: impl Fn([i32; 3]) -> u32,
++        biome: impl Fn() -> Option<&'b str>,
++        texture: impl Fn() -> Option<Axes>,
+         mut overlay: impl FnMut(Overlay),
++        model_variant: usize,
+     ) -> Pick {
+         let (mut by_state, mut by_layer) = (
+             self.list(&self.by_state, state as usize),
+@@ -492,6 +522,7 @@
+                     &biome,
+                     &texture,
+                     &mut overlay,
++                    model_variant,
+                 )
+             {
+                 // "Tiles output by CTM rules can also be matched by another rule": once, by the
+@@ -528,6 +559,7 @@
+                         &biome,
+                         &texture,
+                         &mut overlay,
++                        model_variant,
+                     ) {
+                         Some((Pick::Keep, _)) => return pick,
+                         Some((chained, _)) => return chained,
+@@ -553,6 +585,7 @@
+         biome: &impl Fn() -> Option<&'b str>,
+         texture: &impl Fn() -> Option<Axes>,
+         overlay: &mut impl FnMut(Overlay),
++        model_variant: usize,
+     ) -> Option<(Pick, usize)> {
+         let rule = &r.rule;
+         // `Rule::applies_at`, with the biome looked up only for rules that test one. Rules with
+@@ -632,7 +665,14 @@
+             m => m,
+         };
+         let index = match method {
+-            Method::Ctm => geometry::ctm_index(mask()),
++            Method::Ctm => {
++                let index = geometry::ctm_index(mask());
++                if rule.java_model_random {
++                    index + 47 * model_variant
++                } else {
++                    index
++                }
++            }
+             Method::CtmCompact => {
+                 let mask = mask();
+                 let case = geometry::ctm_index(mask) as u8;
+diff --git a/crates/horizon-client-render/src/mesher.rs b/crates/horizon-client-render/src/mesher.rs
+--- a/crates/horizon-client-render/src/mesher.rs
++++ b/crates/horizon-client-render/src/mesher.rs
+@@ -21,7 +21,12 @@
+     models::catalog::BakedFace,
+ };
+ use horizon_assets::model::Direction as ModelDirection;
+-use horizon_core::{biome::BiomeZoom, geometry::Direction, position::BlockPos};
++use horizon_core::{
++    biome::BiomeZoom,
++    geometry::Direction,
++    position::BlockPos,
++    random::{LegacyRandom, RandomSource, position_seed},
++};
+ use horizon_optifine::ctm::connect::{Axes as CtmAxes, Face as CtmFace};
+ use horizon_world::{
+     block_render::FaceVisibility,
+@@ -1954,8 +1959,15 @@
+                         continue;
+                     }
+                     let world = BlockPos::new(center.x * 16 + x, base_y + y, center.z * 16 + z);
++                    let connected = &self.render.connected;
++                    let java_model_random = connected.uses_java_model_random(id);
+                     if catalog
+-                        .models_at(BlockStateId(id), world, &mut models)
++                        .models_at_with_legacy_weighted(
++                            BlockStateId(id),
++                            world,
++                            &mut models,
++                            java_model_random,
++                        )
+                         .is_err()
+                     {
+                         continue;
+@@ -2020,10 +2032,30 @@
+                                 )
+                                 .unwrap_or(true);
+                     }
+-                    let connected = &self.render.connected;
++                    let mut model_random = java_model_random.then(|| {
++                        let mut random = LegacyRandom::new(position_seed(world));
++                        // Vanilla resets to the position seed for each cull direction and
++                        // the unculled list. Weighted and multipart models consume one long
++                        // while obtaining that list, before its connected-texture changes.
++                        random.next_long();
++                        std::array::from_fn::<_, 7, _>(|_| random.clone())
++                    });
+                     let start = [out.solid.len(), out.translucent.len()];
+                     for model in &models {
+                         for face in &model.faces {
++                            let model_variant = model_random.as_mut().map_or(0, |random| {
++                                if matches!(
++                                    face.quad.facing,
++                                    ModelDirection::Up | ModelDirection::Down
++                                ) {
++                                    return 0;
++                                }
++                                let list = face.quad.cull.map_or(6, |direction| direction as usize);
++                                random[list]
++                                    .next_int_bound(4)
++                                    .expect("four texture variants")
++                                    as usize
++                            });
+                             if face.quad.cull.is_some_and(|d| !visible[d as usize]) {
+                                 continue;
+                             }
+@@ -2062,6 +2094,7 @@
+                                 (id, state),
+                                 world,
+                                 interior_leaf,
++                                model_variant,
+                             );
+                         }
+                     }
+@@ -2114,6 +2147,7 @@
+         (id, state): (u32, &Info),
+         world: BlockPos,
+         interior_leaf: bool,
++        model_variant: usize,
+     ) {
+         let q = &face.quad;
+         // A quad's own light (a model's glowing part) may raise the tier; whether it
+@@ -2196,7 +2230,7 @@
+             Pick::Keep
+         } else {
+             let tints = &*tints;
+-            connected.pick(
++            connected.pick_with_model_variant(
+                 id,
+                 face.layer as u16,
+                 CtmFace::ALL[q.facing as usize],
+@@ -2212,6 +2246,7 @@
+                     }
+                 },
+                 &mut push,
++                model_variant,
+             )
+         };
+         let vertex = |tint: Option<u32>, i: usize, uv: [u16; 2]| {
+diff --git a/crates/horizon-client-render/src/models/catalog.rs b/crates/horizon-client-render/src/models/catalog.rs
+--- a/crates/horizon-client-render/src/models/catalog.rs
++++ b/crates/horizon-client-render/src/models/catalog.rs
+@@ -564,7 +564,7 @@
+         seed: i64,
+     ) -> Result<Vec<(&Variant, &BakedModel)>> {
+         let mut models = Vec::new();
+-        self.each_seeded(state, seed, |(variant, model)| {
++        self.each_seeded(state, seed, false, |(variant, model)| {
+             models.push((variant, model))
+         })?;
+         Ok(models)
+@@ -577,24 +577,45 @@
+         position: BlockPos,
+         out: &mut Vec<&'a BakedModel>,
+     ) -> Result<()> {
++        self.models_at_with_legacy_weighted(state, position, out, false)
++    }
++
++    pub(crate) fn models_at_with_legacy_weighted<'a>(
++        &'a self,
++        state: BlockStateId,
++        position: BlockPos,
++        out: &mut Vec<&'a BakedModel>,
++        legacy_weighted: bool,
++    ) -> Result<()> {
+         out.clear();
+         if let Some(Some(model)) = self.single_models.get(state.0 as usize) {
+             out.push(&self.baked[*model as usize].1);
+             return Ok(());
+         }
+-        self.each_seeded(state, position_seed(position), |(_, model)| out.push(model))
++        self.each_seeded(
++            state,
++            position_seed(position),
++            legacy_weighted,
++            |(_, model)| out.push(model),
++        )
+     }
+     fn each_seeded<'a>(
+         &'a self,
+         state: BlockStateId,
+         seed: i64,
++        legacy_weighted: bool,
+         mut f: impl FnMut(&'a (Variant, BakedModel)),
+     ) -> Result<()> {
+         let (choice, selected) = self.state(state).ok_or("unbound gallery block state")?;
+         let mut random = LegacyRandom::new(seed);
+-        self.choices[*choice].for_each(selected, &mut random, |&model| {
+-            f(&self.baked[model as usize]);
+-        })?;
++        self.choices[*choice].for_each_with_legacy_weighted(
++            selected,
++            &mut random,
++            legacy_weighted,
++            |&model| {
++                f(&self.baked[model as usize]);
++            },
++        )?;
+         Ok(())
+     }
+     fn state(&self, state: BlockStateId) -> Option<&(usize, SelectedModels)> {
+diff --git a/crates/horizon-optifine/src/ctm.rs b/crates/horizon-optifine/src/ctm.rs
+--- a/crates/horizon-optifine/src/ctm.rs
++++ b/crates/horizon-optifine/src/ctm.rs
+@@ -177,6 +177,8 @@
+     /// ... or these blocks.
+     pub connect_blocks: Vec<BlockMatch>,
+     pub inner_seams: bool,
++    /// Four successive CTM tile groups, chosen from the Java baked-model quad stream.
++    pub java_model_random: bool,
+     /// One per tile (`random`); empty when every tile counts the same.
+     pub weights: Vec<u32>,
+     pub random_loops: u32,
+@@ -265,7 +267,15 @@
+             Some(v) => tile_list(path, v)?,
+             None => Vec::new(),
+         };
+-        let (min, max) = method.tiles_needed(width, height);
++        let java_model_random = flag("javaModelRandom") == Some(true);
++        let (min, max) = if java_model_random {
++            if method != Method::Ctm || match_blocks.is_empty() {
++                return Err("javaModelRandom requires method=ctm and matchBlocks".into());
++            }
++            (4 * 47, Some(4 * 47))
++        } else {
++            method.tiles_needed(width, height)
++        };
+         if tiles.len() < min || max.is_some_and(|max| tiles.len() != max) || min == 0 {
+             return Err(format!("{} tiles for {method:?}", tiles.len()));
+         }
+@@ -354,6 +364,7 @@
+             connect_tiles: get("connectTiles").map_or_else(Vec::new, |v| sprite_list(path, v)),
+             connect_blocks: get("connectBlocks").map_or_else(Vec::new, BlockMatch::parse_list),
+             inner_seams: flag("innerSeams") == Some(true),
++            java_model_random,
+             weights,
+             random_loops: int("randomLoops", 0).clamp(0, 9) as u32,
+             symmetry: match get("symmetry") {

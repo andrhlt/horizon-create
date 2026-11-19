@@ -1,0 +1,112 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..174da963b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.allEncasedCogwheelMaterialsAndSizes"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..2b4a8c366 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,80 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++
++	@GameTest(template = "shearing", timeoutTicks = 24)
++	public static void allEncasedCogwheelMaterialsAndSizes(CreateGameTestHelper helper) {
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var top = com.simibubi.create.content.kinetics.simpleRelays.encased.EncasedCogwheelBlock.TOP_SHAFT;
++		var bottom = com.simibubi.create.content.kinetics.simpleRelays.encased.EncasedCogwheelBlock.BOTTOM_SHAFT;
++		var east = net.minecraft.core.Direction.EAST;
++		var up = net.minecraft.core.Direction.UP;
++		var x = net.minecraft.core.Direction.Axis.X;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var small = com.simibubi.create.AllBlocks.COGWHEEL.get();
++		var large = com.simibubi.create.AllBlocks.LARGE_COGWHEEL.get();
++		var andesite = com.simibubi.create.AllBlocks.ANDESITE_CASING.get();
++		var brass = com.simibubi.create.AllBlocks.BRASS_CASING.get();
++		var variants = java.util.List.of(
++			com.simibubi.create.AllBlocks.ANDESITE_ENCASED_COGWHEEL.get(),
++			com.simibubi.create.AllBlocks.ANDESITE_ENCASED_LARGE_COGWHEEL.get(),
++			com.simibubi.create.AllBlocks.BRASS_ENCASED_LARGE_COGWHEEL.get()
++		);
++		var casings = java.util.List.of(andesite, andesite, brass);
++		var cogs = java.util.List.of(small, large, large);
++		var heldItems = casings.stream().map(casing -> new ItemStack(casing.asItem(), 2)).toList();
++		java.util.function.Function<BlockPos, Float> speed = pos -> {
++			var entity = level.getBlockEntity(helper.absolutePos(pos));
++			return entity instanceof com.simibubi.create.content.kinetics.base.KineticBlockEntity kinetic
++				? kinetic.getSpeed() : 0.0f;
++		};
++		for (int variant = 0; variant < variants.size(); variant++) {
++			var pos = new BlockPos(12, 3, 2 + variant * 5);
++			var input = pos.west();
++			var output = pos.east();
++			var gearLink = variant == 0 ? pos.south() : pos.south().above();
++			helper.setBlock(input, com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east));
++			helper.setBlock(pos, cogs.get(variant).defaultBlockState().setValue(axis, x));
++			helper.setBlock(output, com.simibubi.create.AllBlocks.SHAFT.getDefaultState().setValue(axis, x));
++			helper.setBlock(gearLink, small.defaultBlockState().setValue(axis, x));
++			helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), input).generatedSpeed.setValue(24);
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int variant = 0; variant < variants.size(); variant++) {
++				var pos = new BlockPos(12, 3, 2 + variant * 5);
++				var gearLink = variant == 0 ? pos.south() : pos.south().above();
++				var state = helper.getBlockState(pos);
++				String kind = state.is(variants.get(variant)) ? "encased" : state.is(cogs.get(variant)) ? "bare" : "unexpected";
++				var held = heldItems.get(variant);
++				System.out.printf(java.util.Locale.ROOT,
++					"CREATE_ENCASED_COGWHEEL_FAMILY,%d,%d,%s,%s,%s,%s,%d,%.4f,%.4f,%.4f%n",
++					tick, variant, kind, state.getValue(axis).getName(),
++					state.hasProperty(top) && state.getValue(top), state.hasProperty(bottom) && state.getValue(bottom),
++					held.getCount(), speed.apply(pos), speed.apply(pos.east()), speed.apply(gearLink));
++				if (tick == 3 || tick == 6 || tick == 10) {
++					var at = helper.absolutePos(pos);
++					player.setPos(at.getX(), at.getY(), at.getZ() - 2);
++					player.setShiftKeyDown(tick == 10);
++					var side = tick == 6 ? east : up;
++					var hit = new net.minecraft.world.phys.BlockHitResult(at.getCenter().relative(side, 0.49).add(0, side == east ? 0.29 : 0, 0), side, at, false);
++					if (tick == 3) {
++						player.setItemInHand(hand, held);
++						state.useItemOn(held, level, player, hand, hit);
++					} else {
++						var wrench = com.simibubi.create.AllItems.WRENCH.asStack();
++						player.setItemInHand(hand, wrench);
++						wrench.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++					}
++					player.setShiftKeyDown(false);
++				}
++			}
++			if (tick < 14)
++				helper.fail("Waiting for the complete encased-cogwheel family trace");
++		});
++	}
+ }

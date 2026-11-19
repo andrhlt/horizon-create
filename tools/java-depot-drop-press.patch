@@ -1,0 +1,73 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -144,4 +144,57 @@
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+ 		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
+ 	}
++
++	@GameTest(template = "wheat_milling", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void depotDropPressing(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var east = net.minecraft.core.Direction.EAST;
++		BlockPos depotPos = new BlockPos(3, 9, 2);
++		var depotAt = helper.absolutePos(depotPos);
++		BlockPos pressPos = depotPos.above(2);
++		BlockPos motorPos = pressPos.west();
++		level.setBlockAndUpdate(depotAt, AllBlocks.DEPOT.getDefaultState());
++		level.setBlockAndUpdate(helper.absolutePos(pressPos),
++			AllBlocks.MECHANICAL_PRESS.getDefaultState().setValue(horizontal, east));
++		level.setBlockAndUpdate(helper.absolutePos(motorPos),
++			AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, east));
++		((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) helper.getBlockEntity(motorPos))
++			.generatedSpeed.setValue(128);
++		var press = (com.simibubi.create.content.kinetics.press.MechanicalPressBlockEntity) helper.getBlockEntity(pressPos);
++		var depot = (com.simibubi.create.content.logistics.depot.DepotBlockEntity) helper.getBlockEntity(depotPos);
++		var ingot = new net.minecraft.world.entity.item.ItemEntity(level, depotAt.getX()+.5,
++			depotAt.getY()+1.875, depotAt.getZ()+.5, new ItemStack(Items.IRON_INGOT));
++		ingot.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
++		ingot.setNeverPickUp();
++		var sounds = new java.util.ArrayList<String>();
++		java.util.function.Consumer<net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition> listen = event -> {
++			if (event.getLevel() != level || event.getSound() == null)
++				return;
++			var id = event.getSound().value().getLocation();
++			if (id.toString().equals("create:depot_plop"))
++				sounds.add(String.format(java.util.Locale.ROOT, "%s/%s/%.6f/%.6f",
++					id, event.getSource().getName(), event.getNewVolume(), event.getNewPitch()));
++		};
++		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(listen);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick() - 5;
++			helper.assertTrue(tick >= 0, "Waiting for the press to initialize");
++			if (tick == 0)
++				level.addFreshEntity(ingot);
++			var held = depot.getHeldItem();
++			var items = depot.saveWithoutMetadata(level.registryAccess()).getCompound("HeldItem");
++			System.out.printf(java.util.Locale.ROOT, "CREATE_DEPOT_DROPPED_PRESS %d,%d,%.6f,%d,%d,%.6f,%d,%s%n",
++				tick, ingot.isAlive() ? 1 : 0, ingot.isAlive() ? ingot.getY() - depotAt.getY() : -1,
++				held.is(Items.IRON_INGOT) ? held.getCount() : 0,
++				held.is(AllItems.IRON_SHEET.get()) ? held.getCount() : 0,
++				held.isEmpty() ? 0 : items.getFloat("Pos"), press.getPressingBehaviour().runningTicks,
++				sounds.isEmpty() ? "-" : String.join(";", sounds));
++			sounds.clear();
++			helper.assertTrue(tick >= 40 && held.is(AllItems.IRON_SHEET.get()),
++				"An ingot dropped onto the Depot must be turned into a sheet.");
++			net.neoforged.neoforge.common.NeoForge.EVENT_BUS.unregister(listen);
++		});
++	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,7 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestProcessing.depotDropPressing")).toList();
+ 	}
+ }

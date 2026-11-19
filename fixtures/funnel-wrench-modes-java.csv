@@ -1,0 +1,8 @@
+case,variant,held
+0,true,1
+1,false,1
+2,pushing,1
+3,pulling,1
+4,retracted,1
+5,extended,1
+6,retracted,1

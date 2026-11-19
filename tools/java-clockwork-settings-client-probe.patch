@@ -1,0 +1,114 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaClockworkSettingsProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaClockworkSettingsProbe.java
+new file mode 100644
+index 0000000..29ff463
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/JavaClockworkSettingsProbe.java
+@@ -0,0 +1,108 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import com.simibubi.create.CreateClient;
++import com.simibubi.create.content.contraptions.bearing.ClockworkBearingBlockEntity;
++import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBehaviour.ValueSettings;
++import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBoard;
++import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsScreen;
++import com.simibubi.create.foundation.utility.CreateLang;
++import net.minecraft.client.Minecraft;
++import net.minecraft.client.MouseHandler;
++import net.minecraft.client.Screenshot;
++import net.minecraft.core.BlockPos;
++import net.minecraft.network.chat.Component;
++import net.minecraft.world.phys.BlockHitResult;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++import org.lwjgl.glfw.GLFW;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public class JavaClockworkSettingsProbe {
++    private static final BlockPos BEARING = new BlockPos(8, 96, 40);
++    private static final int[] VALUES = {0, 1, 2, 0};
++    private static int phase;
++    private static int elapsed = -1;
++    private static int wait;
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post ignored) throws ReflectiveOperationException {
++        if (!Boolean.getBoolean("parity.clockworkSettings"))
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.player == null || mc.level == null || phase == VALUES.length
++            || !(mc.level.getBlockEntity(BEARING) instanceof ClockworkBearingBlockEntity bearing))
++            return;
++        int mode = bearing.saveWithoutMetadata(mc.level.registryAccess()).getInt("ScrollValue");
++        if (elapsed < 0) {
++            if (!(mc.hitResult instanceof BlockHitResult hit) || !hit.getBlockPos().equals(BEARING)
++                || wait++ < 10)
++                return;
++            if (phase > 0 && mode != VALUES[phase - 1])
++                return;
++            var use = Minecraft.class.getDeclaredMethod("startUseItem");
++            use.setAccessible(true);
++            mc.options.keyUse.setDown(true);
++            use.invoke(mc);
++            elapsed = 0;
++        } else {
++            elapsed++;
++        }
++        var input = CreateClient.VALUE_SETTINGS_HANDLER;
++        System.out.printf("CREATE_CLOCKWORK_UI %d,%d,%d,%s,%d%n", phase, elapsed, input.interactHeldTicks,
++            mc.screen instanceof ValueSettingsScreen, mode);
++        if (phase == 0 && elapsed == 2)
++            mc.options.keyUse.setDown(false);
++        if (phase == 0 && elapsed == 8) {
++            phase++;
++            elapsed = -1;
++            wait = 0;
++        }
++        if (phase > 0 && mc.screen instanceof ValueSettingsScreen menu) {
++            var field = ValueSettingsScreen.class.getDeclaredField("board");
++            field.setAccessible(true);
++            var board = (ValueSettingsBoard) field.get(menu);
++            var initial = ValueSettingsScreen.class.getDeclaredField("initialSettings");
++            initial.setAccessible(true);
++            var current = (ValueSettings) initial.get(menu);
++            var left = menu.getCoordinateOfValue(0, 0);
++            var middle = menu.getCoordinateOfValue(0, 1);
++            var right = menu.getCoordinateOfValue(0, 2);
++            if (elapsed == 6) {
++                System.out.printf("CREATE_CLOCKWORK_BOARD %s,%s,%s,%s,%s,%d,%d,%d,%d,%.1f,%.1f%n",
++                    board.title().getString(), board.rows().getFirst().getString(),
++                    board.formatter().format(new ValueSettings(0, 0)).getString(),
++                    board.formatter().format(new ValueSettings(0, 1)).getString(),
++                    board.formatter().format(new ValueSettings(0, 2)).getString(),
++                    board.maxValue(), board.milestoneInterval(), elapsed, current.value(),
++                    middle.x - left.x, right.x - middle.x);
++                System.out.println("CREATE_CLOCKWORK_TIP " + CreateLang.translateDirect(
++                    "gui.value_settings.release_to_confirm", Component.keybind("key.use")).getString());
++            }
++            if (Boolean.getBoolean("parity.clockworkSettingsScreenshots")) {
++                if (elapsed == 6) {
++                    var point = menu.getCoordinateOfValue(current.row(), current.value());
++                    var window = mc.getWindow();
++                    var move = MouseHandler.class.getDeclaredMethod("onMove", long.class, double.class, double.class);
++                    move.setAccessible(true);
++                    move.invoke(mc.mouseHandler, window.getWindow(),
++                        (double) point.x * window.getScreenWidth() / window.getGuiScaledWidth(),
++                        (double) point.y * window.getScreenHeight() / window.getGuiScaledHeight());
++                }
++                if (elapsed < 12)
++                    return;
++                Screenshot.grab(mc.gameDirectory, "clockwork-mode-" + current.value() + ".png",
++                    mc.getMainRenderTarget(), message -> System.out.println(message.getString()));
++            }
++            var choice = menu.getCoordinateOfValue(0, VALUES[phase]);
++            menu.mouseReleased((int) Math.ceil(choice.x), (int) choice.y, GLFW.GLFW_MOUSE_BUTTON_RIGHT);
++            mc.options.keyUse.setDown(false);
++            elapsed = -1;
++            wait = 0;
++            phase++;
++            if (phase == VALUES.length)
++                System.out.println("CREATE_CLOCKWORK_UI_DONE");
++        }
++    }
++}

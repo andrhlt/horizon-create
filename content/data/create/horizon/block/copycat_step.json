@@ -1,0 +1,133 @@
+{
+  "template": "minecraft:gold_block",
+  "item": true,
+  "properties": {
+    "occludes": false,
+    "map_color": 0,
+    "waterloggable": true
+  },
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "south",
+        "west",
+        "east"
+      ]
+    },
+    "waterlogged": {
+      "type": "boolean"
+    },
+    "half": {
+      "type": "enum",
+      "values": [
+        "bottom",
+        "top"
+      ]
+    }
+  },
+  "default_state": {
+    "facing": "south",
+    "waterlogged": "false",
+    "half": "bottom"
+  },
+  "shapes": {
+    "properties": [
+      "facing",
+      "half"
+    ],
+    "values": {
+      "north,bottom": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0.5,
+          0.5
+        ]
+      ],
+      "north,top": [
+        [
+          0,
+          0.5,
+          0,
+          1,
+          1,
+          0.5
+        ]
+      ],
+      "south,bottom": [
+        [
+          0,
+          0,
+          0.5,
+          1,
+          0.5,
+          1
+        ]
+      ],
+      "south,top": [
+        [
+          0,
+          0.5,
+          0.5,
+          1,
+          1,
+          1
+        ]
+      ],
+      "west,bottom": [
+        [
+          0,
+          0,
+          0,
+          0.5,
+          0.5,
+          1
+        ]
+      ],
+      "west,top": [
+        [
+          0,
+          0.5,
+          0,
+          0.5,
+          1,
+          1
+        ]
+      ],
+      "east,bottom": [
+        [
+          0.5,
+          0,
+          0,
+          1,
+          0.5,
+          1
+        ]
+      ],
+      "east,top": [
+        [
+          0.5,
+          0.5,
+          0,
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    "default": [
+      [
+        0,
+        0,
+        0.5,
+        1,
+        0.5,
+        1
+      ]
+    ]
+  }
+}

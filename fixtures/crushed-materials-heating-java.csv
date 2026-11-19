@@ -1,0 +1,7 @@
+input,type,recipe,duration,experience,output,count
+crushed_raw_iron,minecraft:smelting,create:smelting/iron_ingot_from_crushed,200,0.10,minecraft:iron_ingot,1
+crushed_raw_iron,minecraft:blasting,create:blasting/iron_ingot_from_crushed,100,0.10,minecraft:iron_ingot,1
+crushed_raw_gold,minecraft:smelting,create:smelting/gold_ingot_from_crushed,200,0.10,minecraft:gold_ingot,1
+crushed_raw_gold,minecraft:blasting,create:blasting/gold_ingot_from_crushed,100,0.10,minecraft:gold_ingot,1
+crushed_raw_copper,minecraft:smelting,create:smelting/copper_ingot_from_crushed,200,0.10,minecraft:copper_ingot,1
+crushed_raw_copper,minecraft:blasting,create:blasting/copper_ingot_from_crushed,100,0.10,minecraft:copper_ingot,1

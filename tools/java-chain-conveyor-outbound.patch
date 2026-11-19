@@ -1,0 +1,20 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -222,6 +222,17 @@
+ 					if (!source.connections.isEmpty() || !dest.connections.isEmpty())
+ 						throw new IllegalStateException("Disconnect packet left a unilateral edge");
+ 				}
++				if (port != null && tick == 35)
++					port.inventory.setStackInSlot(1, chainPackage("Away", Items.PAPER, 4));
++				if (port != null && tick >= 35 && tick <= 68) {
++					var box = dest.getLoopingPackages().stream()
++						.filter(pkg -> PackageItem.getAddress(pkg.item).equals("Away")).findFirst();
++					boolean stored = PackageItem.getAddress(port.inventory.getStackInSlot(1)).equals("Away");
++					boolean animated = port.animatedPackage != null && PackageItem.getAddress(port.animatedPackage).equals("Away");
++					System.out.printf(Locale.ROOT, "CREATE_CHAIN_FROGPORT_OUT %d,%.9f,%b,%b,%b,%.9f%n", tick,
++						port.animationProgress.getValue(), port.currentlyDepositing, stored, animated,
++						box.map(pkg -> pkg.chainPosition).orElse(-1f));
++				}
+ 				String receipt = port == null ? "-" : chainReceipt(port);
+ 				System.out.printf(Locale.ROOT, "CREATE_CHAIN_WORLD %s,%d,%.8f,%.8f,%b,%b,%b,%b,%s,%.8f,%s%n",
+ 					scenario, tick, source.getSpeed(), dest.getSpeed(), source.connections.contains(edge),

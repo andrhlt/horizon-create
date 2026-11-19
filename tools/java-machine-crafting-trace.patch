@@ -1,0 +1,70 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.machineCraftingRecipes"))
++			.toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,55 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++    public static void machineCraftingRecipes(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        for (String example : java.util.List.of(
++            "crafting/appliances/dough;2;1;create:wheat_flour,minecraft:water_bucket",
++            "crafting/kinetics/chute;1;3;create:iron_sheet,minecraft:iron_ingot,create:iron_sheet",
++            "crafting/kinetics/encased_chain_drive_from_zinc;3;2;create:andesite_casing,create:zinc_nugget,create:zinc_nugget,create:zinc_nugget,_,_",
++            "crafting/kinetics/filter;3;1;minecraft:iron_nugget,minecraft:white_wool,minecraft:iron_nugget",
++            "crafting/kinetics/fluid_pipe;3;1;create:copper_sheet,minecraft:copper_ingot,create:copper_sheet",
++            "crafting/kinetics/fluid_pipe_vertical;1;3;create:copper_sheet,minecraft:copper_ingot,create:copper_sheet",
++            "crafting/kinetics/large_cogwheel_from_little;2;1;create:cogwheel,minecraft:oak_planks",
++            "crafting/kinetics/mechanical_arm;3;3;create:brass_sheet,create:brass_sheet,create:andesite_alloy,create:brass_sheet,_,_,create:precision_mechanism,create:brass_casing,_",
++            "crafting/kinetics/mechanical_bearing;1;3;minecraft:oak_slab,create:andesite_casing,create:shaft",
++            "crafting/kinetics/mechanical_crafter;1;3;create:electron_tube,create:brass_casing,minecraft:crafting_table",
++            "crafting/kinetics/mechanical_pump;2;1;create:cogwheel,create:fluid_pipe",
++            "crafting/kinetics/smart_chute;1;3;create:brass_sheet,create:chute,create:electron_tube",
++            "crafting/kinetics/smart_fluid_pipe;1;3;create:brass_sheet,create:fluid_pipe,create:electron_tube",
++            "crafting/kinetics/speedometer_from_conversion;1;1;create:stressometer",
++            "crafting/kinetics/spout;1;2;create:copper_casing,minecraft:dried_kelp",
++            "crafting/kinetics/white_seat;2;1;minecraft:white_wool,minecraft:oak_slab",
++            "crafting/logistics/andesite_tunnel;2;2;create:andesite_alloy,create:andesite_alloy,minecraft:dried_kelp,minecraft:dried_kelp",
++            "crafting/logistics/brass_funnel;1;3;create:electron_tube,create:brass_ingot,minecraft:dried_kelp",
++            "crafting/logistics/content_observer;1;3;create:electron_tube,create:brass_casing,minecraft:observer",
++            "crafting/logistics/stockpile_switch;1;3;create:electron_tube,create:brass_casing,minecraft:comparator",
++            "crafting/materials/andesite_alloy_from_zinc;2;2;create:zinc_nugget,minecraft:andesite,minecraft:andesite,create:zinc_nugget",
++            "crafting/materials/brass_block_from_compacting;3;3;create:brass_ingot,create:brass_ingot,create:brass_ingot,create:brass_ingot,create:brass_ingot,create:brass_ingot,create:brass_ingot,create:brass_ingot,create:brass_ingot",
++            "crafting/materials/zinc_ingot_from_compacting;3;3;create:zinc_nugget,create:zinc_nugget,create:zinc_nugget,create:zinc_nugget,create:zinc_nugget,create:zinc_nugget,create:zinc_nugget,create:zinc_nugget,create:zinc_nugget",
++            "crafting/materials/zinc_nugget_from_decompacting;1;1;create:zinc_ingot"
++        )) {
++            String[] fields = example.split(";");
++            var items = new java.util.ArrayList<net.minecraft.world.item.ItemStack>();
++            for (String cell : fields[3].split(","))
++                items.add(cell.equals("_") ? net.minecraft.world.item.ItemStack.EMPTY :
++                    new net.minecraft.world.item.ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
++                        net.minecraft.resources.ResourceLocation.parse(cell))));
++            var input = net.minecraft.world.item.crafting.CraftingInput.of(
++                Integer.parseInt(fields[1]), Integer.parseInt(fields[2]), items);
++            var match = level.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level)
++                .orElseThrow(() -> new IllegalStateException("No original recipe for " + fields[0]));
++            helper.assertTrue(match.id().toString().equals("create:" + fields[0]), "Wrong recipe for " + example + ": " + match.id());
++            var out = match.value().assemble(input, level.registryAccess());
++            var leftovers = match.value().getRemainingItems(input).stream().filter(stack -> !stack.isEmpty())
++                .map(stack -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()) + ":" + stack.getCount())
++                .sorted().toList();
++            System.out.printf(java.util.Locale.ROOT, "CREATE_MACHINE_CRAFT %s;%s;%d;%s%n", example,
++                net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(out.getItem()), out.getCount(),
++                String.join(",", leftovers));
++        }
++        helper.succeed();
++    }
++
+ }

@@ -1,0 +1,24 @@
+{
+  "Cyclic": 1,
+  "Entries": [
+    {
+      "Conditions": [
+        [
+          {
+            "Data": {
+              "TimeUnit": 1,
+              "Value": 5
+            },
+            "Id": "create:delay"
+          }
+        ]
+      ],
+      "Instruction": {
+        "Data": {
+          "Text": "Main Platform *"
+        },
+        "Id": "create:destination"
+      }
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..0ec7d5c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.brassDiodeActions"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..00bed80 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,66 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void brassDiodeActions(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var relative = new BlockPos(3, 4, 2);
++		var pos = helper.absolutePos(relative);
++		var south = net.minecraft.core.Direction.SOUTH;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		player.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 2.5);
++		player.setYRot(180);
++		var diode = com.simibubi.create.content.redstone.diodes.BrassDiodeBlock.POWERING;
++		var inverted = com.simibubi.create.content.redstone.diodes.BrassDiodeBlock.INVERTED;
++		var power = net.minecraft.world.level.block.RedStoneWireBlock.POWER;
++		var facing = net.minecraft.world.level.block.DiodeBlock.FACING;
++		for (String type : new String[]{"timer", "extender", "repeater"}) {
++			world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
++			for (BlockPos at : new BlockPos[]{pos, pos.north(), pos.east()})
++				world.setBlockAndUpdate(at.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++			world.setBlockAndUpdate(pos.north(), Blocks.REDSTONE_WIRE.defaultBlockState());
++			world.setBlockAndUpdate(pos.east(), Blocks.REDSTONE_WIRE.defaultBlockState());
++
++			var torch = new ItemStack(Items.REDSTONE_TORCH);
++			var stone = new ItemStack(Items.STONE);
++			var input = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
++				ItemStack.EMPTY, ItemStack.EMPTY, type.equals("extender") ? torch.copy() : ItemStack.EMPTY,
++				new ItemStack(type.equals("timer") ? Items.AMETHYST_SHARD : Items.REDSTONE),
++				com.simibubi.create.AllItems.BRASS_SHEET.asStack(), torch, stone, stone.copy(), stone.copy()
++			));
++			var recipeType = net.minecraft.world.item.crafting.RecipeType.CRAFTING;
++			var recipe = world.getRecipeManager().getRecipeFor(recipeType, input, world).orElseThrow();
++			var stack = recipe.value().assemble(input, world.registryAccess());
++			var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
++			helper.assertTrue(id.toString().equals("create:pulse_" + type) && stack.getCount() == 1,
++				"Wrong crafting result for " + type + ": " + stack);
++			System.out.println("JAVA_DIODE_CRAFT " + id + " " + stack.getCount());
++
++			player.setItemInHand(hand, stack);
++			var floor = pos.below();
++			var hit = new net.minecraft.world.phys.BlockHitResult(
++				net.minecraft.world.phys.Vec3.atBottomCenterOf(pos), net.minecraft.core.Direction.UP, floor, false);
++			helper.useBlock(relative.below(), player, hit);
++			helper.assertTrue(player.getItemInHand(hand).isEmpty(), "Survival placement kept the item");
++			for (String action : new String[]{"place", "sneak-empty", "empty-hand", "stick"}) {
++				player.setShiftKeyDown(action.equals("sneak-empty"));
++				if (action.equals("stick"))
++					player.setItemInHand(hand, new ItemStack(Items.STICK));
++				if (!action.equals("place"))
++					helper.useBlock(relative, player);
++				var state = world.getBlockState(pos);
++				var front = world.getBlockState(pos.north()).getValue(power);
++				var side = world.getBlockState(pos.east()).getValue(power);
++				var shouldInvert = action.equals("empty-hand");
++				var matches = state.getValue(facing) == south && !state.getValue(diode)
++					&& state.getValue(inverted) == shouldInvert && front == (shouldInvert ? 15 : 0) && side == 0;
++				System.out.printf("JAVA_DIODE_ACTION %s %s %s %s %s %d %d%n", id, action,
++					state.getValue(facing), state.getValue(diode), state.getValue(inverted), front, side);
++				helper.assertTrue(matches, "Wrong diode state after " + action + " on " + id);
++			}
++		}
++		helper.succeed();
++	}
+ }

@@ -1,0 +1,67 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestContraptions.waterloggedStickyPiston"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -278,4 +278,50 @@
+ 			helper.assertBlockProperty(vaultLamp, RedstoneLampBlock.LIT, true);
+ 		});
+ 	}
++
++
++	@GameTest(template = "ploughing", timeoutTicks = 60)
++	public static void waterloggedStickyPiston(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var water = Blocks.WATER.defaultBlockState();
++		var wet = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var head = helper.absolutePos(new BlockPos(3, 3, 1));
++		var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++
++		helper.runAtTickTime(0, () -> {
++			var piston = (com.simibubi.create.content.contraptions.piston.MechanicalPistonBlockEntity)
++				world.getBlockEntity(head.west());
++			var mode = piston.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE);
++			System.out.printf("PISTON_MOVEMENT_MODE %d%n", mode.value);
++			mode.setValue(0);
++			helper.pullLever(new BlockPos(3, 3, 2));
++		});
++		helper.succeedWhen(() -> {
++			var tick = helper.getTick();
++			if (tick < 1)
++				helper.fail("waiting for initial actions");
++			if (tick == 4)
++				world.setBlockAndUpdate(head, water);
++			var state = world.getBlockState(head);
++			var fluid = world.getFluidState(head);
++			var piston = world.getBlockState(head.west());
++			var lever = world.getBlockState(head.south());
++			var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++			var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++			var type = net.minecraft.world.level.block.state.properties.BlockStateProperties.PISTON_TYPE;
++			System.out.printf("PISTON_HEAD_WATER %d,%s,%s,%s,%s,%s,%s,%s%n", tick, registry.getKey(state.getBlock()),
++				state.hasProperty(wet) ? state.getValue(wet).toString() : "absent", fluid.isSource(),
++				state.getOptionalValue(facing).or(() -> state.getOptionalValue(horizontal)).map(Object::toString).orElse("absent"),
++				state.getOptionalValue(type).map(Object::toString).orElse("absent"), piston, lever);
++			if (tick == 24) {
++				var motor = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity)
++					world.getBlockEntity(helper.absolutePos(new BlockPos(4, 2, 2)));
++				motor.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE)
++					.setValue(-64);
++			}
++			if (tick < 45)
++				helper.fail("waiting for the piston round trip");
++		});
++	}
++
+ }

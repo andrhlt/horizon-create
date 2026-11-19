@@ -1,0 +1,30 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -145,6 +145,27 @@
+ 		runChainConveyor(helper, "rising_reversal", new BlockPos(6, 2, 3), true);
+ 	}
+ 
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void chainConveyorFrogportGoggles(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var pos = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		helper.runAtTickTime(2, () -> {
++			world.setBlockAndUpdate(pos, AllBlocks.PACKAGE_FROGPORT.getDefaultState());
++			var port = (FrogportBlockEntity) world.getBlockEntity(pos);
++			var player = chainPlayer(world, pos, 0);
++			player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,
++				com.simibubi.create.AllItems.GOGGLES.asStack());
++			for (int click = 0; click < 3; click++) {
++				if (click > 0)
++					port.use(player);
++				var saved = port.saveWithFullMetadata(world.registryAccess());
++				System.out.printf(Locale.ROOT, "CREATE_FROGPORT_GOGGLES %d,%b,%d,%b%n", click,
++					port.goggles, player.getMainHandItem().getCount(), saved.getBoolean("Goggles"));
++			}
++			helper.succeed();
++		});
++	}
++
+ 	private static void runChainConveyor(CreateGameTestHelper helper, String scenario, BlockPos edge, boolean reverse) {
+ 		var world = helper.getLevel();
+ 		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);

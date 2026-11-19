@@ -1,0 +1,158 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -32,6 +32,10 @@
+     pub knockback: f32,
+ }
+ 
++pub fn create_cannon_sticky(item: &str) -> bool {
++    matches!(item, "minecraft:pumpkin_pie" | "minecraft:cake" | "minecraft:cod" | "minecraft:cooked_cod" | "minecraft:salmon" | "minecraft:cooked_salmon" | "minecraft:tropical_fish")
++}
++
+ pub fn create_cannon_ammo(item: &str) -> Option<CreateCannonAmmo> {
+     let (velocity, reload, damage, knockback) = match item {
+         "minecraft:potato" => (1.25, 15, 5.0, 1.5),
+@@ -39,6 +43,8 @@
+         "minecraft:poisonous_potato" => (1.25, 15, 5.0, 0.05),
+         "minecraft:melon" => (0.95, 20, 8.0, 2.0),
+         "minecraft:pumpkin_pie" => (1.1, 15, 7.0, 0.05),
++        "minecraft:cake" => (1.1, 15, 8.0, 0.1),
++        "minecraft:cod" | "minecraft:cooked_cod" | "minecraft:salmon" | "minecraft:cooked_salmon" | "minecraft:tropical_fish" => (1.3, 10, 4.0, 0.6),
+         "minecraft:pumpkin" => (0.95, 15, 6.0, 2.0),
+         "create:honeyed_apple" => (1.35, 15, 6.0, 0.1),
+         "minecraft:golden_apple" | "minecraft:enchanted_golden_apple" => (1.45, 100, 1.0, 0.05),
+@@ -266,8 +272,8 @@
+     pub previous_pitch: f32,
+     pub age: u32,
+     pub stuck: bool,
+-    /// Create sticky pie: target, optional guest connection, offset and slide speed.
+-    pub create_pie_stuck: Option<(Who, Option<u32>, Vec3, f64)>,
++    /// Create sticky projectile: target, optional guest connection, offset and slide speed.
++    pub create_sticky_stuck: Option<(Who, Option<u32>, Vec3, f64)>,
+     /// `Entity.stuckSpeedMultiplier`: set by a cobweb or powder snow its box
+     /// passed through on a block's push (`makeStuckInBlock`); the next push
+     /// (`Entity.move`) then stops it dead. Zero: not stuck.
+@@ -581,7 +587,7 @@
+             previous_pitch: 0.0,
+             age: 0,
+             stuck: false,
+-            create_pie_stuck: None,
++            create_sticky_stuck: None,
+             stuck_speed: Vec3::ZERO,
+             left_owner: false,
+             has_been_shot: false,
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -4326,7 +4326,7 @@
+         let mut trails = Vec::new();
+         let mut bubble_tops = Vec::new();
+         let mut snow_contacts = Vec::new();
+-        let mut pie_pops = Vec::new();
++        let mut sticky_pops = Vec::new();
+         let mut keep_flags = vec![true; projectiles.len()];
+         let mut winds = std::mem::take(&mut self.creatures.pickable_projectile_targets);
+         // The impacts the mods may cancel (`native_projectile_impact`), on a server.
+@@ -4412,7 +4412,7 @@
+                 {
+                     pickable_projectile_hitboxes_into(&projectiles, &keep_flags, i, &mut winds);
+                 }
+-                if let Some((target, guest, mut offset, mut slide)) = projectiles[i].create_pie_stuck {
++                if let Some((target, guest, mut offset, mut slide)) = projectiles[i].create_sticky_stuck {
+                     let target_position = match (target, guest) {
+                         (Who::Mob(id), _) => self.mobs.iter().find(|m| m.id == id && m.alive()).map(|m| m.position),
+                         (Who::Player, None) => self.player.as_ref().filter(|p| !p.health.dead_or_dying()).map(|p| p.position),
+@@ -4422,7 +4422,7 @@
+                     if let Some(position) = target_position {
+                         let p = &mut projectiles[i];
+                         if p.position.y < position.y - 0.1 {
+-                            pie_pops.push((p.id, [p.position.x, p.position.y, p.position.z]));
++                            sticky_pops.push((p.id, [p.position.x, p.position.y, p.position.z], p.item.as_ref().map(|item| item.item.clone())));
+                             keep_flags[i] = false;
+                         } else {
+                             slide += 0.007;
+@@ -4431,12 +4431,12 @@
+                             p.position = position.add_vector(offset);
+                             p.velocity = Vec3::ZERO;
+                             p.age += 1;
+-                            p.create_pie_stuck = Some((target, guest, offset, slide));
++                            p.create_sticky_stuck = Some((target, guest, offset, slide));
+                             p.needs_sync = true;
+                         }
+                         continue;
+                     }
+-                    projectiles[i].create_pie_stuck = None;
++                    projectiles[i].create_sticky_stuck = None;
+                 }
+                 let p = &mut projectiles[i];
+                 if vanish
+@@ -4630,9 +4630,9 @@
+             }
+         }
+         self.creatures.pickable_projectile_targets = winds;
+-        for (id, at) in pie_pops {
++        for (id, at, item) in sticky_pops {
+             self.thrown_break_event(id, at);
+-            self.item_burst(at, "minecraft:pumpkin_pie");
++            self.item_burst(at, item.as_deref().unwrap_or("minecraft:pumpkin_pie"));
+         }
+         for (block, position, movement) in snow_contacts {
+             self.powder_snow_particle(block, position, movement);
+@@ -5635,7 +5635,7 @@
+                     Some("minecraft:enchanted_golden_apple") => &[("regeneration", 400, 1), ("absorption", 2400, 3), ("resistance", 6000, 0), ("fire_resistance", 6000, 0)],
+                     _ => &[],
+                 };
+-                let mut pie_stuck = false;
++                let mut sticky_attached = false;
+                 match hit {
+                     Hit::Entity {
+                         who: Who::Mob(id), ..
+@@ -5699,7 +5699,7 @@
+                                     self.mod_effect_added(name, Some(id as i32), amplifier, new);
+                                 }
+                             }
+-                            if p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:pumpkin_pie")
++                            if p.item.as_ref().is_some_and(|item| horizon_client::projectiles::create_cannon_sticky(item.item.as_ref()))
+                                 && let Some(mob) = self.mobs.iter().find(|m| m.id == id && m.alive())
+                             {
+                                 let offset = Vec3::new(p.previous.x - mob.position.x, p.previous.y - mob.position.y, p.previous.z - mob.position.z);
+@@ -5707,9 +5707,9 @@
+                                 attached.position = p.previous;
+                                 attached.previous = p.previous;
+                                 attached.velocity = Vec3::ZERO;
+-                                attached.create_pie_stuck = Some((Who::Mob(id), None, offset, 0.0));
++                                attached.create_sticky_stuck = Some((Who::Mob(id), None, offset, 0.0));
+                                 self.creatures.projectiles.push(attached);
+-                                pie_stuck = true;
++                                sticky_attached = true;
+                             }
+                             self.player_hurt_mob(p, id);
+                         }
+@@ -5742,7 +5742,7 @@
+                             for &(effect, duration, amplifier) in effects {
+                                 self.add_player_effect(horizon_client::effects::EffectInstance::new(effect, duration, amplifier));
+                             }
+-                            if p.item.as_ref().is_some_and(|item| item.item.as_ref() == "minecraft:pumpkin_pie")
++                            if p.item.as_ref().is_some_and(|item| horizon_client::projectiles::create_cannon_sticky(item.item.as_ref()))
+                                 && let Some(player) = self.player.as_ref().filter(|player| !player.health.dead_or_dying())
+                             {
+                                 let offset = Vec3::new(p.previous.x - player.position.x, p.previous.y - player.position.y, p.previous.z - player.position.z);
+@@ -5750,9 +5750,9 @@
+                                 attached.position = p.previous;
+                                 attached.previous = p.previous;
+                                 attached.velocity = Vec3::ZERO;
+-                                attached.create_pie_stuck = Some((Who::Player, self.lan_acting, offset, 0.0));
++                                attached.create_sticky_stuck = Some((Who::Player, self.lan_acting, offset, 0.0));
+                                 self.creatures.projectiles.push(attached);
+-                                pie_stuck = true;
++                                sticky_attached = true;
+                             }
+                         }
+                     }
+@@ -5793,7 +5793,7 @@
+                     }
+                     _ => {}
+                 }
+-                if !pie_stuck {
++                if !sticky_attached {
+                     self.thrown_break_event(p.id, atp);
+                     let burst_item = if cannon_ammo.is_some() {
+                         p.item

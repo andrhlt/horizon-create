@@ -1,0 +1,4 @@
+phase,running,hour_angle,minute_angle,rpm,stress,capacity,hands,present
+before,true,0.00000000,0.00000000,16.00000000,64.0,262144.0,2,0
+reopened,true,2.40000010,4.80000019,16.00000000,64.0,262144.0,2,0
+stopped,false,0.00000000,0.00000000,16.00000000,64.0,262144.0,0,4

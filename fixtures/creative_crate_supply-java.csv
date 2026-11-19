@@ -1,0 +1,3 @@
+top_hit,side_hit,held_count,filter_id,filter_count,slots,visible_count,extract_id_matches,extract_first,extract_second,slot1_extract,insert_consumed,custom_data,exact_below,exact_above
+true,false,7,minecraft:iron_ingot,7,2,64,true,3,64,0,true,{marker:17},9,0
+true,false,7,minecraft:iron_ingot,7,2,16,true,3,16,0,true,{marker:17},9,0

@@ -1,0 +1,5 @@
+case,held_after_set,filter_count,filters_after_replace,marker_retained,replacement_hand,replacement_id
+survival,0,1,1,true,7,minecraft:iron_ingot
+creative_has_copy,1,1,2,true,7,minecraft:iron_ingot
+creative_no_copy,1,1,1,true,7,minecraft:iron_ingot
+creative_exact_copy,1,1,1,true,7,minecraft:iron_ingot

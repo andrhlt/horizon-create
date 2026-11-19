@@ -1,0 +1,3 @@
+tick,item,count,y,motion_y,no_gravity,silent,just_created
+1,create:refined_radiance,3,-0.040000000000,-0.039200000000,false,false,true
+2,create:refined_radiance,3,0.170800000000,0.206584000000,true,true,false

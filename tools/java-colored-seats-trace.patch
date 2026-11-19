@@ -1,0 +1,90 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..edd9e5f8b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.coloredSeats"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..0bd3b7688 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,58 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void coloredSeats(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var recipes = level.getRecipeManager();
++		var items = net.minecraft.core.registries.BuiltInRegistries.ITEM;
++		var blocks = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++		var type = net.minecraft.world.item.crafting.RecipeType.CRAFTING;
++		var at = helper.absolutePos(new BlockPos(2, 12, 2));
++		var waterlogged = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		player.setPos(at.getX() + .5, at.getY(), at.getZ() - 2.0);
++		var side = net.minecraft.core.Direction.NORTH;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var hit = new net.minecraft.world.phys.BlockHitResult(at.getCenter().relative(side, .5), side, at, false);
++		var white = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.WHITE).getDefaultState();
++		var black = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.BLACK).getDefaultState();
++		var slab = net.minecraft.world.item.Items.OAK_SLAB.getDefaultInstance();
++		for (var dye : net.minecraft.world.item.DyeColor.values()) {
++			var name = dye.getSerializedName();
++			var block = com.simibubi.create.AllBlocks.SEATS.get(dye).get();
++			var next = block.defaultBlockState();
++			var dyeStack = net.minecraft.world.item.DyeItem.byColor(dye).getDefaultInstance();
++			var wool = items.get(net.minecraft.resources.ResourceLocation.withDefaultNamespace(name + "_wool")).getDefaultInstance();
++			var old = dye == net.minecraft.world.item.DyeColor.WHITE ? black : white;
++			var source = old.getBlock().asItem().getDefaultInstance();
++			var first = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(wool, slab));
++			var second = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(dyeStack, source));
++			var craft = recipes.getRecipeFor(type, first, level).orElseThrow();
++			var recolor = recipes.getRecipeFor(type, second, level).orElseThrow();
++			var result = craft.value().assemble(first, level.registryAccess());
++			var other = recolor.value().assemble(second, level.registryAccess());
++			level.setBlockAndUpdate(at, old.setValue(waterlogged, true));
++			player.setItemInHand(hand, dyeStack);
++			var used = level.getBlockState(at).useItemOn(dyeStack, level, player, hand, hit);
++			var changed = level.getBlockState(at);
++			player.setItemInHand(hand, net.minecraft.world.item.ItemStack.EMPTY);
++			level.getBlockState(at).useItemOn(net.minecraft.world.item.ItemStack.EMPTY, level, player, hand, hit);
++			var vehicle = player.getVehicle();
++			if (vehicle != null) {
++				player.rideTick();
++				vehicle.discard();
++			}
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_COLORED_SEAT %s,%s,%.2f,%.2f,%d,%s,%s,%d,%s,%s,%d,%s,%s,%b,%d,%b%n",
++				name, blocks.getKey(block), next.getDestroySpeed(level, at), block.getExplosionResistance(),
++				next.getMapColor(level, at).id, items.getKey(wool.getItem()), craft.id(), result.getCount(),
++				items.getKey(source.getItem()), recolor.id(), other.getCount(), used,
++				blocks.getKey(changed.getBlock()), changed.getValue(waterlogged), dyeStack.getCount(),
++				vehicle instanceof com.simibubi.create.content.contraptions.actors.seat.SeatEntity);
++		}
++		helper.succeed();
++	}
++
+ }

@@ -1,0 +1,212 @@
+{
+  "include_components": true,
+  "actions": [
+    {
+      "op": "place",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        5,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        5,
+        1,
+        0
+      ]
+    },
+    {
+      "op": "place",
+      "block": "creative",
+      "pos": [
+        5,
+        2,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 6
+    },
+    {
+      "op": "probe",
+      "label": "adjacent",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          5,
+          0,
+          0
+        ],
+        [
+          5,
+          1,
+          0
+        ],
+        [
+          5,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "fill",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "fluid": "minecraft:water",
+      "amount": 4000
+    },
+    {
+      "op": "configure",
+      "pos": [
+        0,
+        1,
+        0
+      ],
+      "fluid": "minecraft:water",
+      "amount": 1000
+    },
+    {
+      "op": "configure",
+      "pos": [
+        5,
+        0,
+        0
+      ],
+      "fluid": "minecraft:water",
+      "amount": 1000
+    },
+    {
+      "op": "fill",
+      "pos": [
+        5,
+        1,
+        0
+      ],
+      "fluid": "minecraft:water",
+      "amount": 4000
+    },
+    {
+      "op": "probe",
+      "label": "filled",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          5,
+          0,
+          0
+        ],
+        [
+          5,
+          1,
+          0
+        ],
+        [
+          5,
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "probe",
+      "label": "settled",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          5,
+          0,
+          0
+        ],
+        [
+          5,
+          1,
+          0
+        ],
+        [
+          5,
+          2,
+          0
+        ]
+      ]
+    }
+  ]
+}

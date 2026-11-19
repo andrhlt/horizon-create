@@ -1,0 +1,12 @@
+--- a/crates/horizon-client/src/game/control.rs
++++ b/crates/horizon-client/src/game/control.rs
+@@ -1783,6 +1783,9 @@
+         "f11" => KeyCode::F11,
+         "slash" | "/" => KeyCode::Slash,
+         "backspace" => KeyCode::Backspace,
++        "home" => KeyCode::Home,
++        "end" => KeyCode::End,
++        "delete" => KeyCode::Delete,
+         "pageup" => KeyCode::PageUp,
+         "pagedown" => KeyCode::PageDown,
+         "left" => KeyCode::ArrowLeft,

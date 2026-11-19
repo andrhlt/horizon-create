@@ -1,0 +1,19 @@
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -1130,6 +1130,8 @@
+         }
+     }
+     /// Advance every mob one tick, then apply their events.
++    fn native_after_mob_positions(&mut self) {}
++
+     pub(super) fn tick_creatures(&mut self) -> Result<()> {
+         // Hurts dealt since the last creature tick (explosions, commands, the
+         // systems after it) teleport an enderman before it ticks, not in its AI step.
+@@ -1390,6 +1392,7 @@
+         }
+         laps.lap("creature_retain");
+         self.sync_riders();
++        self.native_after_mob_positions();
+         self.tick_skeleton_traps();
+         self.tick_apparition();
+         self.guardian_bubbles();

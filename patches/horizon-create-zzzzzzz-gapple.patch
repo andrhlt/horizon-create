@@ -1,0 +1,37 @@
+--- a/crates/horizon-client/src/projectiles.rs
++++ b/crates/horizon-client/src/projectiles.rs
+@@ -37,6 +37,7 @@
+         "minecraft:potato" => (1.25, 15, 5.0, 1.5),
+         "minecraft:baked_potato" => (1.25, 15, 5.0, 0.5),
+         "minecraft:poisonous_potato" => (1.25, 15, 5.0, 0.05),
++        "minecraft:golden_apple" | "minecraft:enchanted_golden_apple" => (1.45, 100, 1.0, 0.05),
+         "minecraft:carrot" => (1.45, 12, 4.0, 0.3),
+         "minecraft:apple" => (1.45, 10, 5.0, 0.5),
+         "minecraft:beetroot" => (1.6, 5, 2.0, 0.1),
+--- a/crates/horizon-client/src/game/creatures.rs
++++ b/crates/horizon-client/src/game/creatures.rs
+@@ -5562,6 +5562,24 @@
+                                     let new = !m.has_effect("minecraft:poison");
+                                     m.add_effect("minecraft:poison", 160, 0);
+                                     self.mod_effect_added("minecraft:poison", Some(id as i32), 0, new);
++                                }
++                            }
++                            let apple = p.item.as_ref().map(|item| item.item.as_ref());
++                            let effects: &[(&str, i32, i32)] = match apple {
++                                Some("minecraft:golden_apple") => &[("regeneration", 100, 1), ("absorption", 2400, 0)],
++                                Some("minecraft:enchanted_golden_apple") => &[("regeneration", 400, 1), ("absorption", 2400, 3), ("resistance", 6000, 0), ("fire_resistance", 6000, 0)],
++                                _ => &[],
++                            };
++                            for &(effect, duration, amplifier) in effects {
++                                let tags = &self.res.stations().enchantments.entity_tags;
++                                if let Some(m) = self.mobs.iter_mut().find(|m| m.id == id)
++                                    && !(apple == Some("minecraft:golden_apple") && m.kind.id == "minecraft:zombie_villager" && m.has_effect("minecraft:weakness"))
++                                    && super::potions::mob_can_be_affected(tags, &m.kind.id, effect)
++                                    && let Some(name) = super::potions::mob_effect_id(effect)
++                                {
++                                    let new = !m.has_effect(name);
++                                    m.add_effect(name, duration, amplifier);
++                                    self.mod_effect_added(name, Some(id as i32), amplifier, new);
+                                 }
+                             }
+                             self.player_hurt_mob(p, id);

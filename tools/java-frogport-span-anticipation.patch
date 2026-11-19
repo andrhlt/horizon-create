@@ -1,0 +1,51 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -145,6 +145,48 @@
+ 		runChainConveyor(helper, "rising_reversal", new BlockPos(6, 2, 3), true);
+ 	}
+ 
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 40)
++	public static void chainConveyorFrogportSpanAnticipation(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		var edge = new BlockPos(6, 2, 3);
++		var other = origin.offset(edge);
++		var motorPos = origin.below();
++		var portPos = origin.offset(4, -1, 2);
++		helper.runAtTickTime(2, () -> {
++			world.setBlockAndUpdate(origin, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
++			world.setBlockAndUpdate(other, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
++			world.setBlockAndUpdate(portPos, AllBlocks.PACKAGE_FROGPORT.getDefaultState());
++			world.setBlockAndUpdate(motorPos, AllBlocks.CREATIVE_MOTOR.getDefaultState()
++				.setValue(CreativeMotorBlock.FACING, Direction.UP));
++		});
++		helper.runAtTickTime(5, () -> ((CreativeMotorBlockEntity) world.getBlockEntity(motorPos))
++			.generatedSpeed.setValue(128));
++		helper.runAtTickTime(8, () -> {
++			var player = chainPlayer(world, origin, 16);
++			new ChainConveyorConnectionPacket(origin, other, new ItemStack(Items.CHAIN), true).handle(player);
++			var wheel = (ChainConveyorBlockEntity) world.getBlockEntity(origin);
++			var port = (FrogportBlockEntity) world.getBlockEntity(portPos);
++			port.target = new ChainConveyorFrogportTarget(origin.subtract(portPos), 2.4f, edge, false);
++			port.addressFilter = "Lab-In";
++			port.target.setup(port, world, portPos);
++			port.target.register(port, world, portPos);
++			System.out.printf(Locale.ROOT, "CREATE_FROGPORT_SPAN_ANTICIPATE_START %d,%d,%d,%d%n",
++				world.getGameTime(), portPos.getX(), portPos.getY(), portPos.getZ());
++			if (!wheel.addTravellingPackage(new ChainConveyorPackage(0, chainPackage("Lab-In", Items.PAPER, 3)), edge))
++				throw new IllegalStateException("Unable to load the rising span");
++		});
++		for (int t = 8; t <= 26; t++) {
++			final int tick = t - 8;
++			helper.runAtTickTime(t, () -> {
++				var port = (FrogportBlockEntity) world.getBlockEntity(portPos);
++				System.out.printf(Locale.ROOT, "CREATE_FROGPORT_SPAN_CUSTODY %d,%s%n", tick, chainReceipt(port));
++				if (tick == 18)
++					helper.succeed();
++			});
++		}
++	}
++
+ 	private static void runChainConveyor(CreateGameTestHelper helper, String scenario, BlockPos edge, boolean reverse) {
+ 		var world = helper.getLevel();
+ 		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);

@@ -1,0 +1,123 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,108 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void nozzleContract(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var base = helper.absolutePos(new BlockPos(3, 16, 3));
++		var east = net.minecraft.core.Direction.EAST;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var nozzle = com.simibubi.create.AllBlocks.NOZZLE.get();
++		var fan = com.simibubi.create.AllBlocks.ENCASED_FAN.get();
++		var empty = net.minecraft.world.item.ItemStack.EMPTY;
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var craft = com.simibubi.create.AllItems.ANDESITE_ALLOY.asStack();
++		var input = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
++			empty, craft, empty, empty, net.minecraft.world.item.Items.WHITE_WOOL.getDefaultInstance(),
++			empty, craft, craft, craft));
++		var recipe = world.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING,
++			input, world).orElseThrow();
++		var product = recipe.value().assemble(input, world.registryAccess());
++		System.out.printf(java.util.Locale.ROOT, "CREATE_MACHINE_CRAFT crafting/kinetics/nozzle;3;3;_,create:andesite_alloy,_,_,minecraft:white_wool,_,create:andesite_alloy,create:andesite_alloy,create:andesite_alloy;%s;%d;%s%n",
++			net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(product.getItem()), product.getCount(),
++			recipe.value().getRemainingItems(input).stream().filter(stack -> !stack.isEmpty())
++				.map(stack -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()) + ":" + stack.getCount())
++				.collect(java.util.stream.Collectors.joining(",")));
++		helper.assertTrue(recipe.id().toString().equals("create:crafting/kinetics/nozzle"), "Unexpected Nozzle recipe");
++		var place = (java.util.function.BiFunction<net.minecraft.core.BlockPos, net.minecraft.core.Direction, String>) (support, side) -> {
++			var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++			var held = com.simibubi.create.AllBlocks.NOZZLE.asStack();
++			player.setItemInHand(hand, held);
++			player.setPos(net.minecraft.world.phys.Vec3.atCenterOf(support.above(2)));
++			var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(support)
++				.relative(side, .5), side, support, false);
++			var context = new net.minecraft.world.item.context.UseOnContext(player, hand, hit);
++			var action = held.useOn(context);
++			var target = support.relative(side);
++			var state = world.getBlockState(target);
++			if (!state.is(nozzle))
++				return action + "|none|" + held.getCount() + "|none|none";
++			var shape = state.getShape(world, target).toAabbs().stream()
++				.map(box -> java.util.stream.DoubleStream.of(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ)
++					.mapToObj(coord -> Integer.toString((int) (coord * 16))).collect(java.util.stream.Collectors.joining(":")))
++				.collect(java.util.stream.Collectors.joining("+"));
++			var wrench = nozzle.onWrenched(state, context);
++			return action + "|" + state.getValue(facing) + "|" + held.getCount() + "|" + shape + "|" + wrench;
++		};
++		helper.runAtTickTime(2, () -> {
++			var directions = net.minecraft.core.Direction.values();
++			for (int index = 0; index < directions.length; index++) {
++				var side = directions[index];
++				var support = base.east(index * 3);
++				world.setBlockAndUpdate(support, fan.defaultBlockState().setValue(facing, side));
++				System.out.printf(java.util.Locale.ROOT, "CREATE_NOZZLE_PLACE %s|%s%n", side, place.apply(support, side));
++			}
++			var unsupported = base.south(3);
++			world.setBlockAndUpdate(unsupported, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++			System.out.printf(java.util.Locale.ROOT, "CREATE_NOZZLE_PLACE stone|%s%n", place.apply(unsupported, east));
++			world.setBlockAndUpdate(unsupported, fan.defaultBlockState().setValue(facing, east.getOpposite()));
++			System.out.printf(java.util.Locale.ROOT, "CREATE_NOZZLE_PLACE fan_back|%s%n", place.apply(unsupported, east));
++			world.setBlockAndUpdate(base, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
++			var detached = base.relative(directions[0]);
++			helper.assertTrue(world.isEmptyBlock(detached), "Nozzle retained after backing fan was removed");
++			var drops = world.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
++				new net.minecraft.world.phys.AABB(detached).inflate(.5)).stream()
++				.filter(entity -> entity.getItem().is(com.simibubi.create.AllBlocks.NOZZLE.asItem())).count();
++			System.out.printf(java.util.Locale.ROOT, "CREATE_NOZZLE_DROP %s|%d%n", directions[0], drops);
++		});
++		helper.runAtTickTime(4, () -> {
++			var source = base.south(8);
++			var at = source.east();
++			var center = net.minecraft.world.phys.Vec3.atCenterOf(at);
++			world.setBlockAndUpdate(source, fan.defaultBlockState().setValue(facing, east));
++			world.setBlockAndUpdate(at, nozzle.defaultBlockState().setValue(facing, east));
++			var fanEntity = (com.simibubi.create.content.kinetics.fan.EncasedFanBlockEntity) world.getBlockEntity(source);
++			var port = (com.simibubi.create.content.kinetics.fan.NozzleBlockEntity) world.getBlockEntity(at);
++			port.initialize();
++			float[] speeds = {64, -64, -64, 256, 64, 64, 0};
++			double[] distances = {2.25, 2.25, 1.25, 3, 4, 2.25, 2.25};
++			String[] names = {"push", "pull", "deadzone", "max_push", "outside_acquisition", "occluded", "stopped"};
++			for (int index = 0; index < names.length; index++) {
++				fanEntity.setSpeed(0);
++				port.tick();
++				fanEntity.setSpeed(speeds[index]);
++				var target = center.add(distances[index], 0, 0);
++				if (names[index].equals("occluded"))
++					world.setBlockAndUpdate(at.east(), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++				var entity = new net.minecraft.world.entity.item.ItemEntity(world, target.x, target.y, target.z,
++					net.minecraft.world.item.Items.PAPER.getDefaultInstance(), 0, 0, 0);
++				entity.setNoGravity(true);
++				world.addFreshEntity(entity);
++				port.tick();
++				port.lazyTick();
++				port.tick();
++				var update = port.getUpdateTag(world.registryAccess());
++				var velocity = entity.getDeltaMovement();
++				System.out.printf(java.util.Locale.ROOT, "CREATE_NOZZLE_AIR %s,%.0f,%.2f,%.5f,%b,%.10f,%.10f,%.10f%n",
++					names[index], speeds[index], distances[index], update.getFloat("Range"), update.getBoolean("Pushing"),
++					velocity.x, velocity.y, velocity.z);
++				entity.discard();
++				if (names[index].equals("occluded"))
++					world.setBlockAndUpdate(at.east(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
++			}
++			helper.succeed();
++		});
++	}
++
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.nozzleContract"))
++			.toList();
+ 	}
+ }

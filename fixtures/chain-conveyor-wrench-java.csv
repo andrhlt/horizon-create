@@ -1,0 +1,5 @@
+scenario,payload,x,y,z
+rising_reversal,Removed-A:paper:3,2.739041546,0.663745285,2.421123246
+rising_reversal,Removed-B:string:2,4.671929815,1.283441036,1.784352046
+straight,Removed-A:paper:3,3.523909524,-0.125000000,1.216974519
+straight,Removed-B:string:2,4.976090476,-0.125000000,-0.216984427

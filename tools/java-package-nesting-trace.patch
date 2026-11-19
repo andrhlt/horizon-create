@@ -1,0 +1,40 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..b0774e4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageContainerSlots"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..d7a6baa 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,21 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void packageContainerSlots(CreateGameTestHelper helper) {
++		var boxes = com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES;
++		var items = new java.util.ArrayList<ItemStack>();
++		for (var box : boxes) items.add(new ItemStack(box));
++		items.add(new ItemStack(Items.STONE));
++		items.add(new ItemStack(Items.SHULKER_BOX));
++		var shulker = new net.minecraft.world.inventory.ShulkerBoxSlot(new net.minecraft.world.SimpleContainer(27), 0, 0, 0);
++		for (var sample : items) {
++			var bundle = new net.minecraft.world.item.component.BundleContents.Mutable(net.minecraft.world.item.component.BundleContents.EMPTY);
++			boolean nested = bundle.tryInsert(sample.copy()) != 0;
++			System.out.printf("PACKAGE_CONTAINER,%s,%b,%b%n",
++				net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(sample.getItem()), nested, shulker.mayPlace(sample));
++		}
++		helper.succeed();
++	}
+ }

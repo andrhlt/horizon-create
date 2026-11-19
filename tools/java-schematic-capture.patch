@@ -1,0 +1,44 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..be2ef2b 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.schematicJavaExport")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..10f2deb 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,27 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void schematicJavaExport(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var start = helper.absolutePos(new BlockPos(1, 7, 1));
++		for (var pos : BlockPos.betweenClosed(start, start.offset(2, 0, 1)))
++			level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
++		level.setBlock(start, Blocks.STONE.defaultBlockState(), 2);
++		level.setBlock(start.east(), Blocks.OAK_STAIRS.defaultBlockState()
++			.setValue(net.minecraft.world.level.block.StairBlock.FACING, net.minecraft.core.Direction.EAST), 2);
++		level.setBlock(start.east(2), Blocks.STRUCTURE_VOID.defaultBlockState(), 2);
++		level.setBlock(start.south(), Blocks.CHEST.defaultBlockState()
++			.setValue(net.minecraft.world.level.block.ChestBlock.FACING, net.minecraft.core.Direction.NORTH), 2);
++		var chest = (net.minecraft.world.level.block.entity.ChestBlockEntity) level.getBlockEntity(start.south());
++		var chestData = new net.minecraft.nbt.CompoundTag();
++		chestData.putString("CustomName", "\"capture chest\"");
++		chest.loadWithComponents(chestData, level.registryAccess());
++		var file = com.simibubi.create.content.schematics.SchematicExport.saveSchematic(
++			java.nio.file.Path.of("schematics"), "horizon-java-capture", true, level, start.offset(2, 0, 1), start);
++		helper.assertTrue(file != null, "schematic export returned a file");
++		System.out.println("CREATE_SCHEMATIC_EXPORT " + file.file());
++		helper.succeed();
++	}
++
+ }

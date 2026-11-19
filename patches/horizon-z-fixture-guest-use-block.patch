@@ -1,0 +1,43 @@
+--- a/crates/horizon-client/src/game/control.rs
++++ b/crates/horizon-client/src/game/control.rs
+@@ -664,6 +664,18 @@
+                     json!({ "game_time": self.world.game_time, "projectiles": self.projectiles_status() })
+                 };
+                 Ok(Some(value))
++            }
++            "fixture-use-block" => {
++                if std::env::var_os("HORIZON_FIXTURE_USE_BLOCK").as_deref()
++                    != Some(std::ffi::OsStr::new("1"))
++                {
++                    return Err("fixture-use-block is not enabled".into());
++                }
++                let (hit, consumes) = self.fixture_use_block()?;
++                Ok(Some(json!({
++                    "ok": true, "client_consumes": consumes,
++                    "block": hit.pos, "face": hit.face, "point": hit.point,
++                })))
+             }
+             "server-hold" => {
+                 self.require_world()?;
+--- a/crates/horizon-client/src/game/remote.rs
++++ b/crates/horizon-client/src/game/remote.rs
+@@ -8030,6 +8030,19 @@
+         done
+     }
+ 
++    /// Send one ordinary main-hand block use without the air-use fallback.
++    /// For opt-in fixture control only; the bool is client prediction, not server acceptance.
++    pub(super) fn fixture_use_block(&mut self) -> Result<(super::Hit, bool)> {
++        if self.remote.is_none() {
++            return Err("fixture-use-block requires a connected client".into());
++        }
++        if self.screen != Screen::Playing {
++            return Err("fixture-use-block requires the playing screen".into());
++        }
++        let hit = self.pick().ok_or("fixture-use-block requires a targeted block")?;
++        Ok((hit, self.remote_use_item_on(Hand::Main)))
++    }
++
+     /// MultiPlayerGameMode.useItemOn for `hand`: whether the click ends there
+     /// (the block reacts, or a block item is placed).
+     fn remote_use_item_on(&mut self, hand: Hand) -> bool {

@@ -1,0 +1,93 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f9821..218ffcfa5 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae188..1e44c38ac 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.cogwheelPlacement"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c531165b..42c3b4008 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,61 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing")
++	public static void cogwheelPlacement(CreateGameTestHelper helper) {
++		var small = com.simibubi.create.AllBlocks.COGWHEEL;
++		var large = com.simibubi.create.AllBlocks.LARGE_COGWHEEL;
++		var shaft = com.simibubi.create.AllBlocks.SHAFT;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var wet = net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++		var x = net.minecraft.core.Direction.Axis.X;
++		var y = net.minecraft.core.Direction.Axis.Y;
++		var z = net.minecraft.core.Direction.Axis.Z;
++		var west = net.minecraft.core.Direction.WEST;
++		var north = net.minecraft.core.Direction.NORTH;
++		var up = net.minecraft.core.Direction.UP;
++		var level = helper.getLevel();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++
++		for (int index = 0; index < 10; index++) {
++			var target = new BlockPos(12 + (index % 5) * 4, 3, 2 + (index / 5) * 6);
++			var placeLarge = index == 1 || index == 3 || index == 5 || index == 7 || index == 8;
++			var face = switch (index) {
++				case 0, 4, 5, 7, 8 -> west;
++				case 1 -> north;
++				default -> up;
++			};
++			var support = target.relative(face.getOpposite());
++			helper.setBlock(support, index == 4 || index == 5
++				? small.getDefaultState().setValue(axis, y) : Blocks.STONE.defaultBlockState());
++			if (index == 2 || index == 9)
++				helper.setBlock(target.west(), shaft.getDefaultState().setValue(axis, x));
++			if (index == 3 || index == 9)
++				helper.setBlock(target.north(), shaft.getDefaultState().setValue(axis, z));
++			if (index == 6)
++				helper.setBlock(target.east(), large.getDefaultState().setValue(axis, y));
++			if (index == 7 || index == 8)
++				helper.setBlock(target, Blocks.WATER.defaultBlockState().setValue(
++					net.minecraft.world.level.block.LiquidBlock.LEVEL, index == 7 ? 0 : 1));
++
++			var supportAt = helper.absolutePos(support);
++			player.setPos(supportAt.getX() - 2, supportAt.getY() - 1, supportAt.getZ());
++			player.setShiftKeyDown(index == 3);
++			var held = new ItemStack(placeLarge ? large.asItem() : small.asItem(), 2);
++			player.setItemInHand(hand, held);
++			var location = supportAt.getCenter().relative(face, 0.5);
++			var hit = new net.minecraft.world.phys.BlockHitResult(location, face, supportAt, false);
++			held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++			var state = helper.getBlockState(target);
++			var name = small.has(state) ? "small" : large.has(state) ? "large" : "none";
++			var placed = !name.equals("none");
++			System.out.printf("CREATE_COG_PLACEMENT,%d,%s,%s,%s,%d%n", index, name,
++				placed ? state.getValue(axis).getName() : "none",
++				placed && state.getValue(wet), held.getCount());
++		}
++		player.setShiftKeyDown(false);
++		helper.succeed();
++	}
+ }

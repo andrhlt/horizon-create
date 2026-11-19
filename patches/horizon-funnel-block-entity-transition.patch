@@ -1,0 +1,99 @@
+diff --git a/crates/horizon-world/src/level/mod.rs b/crates/horizon-world/src/level/mod.rs
+--- a/crates/horizon-world/src/level/mod.rs
++++ b/crates/horizon-world/src/level/mod.rs
+@@ -846,6 +846,10 @@
+     fn has_native_block_entity(&self, _state: BlockStateId) -> bool {
+         false
+     }
++    /// Whether two variants share the existing mod block entity across a block-ID change.
++    fn keeps_mod_block_entity(&self, _old: BlockStateId, _new: BlockStateId) -> bool {
++        false
++    }
+     /// Whether a block entity a mod made lives at `pos` (`native_block_entity`),
+     /// whatever its block's template: it is removed with its block and no piston
+     /// moves it, as for a template that has one.
+diff --git a/crates/horizon-world/src/level/update.rs b/crates/horizon-world/src/level/update.rs
+--- a/crates/horizon-world/src/level/update.rs
++++ b/crates/horizon-world/src/level/update.rs
+@@ -355,6 +355,7 @@
+                 || self.level.has_native_block_entity(old)
+                 || self.level.has_mod_block_entity(pos))
+             && !self.keeps_block_entity(state, old)
++            && !self.level.keeps_mod_block_entity(old, state)
+         {
+             // BlockEntity.preRemoveSideEffects (unless UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS)
+             // and removeBlockEntity, before the neighbours hear of the removal.
+diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -1060,6 +1060,11 @@
+     }
+     fn has_native_block_entity(&self, state: BlockStateId) -> bool {
+         self.world.block_entities.stateful_entity(state.0)
++    }
++    fn keeps_mod_block_entity(&self, old: BlockStateId, new: BlockStateId) -> bool {
++        let old = &self.facts.get(old).name;
++        let new = &self.facts.get(new).name;
++        Game::native_keeps_mod_block_entity(old, new)
+     }
+     fn ensure_block_entity(&mut self, pos: BlockPos, state: BlockStateId) {
+         let key = (pos.x, pos.y, pos.z);
+diff --git a/crates/horizon-client/src/game/remote.rs b/crates/horizon-client/src/game/remote.rs
+--- a/crates/horizon-client/src/game/remote.rs
++++ b/crates/horizon-client/src/game/remote.rs
+@@ -2590,6 +2590,11 @@
+             );
+         }
+     }
++    pub(super) fn native_keeps_mod_block_entity(old: &str, new: &str) -> bool {
++        let _ = (old, new);
++        false
++    }
++
+     /// Keep the renderable block entities (chests, furnaces) in step with blocks.
+     /// `previous`: the block's state before, when it changed. A column sent again has
+     /// none, and keeps its block entities' synced attachments: the server does not send
+@@ -2609,10 +2614,15 @@
+         }) {
+             self.world.set_copycat_panel_material(pos, None);
+         }
++        let replaces_mod_entity = other_block
++            && previous.is_some_and(|p| {
++                let old = &self.res.facts().get(p).name;
++                !Self::native_keeps_mod_block_entity(old, &name)
++            });
+         self.ensure_stateful_entity_table();
+-        // State-aware factories decide creation only. A valid same-block
+-        // instance survives even when the new state would create none.
+-        if !other_block
++        // State-aware factories decide creation only. Keep an existing mod
++        // entity for the same block or across an explicitly shared variant.
++        if !replaces_mod_entity
+             && self.world.block_entities.stateful_entity(state.0)
+             && matches!(
+                 self.world.block_entities.get(&pos),
+@@ -2625,7 +2635,8 @@
+         match self.new_block_entity_for_state(state) {
+             Some(entity) => {
+                 let same = self.world.block_entities.get(&pos).is_some_and(|e| {
+-                    e.id() == entity.id() && !(other_block && matches!(e, BlockEntity::Mod(_)))
++                    e.id() == entity.id()
++                        && !(replaces_mod_entity && matches!(e, BlockEntity::Mod(_)))
+                 });
+                 if !same {
+                     if previous.is_some() {
+diff --git a/crates/horizon-client/src/game/native_hooks.rs b/crates/horizon-client/src/game/native_hooks.rs
+--- a/crates/horizon-client/src/game/native_hooks.rs
++++ b/crates/horizon-client/src/game/native_hooks.rs
+@@ -10597,8 +10597,10 @@
+         let new = self.res.facts().get(state).name.clone();
+         let landed = self.world.block(pos[0], pos[1], pos[2]);
++        let previous_name = &self.res.facts().get(previous).name;
+         let needs_entity = !self.world.block_entities.stateful_entity(landed.0)
+-            && self.res.facts().get(previous).name != new;
++            && previous_name != &new
++            && !Self::native_keeps_mod_block_entity(previous_name, &new);
+         if changed
+             && needs_entity
+             && self.res.facts().get(landed).name == new
+             && let Some(entity) = self.new_block_entity_for_state(landed)

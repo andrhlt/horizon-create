@@ -1,0 +1,49 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,46 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++ @GameTest(template = "shearing", timeoutTicks = 100)
++ public static void placardContract(CreateGameTestHelper helper) {
++   var world = helper.getLevel();
++   var base = helper.absolutePos(new BlockPos(3, 16, 3));
++   var placard = com.simibubi.create.AllBlocks.PLACARD.get();
++   var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++   helper.runAtTickTime(2, () -> {
++     for (var side : net.minecraft.core.Direction.values()) for (int yaw = 0; yaw < 360; yaw += 90) {
++       var support = base;
++       world.setBlockAndUpdate(support, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++       for (var clear : net.minecraft.core.Direction.values()) world.setBlockAndUpdate(support.relative(clear), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
++       var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++       player.setYRot(yaw);
++       var stack = com.simibubi.create.AllBlocks.PLACARD.asStack();
++       player.setItemInHand(hand, stack);
++       var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(support).relative(side, .5), side, support, false);
++       var result = stack.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++       var state = world.getBlockState(support.relative(side));
++       System.out.printf("CREATE_PLACARD_PLACE %s,%d,%s,%s%n", side, yaw, result, state);
++     }
++     var pos = base.east();
++     world.setBlockAndUpdate(base, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
++     world.setBlockAndUpdate(pos, placard.defaultBlockState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.ATTACH_FACE, net.minecraft.world.level.block.state.properties.AttachFace.WALL).setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, net.minecraft.core.Direction.EAST));
++     var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++     player.setItemInHand(hand, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND, 3));
++     var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(pos), net.minecraft.core.Direction.EAST, pos, false);
++     try {
++       var method = placard.getClass().getDeclaredMethod("useItemOn", net.minecraft.world.item.ItemStack.class, net.minecraft.world.level.block.state.BlockState.class, net.minecraft.world.level.Level.class, net.minecraft.core.BlockPos.class, net.minecraft.world.entity.player.Player.class, net.minecraft.world.InteractionHand.class, net.minecraft.world.phys.BlockHitResult.class);
++       method.setAccessible(true);
++       method.invoke(placard, player.getItemInHand(hand), world.getBlockState(pos), world, pos, player, hand, hit);
++       var result = method.invoke(placard, player.getItemInHand(hand), world.getBlockState(pos), world, pos, player, hand, hit);
++       var be = (com.simibubi.create.content.decoration.placard.PlacardBlockEntity) world.getBlockEntity(pos);
++       for (int tick = 0; tick <= 20; tick++) {
++         var state = world.getBlockState(pos);
++         System.out.printf("CREATE_PLACARD_PULSE %d,%s,%s,%d,%d,%d%n", tick, result, state.getValue(com.simibubi.create.content.decoration.placard.PlacardBlock.POWERED), player.getItemInHand(hand).getCount(), state.getSignal(world,pos,net.minecraft.core.Direction.NORTH), state.getDirectSignal(world,pos,net.minecraft.core.Direction.EAST));
++         be.tick();
++       }
++     } catch (Exception e) { throw new RuntimeException(e); }
++   });
++   helper.runAtTickTime(5, helper::succeed);
++ }
+ }

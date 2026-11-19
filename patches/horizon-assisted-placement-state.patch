@@ -1,0 +1,143 @@
+diff --git a/crates/horizon-world/src/level/place.rs b/crates/horizon-world/src/level/place.rs
+--- a/crates/horizon-world/src/level/place.rs
++++ b/crates/horizon-world/src/level/place.rs
+@@ -30,6 +30,8 @@
+     /// Player view rotation in degrees (`getYRot`, `getXRot`).
+     pub yaw: f32,
+     pub pitch: f32,
++    /// A state selected by placement assistance. It must belong to the normal block.
++    pub state_override: Option<BlockStateId>,
+     /// `isSecondaryUseActive` (sneaking).
+     pub sneaking: bool,
+     /// The item in hand (registry name, e.g. `minecraft:oak_stairs`).
+@@ -1625,7 +1627,11 @@
+             }
+             _ => {
+                 let must_survive = binding.kind != ItemKind::Scaffolding;
+-                self.state_for_placement(binding.block, &ctx)
++                input.state_override
++                    .filter(|state| {
++                        (state.0 as usize) < b.table.state_count() && b.block(*state) == binding.block
++                    })
++                    .or_else(|| self.state_for_placement(binding.block, &ctx))
+                     .filter(|state| {
+                         (!must_survive || self.can_survive(*state, ctx.pos))
+                             && self.level.is_unobstructed(ctx.pos, *state)
+diff --git a/crates/horizon-world/src/level/tests.rs b/crates/horizon-world/src/level/tests.rs
+--- a/crates/horizon-world/src/level/tests.rs
++++ b/crates/horizon-world/src/level/tests.rs
+@@ -1398,6 +1398,7 @@
+             inside: false,
+             yaw,
+             pitch,
++            state_override: None,
+             sneaking: false,
+             item: format!("minecraft:{item}"),
+             can_use_game_master_blocks: false,
+@@ -3571,6 +3572,7 @@
+         inside: false,
+         yaw: 0.0,
+         pitch: 0.0,
++        state_override: None,
+         sneaking: false,
+         item: "minecraft:furnace".into(),
+         can_use_game_master_blocks: false,
+@@ -3644,6 +3646,7 @@
+         inside: false,
+         yaw: 270.0,
+         pitch: 0.0,
++        state_override: None,
+         sneaking: false,
+         item: "minecraft:furnace".into(),
+         can_use_game_master_blocks: false,
+@@ -3763,6 +3766,7 @@
+             inside: false,
+             yaw: 0.0,
+             pitch: 0.0,
++            state_override: None,
+             sneaking: false,
+             item: item.into(),
+             can_use_game_master_blocks: false,
+@@ -3896,6 +3900,7 @@
+             inside: false,
+             yaw: 0.0,
+             pitch: 0.0,
++            state_override: None,
+             sneaking: false,
+             item: "minecraft:campfire".into(),
+             can_use_game_master_blocks: false,
+diff --git a/crates/horizon-world/src/level/mod.rs b/crates/horizon-world/src/level/mod.rs
+--- a/crates/horizon-world/src/level/mod.rs
++++ b/crates/horizon-world/src/level/mod.rs
+@@ -77,7 +77,7 @@
+ //! for event in level.events.drain(..) { /* play sounds, spawn drops/falling blocks, grow trees */ }
+ //!
+ //! // Player actions:
+-//! behaviours.place_block(&mut level, &mut ticks, &PlaceContext { clicked_pos, face, hit, inside: false,
++//! behaviours.place_block(&mut level, &mut ticks, &PlaceContext { clicked_pos, face, hit, inside: false, state_override: None,
+ //!     yaw, pitch, sneaking, item: "minecraft:oak_stairs".into(), can_use_game_master_blocks: false });
+ //! behaviours.use_without_item(&mut level, &mut ticks, pos, face, hit, player_context);
+ //! behaviours.player_destroy_block(&mut level, &mut ticks, pos, creative, correct_tool);
+diff --git a/crates/horizon-world/examples/probe/level_place_fixture.rs b/crates/horizon-world/examples/probe/level_place_fixture.rs
+--- a/crates/horizon-world/examples/probe/level_place_fixture.rs
++++ b/crates/horizon-world/examples/probe/level_place_fixture.rs
+@@ -99,6 +99,7 @@
+             inside: false,
+             yaw: case["yaw"].as_f64().unwrap() as f32,
+             pitch: case["pitch"].as_f64().unwrap() as f32,
++            state_override: None,
+             sneaking: case["sneak"].as_bool().unwrap(),
+             item: case["item"].as_str().unwrap().to_owned(),
+             can_use_game_master_blocks: false,
+diff --git a/crates/horizon-client/src/mod_content_tests.rs b/crates/horizon-client/src/mod_content_tests.rs
+--- a/crates/horizon-client/src/mod_content_tests.rs
++++ b/crates/horizon-client/src/mod_content_tests.rs
+@@ -318,6 +318,7 @@
+                 inside: false,
+                 yaw: 0.0,
+                 pitch: 0.0,
++                state_override: None,
+                 sneaking: false,
+                 item: (*name).into(),
+                 can_use_game_master_blocks: false,
+diff --git a/crates/horizon-client/src/game/use_hand.rs b/crates/horizon-client/src/game/use_hand.rs
+--- a/crates/horizon-client/src/game/use_hand.rs
++++ b/crates/horizon-client/src/game/use_hand.rs
+@@ -466,6 +466,7 @@
+             inside: false,
+             yaw: self.yaw,
+             pitch: self.pitch,
++            state_override: None,
+             sneaking: self.keys.held(Mapping::Sneak),
+             item: stack.item.to_string(),
+             can_use_game_master_blocks: self.can_use_game_master_blocks(),
+diff --git a/crates/horizon-client/src/game/remote.rs b/crates/horizon-client/src/game/remote.rs
+--- a/crates/horizon-client/src/game/remote.rs
++++ b/crates/horizon-client/src/game/remote.rs
+@@ -8668,6 +8668,7 @@
+             inside: hit.face == [0; 3],
+             yaw: self.yaw,
+             pitch: self.pitch,
++            state_override: None,
+             sneaking: self.remote_shift_down(),
+             item: stack.item.to_string(),
+             can_use_game_master_blocks: self.can_use_game_master_blocks(),
+@@ -13145,6 +13146,7 @@
+                 inside: false,
+                 yaw: 0.0,
+                 pitch: 45.0,
++                state_override: None,
+                 sneaking: false,
+                 item: item.into(),
+                 can_use_game_master_blocks: false,
+diff --git a/crates/horizon-client/src/game/dispenser.rs b/crates/horizon-client/src/game/dispenser.rs
+--- a/crates/horizon-client/src/game/dispenser.rs
++++ b/crates/horizon-client/src/game/dispenser.rs
+@@ -1754,6 +1754,7 @@
+             inside: false,
+             yaw: place_rotation(facing),
+             pitch: 0.0,
++            state_override: None,
+             sneaking: false,
+             item: stack.item.to_string(),
+             can_use_game_master_blocks: false,

@@ -1,0 +1,127 @@
+--- a/crates/horizon-client/src/crafting.rs
++++ b/crates/horizon-client/src/crafting.rs
+@@ -408,8 +408,24 @@
+     /// `Recipe.isSpecial`: special recipes (e.g. firework rocket, dye) are not in the recipe book.
+     pub fn is_special(&self) -> bool {
+         matches!(self, Recipe::Special(_))
++    }
++}
++/// NeoForge DyeColor.getColor prefers vanilla DyeItems. The fallback's
++/// tag iteration stops before the last color (black).
++pub fn toolbox_dye_color(item: &str, mut tagged: impl FnMut(&str) -> bool) -> Option<&'static str> {
++    use crate::block_entity_render::DYES;
++
++    let material = item
++        .strip_prefix("minecraft:")
++        .and_then(|id| id.strip_suffix("_dye"));
++    if let Some((color, _)) = DYES.iter().find(|(color, _)| Some(*color) == material) {
++        return Some(*color);
+     }
++    DYES.iter()
++        .take_while(|(color, _)| *color != "black")
++        .find_map(|(color, _)| tagged(color).then_some(*color))
+ }
++
+ /// The custom and transmuting crafting recipes.
+ #[derive(Clone, Debug)]
+ pub enum Special {
+@@ -445,6 +461,12 @@
+     },
+     /// Create's item-copying recipe for a programmed Train Schedule.
+     CreateScheduleCopy,
++    /// Create's original component-preserving Toolbox dyeing recipe.
++    CreateToolboxDye {
++        toolbox: Ingredient,
++        dye: Ingredient,
++        colors: Vec<(&'static str, Ingredient)>,
++    },
+     /// `BookCloningRecipe`.
+     BookCloning {
+         source: Ingredient,
+@@ -830,6 +852,9 @@
+                 })
+             }
+             Self::CreateScheduleCopy => Self::schedule_copy_source(&stacks).is_some(),
++            Self::CreateToolboxDye { toolbox, dye, .. } => {
++                Self::toolbox_dye_inputs(&stacks, toolbox, dye).is_some()
++            }
+             Self::BookCloning {
+                 source,
+                 material,
+@@ -1011,6 +1036,22 @@
+             }
+         }
+         source
++    }
++
++    fn toolbox_dye_inputs<'a>(
++        stacks: &[&'a ItemStack],
++        toolbox: &Ingredient,
++        dye: &Ingredient,
++    ) -> Option<(&'a ItemStack, &'a ItemStack)> {
++        match stacks {
++            [first, second] if toolbox.test(first) && !toolbox.test(second) && dye.test(second) => {
++                Some((first, second))
++            }
++            [first, second] if toolbox.test(second) && !toolbox.test(first) && dye.test(first) => {
++                Some((second, first))
++            }
++            _ => None,
++        }
+     }
+ 
+     /// `Recipe.assemble`; None is the empty stack.
+@@ -1111,6 +1152,20 @@
+                 let mut out = result.create();
+                 out.data_mut().potion = source.data().and_then(|d| d.potion.clone());
+                 out
++            }
++            Self::CreateToolboxDye { toolbox, dye, colors } => {
++                let (toolbox, dye) = Self::toolbox_dye_inputs(&stacks, toolbox, dye)?;
++                let color = toolbox_dye_color(&dye.item, |color| {
++                    colors
++                        .iter()
++                        .any(|(candidate, ingredient)| *candidate == color && ingredient.test(dye))
++                })
++                .unwrap_or("brown");
++                ItemStack {
++                    item: Arc::from(format!("create:{color}_toolbox")),
++                    count: 1,
++                    ..toolbox.clone()
++                }
+             }
+             Self::CreateScheduleCopy => {
+                 let mut result = Self::schedule_copy_source(&stacks)?.clone();
+@@ -1363,8 +1418,12 @@
+ fn custom_type(v: &Value) -> Option<&str> {
+     v["type"]
+         .as_str()
+-        // This Create serializer is handled by the shared crafting table.
+-        .filter(|t| t.contains(':') && !t.starts_with("minecraft:") && *t != "create:item_copying")
++        // These Create serializers are handled by the shared crafting table.
++        .filter(|t| {
++            t.contains(':')
++                && !t.starts_with("minecraft:")
++                && !matches!(*t, "create:item_copying" | "create:toolbox_dyeing")
++        })
+ }
+ pub struct Recipes {
+     pub crafting: Vec<(String, Recipe)>,
+@@ -1697,6 +1756,17 @@
+                     })
+                 })()),
+                 "create:item_copying" => special(Some(Special::CreateScheduleCopy)),
++                "create:toolbox_dyeing" => special((|| {
++                    let tag = |tag: &str| Ingredient::parse(&Value::String(format!("#{tag}")), items);
++                    Some(Special::CreateToolboxDye {
++                        toolbox: tag("create:toolboxes")?,
++                        dye: tag("c:dyes")?,
++                        colors: crate::block_entity_render::DYES
++                            .into_iter()
++                            .filter_map(|(color, _)| Some((color, tag(&format!("c:dyes/{color}"))?)))
++                            .collect(),
++                    })
++                })()),
+                 "minecraft:crafting_special_bookcloning" => special((|| {
+                     let (min, max) = bounds(v.get("allowed_generations"), (0, 1), (0, 2));
+                     Some(Special::BookCloning {

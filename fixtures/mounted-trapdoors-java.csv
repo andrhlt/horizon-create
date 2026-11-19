@@ -1,0 +1,7 @@
+block,x,y,z,click,open,facing,half
+create:train_trapdoor,2,2,-1,0,false,north,bottom
+create:train_trapdoor,2,2,-1,1,true,north,bottom
+create:train_trapdoor,2,2,-1,2,false,north,bottom
+create:framed_glass_trapdoor,2,2,1,0,false,north,bottom
+create:framed_glass_trapdoor,2,2,1,1,true,north,bottom
+create:framed_glass_trapdoor,2,2,1,2,false,north,bottom

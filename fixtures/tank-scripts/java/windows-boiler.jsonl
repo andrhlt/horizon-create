@@ -1,0 +1,8 @@
+{"type":"probe","label":"before","tick":4,"pos":[0,0,0],"block":"create:fluid_tank","controller":[0,0,0],"capacity":8000,"fluid":"minecraft:empty","amount":0,"shape":"window"}
+{"type":"probe","label":"active","tick":44,"pos":[0,0,0],"block":"create:fluid_tank","controller":[0,0,0],"capacity":10000,"fluid":"minecraft:empty","amount":0,"shape":"plain"}
+{"type":"fill","tick":44,"pos":[0,0,0],"accepted":1250}
+{"type":"fill","tick":44,"pos":[0,0,0],"accepted":1500}
+{"type":"fill","tick":44,"pos":[0,0,0],"accepted":0}
+{"type":"drain","tick":44,"pos":[0,0,0],"fluid":"minecraft:empty","amount":0}
+{"type":"probe","label":"active-wrench","tick":44,"pos":[0,0,0],"block":"create:fluid_tank","controller":[0,0,0],"capacity":10000,"fluid":"minecraft:empty","amount":0,"shape":"plain"}
+{"type":"probe","label":"inactive-wrench","tick":84,"pos":[0,0,0],"block":"create:fluid_tank","controller":[0,0,0],"capacity":8000,"fluid":"minecraft:empty","amount":0,"shape":"window"}

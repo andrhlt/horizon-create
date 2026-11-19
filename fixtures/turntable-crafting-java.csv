@@ -1,0 +1,2 @@
+recipe,width,height,inputs,output,count
+create:crafting/kinetics/turntable,1,2,minecraft:spruce_slab|create:shaft,create:turntable,1

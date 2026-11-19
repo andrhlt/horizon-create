@@ -1,0 +1,75 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..816c440 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.packageStack"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..6297a49 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,56 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 45)
++	public static void packageStack(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var floor = helper.absolutePos(new BlockPos(4, 4, 2));
++		var origin = net.minecraft.world.phys.Vec3.atLowerCornerOf(floor).add(0.5, 0, 0.5);
++		for (int x = -2; x <= 2; x++) {
++			for (int z = -2; z <= 2; z++) {
++				world.setBlockAndUpdate(floor.offset(x, -1, z), Blocks.OBSIDIAN.defaultBlockState());
++				for (int y = 0; y < 4; y++)
++					world.setBlockAndUpdate(floor.offset(x, y, z), Blocks.AIR.defaultBlockState());
++			}
++		}
++		var styles = com.simibubi.create.content.logistics.box.PackageStyles.ALL_BOXES;
++		for (String scenario : new String[]{"wideBelow", "narrowBelow", "edge", "miss", "pig"}) {
++			net.minecraft.world.entity.LivingEntity lower;
++			if (scenario.equals("pig")) {
++				var pig = EntityType.PIG.create(world);
++				pig.setNoAi(true);
++				pig.setPos(origin);
++				lower = pig;
++			} else {
++				int lowerStyle = scenario.equals("narrowBelow") ? 2 : 0;
++				lower = com.simibubi.create.content.logistics.box.PackageEntity.fromItemStack(
++					world, origin, new ItemStack(styles.get(lowerStyle)));
++			}
++			lower.setYRot(0);
++			world.addFreshEntity(lower);
++			double offset = scenario.equals("edge") ? 0.68 : scenario.equals("miss") ? 0.70 : 0;
++			var upper = com.simibubi.create.content.logistics.box.PackageEntity.fromItemStack(
++				world, origin.add(offset, 2.5, 0), new ItemStack(styles.get(2)));
++			upper.setYRot(0);
++			upper.setDeltaMovement(0, -0.12, 0);
++			world.addFreshEntity(upper);
++			for (int tick = 0; tick < 25; tick++) {
++				if (tick > 0) {
++					world.tickNonPassenger(lower);
++					world.tickNonPassenger(upper);
++				}
++				var actual = upper.position().subtract(origin);
++				var motion = upper.getDeltaMovement();
++				var support = lower.position().subtract(origin);
++				System.out.printf(java.util.Locale.ROOT,
++					"PACKAGE_STACK,%s,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%b,%.9f,%.9f,%.9f,%.9f%n",
++					scenario, tick, actual.x, actual.y, actual.z, motion.x, motion.y, motion.z,
++					upper.onGround(), support.x, support.y, support.z, lower.getBoundingBox().maxY - origin.y);
++			}
++			upper.discard();
++			lower.discard();
++		}
++		helper.succeed();
++	}
+ }

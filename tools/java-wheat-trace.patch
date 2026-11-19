@@ -1,0 +1,47 @@
+diff --git a/src/main/java/com/simibubi/create/content/kinetics/millstone/MillstoneBlockEntity.java b/src/main/java/com/simibubi/create/content/kinetics/millstone/MillstoneBlockEntity.java
+index cc8a5aa..99a3568 100644
+--- a/src/main/java/com/simibubi/create/content/kinetics/millstone/MillstoneBlockEntity.java
++++ b/src/main/java/com/simibubi/create/content/kinetics/millstone/MillstoneBlockEntity.java
+@@ -44,6 +44,7 @@ public class MillstoneBlockEntity extends KineticBlockEntity implements Clearabl
+ 	public ItemStackHandler outputInv;
+ 	public IItemHandler capability;
+ 	public int timer;
++	public net.minecraft.util.RandomSource wheatFixtureRandom;
+ 	private MillingRecipe lastRecipe;
+ 
+ 	public MillstoneBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
+@@ -160,7 +161,7 @@ public class MillstoneBlockEntity extends KineticBlockEntity implements Clearabl
+ 		ItemStack craftingRemainingItem = stackInSlot.getCraftingRemainingItem();
+ 		stackInSlot.shrink(1);
+ 		inputInv.setStackInSlot(0, stackInSlot);
+-		lastRecipe.rollResults(level.random)
++		lastRecipe.rollResults(wheatFixtureRandom == null ? level.random : wheatFixtureRandom)
+ 			.forEach(stack -> ItemHandlerHelper.insertItemStacked(outputInv, stack, false));
+ 		if (!craftingRemainingItem.isEmpty()) {
+ 			ItemHandlerHelper.insertItemStacked(outputInv, craftingRemainingItem, false);
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+index 921915d..653eb0e 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -138,10 +138,20 @@ public class TestProcessing {
+ 
+ 	@GameTest(template = "wheat_milling")
+ 	public static void wheatMilling(CreateGameTestHelper helper) {
++		var mill = (com.simibubi.create.content.kinetics.millstone.MillstoneBlockEntity)
++			helper.getBlockEntity(new BlockPos(2, 3, 1));
++		mill.wheatFixtureRandom = net.minecraft.util.RandomSource.create(2L);
+ 		BlockPos output = new BlockPos(1, 2, 1);
+ 		BlockPos lever = new BlockPos(1, 7, 1);
+ 		helper.pullLever(lever);
+ 		ItemStack expected = new ItemStack(AllItems.WHEAT_FLOUR.get(), 3);
+-		helper.succeedWhen(() -> helper.assertContainerContains(output, expected));
++		helper.succeedWhen(() -> {
++			long input = helper.getItemContent(new BlockPos(2, 7, 1)).getLong(Items.WHEAT);
++			long inHopper = helper.getItemContent(new BlockPos(2, 2, 1)).getLong(expected.getItem());
++			long inChest = helper.getItemContent(output).getLong(expected.getItem());
++			System.out.printf(java.util.Locale.ROOT, "CREATE_WHEAT %d %d %d %d %d %.1f%n",
++				helper.getTick(), input, inHopper, inChest, mill.timer, mill.getSpeed());
++			helper.assertContainerContains(output, expected);
++		});
+ 	}
+ }

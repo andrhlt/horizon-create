@@ -1,0 +1,471 @@
+{
+  "integration_only": true,
+  "include_components": true,
+  "actions": [
+    {
+      "op": "place",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "create:builders_tea",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "0-insert",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:glass_bottle",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "0-extract",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "0-next-tick",
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        6,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        6,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:honey_bottle",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "1-insert",
+      "positions": [
+        [
+          6,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        6,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:glass_bottle",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "1-extract",
+      "positions": [
+        [
+          6,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "1-next-tick",
+      "positions": [
+        [
+          6,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        12,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        12,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:milk_bucket",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "2-insert",
+      "positions": [
+        [
+          12,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        12,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:bucket",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "2-extract",
+      "positions": [
+        [
+          12,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "2-next-tick",
+      "positions": [
+        [
+          12,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        18,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        18,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:potion",
+        "count": 1,
+        "components": {
+          "minecraft:potion_contents": {
+            "potion": "minecraft:water"
+          }
+        }
+      }
+    },
+    {
+      "op": "probe",
+      "label": "3-insert",
+      "positions": [
+        [
+          18,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        18,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:glass_bottle",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "3-extract",
+      "positions": [
+        [
+          18,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "3-next-tick",
+      "positions": [
+        [
+          18,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        24,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        24,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:splash_potion",
+        "count": 1,
+        "components": {
+          "minecraft:potion_contents": {
+            "potion": "minecraft:healing"
+          }
+        }
+      }
+    },
+    {
+      "op": "probe",
+      "label": "4-insert",
+      "positions": [
+        [
+          24,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        24,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:glass_bottle",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "4-extract",
+      "positions": [
+        [
+          24,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "4-next-tick",
+      "positions": [
+        [
+          24,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "place",
+      "pos": [
+        30,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 2
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        30,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:lingering_potion",
+        "count": 1,
+        "components": {
+          "minecraft:potion_contents": {
+            "potion": "minecraft:healing"
+          }
+        }
+      }
+    },
+    {
+      "op": "probe",
+      "label": "5-insert",
+      "positions": [
+        [
+          30,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "use_item",
+      "pos": [
+        30,
+        0,
+        0
+      ],
+      "mode": "creative",
+      "item": {
+        "id": "minecraft:glass_bottle",
+        "count": 1
+      }
+    },
+    {
+      "op": "probe",
+      "label": "5-extract",
+      "positions": [
+        [
+          30,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "op": "tick",
+      "count": 1
+    },
+    {
+      "op": "probe",
+      "label": "5-next-tick",
+      "positions": [
+        [
+          30,
+          0,
+          0
+        ]
+      ]
+    }
+  ]
+}

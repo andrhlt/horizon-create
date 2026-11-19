@@ -1,0 +1,167 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.scheduleConductor")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,154 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 60)
++	public static void scheduleConductor(CreateGameTestHelper helper) {
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		var level = helper.getLevel();
++		var track = com.simibubi.create.AllBlocks.TRACK.get();
++		var casing = com.simibubi.create.AllBlocks.RAILWAY_CASING.asItem();
++		var shape = com.simibubi.create.content.trains.track.TrackBlock.SHAPE;
++		var rail = track.defaultBlockState().setValue(shape, com.simibubi.create.content.trains.track.TrackShape.XO);
++		var origin = helper.absolutePos(new BlockPos(1, 8, 0));
++		for (int x = -20; x <= 24; x++) {
++			level.setBlockAndUpdate(origin.offset(x,-1,0), Blocks.SMOOTH_STONE.defaultBlockState());
++			level.setBlockAndUpdate(origin.east(x), rail);
++			level.setBlockAndUpdate(origin.east(x).above(), Blocks.AIR.defaultBlockState());
++		}
++		var destination = origin.south(2);
++		level.setBlockAndUpdate(destination, Blocks.AIR.defaultBlockState());
++		level.setBlockAndUpdate(destination.below(), Blocks.SMOOTH_STONE.defaultBlockState());
++		var item = (com.simibubi.create.content.trains.track.TrackTargetingBlockItem) com.simibubi.create.AllBlocks.TRACK_STATION.asItem();
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		helper.runAfterDelay(7, () -> {
++			player.setItemInHand(hand, new ItemStack(item));
++			player.setYRot(90);
++			player.setXRot(20);
++			clickTrackForAssembly(item, player, origin);
++			clickTrackForAssembly(item, player, destination.below());
++		});
++		helper.runAfterDelay(12, () -> {
++			var station = (com.simibubi.create.content.trains.station.StationBlockEntity) level.getBlockEntity(destination);
++			helper.assertTrue(station != null && station.enterAssemblyMode(null), "Station must enter assembly mode");
++			player.setItemInHand(hand, new ItemStack(casing, 3));
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east()), "Expected first bogey");
++			helper.assertTrue(station.trackClicked(player, hand, track, rail, origin.east(4)), "Expected rear bogey");
++			for (int x = 1; x <= 4; x++)
++				level.setBlockAndUpdate(origin.east(x).above(2), Blocks.OAK_PLANKS.defaultBlockState());
++			var controls = com.simibubi.create.AllBlocks.TRAIN_CONTROLS.get().defaultBlockState()
++				.setValue(com.simibubi.create.content.contraptions.actors.trainControls.ControlsBlock.FACING,
++					net.minecraft.core.Direction.EAST);
++			level.setBlockAndUpdate(origin.east().above(3), controls);
++            var seat = com.simibubi.create.AllBlocks.SEATS.get(net.minecraft.world.item.DyeColor.WHITE).get().defaultBlockState();
++            level.setBlockAndUpdate(origin.east(2).above(3), seat);
++            level.setBlockAndUpdate(origin.east(4).above(3), seat);
++			var area = com.simibubi.create.content.contraptions.glue.SuperGlueEntity.span(origin.east().above(), origin.east(4).above(3));
++			level.addFreshEntity(new com.simibubi.create.content.contraptions.glue.SuperGlueEntity(level, area));
++			station.assemble(player.getUUID());
++		});
++
++        helper.runAfterDelay(23, () -> {
++            var train = com.simibubi.create.Create.RAILWAYS.trains.values().stream()
++                .filter(candidate -> candidate.owner.equals(player.getUUID())).findFirst().orElseThrow();
++            var carriage = train.carriages.getFirst().anyAvailableEntity();
++            helper.assertTrue(carriage != null, "Train has no entity");
++            var contraption = (com.simibubi.create.content.trains.entity.CarriageContraption) carriage.getContraption();
++            var controllingPosition = new BlockPos(1, 2, 0);
++            var otherPosition = new BlockPos(3, 2, 0);
++            var seats = contraption.getSeats();
++            helper.assertTrue(seats.contains(controllingPosition) && seats.contains(otherPosition), "Train has both seats: " + seats);
++            var directions = contraption.conductorSeats.get(controllingPosition);
++            helper.assertTrue(directions != null && !contraption.conductorSeats.containsKey(otherPosition), "Expected one controlling seat: " + contraption.conductorSeats);
++            System.out.printf("CREATE_CONDUCTOR_SEATS %d,%d,%s,%s%n", seats.indexOf(controllingPosition),
++                seats.indexOf(otherPosition), directions.getFirst(), directions.getSecond());
++
++            var driver = EntityType.VILLAGER.create(level);
++            var passenger = EntityType.VILLAGER.create(level);
++            for (var mob : java.util.List.of(driver, passenger)) {
++                mob.setNoAi(true);
++                var at = carriage.position();
++                mob.setPos(at.x, at.y + 2, at.z);
++                level.addFreshEntity(mob);
++            }
++            carriage.addSittingPassenger(driver, seats.indexOf(controllingPosition));
++            carriage.addSittingPassenger(passenger, seats.indexOf(otherPosition));
++            helper.assertTrue(driver.getRootVehicle() == carriage && passenger.getRootVehicle() == carriage, "Both villagers must ride");
++
++            var sounds = new java.util.ArrayList<String>();
++            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
++                (net.neoforged.neoforge.event.PlayLevelSoundEvent.AtPosition sound) -> {
++                    if (sound.getLevel() == level && sound.getSound() != null)
++                        sounds.add(sound.getSound().value().getLocation().toString());
++                });
++            var schedule = new com.simibubi.create.content.trains.schedule.Schedule();
++            var entry = new com.simibubi.create.content.trains.schedule.ScheduleEntry();
++            var destinationInstruction = new com.simibubi.create.content.trains.schedule.destination.DestinationInstruction();
++            destinationInstruction.getData().putString("Text", "No Such Station");
++            entry.instruction = destinationInstruction;
++            entry.conditions.add(java.util.List.of(new com.simibubi.create.content.trains.schedule.condition.ScheduledDelay()));
++            schedule.entries.add(entry);
++            var type = com.simibubi.create.AllDataComponents.TRAIN_SCHEDULE;
++            var programmed = com.simibubi.create.AllItems.SCHEDULE.asStack(2);
++            programmed.set(type, schedule.write(level.registryAccess()));
++            programmed.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
++                net.minecraft.network.chat.Component.literal("Route Master"));
++            var emptySchedule = com.simibubi.create.AllItems.SCHEDULE.asStack();
++            emptySchedule.set(type, new com.simibubi.create.content.trains.schedule.Schedule().write(level.registryAccess()));
++
++            java.util.function.BiConsumer<String, net.minecraft.world.entity.Entity> click = (label, target) -> {
++                int ticks = label.equals("remove_early") ? 4 : label.equals("remove") ? 1 : 5;
++                for (int i = 0; i < ticks; i++)
++                    player.getCooldowns().tick();
++                var at = target.position();
++                player.setPos(at.x + 1, at.y + 1, at.z);
++                sounds.clear();
++                var event = new net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.EntityInteractSpecific(
++                    player, hand, target, net.minecraft.world.phys.Vec3.ZERO);
++                net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event);
++                var held = player.getMainHandItem();
++                int inventoryCount = player.getInventory().items.stream()
++                    .filter(com.simibubi.create.AllItems.SCHEDULE::isIn).mapToInt(ItemStack::getCount).sum();
++                System.out.printf("CREATE_CONDUCTOR %s,%s,%d,%s,%s,%d,%s,%s%n",
++                    label, event.isCanceled(), held.getCount(), train.runtime.getSchedule() != null,
++                    train.runtime.paused, inventoryCount,
++                    player.getCooldowns().isOnCooldown(com.simibubi.create.AllItems.SCHEDULE.get()),
++                    String.join("|", sounds));
++            };
++            player.setItemInHand(hand, programmed.copy());
++            click.accept("ordinary_seat", passenger);
++            player.setItemInHand(hand, com.simibubi.create.AllItems.SCHEDULE.asStack());
++            click.accept("blank", driver);
++            player.setItemInHand(hand, emptySchedule);
++            click.accept("empty_entries", driver);
++            player.setItemInHand(hand, programmed.copy());
++            click.accept("assign", driver);
++            helper.assertTrue(train.runtime.getSchedule() != null, "Program must attach");
++            click.accept("again", driver);
++            player.setItemInHand(hand, ItemStack.EMPTY);
++            click.accept("ordinary_empty", passenger);
++            player.setItemInHand(hand, new ItemStack(net.minecraft.world.item.Items.PAPER));
++            click.accept("occupied_hand", driver);
++            player.setItemInHand(hand, ItemStack.EMPTY);
++            train.runtime.paused = true;
++            click.accept("resume", driver);
++            click.accept("remove_early", driver);
++            click.accept("remove", driver);
++            var returned = player.getInventory().items.stream()
++                .filter(com.simibubi.create.AllItems.SCHEDULE::isIn).findFirst().orElseThrow();
++            System.out.printf("CREATE_CONDUCTOR_RETURN %d,%s,%s,%s%n", returned.getCount(),
++                returned.get(type).equals(programmed.get(type)), returned.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME),
++                returned.get(type));
++            helper.assertTrue(train.runtime.getSchedule() == null, "Schedule must detach");
++            helper.succeed();
++        });
++    }
++
++	private static void clickTrackForAssembly(com.simibubi.create.content.trains.track.TrackTargetingBlockItem item,
++			net.minecraft.world.entity.player.Player player, BlockPos pos) {
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			net.minecraft.world.phys.Vec3.atCenterOf(pos).add(0,.5,0), net.minecraft.core.Direction.UP, pos, false);
++		item.useOn(new net.minecraft.world.item.context.UseOnContext(player,
++			net.minecraft.world.InteractionHand.MAIN_HAND, hit));
++	}
+ }

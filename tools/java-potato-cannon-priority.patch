@@ -1,0 +1,60 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..4ded967 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.potatoCannon")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..0868688 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,41 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
+-}
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void potatoCannon(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var origin = helper.absolutePos(new BlockPos(2, 24, 2));
++		record Trial(String name, net.minecraft.world.item.Item off, net.minecraft.world.item.Item first, net.minecraft.world.item.Item second) {}
++		var trials = java.util.List.of(
++			new Trial("off_carrot", Items.CARROT, Items.POTATO, null),
++			new Trial("off_potato", Items.POTATO, Items.CARROT, null),
++			new Trial("first_carrot", null, Items.CARROT, Items.POTATO),
++			new Trial("first_potato", null, Items.POTATO, Items.CARROT),
++			new Trial("first_apple", null, Items.APPLE, Items.CARROT),
++			new Trial("off_beetroot", Items.BEETROOT, Items.MELON_SLICE, null),
++			new Trial("first_golden_carrot", null, Items.GOLDEN_CARROT, Items.BEETROOT),
++			new Trial("first_melon", null, Items.MELON_SLICE, Items.POTATO)
++		);
++		helper.runAtTickTime(2, () -> {
++			for (var trial : trials) {
++				var player = new net.neoforged.neoforge.common.util.FakePlayer(world,
++					new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "AmmoFixture"));
++				player.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++				player.setPos(origin.getX() + .5, origin.getY(), origin.getZ() + .5);
++				var cannon = com.simibubi.create.AllItems.POTATO_CANNON.asStack();
++				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, cannon);
++				if (trial.off() != null) player.setItemInHand(net.minecraft.world.InteractionHand.OFF_HAND, new ItemStack(trial.off(), 3));
++				player.getInventory().setItem(1, new ItemStack(trial.first(), 3));
++				if (trial.second() != null) player.getInventory().setItem(2, new ItemStack(trial.second(), 3));
++				var ammo = com.simibubi.create.content.equipment.potatoCannon.PotatoCannonItem.getAmmo(player, cannon);
++				String selected = ammo.stack().getItem().toString();
++				var result = cannon.use(world, player, net.minecraft.world.InteractionHand.MAIN_HAND);
++				System.out.printf("CANNON_PRIORITY,%s,%s,%s,%d,%d,%d,%d%n", trial.name(), selected, result.getResult(),
++					player.getOffhandItem().getCount(), player.getInventory().getItem(1).getCount(),
++					player.getInventory().getItem(2).getCount(), cannon.getDamageValue());
++			}
++			helper.succeed();
++		});
++	}
++
++}
+\ No newline at end of file

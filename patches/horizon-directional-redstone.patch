@@ -1,0 +1,19 @@
+--- a/crates/horizon-world/src/level/mod.rs
++++ b/crates/horizon-world/src/level/mod.rs
+@@ -1434,6 +1434,16 @@
+     ) -> bool {
+         self.sim(level, ticks).has_neighbor_signal(pos)
+     }
++    /// The vanilla redstone signal from one neighbour, including conductor output.
++    pub fn signal_at<L: LevelAccess + ?Sized>(
++        &self,
++        level: &mut L,
++        ticks: &mut Ticks,
++        pos: BlockPos,
++        direction: Direction,
++    ) -> i32 {
++        self.sim(level, ticks).signal(pos, direction)
++    }
+     pub fn best_neighbor_signal<L: LevelAccess + ?Sized>(
+         &self,
+         level: &mut L,

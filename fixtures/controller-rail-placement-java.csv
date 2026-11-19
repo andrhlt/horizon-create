@@ -1,0 +1,13 @@
+yaw,scenario,shape,backwards,waterlogged,power,stack
+0,0,north_south,true,false,0,1
+0,1,north_south,true,true,0,1
+0,2,ascending_east,false,false,0,1
+90,0,east_west,false,false,0,1
+90,1,east_west,false,true,0,1
+90,2,ascending_east,false,false,0,1
+180,0,north_south,false,false,0,1
+180,1,north_south,false,true,0,1
+180,2,ascending_east,false,false,0,1
+270,0,east_west,true,false,0,1
+270,1,east_west,true,true,0,1
+270,2,ascending_east,true,false,0,1

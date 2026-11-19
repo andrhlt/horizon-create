@@ -1,0 +1,3 @@
+case,hit_face,hit_from_origin,result,selected_block,changed_count,changed_cells,components
+up,up,0:2:0,SUCCESS,false,1,0:2:0:minecraft:stone>minecraft:air,"{""create:placement_pattern"":""solid"",""create:shaper_brush"":""cuboid"",""create:shaper_brush_params"":[I;7,7,7],""create:shaper_placement_options"":""merged"",""create:shaper_tool"":""flatten""}"
+west,west,-2:0:0,SUCCESS,false,1,-2:0:0:minecraft:stone>minecraft:air,"{""create:placement_pattern"":""solid"",""create:shaper_brush"":""cuboid"",""create:shaper_brush_params"":[I;7,7,7],""create:shaper_placement_options"":""merged"",""create:shaper_tool"":""flatten""}"

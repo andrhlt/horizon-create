@@ -1,0 +1,24 @@
+{
+  "template": "minecraft:gold_block",
+  "item": true,
+  "properties": {
+    "occludes": false,
+    "sounds": "minecraft:glass"
+  },
+  "state_properties": {
+    "facing": {"type": "enum", "values": ["north", "south", "east", "west"]}
+  },
+  "default_state": {"facing": "north"},
+  "shapes": {
+    "default": [
+      [0.0625, 0.0, 0.0625, 0.9375, 0.25, 0.9375],
+      [0.125, 0.25, 0.125, 0.875, 1.0, 0.875]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [0.0625, 0.0, 0.0625, 0.9375, 0.25, 0.9375],
+      [0.125, 0.25, 0.125, 0.875, 1.0, 0.875]
+    ]
+  }
+}

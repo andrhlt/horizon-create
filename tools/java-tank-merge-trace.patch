@@ -1,0 +1,51 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..7906c49 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.tankMergeTrace")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..d576f26 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,34 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "shearing", timeoutTicks = 50)
++    public static void tankMergeTrace(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var base = helper.absolutePos(new BlockPos(3, 16, 3));
++        var tank = com.simibubi.create.AllBlocks.FLUID_TANK.getDefaultState();
++        helper.runAtTickTime(2, () -> {
++            level.setBlockAndUpdate(base, tank);
++            level.setBlockAndUpdate(base.above(2), tank);
++        });
++        helper.runAtTickTime(8, () -> {
++            for (int y : new int[]{0, 2}) {
++                var cap = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK, base.above(y), null);
++                int amount = y == 0 ? 4000 : 5000;
++                System.out.printf("CREATE_TANK_MERGE_FILL %d|%d%n", y, cap.fill(new net.neoforged.neoforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.WATER, amount), net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE));
++            }
++        });
++        helper.runAtTickTime(10, () -> level.setBlockAndUpdate(base.above(), tank));
++        for (int tick = 8; tick <= 16; tick++) {
++            final int sample = tick;
++            helper.runAtTickTime(tick, () -> {
++                for (int y = 0; y < 3; y++) {
++                    var at = base.above(y);
++                    var cap = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK, at, null);
++                    System.out.printf("CREATE_TANK_MERGE %d|%d|%s|%s|%d%n", sample, y, level.getBlockState(at).getBlock(), cap == null ? "-" : cap.getFluidInTank(0), cap == null ? 0 : cap.getTankCapacity(0));
++                }
++                if (sample == 16) helper.succeed();
++            });
++        }
++    }
+ }

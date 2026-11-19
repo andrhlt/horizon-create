@@ -1,0 +1,261 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..64ffb8a 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestMisc.chainConveyor"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..730f0f7 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -2,20 +2,35 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ 
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
++import java.util.Locale;
++
+ import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorBlockEntity;
++import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorConnectionPacket;
++import com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorPackage;
++import com.simibubi.create.content.kinetics.motor.CreativeMotorBlock;
++import com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity;
++import com.simibubi.create.content.logistics.box.PackageItem;
++import com.simibubi.create.content.logistics.box.PackageStyles;
++import com.simibubi.create.content.logistics.packagePort.PackagePortTarget.ChainConveyorFrogportTarget;
++import com.simibubi.create.content.logistics.packagePort.frogport.FrogportBlockEntity;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+ import com.simibubi.create.content.schematics.SchematicItem;
+-import com.simibubi.create.content.schematics.cannon.SchematicannonBlockEntity;
+ import com.simibubi.create.content.schematics.cannon.SchematicannonBlockEntity.State;
++import com.simibubi.create.content.schematics.cannon.SchematicannonBlockEntity;
+ import com.simibubi.create.foundation.utility.CreatePaths;
+ import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
+ import com.simibubi.create.infrastructure.gametest.GameTestGroup;
+ 
+ import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
+ import net.minecraft.gametest.framework.GameTest;
++import net.minecraft.nbt.Tag;
+ import net.minecraft.server.level.ServerLevel;
++import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.sounds.SoundSource;
+ import net.minecraft.world.entity.EntityType;
+ import net.minecraft.world.entity.EquipmentSlot;
+@@ -24,8 +39,12 @@ import net.minecraft.world.entity.decoration.ArmorStand;
+ import net.minecraft.world.entity.monster.Zombie;
+ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.item.Items;
++import net.minecraft.world.item.component.ItemContainerContents;
+ import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.RedstoneLampBlock;
++import net.minecraft.world.phys.Vec3;
++
++import net.neoforged.neoforge.common.util.FakePlayerFactory;
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
+@@ -115,4 +134,192 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 100)
++	public static void chainConveyorStraight(CreateGameTestHelper helper) {
++		runChainConveyor(helper, "straight", new BlockPos(7, 0, 0), false);
++	}
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 100)
++	public static void chainConveyorRisingReversal(CreateGameTestHelper helper) {
++		runChainConveyor(helper, "rising_reversal", new BlockPos(6, 2, 3), true);
++	}
++
++	private static void runChainConveyor(CreateGameTestHelper helper, String scenario, BlockPos edge, boolean reverse) {
++		var world = helper.getLevel();
++		var start = helper.absolutePos(new BlockPos(2, 2, 2)).above(12);
++		var end = start.offset(edge);
++		var portPos = end.east(2).below(2);
++		var motorPos = start.below();
++		int startTick = 8;
++		int last = reverse ? 66 : 79;
++		helper.runAtTickTime(2, () -> {
++			world.setBlockAndUpdate(start, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
++			world.setBlockAndUpdate(end, AllBlocks.CHAIN_CONVEYOR.getDefaultState());
++			world.setBlockAndUpdate(motorPos, AllBlocks.CREATIVE_MOTOR.getDefaultState()
++				.setValue(CreativeMotorBlock.FACING, Direction.UP));
++			if (!reverse)
++				world.setBlockAndUpdate(portPos, AllBlocks.PACKAGE_FROGPORT.getDefaultState());
++		});
++		helper.runAtTickTime(5, () -> {
++			var motor = (CreativeMotorBlockEntity) world.getBlockEntity(motorPos);
++			motor.generatedSpeed.setValue(128);
++		});
++		helper.runAtTickTime(startTick, () -> {
++			var source = (ChainConveyorBlockEntity) world.getBlockEntity(start);
++			var dest = (ChainConveyorBlockEntity) world.getBlockEntity(end);
++			var player = chainPlayer(world, start, 1);
++			var chain = new ItemStack(Items.CHAIN);
++			new ChainConveyorConnectionPacket(start, end, chain, true).handle(player);
++			chainConnectionLine(scenario, "insufficient", source, dest, player, edge);
++			if (!source.connections.isEmpty() || !dest.connections.isEmpty() || player.getInventory().countItem(Items.CHAIN) != 1)
++				throw new IllegalStateException("Insufficient chains created a connection or changed inventory");
++			player.getInventory().setItem(0, new ItemStack(Items.CHAIN, 16));
++			new ChainConveyorConnectionPacket(start, end, chain, true).handle(player);
++			chainConnectionLine(scenario, "connected", source, dest, player, edge);
++			if (!source.connections.contains(edge) || !dest.connections.contains(edge.multiply(-1)))
++				throw new IllegalStateException("Connection packet did not link both conveyors");
++		});
++		for (int t = 0; t <= last; t++) {
++			final int tick = t;
++			helper.runAtTickTime(startTick + 1 + t, () -> {
++				var source = (ChainConveyorBlockEntity) world.getBlockEntity(start);
++				var dest = (ChainConveyorBlockEntity) world.getBlockEntity(end);
++				var port = reverse ? null : (FrogportBlockEntity) world.getBlockEntity(portPos);
++				if (tick == 0 && port != null) {
++					port.target = new ChainConveyorFrogportTarget(end.subtract(portPos), 150, (BlockPos) null, false);
++					port.addressFilter = "Lab-In";
++					port.target.setup(port, world, portPos);
++					port.target.register(port, world, portPos);
++				}
++				if (tick == 2) {
++					var box = chainPackage("Lab-In", Items.PAPER, 3);
++					if (reverse) {
++						var inject = new ChainConveyorFrogportTarget(BlockPos.ZERO, 0, edge, false);
++						if (!inject.export(world, start, box, true) || !inject.export(world, start, box, false))
++							throw new IllegalStateException("Travel package ingress was rejected");
++					} else {
++						source.addLoopingPackage(new ChainConveyorPackage(40, box));
++						source.addLoopingPackage(new ChainConveyorPackage(40, chainPackage("Other", Items.STRING, 2)));
++					}
++				}
++				if (reverse && tick == 11) {
++					var motor = (CreativeMotorBlockEntity) world.getBlockEntity(motorPos);
++					motor.generatedSpeed.setValue(-128);
++				}
++				if (reverse && tick == 31)
++					world.setBlockAndUpdate(motorPos, Blocks.AIR.defaultBlockState());
++				if (reverse && tick == 39) {
++					world.setBlockAndUpdate(motorPos, AllBlocks.CREATIVE_MOTOR.getDefaultState()
++						.setValue(CreativeMotorBlock.FACING, Direction.UP));
++				}
++				if (reverse && tick == 41)
++					((CreativeMotorBlockEntity) world.getBlockEntity(motorPos)).generatedSpeed.setValue(128);
++				if (tick == last - 3) {
++					var player = chainPlayer(world, start, 8);
++					new ChainConveyorConnectionPacket(start, end, new ItemStack(Items.CHAIN), false).handle(player);
++					chainConnectionLine(scenario, "disconnected", source, dest, player, edge);
++					if (!source.connections.isEmpty() || !dest.connections.isEmpty())
++						throw new IllegalStateException("Disconnect packet left a unilateral edge");
++				}
++				String receipt = port == null ? "-" : chainReceipt(port);
++				System.out.printf(Locale.ROOT, "CREATE_CHAIN_WORLD %s,%d,%.8f,%.8f,%b,%b,%b,%b,%s,%.8f,%s%n",
++					scenario, tick, source.getSpeed(), dest.getSpeed(), source.connections.contains(edge),
++					dest.connections.contains(edge.multiply(-1)), source.reversed, dest.reversed, chainOffset(source.routingTable.getExitFor(chainPackage("Lab-In", Items.PAPER, 3))),
++					port == null ? 0 : port.animationProgress.getValue(), receipt);
++				chainPackages(world, scenario, tick, "A", source, start);
++				chainPackages(world, scenario, tick, "B", dest, start);
++				if (tick == last) {
++					if (!reverse && !receipt.equals("inventory:Lab-In:paper:3"))
++						throw new IllegalStateException("Matching box failed to arrive at receiving Frogport: " + receipt);
++					helper.succeed();
++				}
++			});
++		}
++	}
++
++	private static ServerPlayer chainPlayer(ServerLevel world, BlockPos at, int chains) {
++		var player = FakePlayerFactory.getMinecraft(world);
++		player.setPos(Vec3.atBottomCenterOf(at.above()));
++		player.getInventory().clearContent();
++		player.getInventory().setItem(0, new ItemStack(Items.CHAIN, chains));
++		return player;
++	}
++
++	private static ItemStack chainPackage(String address, net.minecraft.world.item.Item item, int count) {
++		var box = new ItemStack(PackageStyles.ALL_BOXES.get(0));
++		PackageItem.addAddress(box, address);
++		box.set(AllDataComponents.PACKAGE_CONTENTS, ItemContainerContents.fromItems(java.util.List.of(new ItemStack(item, count))));
++		return box;
++	}
++
++	private static String chainPayload(ItemStack box) {
++		var stack = box.getOrDefault(AllDataComponents.PACKAGE_CONTENTS, ItemContainerContents.EMPTY).getStackInSlot(0);
++		return PackageItem.getAddress(box) + ":" + net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath()
++			+ ":" + stack.getCount();
++	}
++
++	private static String chainReceipt(FrogportBlockEntity port) {
++		if (port.animatedPackage != null && !port.animatedPackage.isEmpty())
++			return "animation:" + chainPayload(port.animatedPackage);
++		for (int i = 0; i < port.inventory.getSlots(); i++) {
++			var box = port.inventory.getStackInSlot(i);
++			if (!box.isEmpty())
++				return "inventory:" + chainPayload(box);
++		}
++		return "-";
++	}
++
++	private static String chainOffset(BlockPos offset) {
++		return offset.getX() + ":" + offset.getY() + ":" + offset.getZ();
++	}
++
++	private static void chainConnectionLine(String scenario, String action, ChainConveyorBlockEntity source,
++			ChainConveyorBlockEntity dest, ServerPlayer player, BlockPos edge) {
++		var stats = source.connectionStats.get(edge);
++		var start = stats == null ? Vec3.ZERO : stats.start().subtract(Vec3.atLowerCornerOf(source.getBlockPos()));
++		var end = stats == null ? Vec3.ZERO : stats.end().subtract(Vec3.atLowerCornerOf(source.getBlockPos()));
++		System.out.printf(Locale.ROOT, "CREATE_CHAIN_CONNECTION %s,%s,%s,%d,%d,%b,%b,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f%n",
++			scenario, action, chainOffset(edge), ChainConveyorBlockEntity.getChainCost(edge), player.getInventory().countItem(Items.CHAIN),
++			source.connections.contains(edge), dest.connections.contains(edge.multiply(-1)),
++			stats == null ? 0 : stats.tangentAngle(), stats == null ? 0 : stats.chainLength(),
++			start.x, start.y, start.z, end.x, end.y, end.z);
++	}
++
++	private static void chainPackages(ServerLevel world, String scenario, int tick, String owner, ChainConveyorBlockEntity conveyor, BlockPos origin) {
++		var registries = world.registryAccess();
++		var root = conveyor.saveWithoutMetadata(registries);
++		var loops = root.getList("LoopingPackages", Tag.TAG_COMPOUND);
++		for (int i = 0; i < loops.size(); i++)
++			chainPackageLine(world, scenario, tick, owner, conveyor, origin, "loop", null, loops.getCompound(i));
++		var spans = root.getList("TravellingPackages", Tag.TAG_COMPOUND);
++		for (int i = 0; i < spans.size(); i++) {
++			var span = spans.getCompound(i);
++			var offset = net.minecraft.nbt.NbtUtils.readBlockPos(span, "Target").orElseThrow();
++			var boxes = span.getList("Packages", Tag.TAG_COMPOUND);
++			for (int b = 0; b < boxes.size(); b++)
++				chainPackageLine(world, scenario, tick, owner, conveyor, origin, "travel", offset, boxes.getCompound(b));
++		}
++	}
++
++	private static void chainPackageLine(ServerLevel world, String scenario, int tick, String owner,
++			ChainConveyorBlockEntity conveyor, BlockPos origin, String lane, BlockPos offset, net.minecraft.nbt.CompoundTag entry) {
++		float position = entry.getFloat("Position");
++		var box = ItemStack.parseOptional(world.registryAccess(), entry.getCompound("Item"));
++		// The public getPackagePosition method refreshes connection stats and can
++		// consume the polarity transition before the original block-entity tick.
++		var point = offset == null
++			? Vec3.atBottomCenterOf(conveyor.getBlockPos())
++				.add(net.createmod.catnip.math.VecHelper.rotate(new Vec3(0, 6 / 16f, 0.875), position, Direction.Axis.Y))
++			: chainSpanPosition(conveyor.connectionStats.get(offset), position);
++		point = point.subtract(Vec3.atLowerCornerOf(origin));
++		System.out.printf(Locale.ROOT, "CREATE_CHAIN_PACKAGE %s,%d,%s,%s,%s,%s,%.9f,%.9f,%.9f,%.9f%n",
++			scenario, tick, owner, lane, offset == null ? "-" : chainOffset(offset), chainPayload(box),
++			position, point.x, point.y, point.z);
++	}
++
++	private static Vec3 chainSpanPosition(ChainConveyorBlockEntity.ConnectionStats stats, float position) {
++		return stats.start().add(stats.end().subtract(stats.start()).normalize().scale(Math.min(stats.chainLength(), position)));
++	}
++
+ }

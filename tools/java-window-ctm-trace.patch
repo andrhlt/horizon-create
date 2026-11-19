@@ -1,0 +1,76 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.windowConnectedTextures"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,59 @@
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "threshold_switch_pulley", timeoutTicks = 32)
++    public static void windowConnectedTextures(CreateGameTestHelper helper) {
++        var world = helper.getLevel();
++        var at = helper.absolutePos(new BlockPos(1, 2, 1)).above(8);
++        var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
++        var air = Blocks.AIR.defaultBlockState();
++        var face = net.minecraft.core.Direction.SOUTH;
++        var opposite = face.getOpposite();
++        var vertical = com.simibubi.create.foundation.block.connected.AllCTTypes.VERTICAL;
++        var solid = new com.simibubi.create.foundation.block.connected.HorizontalCTBehaviour(null);
++        var pane = new com.simibubi.create.foundation.block.connected.GlassPaneCTBehaviour(null);
++        var variants = java.util.List.of("oak", "spruce", "birch", "jungle", "acacia", "dark_oak",
++            "mangrove", "crimson", "warped", "cherry", "bamboo", "ornate_iron");
++        helper.runAtTickTime(4, () -> {
++            for (String family : variants) {
++                for (boolean skinny : new boolean[] {false, true}) {
++                    String suffix = skinny ? "_window_pane" : "_window";
++                    var tested = registry.get(com.simibubi.create.Create.asResource(family + suffix));
++                    var different = registry.get(com.simibubi.create.Create.asResource(
++                        (family.equals("acacia") ? "oak" : "acacia") + suffix));
++                    var center = tested.defaultBlockState();
++                    var behavior = skinny ? pane : solid;
++                    var neighbor = center;
++                    if (skinny) {
++                        center = center.setValue(net.minecraft.world.level.block.CrossCollisionBlock.EAST, true)
++                            .setValue(net.minecraft.world.level.block.CrossCollisionBlock.WEST, true);
++                        neighbor = neighbor.setValue(net.minecraft.world.level.block.CrossCollisionBlock.WATERLOGGED, true);
++                    }
++                    world.setBlock(at, center, 2);
++                    for (int testCase = 0; testCase <= 7; testCase++) {
++                        for (int dy : new int[] {-1, 1}) {
++                            world.setBlock(at.above(dy), air, 2);
++                            world.setBlock(at.above(dy).relative(face), air, 2);
++                        }
++                        if (testCase == 1 || testCase == 3 || testCase == 4 || testCase == 5 || testCase == 7)
++                            world.setBlock(at.above(), neighbor, 2);
++                        if (testCase == 2 || testCase == 3 || testCase == 7)
++                            world.setBlock(at.below(), neighbor, 2);
++                        if (testCase == 4)
++                            world.setBlock(at.above().relative(face), neighbor, 2);
++                        if (testCase == 5)
++                            world.setBlock(at.above().relative(face), Blocks.STONE.defaultBlockState(), 2);
++                        if (testCase == 6)
++                            world.setBlock(at.above(), different.defaultBlockState(), 2);
++                        var chosenFace = testCase == 7 ? opposite : face;
++                        var context = behavior.buildContext(world, at, center, chosenFace, vertical.getContextRequirement());
++                        System.out.printf("CREATE_WINDOW_CTM %s,%s,%d,%d,%s,%s%n", family, skinny, testCase,
++                            vertical.getTextureIndex(context), context.up, context.down);
++                    }
++                }
++            }
++            helper.succeed();
++        });
++    }
+ }

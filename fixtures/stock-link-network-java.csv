@@ -1,0 +1,9 @@
+tick,visible_iron,visible_copper,visible_gold,contributing_links,accepted,packaged_iron,address,stored_iron,reserve_has_package,animation
+4,17,4,3,2,false,0,_,12,false,0
+5,17,4,3,2,false,0,_,12,false,0
+6,12,4,0,1,false,0,_,12,false,0
+7,12,4,0,1,false,0,_,12,false,0
+8,6,4,0,1,true,6,Smelting,6,false,20
+9,6,4,0,1,false,6,Smelting,6,false,19
+10,6,4,0,1,false,6,Smelting,6,false,18
+11,6,4,0,1,false,6,Smelting,6,false,17

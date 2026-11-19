@@ -1,0 +1,11 @@
+diff --git a/crates/horizon-client/src/game/machines.rs b/crates/horizon-client/src/game/machines.rs
+--- a/crates/horizon-client/src/game/machines.rs
++++ b/crates/horizon-client/src/game/machines.rs
+@@ -1809,6 +1809,7 @@
+             };
+             let face = Some(facing.opposite());
+             let inserted = match self.containers().view(target, false) {
++                _ if super::create_creative_crate::accepts_items(self, [target.0, target.1, target.2]) => Some(true),
+                 Some(into) => Some(self.dropper_insert(&into, one, face)),
+                 None => self
+                     .entity_container_at([

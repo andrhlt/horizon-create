@@ -1,0 +1,9 @@
+case,held,neighbors
+0,1,up=create:white_sail[east]
+1,1,south=create:white_sail[east]
+2,2,
+3,1,west=create:white_sail[west]
+4,1,up=create:sail_frame[east]
+5,1,up=create:white_sail[east]
+6,1,east=create:white_sail[north]
+7,1,west=create:white_sail[up]

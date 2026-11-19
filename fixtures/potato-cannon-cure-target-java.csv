@@ -1,0 +1,11 @@
+case,tick,health,absorption,converting,conversion_time,conversion_player,weak_duration,weak_amplifier,strength_duration,strength_amplifier,regeneration_duration,regeneration_amplifier,absorption_duration,absorption_amplifier,shots
+weak,0,20.000000000,0.000000000,false,-1,none,599,0,-1,-1,-1,-1,-1,-1,1
+weak,1,20.000000000,0.000000000,false,-1,none,598,0,-1,-1,-1,-1,-1,-1,1
+weak,2,19.059999466,0.000000000,true,5441,be12d3dc-27d3-4992-8c97-66be53fd49c5,-1,-1,5441,0,-1,-1,-1,-1,0
+weak,3,19.059999466,0.000000000,true,5440,be12d3dc-27d3-4992-8c97-66be53fd49c5,-1,-1,5440,0,-1,-1,-1,-1,0
+weak,4,19.059999466,0.000000000,true,5439,be12d3dc-27d3-4992-8c97-66be53fd49c5,-1,-1,5439,0,-1,-1,-1,-1,0
+no_weakness,0,20.000000000,0.000000000,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,1
+no_weakness,1,20.000000000,0.000000000,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,1
+no_weakness,2,19.059999466,4.000000000,false,-1,none,-1,-1,-1,-1,-1,-1,2400,0,0
+no_weakness,3,19.059999466,4.000000000,false,-1,none,-1,-1,-1,-1,-1,-1,2399,0,0
+no_weakness,4,19.059999466,4.000000000,false,-1,none,-1,-1,-1,-1,-1,-1,2398,0,0
