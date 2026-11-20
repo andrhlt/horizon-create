@@ -8372,3 +8372,44 @@ The new dedicated check is registered as `server-baseline` in
 loading/import, network synchronization or migration. The existing hand-crank
 restart check is a local world reopen, while the multiplayer check exercises a
 dedicated LAN world. Those broader cases and Full 1:1 remain open.
+
+
+## Item Vault gameplay baseline (APP-2015)
+
+On `native-9f42064-6ce68a31b125` (Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`) with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`, the
+registered [bounded vault replay](tools/test-vault-groups.py) passed these
+state and interaction cases:
+
+- A Hopper inserted paper through the first member of a two-block group; a
+  second Hopper extracted it through the other member. Both blocks then read
+  empty.
+- Removing one empty member split the group and left its neighbor usable.
+- A surviving member was filled to all 20 slots (64 paper plus 19 stacks of
+  stone). Two additional paper remained in its Hopper across save/reopen; after
+  one slot was freed, the transfer completed without loss or duplication.
+- A LAN guest opened that output Hopper, retrieved its paper, and the host saw
+  the emptied slot after state convergence. This proves the resulting state,
+  not Java-equivalent packet arrival timing.
+- A complete 3×3×9 horizontal group reached the large state. This matches the
+  pinned `ItemVaultBlockEntity` width limit of 3 and length limit of
+  `width * 3`.
+
+The sampled checks use command-driven setup and state observation rather than
+a new Java tick trace. The behavior follows the pinned
+`ItemVaultBlock.java`, `ItemVaultBlockEntity.java`, and
+`ConnectivityHandler.java` rules. Existing Java comparisons remain the 69-tick
+comparator, 151-tick storage, and 20-tick fuel protection fixtures. The
+[survival recipe replay](tools/test-machine-crafting.py) also covers the
+original Item Vault recipe among 12 matching recipes. Existing mounted cargo
+comparisons cover guest Hopper insertion and extraction with a mounted Vault.
+
+Run the bounded group replay with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check vault-groups --check vault-groups-lan
+```
+
+Other dimensions, storage groupings and material combinations remain follow-up
+coverage; Full 1:1 stays Open.
