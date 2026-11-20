@@ -331,7 +331,8 @@ between runs. The pinned 26.3 resources used `create.hmod` SHA-256
 The client SHA-256 is
 `0d8c15ef73ed7f31847b91f961a3ac9423887292b1275e8347aa7c54c270374c`.
 
-The earlier build `native-9f42064-ffe4b00e329a` passed 11 neighboring checks:
+The combined build and the earlier `native-9f42064-ffe4b00e329a` both passed
+the following 11 neighboring checks:
 `wheat-milling`, `milling-recipes`, `depot-pressing`, `pressing-category`,
 `basin-dry-alloy`, `basin-wet-materials`, `heated-fluid-food`,
 `water-filling-bottle`, `spouting`, `mixing-lookup` and `recipe-navigation`.
