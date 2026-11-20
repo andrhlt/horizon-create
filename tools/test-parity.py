@@ -466,6 +466,7 @@ CHECKS = (
     ("brass-diode-actions-lan", "test-brass-diode-actions", "--lan"),
     ("brass-diode-settings", "test-brass-diode-settings"),
     ("brass-diode-settings-lan", "test-brass-diode-settings", "--lan"),
+    ("brass-diode-persistence", "test-brass-diode-persistence"),
     ("nixie-colors", "test-nixie-colors"),
     ("nixie-colors-lan", "test-nixie-colors", "--lan"),
     ("nixie-colors-visual", "test-nixie-colors", "--visual"),
