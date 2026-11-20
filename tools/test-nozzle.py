@@ -235,11 +235,12 @@ def airflow(host, actor, player):
             mob_x = center[0] + distance
             host.commands(("/fill 13 171 19 16 171 21 minecraft:stone",
                            f"/tp {player} 7.5 173 16.5"))
-            mp.until("the player to reach the Nozzle airflow sample", lambda: (
-                (state := actor.call("state")["player"])
-                and abs(state["position"][0] - 7.5) < .01
-                and abs(state["position"][2] - 16.5) < .01
-            ))
+            if actor is not host:
+                mp.until("the player to reach the Nozzle airflow sample", lambda: (
+                    (state := actor.call("state")["player"])
+                    and abs(state["position"][0] - 7.5) < .01
+                    and abs(state["position"][2] - 16.5) < .01
+                ))
         host.command(f"/setblock {xyz(nozzle)} {NOZZLE}[facing=east]")
         start = host.clock()
         host.step_to(start + 1)
