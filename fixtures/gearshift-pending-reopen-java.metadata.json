@@ -1,0 +1,13 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_test": "TestMisc.pendingGearshiftReopen",
+  "patch_sha256": "0c6583ad5b7f011156bc149e6abcff5096072c5745ceea37841a8e38964d5787",
+  "trace_sha256": "87a5841a55d8b91dc44eb59c24daad5b2d63f10f9357830c2aaa252bf93e1e3c",
+  "records": 232,
+  "capture": "Run ./gradlew --offline --no-daemon runGameTestServer with CREATE_PENDING_GEARSHIFT=write, then rerun with CREATE_PENDING_GEARSHIFT=read. Repeat with CREATE_PENDING_GEARSHIFT_DROPS=on or off to select separate save folders. The off fixture disables drops in both Java processes because GameTest startup resets the saved rule.",
+  "layout": "Two initialized X-axis Gearshifts between adjacent Creative Motors. A +32 motor is initially the source. On tick 5 a compatible motor takes over with a magnitude of 64. One Gearshift is powered and the other unpowered before the second motor is added. On tick 8 each reverses and the server exits while the scheduled reconnection is pending.",
+  "sampling": "Capture state, theoretical RPM, both motor presences, queued callback and drops. As with the Clutch fixture, Horizon compares write tick 8 and settled Java read tick 48 over three observation ticks after reopening. Absolute startup ticks differ between processes."
+}

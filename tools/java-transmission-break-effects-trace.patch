@@ -1,0 +1,64 @@
+--- a/build.gradle
++++ b/build.gradle
+@@ -91,6 +91,7 @@
+ 
+         gameTestServer {
+             type = "gameTestServer"
++            gameDirectory = project.file("run/transmission-break-effects-tests")
+         }
+     }
+ }
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/TransmissionBreakEffectTraceMixin.java
+@@ -0,0 +1,31 @@
++package com.simibubi.create.foundation.mixin;
++
++import com.simibubi.create.AllBlocks;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.world.entity.player.Player;
++import net.minecraft.world.level.block.Block;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.Inject;
++import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
++
++@Mixin(ServerLevel.class)
++public class TransmissionBreakEffectTraceMixin {
++	@Inject(method = "levelEvent", at = @At("HEAD"))
++	private void create$traceTransmissionBreak(Player player, int event, BlockPos pos, int data, CallbackInfo ci) {
++		if (event != 2001)
++			return;
++		var state = Block.stateById(data);
++		if (!AllBlocks.CLUTCH.has(state) && !AllBlocks.GEARSHIFT.has(state))
++			return;
++		var level = (ServerLevel) (Object) this;
++		var sound = state.getSoundType(level, pos, player);
++		System.out.printf(java.util.Locale.ROOT, "CREATE_TRANSMISSION_BREAK_EFFECT,%d,%d,%s,%s,%s,%.3f,%.3f%n",
++			level.getGameTime(), event, BuiltInRegistries.BLOCK.getKey(state.getBlock()),
++			state.getValue(BlockStateProperties.POWERED), sound.getBreakSound().getLocation(),
++			(sound.getVolume() + 1.0f) / 2.0f, sound.getPitch() * 0.8f);
++	}
++}
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -138,6 +138,7 @@
+ 		}
+ 		helper.succeedWhen(() -> {
+ 			long tick = helper.getTick();
++			System.out.printf("CREATE_TRANSMISSION_EFFECT_TICK,%d,%d%n", tick, level.getGameTime());
+ 			for (int lane = 0; lane < rigs.size(); lane++) {
+ 				var pos = rigs.get(lane);
+ 				if (tick == 0)
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -20,6 +20,7 @@
+     "MobMixin",
+     "PlayerMixin",
+     "ProjectileUtilMixin",
++    "TransmissionBreakEffectTraceMixin",
+     "SmithingMenuMixin",
+     "WaterWheelFluidSpreadMixin",
+     "accessor.BlockBehaviourAccessor",

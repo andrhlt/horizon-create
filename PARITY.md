@@ -818,8 +818,125 @@ python3 tools/test-multiplayer-hand-crank.py /path/to/horizon-ctl /path/to/horiz
 python3 tools/test-hand-crank-motor.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
 
-Sound playback timing, specialized adjacent shaft types, equal-speed and slower
-generators, and the Extendo Grip exemption remain to be compared.
+The [Java GameTest capture](tools/java-hand-crank-edges-trace.patch) ran on
+Create `ac0c444d9828da3453ae8cc65338e8de063286fb` with Java 21. Applying the
+patch to a clean checkout and running `./gradlew --offline runGameTestServer`
+passes all 21 required tests (five edge tests and 16 matrix cases). The patch
+SHA-256 is `fd64c9c045cd6244ae49240735cf94b516589144bcd18f37d38346083887a8d2`.
+The capture verifies the empty-food interaction, although the GameTest mock
+player does not report the advancement through its tracker; delivery remains
+source-verified rather than claimed as a Java runtime check. Copy the CSV
+fields from the `CREATE_HAND_CRANK_EDGE_PLACEMENT`,
+`CREATE_HAND_CRANK_EDGE_GRIP`, `CREATE_HAND_CRANK_EDGE_MOTOR`, and
+`CREATE_HAND_CRANK_MATRIX` records into their respective fixtures.
+
+- [Eight placement cases](fixtures/hand-crank-placement-java.csv) cover both
+  axial ends of a Brass Encased Cogwheel, active and perpendicular stressometer
+  axes, sneaking, and a second shaft on a conflicting axis. The Horizon baseline
+  missed both exposed cog ends and the active gauge axis, and aligned with the
+  regular shaft in the conflicting-axis case.
+- [Three survival uses](fixtures/hand-crank-grip-java.csv) record the active
+  timer, RPM, exhaustion change, and grip damage. The main-hand Extendo Grip
+  prevents 0.32 exhaustion and uses zero durability. The empty and offhand-only
+  cases charge 0.32. The Horizon baseline charged all three.
+- [Two motor rigs](fixtures/hand-crank-edges-motor-java.csv) record ticks 0–28,
+  with strokes after samples 4, 9, and 16. The replay compares ticks 1–28 after
+  kinetic initialization. When reversed against a 32 RPM motor, Java breaks
+  the crank and drops one item at tick 17. The Horizon baseline instead ran the
+  intact crank at −32 RPM. With a 16 RPM motor, both engines accepted the
+  reversal. Java returned to +16 RPM and 262144 SU at tick 26, one tick ahead of
+  the Horizon baseline shaft.
+
+### Measured Hand Crank motor matrix, November 19 2026
+
+The expanded [Java capture](fixtures/hand-crank-matrix-java.csv) adds 16
+deduplicated rigs: stopped, 31/32/33/64 RPM, opposing 32 RPM, speed and sign
+changes before and during use, Wrench-held normal and sneaking use, and all six
+crank facings.
+Each capture includes ticks 0–28; Horizon is compared at ticks 1–28 after
+kinetic initialization (448 tick comparisons). Fields include motor setting
+and existence, crank existence/timer/direction/RPM, shaft and network RPM,
+capacity, stress, overload, and crank/motor drops. Strokes occur at ticks 4, 9,
+and 16; speed and sign changes occur at tick 2 (before use) or tick 7 (during
+use). The Wrench is neither an `IWrenchable` crank nor in Create's
+`wrench_pickup` tag, so both normal and sneaking Wrench uses continue to crank
+the block instead of rotating or removing it. The Java captures show two
+distinct source-conflict paths: an idle crank
+trying to join an oppositely rotating network breaks even against a slower
+source, while a crank already driving the network can reverse against a slower
+31 RPM motor. Changing the attached weaker motor from +16 to −16 during crank
+use instead breaks and drops the motor; when the crank expires, the shaft stops.
+
+The first captures exposed three gameplay gaps: opposing-generator behavior on
+first crank use, motor sign changes against an active crank, and Creative Motor
+loot-table normalization. All three now follow the captured Java behavior.
+An initial overbroad fix also broke the valid reversal against a slower motor;
+the capture distinguished an idle crank joining a network from an active crank
+reversing its own network. The refined rule passed all 448 final observations.
+The Java capture patch is
+[`tools/java-hand-crank-edges-trace.patch`](tools/java-hand-crank-edges-trace.patch)
+(SHA-256 `fd64c9c045cd6244ae49240735cf94b516589144bcd18f37d38346083887a8d2`);
+the matrix CSV SHA-256 is
+`63b534639ddabc6b3265ef63ae258f85b5caa21542679dd7d4d80a6d2a9af342`.
+Java revision remains `ac0c444d9828da3453ae8cc65338e8de063286fb`; all 21
+required Java GameTests passed. The final rebuilt Horizon verification used build
+`native-9f42064-7f4d88c9778e`, client SHA-256
+`bdc37f62b0eba075233a3db5ba80695d34a257156708361430ed514edc8435df`,
+ctl SHA-256 `1cca267a26d8e85ed00e7fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`,
+and prepared pack SHA-256
+`d907f9a6dc2129d83bad5eab4ef80e713ad4d8308841ca1f9946198fbb50bd04`.
+The fresh rebuild's bounded batch passed 11/12 checks on its parallel first
+run; its sole gauge-facing placement mismatch passed when rerun in isolation on
+the same build. Thus each of the 12 selected checks passed, including crank,
+equal/slower/faster motor behavior, multiplayer, persistence, grip, placement,
+and neighboring shaft/cogwheel/valve placement. The bounded LAN rerun passed: the
+host drove +32 RPM and a survival guest reversed the authoritative shaft to
+−32 RPM; guest convergence is checked, not Java packet-arrival timing. The
+expanded persistence rerun passed both idle and active setups: idle crank state
+and zero-speed network survived reopen; the active save retained its attached
+16 RPM motor and, after the crank stroke naturally ended during cold startup, the
+connected shaft resumed at +16 RPM. Exact Java active-timer reload parity remains
+unverified. Nonvisual matrix, placement, motor, LAN and persistence runs use
+`--headless`; only the motor-setting UI and rendered animation comparison use
+isolated offscreen clients. Shared code touched here includes `native/machines.rs`
+and motor loot/settings support used by [APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and)
+and [APP-1950](https://linear.app/appstu/issue/APP-1950/create-full-parity-creative-motor); this PR records the crank-facing source conflict coverage and the focused checks run.
+
+The final source comment clarifying the stopped-versus-active conflict rule
+forced a fresh incremental build with `tools/build-native.sh`: 97 seconds, build
+`native-9f42064-7f4d88c9778e`. The bounded crank/regression batch took about
+three minutes plus the isolated placement rerun.
+
+Measured workflow elapsed about 135 minutes from the workflow comment to the
+latest Wrench-case regression run: Java/source inspection and capture setup
+about 9 minutes; implementation and repair about 63 minutes; native builds
+about 16 minutes;
+pack preparation under a minute; fast standalone logic comparisons 0 minutes
+(the matrix runs production Horizon to include its engine/network path); Horizon
+solo matrix and focused comparisons about 27 minutes; host/guest integration
+and focused regressions about 6 minutes; harness/environment debugging about
+10 minutes. Durations are rounded from recorded command runs and wall clock.
+Full-family parity stays open: exact animation/sound timing and remaining
+applicable placement, generator-layout, manual-break/drop, and action/presentation
+combinations still need evidence. Wrench behavior is covered: Java does not mark the
+Hand Crank as wrenchable, so ordinary and sneaking wrench use cranks it.
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-7f4d88c9778e/horizon-ctl .local/patched-launcher/versions/native-9f42064-7f4d88c9778e/horizon-client /Users/andrewholt/dev/horizon-create/.local/baselines/2026-11-19-pre-mechanical-piston-b2405826c686/build/.local/horizon-client/26.3 --jobs 2 --check hand-crank --check 'hand-crank-*' --check cogwheel-placement --check shaft-placement --check copper-valve-handle-placement
+```
+
+These cases use exact comparison for placement,
+mounted state, countdown, and item counts, with an absolute tolerance of
+0.00002 for floating-point fields.
+The persistence check compares an idle reopen and an active connected setup. The
+active crank’s ten-tick stroke may finish during cold launcher startup; the
+reopened motor setting and resumed connected shaft operation are verified, while
+exact active-timer reload parity remains unverified.
+
+Sound timing remains open. Java requests the layers from each client's crank
+block-entity tick before decrementing its active timer, using the local animation
+clock. Horizon requests them from the server's world clock. A client-side timing
+comparison and additional shaft types and generator layouts remain open.
 
 ## Flywheel
 
@@ -866,6 +983,88 @@ python3 tools/test-adjustable-chain-gearshift.py /path/to/horizon-ctl /path/to/h
 python3 tools/test-multiplayer-adjustable-chain.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
 
+The mixed-cog speed-limit replay uses 64 and 96 RPM motors, each driving
+a large cog, a small cog, and an adjustable gearshift linked to an encased
+chain drive. A weaker motor joins each output side before full redstone
+power is applied. Java transmits −256 RPM in the 64 RPM case. In the 96 RPM
+case it breaks the gearshift when the chain would transmit −384 RPM, leaving
+the output at −32 RPM from the backup motor. Removing the primary motors
+tests reverse drive through the surviving gearshift, then removing the
+signal restores its 1:1 ratio.
+
+The two rigs are sampled at Java GameTest ticks 0–19 and compared from
+tick 1, after Horizon publishes its first RPM. The comparison uses exact
+values for block survival, ratio and signed RPM at both cogs, the
+gearshift, and the output shaft. Capture from Create revision
+`ac0c444d9828da3453ae8cc65338e8de063286fb` with Java 21 by applying
+`tools/java-adjustable-chain-speed-limit.patch` in a disposable checkout,
+running `./gradlew --offline runGameTestServer`, and taking the
+`CREATE_CHAIN_SPEED_LIMIT` rows in order.
+
+The capture patch SHA-256 is
+`f4e2b95520ac9d1c50209043cc6d9f64364fdb49e04ed0149ed5b4e87b47ff6f`.
+The Java capture passed its GameTest in 13 seconds and produced 40 rows.
+The pre-fix Horizon build `native-9f42064-a5156e57df79` differed on all 13
+samples of the 96 RPM case starting at tick 7. It retained the gearshift
+and reported −384 RPM at the output through tick 11.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check adjustable-chain-speed-limit
+```
+
+The chain placement replay covers each shaft axis and both perpendicular
+chain axes. Each arrangement records three positions through nine stages,
+starting with an unlinked placement and adding both ends. It checks removal
+and restoration of an end and the middle, a neighbor with a different
+perpendicular shaft axis, and a neighbor whose shaft points along the
+chain and prevents a link. It compares the block type, shaft axis,
+`axis_along_first`, `part`, and the gearshift's unpowered state. Both
+blocks start with `axis_along_first=true` when placed unlinked. Linked
+blocks calculate the value from their connection direction.
+
+Capture the 54 `CREATE_CHAIN_PLACEMENT` rows by applying
+`tools/java-chain-drive-placement.patch` to the pinned Java revision in
+a disposable checkout and running `./gradlew --offline runGameTestServer`
+with Java 21. The Horizon replay uses an offscreen client to place both
+items through the normal input path and reads their block states after
+each action.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check chain-drive-placement
+```
+
+On rebuilt `native-9f42064-75906adc2576` with pack SHA-256
+`1f6abc604c1840a87dd662eb616580b056d0cb3a4b3bbaf7fe8821e7ddb2be79`,
+the mixed-cog speed-limit check passed all 38 Java samples in headless
+mode. The adjustable gearshift replay passed 75 simulated ticks in both
+directions offscreen. Placement matched all 54 snapshots offscreen; the
+split snapshot advances one game tick after removing the middle link to
+sample the settled neighbor state. The same offscreen replay submitted
+chain-drive shaft geometry on all three axes in 5,253 frames; each frame's
+rotation and shaft phase matched the renderer calculation.
+
+The bounded save/reopen replay configures both gearshifts to analog signal 3.
+It saves a connected but idle network and confirms signal, connection state,
+and zero RPM after reopen. It then reconnects both motors, records each
+gearshift/output speed and sign, saves while transmitting, and verifies the
+same state across three post-reopen ticks. This follows Create's
+`ChainGearshiftBlockEntity.write/read` persistence of `Signal`; it is a
+Horizon gameplay save/reopen check, not an exact Java reload comparison.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check adjustable-chain-persistence
+```
+
+The persistence check passed on `native-9f42064-75906adc2576` with the
+`1f6abc60…` pack. The same final build passed the 75-tick gearshift replay,
+the survival guest action, all 38 mixed-cog samples, all 54 placement
+snapshots and the idle/active persistence replay. The issue shares
+`native/machines.rs` kinetic-network
+behavior with APP-1943; its existing Linear relation is retained. The
+focused gearshift, LAN, mixed-size, placement/render, and persistence checks
+all pass. Other layouts, lifecycle combinations, and exact cosmetic
+animation parity remain outside this bounded delivery.
+
 ## Cogwheel placement
 
 The ten-case Java reference compares normal small and large cog placement
@@ -892,8 +1091,33 @@ diagonals, and axial fallback. The capture is
 `tools/java-cogwheel-placement-trace.patch` captures the comparison in
 `fixtures/cogwheel-placement-java.csv`.
 
+The pinned Create 6.0.10 axe and pickaxe block tags both include the small
+and large cogs and all four encased variants. The headless mining-tag check
+places each variant and queries both tags. Tool-specific break timing and
+drop behavior need separate gameplay comparisons.
+
+The bounded gameplay pass also checks a zero-speed idle large-to-small gear
+train, a powered train at +24/-48 RPM, and save/reopen retention followed by
+resumed operation. The existing gear-train fixture covers the -2 and +0.5
+ratios and source removal/reconnection. Its 36 observations span ticks 0–35:
+tick 0 is the frozen setup baseline, then each row samples one controlled server
+tick. Each row compares the exact integer `Speed` values of ten shafts and
+cogs. The motor is removed after sampling tick 10 and restored after tick 24;
+disconnection is observed at ticks 11–24 and motion resumes at tick 25. The
+competing-source fixture also checks a negative motor setting. The existing
+encased-cogwheel LAN check covers guest shaft toggling and uncasing while the
+host observes the resulting gear speed. Separate source-conflict coverage
+remains linked to
+[APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and).
+Initial persistence fixture attempts were invalid: the helper steps one tick
+per call, and the first rig omitted the motor's input shaft. After correcting
+the harness and matching the existing Java gear layout, the persistence check
+passed.
+
 ```sh
 python3 tools/test-cogwheel-placement.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check cogwheel-mining-tags
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check cogwheel-reopen
 python3 tools/test-cogwheel-rim-assist.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-cogwheel-rim-assist.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --encased
 python3 tools/test-multiplayer-cogwheel-rim-assist.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
@@ -1003,6 +1227,39 @@ saw the same delayed step and comparator output. The
 [Java GameTest patch](tools/java-sequenced-gearshift-comparator-trace.patch)
 cover the powered turn, delay, redstone wait, distance step and active save.
 
+The [reload replay](tools/test-sequenced-gearshift-reload.py) saves an idle
+configured program and an active turn, closes and reopens the same world, then
+checks the persisted Java fields and continuation from tick 5 to tick 6. The
+[metadata](fixtures/sequenced-gearshift-reload-java.metadata.json) records the
+pinned Java BlockEntity read/write fields and links the active checkpoint to
+the existing Java GameTest trace. Other instruction types and persistence
+boundaries remain open.
+
+On rebased `origin/main` (`1f2f317`),
+`sh tools/build-native.sh /Applications/Horizon.app/Contents/MacOS/horizon-launcher
+'/private/tmp/horizon-create-app1949-build'` produced build
+`native-9f42064-f1e8907217b7`. The sequenced-gearshift parity group passed all
+11 checks using that build's `horizon-ctl` and `horizon-client` binaries:
+editor, render, LAN editing, comparator, stop, reload, gantry distance limit,
+orientation and Wrench. The reopened active sequencer
+matched Java's tick-6 state on its first resumed tick. On the same build, the
+sequenced pulley consumer trace passed, as did 13 affected piston, gantry,
+roller and bearing regressions (including piston modes, moving actors and
+reload, both mounted dispenser cases, both roller tracks, and the 105-tick
+contraption-controls trace). Checks that did not need rendering used the
+headless client.
+
+The [sequenced gantry replay](tools/test-sequenced-gearshift-gantry.py) uses
+the existing roller-filling fixture's live motor, gearbox, pinion and carriage.
+It verifies that a 1-block sequence at 128 RPM stops the downstream 32 RPM
+gantry at 0.25 blocks, following Java's relative distance context through the
+gearbox, then restores the carriage. This headless check passed on
+`native-9f42064-f1e8907217b7`. The
+[sequenced piston replay](tools/test-sequenced-gearshift-piston.py) checks
+during-motion offset plus remaining distance, then verifies the piston settles
+at the 1-block endpoint after the sequence finishes. It also passed on that
+exact build. Full 1:1 remains open.
+
 When the original threshold-switch pulley finishes its rotation while the
 lever remains powered, the downstream pulley stops and the gearshift retains
 64 RPM. The [original fixture](fixtures/threshold_switch_pulley-java.csv)
@@ -1055,6 +1312,193 @@ in [54 horizontal render samples](fixtures/clutch-gearshift-render-java.csv).
 Gearshift's output insert reverses on the lever action, and Clutch's stops
 while the input insert keeps turning. Both actual LAN renderers submitted
 the same Gearshift motion on the host's and guest's lever actions.
+The solo client and LAN guest each matched another 84 offscreen samples
+on `native-9f42064-5feaea81a3da`. The checks cover source face, RPM,
+phase, angle and both shaft-half draws for both blocks on all three axes
+and from both source directions at the submitted frame fraction 1.0.
+[Java axis samples](fixtures/transmission-render-axes-java.csv) ·
+[Java capture metadata](fixtures/transmission-render-axes-java.metadata.json)
+
+The headless replay for a Clutch closing into a second drive through a
+Gearshift matched all 26 Java samples on `native-9f42064-fa80052f1dec`.
+Both horizontal Clutches closed on tick 8 and kept +32 RPM. On tick 9,
+the Clutch facing an opposing drive broke and dropped one item. The
+powered Gearshift reversed the other drive and let its Clutch take
++64 RPM. The unchanged `native-9f42064-a5156e57df79` kept the opposing
+Clutch at −64 RPM through all four samples on ticks 9–12. The Java tick
+origin is the first sample after the left motors were set to +32 RPM.
+Each sample records block state, theoretical RPM and dropped item count
+after the scheduled or lever action for that tick.
+[Java reconnect samples](fixtures/clutch-gearshift-reconnect-java.csv)
+
+Breaking the two Gearshifts after the last reconnect sample dropped
+one item in both power states. Horizon sampled the outcome one tick after
+the break command. Pack preparation now translates the Java explosion
+survival condition for both blocks. The two loot tables were the only
+changes among 9,258 entries. The rebuilt pack SHA-256 is
+`5b4d4ee88226ae8b55dacb341e14c8906e13b9ff028e6f079994a1e548cd4cc0`.
+The pinned Java GameTest took 22 seconds with JDK 21. The same Horizon
+build and pack passed the five existing timing, competing-input, and
+solo and LAN render checks. The six Horizon checks took 65 seconds.
+[Java Gearshift drop outcomes](fixtures/clutch-gearshift-drop-java.csv) ·
+[GameTest patch](tools/java-clutch-gearshift-reconnect.patch) ·
+[Reference revisions and hashes](fixtures/clutch-gearshift-reconnect-java.metadata.json)
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --check clutch-gearshift-reconnect
+```
+
+On `native-9f42064-f8f56d21ecc8` with the same pack, Clutch and Gearshift
+matched all 84 samples on X, Y and Z when an adjacent redstone block was
+placed or removed on four consecutive ticks. Each block held +32 RPM
+at the gate. The output stopped on each power change and resumed or
+reversed on the following tick when the block state allowed transmission.
+[Consecutive redstone replay](fixtures/clutch-gearshift-consecutive-java.csv)
+
+A new Gearshift between two independently rotating drives held zero RPM
+on the placement tick, then broke and dropped one item on the following
+tick when the drives opposed the new ratio. The compatible Gearshifts
+acquired the positive-axis source and −64 RPM. Both activating redstone
+after the block was placed and placing the item against an existing
+redstone block matched Java on X, Y and Z. The updated build matched
+108 state, RPM and drop samples and all 54 block entity presence, source
+and RPM samples from the hand placements. The preceding
+`native-9f42064-bc1b4f4d38cf` differed in 18 of 54 samples for each route.
+The five headless gearing replays took 91 seconds.
+[Java direct redstone](fixtures/gearshift-two-sources-java.csv) ·
+[Java powered placement](fixtures/gearshift-powered-placement-java.csv) ·
+[Java block entities](fixtures/gearshift-powered-placement-entities-java.csv) ·
+[Java patch and capture metadata](fixtures/transmission-transition-java.metadata.json)
+
+The updated build passed three offscreen render replays. The host and
+guest drew both Clutch inserts with +32 RPM input and zero output while
+powered, then +32 RPM on both halves after the guest closed the Clutch.
+Gearshift and Clutch both matched the sampled shaft angles. These
+comparisons use eventual guest render samples.
+[Split-shaft render checks](tools/test-clutch-gearshift-render.py)
+
+The headless vanilla Crafter accepted both original shapeless recipes,
+consumed all three ingredients, and placed one block into the output chest.
+Without redstone it kept the other two ingredients and produced no output.
+The survival menu driver required a renderer for slot clicks.
+[Original Java recipes](fixtures/clutch-gearshift-recipes-java.json)
+
+A headless cold reopen matched 54 Java records from separate save and
+reopen processes. Four driven X-axis rigs kept the west input at +32 RPM.
+Their outputs remained +32 RPM when unpowered, zero through the powered
+Clutch, and −32 RPM through the powered Gearshift. One undriven Clutch and
+one undriven Gearshift kept their block entities and output shafts at zero
+RPM with no source. The test samples the stable state before shutdown and
+eight ticks after startup.
+[Cold reopen samples](fixtures/clutch-gearshift-cold-reopen-java.csv) ·
+[Java capture setup](fixtures/clutch-gearshift-cold-reopen-java.metadata.json)
+
+The mixed Clutch and Gearshift chain matched all 60 headless samples on
+the updated build. Each X-axis device order was tested with the upstream
+redstone change first and with the downstream change first. The test
+sampled each callback on the same tick, the intervening shaft's RPM, and
+the scheduled reconnection on the following tick.
+[Mixed callback samples](fixtures/clutch-gearshift-mixed-callbacks-java.csv) ·
+[Java capture metadata](fixtures/clutch-gearshift-mixed-callbacks-java.metadata.json)
+
+Another 60 headless samples matched Java when a Z-axis Gearbox carried
+the drive from an X-axis transmission into a Y-axis transmission. The
+four rigs exercised both device orders and both redstone callback orders.
+[Java Gearbox bend samples](fixtures/clutch-gearshift-mixed-bend-java.csv) ·
+[Java capture metadata](fixtures/clutch-gearshift-mixed-bend-java.metadata.json)
+
+On `native-9f42064-d8c0290a2281`, two Mechanical Presses on a Hand Crank
+matched all 34 Java overload samples. A Clutch placed already powered
+kept driving the input at −32 RPM while the presses were isolated.
+Closing it overloaded the shared drive. Reopening it stopped the
+presses immediately and restored the input speed after the next stress
+update. The Gearshift reversed the theoretical press RPM while the
+effective speed stayed at zero. The earlier build differed in six
+samples across crank actuation, powered isolation and recovery.
+[Overload trace](fixtures/clutch-gearshift-overload-java.csv) ·
+[Java capture metadata](fixtures/clutch-gearshift-overload-java.metadata.json)
+
+On `native-9f42064-65c9b559787b`, initialized Gearshifts with adjacent
+Creative Motors matched 90 Java samples across all three axes. The
+64-RPM motor took over from the 32-RPM motor before two redstone changes.
+The weaker motor stopped on each action tick and resumed at the conveyed
+speed on the next tick. The previous build continued publishing +32 RPM
+for the weaker motor in all 12 action samples.
+[Initialized Gearshift samples](fixtures/initialized-gearshift-java.csv) ·
+[Java capture metadata](fixtures/initialized-gearshift-java.metadata.json)
+
+The headless Wrench replay matched Java event IDs and counts on all 38
+actions. Rotating either block played one cue, clicking along its axis
+was silent, and each survival pickup played both removal cues.
+[Wrench sound events](fixtures/clutch-gearshift-wrench-audio-java.csv) ·
+[Java capture metadata](fixtures/clutch-gearshift-wrench-audio-java.metadata.json)
+
+Both hidden LAN clients matched the Java Clutch break boundary and the
+single dropped item. Both drew the Clutch and Gearshift before reconnection.
+The Gearshift continued drawing after the scheduled break and neither
+client submitted the removed Clutch's shaft halves.
+
+The scheduled Clutch break played Java's stone break cue once on tick 9
+in headless solo and on both hidden LAN clients. Both Gearshift conflict
+replays matched three stone break cues on tick 5, one per axis. The
+direct Horizon destroy-command replay omitted the two Gearshift break
+cues emitted by Java's `level.destroyBlock`.
+[Java break effects](fixtures/transmission-break-effects-java.csv) ·
+[Java capture metadata](fixtures/transmission-break-effects-java.metadata.json)
+
+On `native-9f42064-5feaea81a3da`, two X-axis Clutches closed on the save
+tick between adjacent Creative Motors. After cold reopen, the opposing
+motor broke and its Clutch retained +32 RPM. The compatible rig kept both
+motors at +64 RPM. Two initialized Gearshifts reversed on their save tick.
+On reopen each kept its ±64 RPM input, and each formerly subordinate
+motor broke. The four headless replays matched all 32 saved and settled
+observations with block drops enabled and disabled. Earlier builds kept
+the opposing motors across three Clutch and six Gearshift post-reopen
+observations.
+[Java pending Clutch samples](fixtures/clutch-pending-reopen-java.csv) ·
+[Clutch capture metadata](fixtures/clutch-pending-reopen-java.metadata.json) ·
+[Java pending Gearshift samples](fixtures/gearshift-pending-reopen-java.csv) ·
+[Gearshift capture metadata](fixtures/gearshift-pending-reopen-java.metadata.json)
+
+The headless command harness sampled the saved game time and the first
+two explicit simulation ticks on `native-9f42064-01ed5c97c72e`. All 24
+Java state, RPM and motor-presence observations matched across the
+original and mirrored adjacent-motor layouts. Java checks the dependent
+Gearshift motor's configured speed against its conveyed speed as signed
+values. The +32 motor driven at −64 broke on the first restored tick.
+The mirrored −32 motor driven at +64 remained in the network. The previous
+native build reached the first block-entity tick before its pending check
+could see the restored entities. The new check runs before motor startup
+also when the entity ticker table is still being built.
+[Mirrored Clutch startup](fixtures/clutch-pending-reopen-mirrored-java.csv) ·
+[Clutch capture metadata](fixtures/clutch-pending-reopen-mirrored-java.metadata.json) ·
+[Mirrored Gearshift startup](fixtures/gearshift-pending-reopen-mirrored-java.csv) ·
+[Gearshift capture metadata](fixtures/gearshift-pending-reopen-mirrored-java.metadata.json)
+
+The loaded opposing-motor break uses the regular native loot result first.
+If it returns no stacks with block drops enabled, the captured break path
+emits one motor item. The shipped pack remains byte-identical. An explicitly
+empty custom motor loot result also triggers this scoped fallback.
+
+Final focused verification used the client reinstalled by
+`tools/build-native.sh` as `native-9f42064-01ed5c97c72e`. Its content-addressed
+ID is unchanged because the native inputs match the previously validated
+source; the previous version directory was archived before rebuilding. The
+eight headless gates passed: cold reopen, mixed callbacks, mixed Gearbox bend,
+overload, both pending first-tick directions, recipes and host/guest actions.
+Four hidden offscreen checks passed: guest axis rendering, Clutch break
+rendering, and both settings cursor-warp cases. Client SHA-256 is
+`e5ddb923ca11ae2a28e71da91e967dc84c7161f8600cc0abe45f81f871ba0da3`,
+controller SHA-256 is
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`, and
+the prepared pack SHA-256 remains
+`5b4d4ee88226ae8b55dacb341e14c8906e13b9ff028e6f079994a1e548cd4cc0`.
+
+Other mixed networks, initialized transitions with other load and source
+combinations and pending reload layouts still need direct comparisons.
+The exact queued callback lifetime and wider startup ordering remain
+open. Measuring break gain, pitch and debris requires event-specific
+client telemetry. Shared kinetic ambience remains open.
 
 ## Vertical Gearbox
 
@@ -1085,6 +1529,10 @@ The restored Gearbox and connected shaft first spin on the tick after it
 lands. A live guest operated the piston with its lever and both clients
 observed the Gearbox in its new position. The [Java GameTest patch](tools/java-gearbox-piston-trace.patch)
 records the piston and kinetic states.
+
+The [family comparison](GEARBOX-PARITY.md) records the mechanical piston
+endpoint replay, multi-Gearbox source handoff, Wrench transforms in solo and LAN,
+and save/reopen coverage.
 
 ## Stockpile Switch editor
 
@@ -1921,21 +2369,21 @@ adds the signed Clipboard actions above:
   guest large-cog placement and guest Clipboard copy/paste. Resulting host state
   matches; settings/clipboard delivery checks do not claim Java packet-arrival
   or interpolation timing.
-* On the freshly rebuilt `native-9f42064-e442e57aa9ac` (Horizon source
+* The powered four-gearbox/controller loop-close replay matches the saved Java
+  outcome: the newly inserted gearbox loses its block entity by tick 8 and is
+  air by tick 9, while the original network retains +24 RPM.
+* On the fresh combined build `native-9f42064-9caf86d0e1ba` (Horizon source
   `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, prepared pack SHA-256
   `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`), the
-  bounded controller suite and selected neighbor regressions passed 19/19.
-  The compatible-launcher rebuild took 54 seconds (incremental); the test run
-  used this build's `horizon-client` and resource directory. Test outputs are
-  retained in `.local/parity/`.
+  bounded controller suite, APP-1943 source-conflict check and selected neighbor
+  regressions passed 21/21. This build includes the merged APP-1943 change and
+  this branch's loop-close validation. The compatible-launcher rebuild took
+  3m40s (incremental); checks used this build's `horizon-client` and resource
+  directory. Test outputs are retained in `.local/parity/`.
 
-One consequential shared-network mismatch remains and is tracked as a blocking
-dependency on [APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and):
-in a closed four-gearbox/controller loop, Java breaks the incompatible
-controller/gearbox chain while Horizon can keep the loop and publish conflicting
-speeds. The controller-specific fixes and bounded checks in this branch are
-ready for a clearly labelled partial PR; this mismatch prevents claiming the
-gameplay baseline or marking APP-1951 complete.
+The formerly blocking shared-network mismatch from
+[APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and)
+is resolved and checked on the combined build. Full 1:1 parity remains open.
 
 Nonblocking follow-ups are exact bracket-transition timing, Flywheel
 instancing, overload tint/particles, cosmetic feedback-sound timing, other
@@ -2061,6 +2509,24 @@ falling onto stone and being pressed into separate sheets. The [Horizon replay](
 on build `5d18ba4dd0d3` matched ground contact at tick 7, the first scan at
 tick 15, and sheet conversion and both original impact sounds at ticks 24,
 43, and 62. The 132-sample Basin and moving-belt regressions also passed.
+The ticket baseline extends that replay with a non-recipe cobblestone spawned
+ahead of the valid ingot stack; the Press leaves it untouched and still matches
+all 81 Java samples. On build `native-9f42064-b02beacd07a9`, the updated
+[Pressing category check](tools/test-pressing-category.py) passed iron, gold and
+copper sheet recipe routes and host-to-guest recipe/tag synchronization. A
+separate [material route check](tools/test-press-material-routes.py) processed
+one gold ingot into a golden sheet and one copper ingot into a copper sheet.
+The combined Depot, Brass, stacked-belt, LAN collection, ground-item, category,
+material route, placement, and vertical drop checks all passed on this build.
+
+The [Press lifecycle check](tools/test-press-lifecycle.py) filled the Depot's
+eight output slots with 512 cobblestone and processed two iron ingots. One sheet
+remained in the Depot and one was dropped into the world; both inputs were
+accounted for with no duplicate output and all cobblestone retained. The same
+check reopened an idle powered Press and an active Press with two ingots. The
+active machine retained its input/progress and finished both cycles after
+reopen. This is a gameplay save/reopen check; it does not claim Java reload
+timing equivalence.
 
 The [Java Press ownership fixture](tools/java-press-advancement.patch)
 captures [33 ticks](fixtures/press-advancement-java.csv) from ordinary
@@ -7551,3 +8017,90 @@ actual-player old-world reopen/extension guard passed on the refactored build.
 ## Expanded fluid-tank workflow — November 18, 2026
 
 The [tank evidence matrix](TANK-PARITY.md) records 31/31 scripts and 1,430 exact Java records passing through headless Horizon `92ef2557669b`. Its applicable shared production core also passes 19/19 scripts (1,093 records). The integrated build closes sampled split, component, creative, clone/move, window, boiler, comparator, source-light and real container inventory gaps. Original steam timing matches all 13 ticks. Physical local/reopen/LAN light, imported ownership through partial/full unload, vanilla clone inventory, solo/LAN bucket and muted sound-event guards pass. Java client rendering/particles, propagated-light and unload timing, audio pitch verification, mounted storage and remaining consumers are still open. Full-family parity was not promoted.
+
+## APP-1949 sequencer validation on latest main — November 19, 2026
+
+After rebasing onto `origin/main` at `9341ef5cb462c3bb3f13c028b54a38c6c7ce2853`,
+the updated `tools/build-native.sh` produced build
+`native-9f42064-41316457f440`. The build's `horizon-client` SHA256 is
+`ac4d4b543c70c0e5217b38b7ff37690d0c9f39f1cc9aa147fcd3009ca7a48ced`.
+All checks below ran against that build and the pinned 9f42064 resource pack.
+
+The bounded sequenced-gearshift host/guest, editor, comparator/stop, reload,
+gantry/piston distance, orientation, Wrench and rendering checks passed 11/11.
+Affected mechanical-piston, dispenser, roller and contraption-controls
+regressions passed 13/13. The sequenced-pulley cross-regression passed 1/1,
+including its 56-tick trace. These results replace earlier APP-1949 build
+identifiers; broader combinations and the matrix's Full 1:1 column remain
+open.
+## APP-1943 kinetic source transitions — November 19, 2026
+
+The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+Source review of `RotationPropagator.propagateNewSource` confirms that incompatible
+nonzero conveyed speeds destroy the newly added position with drops. Horizon's
+kinetic source generation is shared with network traversal, and a conflicting
+new kinetic member is now removed; the surviving adjacent networks are then
+republished so their saved capacity and stress reflect the split immediately.
+
+`tools/test-kinetic-network-sources.py` covers two separated creative-motor line
+networks at +16 and -16 RPM, idle save/reopen, and insertion of a three-shaft
+connection whose final shaft must break for equal and weaker opposing sources.
+It also checks a stronger opposing source, matching +16 sources merging to
+capacity 524288, same-direction slower-source transitions, separation after
+removal, and an active merged save/reopen. The headless regression passed on
+freshly built Horizon `native-9f42064-b2e225daec86` (focused source regression rerun after rebase). The existing
+small/large-waterwheel, loaded-stressometer, rotation-speed-controller-cascade,
+rotation-speed-controller-competing and rotation-speed-controller-LAN checks
+also passed on that exact build (6/6). Commands:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-ctl .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-client .local/horizon-client/26.3 --jobs 1 --check kinetic-network-sources
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-ctl .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-client .local/horizon-client/26.3 --jobs 1 --check small-waterwheel --check large-waterwheel --check loaded-stressometer --check rotation-speed-controller-cascade --check rotation-speed-controller-competing --check rotation-speed-controller-lan
+```
+
+These Horizon outcomes are integration regressions, not captured Java trace
+equivalence. Branch layouts and LAN guest observation of this source-merge
+case remain follow-ups. Full 1:1 remains Open.
+
+
+### APP-1943 stress-capacity boundary — November 19, 2026
+
+Extended the existing `tools/test-loaded-stressometer.py` rig; no new load
+family or separate fixture. The small water wheel supplies 8 RPM and 256 SU.
+Seven, eight and nine attached millstones produce 224, 256 and 288 SU. The
+check observes every connected millstone plus the wheel, shaft, stressometer
+and a connected speedometer. It then removes all mills and checks recovery.
+
+Expected behavior comes from pinned Java `KineticNetwork.calculateCapacity`,
+`calculateStress` and `getStressMultiplierForSpeed`,
+`KineticBlockEntity.updateFromNetwork` (`capacity < stress`) and `getSpeed`,
+`StressGaugeBlockEntity.updateFromNetwork`, and
+`SpeedGaugeBlockEntity.onSpeedChanged`. The already captured Java
+`fixtures/loaded_stressometer-java.csv` provides the same 256-SU source and
+prior below/above/recovery samples; the strict at-capacity outcome follows
+the pinned Java comparison (`256 < 256` is false). This case checks both the
+stored theoretical ±8 RPM across the connected gear train and the effective
+speedometer response: it stays active below/at capacity, reads zero at 288 SU,
+and resumes after removing the load.
+
+On fresh build `native-9f42064-b2e225daec86`, the 105-tick existing Java trace
+and Goggles comparison passed, followed by the added boundary states:
+
+| Load | Java expected capacity/stress | Connected stored RPM | Effective speedometer | Result |
+| --- | --- | --- | --- | --- |
+| 7 mills | 256 / 224 SU | Wheel/shaft/gauges +8; millstones alternate ±8 | Moving | Pass |
+| 8 mills | 256 / 256 SU | Wheel/shaft/gauges +8; millstones alternate ±8 | Moving at equality | Pass |
+| 9 mills | 256 / 288 SU | Theoretical values remain signed ±8 | 0 while overstressed | Pass |
+| Mills removed | 256 / 0 SU | Wheel/shaft/gauges +8 | Moving again | Pass |
+
+The overloaded effective-speed comparison uses Java `getSpeed()` (zero while
+overstressed); the saved per-member `Speed` remains the theoretical signed
+RPM, as in Java. The stressometer value was 0.875, 1.0 and 1.125 respectively,
+then returned to zero on recovery. Command:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-ctl .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-client .local/horizon-client/26.3 --jobs 1 --check loaded-stressometer
+```
+
+Branch layouts and direct LAN guest observation of this source merge remain
+follow-ups; Full 1:1 stays Open.

@@ -1175,3 +1175,14 @@ Claim a family in [the Linear work queue](PARITY-WORK-QUEUE.md) and follow
 
 Gameplay tickets use [finite completion gates](COMPLETION-STANDARD.md); ticket
 completion and exhaustive Java parity are tracked separately.
+
+## Lightweight PR checks
+
+GitHub runs one small Linux job for pull requests: tracked Python, JSON/JSONL,
+TOML and shell syntax; five standalone Rust behavior tests for Frogport, Toolbox
+and elevator motion; and Clippy correctness errors for the standalone tank
+crate when its inputs change. It does not build Horizon, download game assets,
+run game fixtures, or enforce repository-wide formatting. The injected mod is not a
+standalone Cargo crate, so this Clippy check does not cover the entire port.
+Run `python3 tools/check-source.py` locally (Python 3.11+). Gameplay evidence
+remains part of each worker's focused verification. Duplicate PR runs cancel.

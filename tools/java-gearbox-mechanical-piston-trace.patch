@@ -1,0 +1,149 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..8d0c4af 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestContraptions.mechanicalGearbox"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+index e74ff27..bee67bb 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -3,18 +3,26 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ import java.util.List;
+ import java.util.concurrent.atomic.AtomicInteger;
+ 
++import com.google.gson.JsonArray;
++import com.google.gson.JsonObject;
+ import com.simibubi.create.AllBlockEntityTypes;
+ import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllEntityTypes;
+ import com.simibubi.create.content.contraptions.Contraption;
+ import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
+ import com.simibubi.create.content.contraptions.elevator.ElevatorPulleyBlockEntity;
++import com.simibubi.create.content.contraptions.piston.LinearActuatorBlockEntity;
++import com.simibubi.create.content.contraptions.piston.MechanicalPistonBlock;
+ import com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftBlock;
++import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
++import com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour;
+ import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
+ import com.simibubi.create.infrastructure.gametest.GameTestGroup;
+ 
+ import it.unimi.dsi.fastutil.objects.Object2LongMap;
+ import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.core.registries.BuiltInRegistries;
+ import net.minecraft.gametest.framework.GameTest;
+ import net.minecraft.world.entity.EntityType;
+ import net.minecraft.world.entity.projectile.Arrow;
+@@ -26,6 +34,9 @@ import net.minecraft.world.level.block.CropBlock;
+ import net.minecraft.world.level.block.LeverBlock;
+ import net.minecraft.world.level.block.RedstoneLampBlock;
+ 
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++
+ import net.neoforged.neoforge.fluids.FluidStack;
+ 
+ @GameTestGroup(path = "contraptions")
+@@ -278,4 +289,93 @@ public class TestContraptions {
+ 			helper.assertBlockProperty(vaultLamp, RedstoneLampBlock.LIT, true);
+ 		});
+ 	}
++
++	@GameTest(template = "ploughing", timeoutTicks = 80)
++	public static void mechanicalGearboxX(CreateGameTestHelper helper) {
++		mechanicalGearbox(helper, "x", Direction.Axis.X, true);
++	}
++
++	@GameTest(template = "ploughing", timeoutTicks = 80)
++	public static void mechanicalGearboxY(CreateGameTestHelper helper) {
++		mechanicalGearbox(helper, "y", Direction.Axis.Y, true);
++	}
++
++	@GameTest(template = "ploughing", timeoutTicks = 80)
++	public static void mechanicalGearboxZ(CreateGameTestHelper helper) {
++		mechanicalGearbox(helper, "z", Direction.Axis.Z, true);
++	}
++
++	@GameTest(template = "ploughing", timeoutTicks = 80)
++	public static void mechanicalGearboxRegular(CreateGameTestHelper helper) {
++		mechanicalGearbox(helper, "regular", Direction.Axis.Y, false);
++	}
++
++	@GameTest(template = "ploughing", timeoutTicks = 80)
++	public static void mechanicalGearboxStone(CreateGameTestHelper helper) {
++		mechanicalGearbox(helper, "stone", null, true);
++	}
++
++	private static void mechanicalGearbox(CreateGameTestHelper helper, String scenario, Direction.Axis axis,
++		boolean sticky) {
++		var level = helper.getLevel();
++		var piston = helper.absolutePos(new BlockPos(2, 3, 1));
++		var pistonState = level.getBlockState(piston);
++		helper.assertTrue(AllBlocks.STICKY_MECHANICAL_PISTON.has(pistonState), "Expected original sticky piston");
++		if (!sticky) {
++			level.setBlock(piston, AllBlocks.MECHANICAL_PISTON.getDefaultState()
++				.setValue(MechanicalPistonBlock.FACING, Direction.EAST)
++				.setValue(MechanicalPistonBlock.AXIS_ALONG_FIRST_COORDINATE,
++					pistonState.getValue(MechanicalPistonBlock.AXIS_ALONG_FIRST_COORDINATE)), 3);
++		}
++
++		level.setBlock(piston.east(), axis == null ? Blocks.STONE.defaultBlockState()
++			: AllBlocks.GEARBOX.getDefaultState().setValue(BlockStateProperties.AXIS, axis), 3);
++		for (int distance = 2; distance <= 4; distance++)
++			level.setBlock(piston.east(distance), Blocks.AIR.defaultBlockState(), 3);
++		// The template keeps its sticky assembly mounted. Force endpoint placement before reversal.
++		var pistonBe = (LinearActuatorBlockEntity) level.getBlockEntity(piston);
++		pistonBe.getBehaviour(ScrollValueBehaviour.TYPE).setValue(0);
++		helper.pullLever(new BlockPos(3, 3, 2));
++
++		for (int tick = 0; tick < 24; tick++) {
++			int sample = tick;
++			helper.runAtTickTime(tick + 2, () -> {
++				if (sample == 10) {
++					helper.assertTrue(level.getBlockState(piston).getValue(MechanicalPistonBlock.STATE)
++						== MechanicalPistonBlock.PistonState.EXTENDED, "Expected disassembly before reversal");
++					var motor = (SmartBlockEntity) level.getBlockEntity(helper.absolutePos(new BlockPos(4, 2, 2)));
++					motor.getBehaviour(ScrollValueBehaviour.TYPE).setValue(-64);
++				}
++
++				var be = (LinearActuatorBlockEntity) level.getBlockEntity(piston);
++				String state = level.getBlockState(piston).getValue(MechanicalPistonBlock.STATE).getSerializedName();
++				var cells = new JsonArray();
++				for (int distance = -2; distance <= 4; distance++)
++					cells.add(mechanicalGearboxBlock(level.getBlockState(piston.east(distance))));
++				var payload = new JsonArray();
++				if (be.movedContraption != null) {
++					be.movedContraption.getContraption().getBlocks().values().stream()
++						.map(info -> mechanicalGearboxBlock(info.state())).sorted().forEach(payload::add);
++				}
++				var row = new JsonObject();
++				row.addProperty("case", scenario);
++				row.addProperty("tick", sample);
++				row.addProperty("offset", be.offset);
++				row.addProperty("speed", be.getSpeed());
++				row.addProperty("state", state);
++				row.add("cells", cells);
++				row.add("payload", payload);
++				System.out.println("CREATE_MECHANICAL_GEARBOX " + row);
++				if (sample == 23)
++					helper.succeed();
++			});
++		}
++	}
++
++	private static String mechanicalGearboxBlock(BlockState state) {
++		String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
++		if (AllBlocks.GEARBOX.has(state))
++			return id + "[axis=" + state.getValue(BlockStateProperties.AXIS).getSerializedName() + "]";
++		return id;
++	}
+ }

@@ -1,6 +1,12 @@
 {
   "replace": false,
   "values": [
+    "create:cogwheel",
+    "create:large_cogwheel",
+    "create:andesite_encased_cogwheel",
+    "create:brass_encased_cogwheel",
+    "create:andesite_encased_large_cogwheel",
+    "create:brass_encased_large_cogwheel",
     "create:gearbox",
     "create:analog_lever",
     "create:flywheel",

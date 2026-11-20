@@ -1,0 +1,10 @@
+fixture,tick,game_time,level_event,block,powered,sound,volume,pitch
+reconnect,9,83,2001,create:clutch,false,minecraft:block.stone.break,1.000,0.800
+reconnect,12,86,2001,create:gearshift,false,minecraft:block.stone.break,1.000,0.800
+reconnect,12,86,2001,create:gearshift,true,minecraft:block.stone.break,1.000,0.800
+gearshift-scheduled,5,76,2001,create:gearshift,true,minecraft:block.stone.break,1.000,0.800
+gearshift-scheduled,5,76,2001,create:gearshift,true,minecraft:block.stone.break,1.000,0.800
+gearshift-scheduled,5,76,2001,create:gearshift,true,minecraft:block.stone.break,1.000,0.800
+gearshift-scheduled,5,76,2001,create:gearshift,true,minecraft:block.stone.break,1.000,0.800
+gearshift-scheduled,5,76,2001,create:gearshift,true,minecraft:block.stone.break,1.000,0.800
+gearshift-scheduled,5,76,2001,create:gearshift,true,minecraft:block.stone.break,1.000,0.800

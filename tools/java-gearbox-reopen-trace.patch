@@ -1,0 +1,127 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/GearboxReopenTrace.java b/src/main/java/com/simibubi/create/infrastructure/gametest/GearboxReopenTrace.java
+new file mode 100644
+index 0000000..a9056c1
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/GearboxReopenTrace.java
+@@ -0,0 +1,121 @@
++package com.simibubi.create.infrastructure.gametest;
++
++import java.util.LinkedHashMap;
++import java.util.Map;
++
++import com.google.gson.JsonObject;
++import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
++import com.simibubi.create.content.kinetics.gearbox.GearboxBlockEntity;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.core.registries.BuiltInRegistries;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.event.tick.ServerTickEvent;
++
++@EventBusSubscriber
++public class GearboxReopenTrace {
++	private static final String PHASE = System.getenv("CREATE_GEARBOX_REOPEN_PHASE");
++	private static final BlockPos POWERED = new BlockPos(8, 104, 8);
++	private static final BlockPos STOPPED = new BlockPos(13, 104, 8);
++	private static int ticks;
++
++	@SubscribeEvent
++	public static void tick(ServerTickEvent.Post event) {
++		if (PHASE == null)
++			return;
++		var server = event.getServer();
++		var level = server.overworld();
++		int tick = ++ticks;
++		if ("save".equals(PHASE)) {
++			if (tick == 1) {
++				level.setChunkForced(0, 0, true);
++				setup(level);
++			}
++			if (tick == 12) {
++				sample(level, "before_save");
++				server.halt(false);
++			}
++		} else if ("reopen".equals(PHASE)) {
++			switch (tick) {
++				case 1 -> sample(level, "after_load");
++				case 8 -> {
++					sample(level, "settled");
++					level.setBlockAndUpdate(POWERED.below(), Blocks.AIR.defaultBlockState());
++				}
++				case 9 -> {
++					sample(level, "source_removed");
++					putMotor(level, POWERED.south(), Direction.NORTH, -24);
++				}
++				case 10 -> {
++					sample(level, "source_replaced");
++					server.halt(false);
++				}
++			}
++		}
++	}
++
++	private static void setup(ServerLevel level) {
++		putMotor(level, POWERED.below(), Direction.UP, -32);
++		putShaft(level, POWERED.north(), Direction.Axis.Z);
++		putShaft(level, POWERED.above(), Direction.Axis.Y);
++		level.setBlockAndUpdate(POWERED, AllBlocks.GEARBOX.getDefaultState()
++			.setValue(BlockStateProperties.AXIS, Direction.Axis.X));
++		putMotor(level, STOPPED.north(), Direction.SOUTH, 32);
++		putShaft(level, STOPPED.south(), Direction.Axis.Z);
++		putShaft(level, STOPPED.east(), Direction.Axis.X);
++		level.setBlockAndUpdate(STOPPED, AllBlocks.GEARBOX.getDefaultState()
++			.setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
++	}
++
++	private static void putMotor(ServerLevel level, BlockPos pos, Direction facing, int rpm) {
++		level.setBlockAndUpdate(pos, AllBlocks.CREATIVE_MOTOR.getDefaultState()
++			.setValue(BlockStateProperties.FACING, facing));
++		level.getBlockEntity(pos, AllBlockEntityTypes.MOTOR.get()).orElseThrow().generatedSpeed.setValue(rpm);
++	}
++
++	private static void putShaft(ServerLevel level, BlockPos pos, Direction.Axis axis) {
++		level.setBlockAndUpdate(pos, AllBlocks.SHAFT.getDefaultState().setValue(BlockStateProperties.AXIS, axis));
++	}
++
++	private static void sample(ServerLevel level, String phase) {
++		Map<String, BlockPos> points = new LinkedHashMap<>();
++		points.put("powered", POWERED);
++		points.put("powered_north", POWERED.north());
++		points.put("powered_up", POWERED.above());
++		points.put("below_motor", POWERED.below());
++		points.put("south_motor", POWERED.south());
++		points.put("stopped", STOPPED);
++		points.put("stopped_south", STOPPED.south());
++		points.put("stopped_east", STOPPED.east());
++		points.put("blocked_motor", STOPPED.north());
++
++		var row = new JsonObject();
++		row.addProperty("phase", phase);
++		var samples = new JsonObject();
++		for (var point : points.entrySet()) {
++			var pos = point.getValue();
++			var state = level.getBlockState(pos);
++			var reading = new JsonObject();
++			reading.addProperty("block", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
++			if (level.getBlockEntity(pos) instanceof KineticBlockEntity kinetic) {
++				reading.addProperty("rpm", kinetic.getSpeed());
++				if (kinetic instanceof GearboxBlockEntity box) {
++					reading.addProperty("axis", state.getValue(BlockStateProperties.AXIS).getSerializedName());
++					reading.addProperty("input", box.hasSource() ? box.getSourceFacing().getSerializedName() : "none");
++					var data = box.saveWithoutMetadata(level.registryAccess());
++					System.out.printf("CREATE_GEARBOX_REOPEN_NBT %s %s %s%n", phase, point.getKey(), data);
++				}
++			}
++			samples.add(point.getKey(), reading);
++		}
++		row.add("points", samples);
++		System.out.println("CREATE_GEARBOX_REOPEN " + row);
++	}
++}

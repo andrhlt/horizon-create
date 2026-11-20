@@ -5,7 +5,7 @@ use horizon_world::registry::BlockStateId;
 
 use crate::containers::ModBlockEntity;
 
-use super::create_machines::{axis_index, int, mod_entity};
+use super::create_machines::{axis_index, chain_gearshift_overspeed, int, mod_entity};
 use super::{Game, GameLevel};
 
 pub(super) const ADJUSTABLE: &str = "create:adjustable_chain_gearshift";
@@ -80,16 +80,22 @@ pub(super) fn prepare(game: &mut Game<'_>) {
     for (pos, age, pending, lazy, initial) in positions {
         let signal =
             (pending || lazy).then(|| game.native_neighbor_signal(game.native_dimension(), pos));
+        let mut changed = false;
         game.native_with_mod_block_entity(pos, |entity| {
             entity.data.resize(LAZY_TICKS + 1, 0);
             entity.data[LAZY_TICKS] = age;
             if let Some(signal) = signal {
+                changed = int(&entity.nbt, "Signal").unwrap_or(0) != signal;
                 entity.nbt.insert("Signal".into(), Tag::Int(signal));
                 if pending {
                     entity.data[PENDING] = 0;
                 }
             }
         });
+        if changed && chain_gearshift_overspeed(game, pos) {
+            game.native_machine_destroy_block(pos, None, false);
+            continue;
+        }
         if initial && let Some(signal) = signal {
             let powered = if signal > 0 { "true" } else { "false" };
             if game.native_block_property(pos, "powered").as_deref() != Some(powered) {

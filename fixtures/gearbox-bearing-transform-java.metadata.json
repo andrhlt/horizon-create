@@ -1,0 +1,14 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "create": "6.0.10",
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.219",
+  "java": "21.0.13.1",
+  "patch_sha256": "a5d1ba9a71bbf1f2b0ad588c39f7a1a1cdcb9b72f6d151125e5987503f323d64",
+  "trace_sha256": "a737e00cf48423c884d5502a3b18eec4ed398b59916f1236406d7a4280303035",
+  "template_sha256": "ee7f068bf608653a052112aab8bfaab4370ea92af182bd87ba191e2a150c0cbc",
+  "capture_seconds": 17.06,
+  "records": 4,
+  "tick_origin": "Sample after setup at GameTest tick 8, then drive bearing at +60 RPM until the measured 90 degree angle, set drive to zero, and sample one then four ticks after stopping.",
+  "scope": "Up-facing mechanical bearing carries a powered X-axis Gearbox and separate glued Z-axis Gearbox through a 90 degree turn around Y. Read restored block IDs, axes, source direction and signed speed."
+}

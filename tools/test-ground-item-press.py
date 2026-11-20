@@ -28,6 +28,8 @@ def setup(control):
     ))
     for _ in range(5):
         control.step_to(control.clock() + 1)
+    control.command('/summon minecraft:item 8.5 179.875 8.5 {Item:{id:"minecraft:cobblestone",count:1},'
+                    'PickupDelay:32767s,Motion:[0.0d,0.0d,0.0d]}')
     control.command('/summon minecraft:item 8.5 179.875 8.5 {Item:{id:"minecraft:iron_ingot",count:3},'
                     'PickupDelay:32767s,Motion:[0.0d,0.0d,0.0d]}')
 
@@ -63,7 +65,9 @@ def run(args):
     actual = []
     if args.sound:
         os.environ["HORIZON_CREATE_ELEVATOR_TRACE"] = "1"
-    ingots, sheets = target("minecraft:iron_ingot"), target("create:iron_sheet")
+    ingots = target("minecraft:iron_ingot")
+    sheets = target("create:iron_sheet")
+    invalid = target("minecraft:cobblestone")
     with fixture_world(args, "GroundItemPress", render=args.sound, pack=args.pack) as control:
         setup(control)
         start = control.clock()
@@ -81,6 +85,9 @@ def run(args):
             if extracted := count(output):
                 delivered += extracted
                 control.command(f"/kill {sheets}")
+            invalid_stack = control.command(f"/data get entity {invalid} Item")
+            if "minecraft:cobblestone" not in invalid_stack or count(invalid_stack) != 1:
+                raise RuntimeError(f"A cobblestone without a pressing recipe was consumed or converted: {invalid_stack}")
             grounded = int(ground.endswith("1b"))
             offset = depot.head_offset(press) * (16 / 19)
             events = []

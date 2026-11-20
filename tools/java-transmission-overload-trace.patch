@@ -1,0 +1,91 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..218ffcf 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..6f330e0 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.transmissionOverload"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..bcbc269 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -3,6 +3,7 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
+ import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllDataComponents;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+@@ -115,4 +116,51 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 22)
++	public static void transmissionOverload(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var powered = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++		var east = net.minecraft.core.Direction.EAST;
++		var west = east.getOpposite();
++		var press = AllBlocks.MECHANICAL_PRESS.getDefaultState().setValue(horizontal, east);
++		var rigs = java.util.List.of(new BlockPos(8, 5, 8), new BlockPos(8, 5, 13));
++		for (int rig = 0; rig < rigs.size(); rig++) {
++			var gate = rigs.get(rig);
++			boolean clutch = rig == 0;
++			helper.setBlock(gate.above(), clutch ? Blocks.REDSTONE_BLOCK.defaultBlockState() : Blocks.AIR.defaultBlockState());
++			helper.setBlock(gate, (clutch ? AllBlocks.CLUTCH.getDefaultState() : AllBlocks.GEARSHIFT.getDefaultState())
++				.setValue(axis, east.getAxis()).setValue(powered, clutch));
++			helper.setBlock(gate.east(), press);
++			helper.setBlock(gate.east(2), press);
++			helper.setBlock(gate.west(), AllBlocks.HAND_CRANK.getDefaultState().setValue(facing, west));
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int rig = 0; rig < rigs.size(); rig++) {
++				var gate = rigs.get(rig);
++				var level = helper.getLevel();
++				boolean clutch = rig == 0;
++				for (int phase = 0; phase < ((tick == 2 || tick == 4 || tick == 7) ? 2 : 1); phase++) {
++					if (phase == 1) {
++						if (tick == 2) {
++							var crank = (com.simibubi.create.content.kinetics.crank.HandCrankBlockEntity) level.getBlockEntity(helper.absolutePos(gate.west()));
++							crank.turn(false);
++						} else {
++							boolean on = tick == 4 ? !clutch : clutch;
++							helper.setBlock(gate.above(), on ? Blocks.REDSTONE_BLOCK.defaultBlockState() : Blocks.AIR.defaultBlockState());
++						}
++					}
++					var drive = (com.simibubi.create.content.kinetics.base.KineticBlockEntity) level.getBlockEntity(helper.absolutePos(gate));
++					var output = (com.simibubi.create.content.kinetics.base.KineticBlockEntity) level.getBlockEntity(helper.absolutePos(gate.east()));
++					System.out.printf(java.util.Locale.ROOT, "CREATE_TRANSMISSION_OVERLOAD,%d,%d,%d,%s,%.0f,%.0f,%.0f,%.0f%n",
++						rig, tick, phase, helper.getBlockState(gate).getValue(powered),
++						drive.getTheoreticalSpeed(), drive.getSpeed(), output.getTheoreticalSpeed(), output.getSpeed());
++				}
++			}
++			if (tick < 13) helper.fail("Waiting for the throttled transmission networks to coast");
++		});
++	}
+ }

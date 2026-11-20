@@ -1,5 +1,5 @@
 use horizon_core::geometry::Direction;
-use horizon_world::level::{LevelAccess, PlacementContext, flags};
+use horizon_world::level::{LevelAccess, PlacementContext, PushReaction, flags};
 use horizon_world::nbt::{Compound, Tag};
 use horizon_world::registry::BlockStateId;
 
@@ -147,6 +147,12 @@ fn assemble(
             if game.native_block_collision(at).is_empty() {
                 break;
             }
+            if speed < 0.0 {
+                let state = game.world.block(at[0], at[1], at[2]);
+                if game.res.behaviours().facts(state).push == PushReaction::Push {
+                    break;
+                }
+            }
             saved_block(game, at, start)?;
             seeds.push(at);
         }
@@ -275,7 +281,13 @@ fn disassemble(
     true
 }
 
-pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity, rpm: f32) {
+pub(super) fn tick(
+    game: &mut Game<'_>,
+    pos: [i32; 3],
+    entity: &mut ModBlockEntity,
+    rpm: f32,
+    distance_limit: Option<f32>,
+) {
     let Some(side) = read_face(game, pos) else {
         return;
     };
@@ -294,6 +306,21 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
         _ => Vec::new(),
     };
     let previous_speed = float(&entity.nbt, "PistonSpeed").unwrap_or(f32::NAN);
+    let previous_ratio = float(&entity.nbt, "SequencedDistanceRatio");
+    let ratio = distance_limit.map(|limit| {
+        if rpm == 0.0 { 0.0 } else { limit / rpm.abs() }
+    });
+    if previous_speed != speed || previous_ratio != ratio {
+        if let Some(limit) = distance_limit {
+            set_float(&mut entity.nbt, "SequencedOffsetLimit", limit);
+            if let Some(ratio) = ratio {
+                set_float(&mut entity.nbt, "SequencedDistanceRatio", ratio);
+            }
+        } else {
+            entity.nbt.remove(&"SequencedOffsetLimit".into());
+            entity.nbt.remove(&"SequencedDistanceRatio".into());
+        }
+    }
     set_float(&mut entity.nbt, "PistonSpeed", speed);
     if blocks.is_empty() {
         if speed != 0.0 && previous_speed != speed {
@@ -311,7 +338,13 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
         let old = float(&entity.nbt, "Offset").unwrap_or_default();
         let range = int(&entity.nbt, "Range").unwrap_or(0) as f32;
         let old_previous = float(&entity.nbt, "PreviousOffset").unwrap_or(old);
-        let mut next = (old + speed).clamp(0.0, range);
+        let limit = float(&entity.nbt, "SequencedOffsetLimit");
+        let step = match limit {
+            Some(remaining) if remaining <= 0.0 => 0.0,
+            Some(remaining) => speed.clamp(-remaining, remaining),
+            None => speed,
+        };
+        let mut next = (old + step).clamp(0.0, range);
         let ahead = position(
             anchor,
             normal,
@@ -326,12 +359,19 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
             next = old.round();
             stopping = true;
         }
+        if let Some(remaining) = limit.filter(|remaining| *remaining > 0.0) {
+            set_float(
+                &mut entity.nbt,
+                "SequencedOffsetLimit",
+                (remaining - (next - old).abs()).max(0.0),
+            );
+        }
         let from = std::array::from_fn(|i| {
             f64::from(anchor[i]) + f64::from(normal[i]) * f64::from(old_previous)
         });
         let at =
             std::array::from_fn(|i| f64::from(anchor[i]) + f64::from(normal[i]) * f64::from(old));
-        let motion = normal.map(|step| f64::from(step) * f64::from(speed));
+        let motion = normal.map(|step| f64::from(step) * f64::from(next - old));
         for block in &blocks {
             let Some(state) = compound(block, "BlockState") else {
                 continue;

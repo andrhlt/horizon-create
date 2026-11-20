@@ -59,9 +59,9 @@ def no_board(control, *, inactive=False):
     control.call("mouse", "right", "up")
 
 
-def configure(control, pos, row, column, *, teleport=True):
+def configure(control, pos, row, column, *, teleport=True, facing="south"):
     x, y, z = pos
-    _, center_y, center_z = SLOT_OFFSETS["south" if pos == HORIZONTAL else "up", "west"]
+    _, center_y, center_z = SLOT_OFFSETS[facing, "west"]
     if teleport:
         control.command(f"/tp @s {x - 2} {y} {z + center_z}")
         control.call("wait", 3)
