@@ -2063,6 +2063,77 @@ control items. Both players applied the blue filter to a Stockpile Switch.
 The [color GameTest patch](tools/java-attribute-filter-color-trace.patch)
 records the original filter decisions.
 
+### APP-2018 filter gameplay baseline
+
+The [Smart Chute GameTest](tools/java-item-filter-chute.patch) ran with Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`, Minecraft 1.21.1, NeoForge
+21.1.219 and JDK 21. It installs each filter through Java's
+`FilteringBehaviour.setFilter` and starts with one item in the source barrel.
+The [captured source and destination counts](fixtures/item-filter-chute-java.csv)
+are exact at GameTest tick 16 after setup. The 20 cases cover positive and
+negative ordinary, deny, nested List, item-tag Attribute, and Package address
+matches, a mixed nested list and the cleared-filter control. An initial
+capture used the Java block's powered default state and transferred
+nothing. The recorded capture explicitly places unpowered Chutes, matching
+player placement.
+
+Build `native-9f42064-558283db0c26` was preserved for `32fb542`, whose native
+and patch trees match the `c1255a0` baseline. It left blank List Filters in
+the source barrel in both the direct and nested sample cases. The fix follows Java's
+`FilterItemStack.of` distinction between a fresh List Filter, which matches
+by item ID under ignore-data matching, and a configured List Filter, which
+tests its contents.
+
+The replay also composes a List Filter from a configured Attribute Filter and
+Package Filter using the held-item editor. It loads the resulting stack data
+into two Smart Chutes. A cold reopen checks that the editor stack, both mounted
+filters, and the idle rejected Apple survive. The active rig holds a Package
+under redstone during startup, then delivers it when unpowered. A new tag
+match verifies operation after reopen. The LAN run uses a survival guest for
+the edit and rejoin. The existing detector replay covers player clicks to
+install and clear filters. The Chute replay seeds its installed filter and
+checks transfer outcomes. Exact packet timing, Java reload behavior, all
+attribute types, deeper nesting, direct Chute and Funnel filter-slot
+interaction, and other consumer combinations remain open.
+
+To recapture Java in a disposable checkout of the pin, apply
+`tools/java-item-filter-chute.patch` and run
+`./gradlew --offline --no-daemon --max-workers=2 runGameTestServer` with an
+isolated Gradle cache. Add the header `case,source,destination` before the
+rows following the `ITEM_FILTER_CHUTE,` prefix in the output.
+
+The patch SHA-256 is
+`fade1de4bc03dcbff852d4bb676644bb3eff4f9a34a37c7d7af4af9732b57275`.
+The exported CSV SHA-256 is
+`c93a92b730c4e4fcb85c85b368b53a7111776d18595232f63b6be5e8e2a930b8`.
+The corrected Java capture took 88 seconds using cached artifacts.
+
+Build with the compatible launcher and private launcher/cache data as described
+in [the worker guide](PARITY-WORKER.md). The Horizon Nightly pin is
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` and the `create.hmod` SHA-256
+is `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+
+The private launcher 0.2.67 build produced `native-9f42064-cd04d5a80e1c` in
+841 seconds. Both Smart Chute runs matched all 20 Java snapshots and completed
+the cold-reopen checks. All 19 selected regressions passed on that build.
+The first two-worker batch took 12 minutes and passed 16 checks. The solo
+Attribute Kinds check and LAN Color check passed serial retries after
+control timeouts. The LAN Attribute Kinds check passed in 61 seconds with
+a headless host and an offscreen guest after offscreen-host control timeouts.
+The host only issues commands in that test. The guest still applies the
+selected filter through player input.
+
+```sh
+sh tools/build-native.sh /path/to/launcher-0.2.67 /path/to/private-launcher-data
+HORIZON_NO_AUDIO=1 HORIZON_NO_DISCORD=1 python3 tools/test-parity.py \
+  /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 \
+  --check 'filter-recipes*' --check 'list-filter-editor*' \
+  --check 'attribute-filter-editor*' --check 'package-filter-editor*' \
+  --check 'attribute-filter-kinds*' --check 'attribute-filter-color*' \
+  --check 'package-address-matching*' --check 'detector-list-filter*' \
+  --check 'attribute-filters' --check 'item-filter-chute*'
+```
+
 
 
 
