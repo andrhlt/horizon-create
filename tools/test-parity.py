@@ -14,6 +14,8 @@ from fixture_world import ROOT
 CHECKS = (
     ("cogwheel", "smoke-cogwheel"),
     ("cogwheel-placement", "test-cogwheel-placement"),
+    ("cogwheel-mining-tags", "test-cogwheel-mining-tags"),
+    ("cogwheel-reopen", "test-cogwheel-reopen"),
     ("cogwheel-rim-assist", "test-cogwheel-rim-assist"),
     ("encased-cogwheel-rim-assist", "test-cogwheel-rim-assist", "--encased"),
     ("brass-cogwheel-casing", "test-brass-cogwheel-casing"),
