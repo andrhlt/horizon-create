@@ -13,6 +13,7 @@ NUM = r"(-?[0-9.Ee+\-]+)"
 VECTOR = rf"\[{NUM}d, {NUM}d, {NUM}d\]"
 IDS = re.compile(r'\bid: "([^"]+)"')
 CROP_AGE = re.compile(r"\bage=(\d+)\b")
+ITEM_COUNT = re.compile(r"Count: (\d+)b")
 
 
 def sample(control):
@@ -67,6 +68,11 @@ def run(args):
             if tick:
                 control.step_to(start+tick)
             actual.append([str(tick), str((start+tick) % 20), *sample(control)])
+        before_reload = inventory_counts(control)
+        control.restart()
+        after_reload = inventory_counts(control)
+        if after_reload != before_reload:
+            raise RuntimeError(f"Harvester output changed across save/reopen: {before_reload} -> {after_reload}")
     output = ROOT / ".local/crop_farming-horizon.csv"
     with output.open("w", newline="") as out:
         writer = csv.writer(out, lineterminator="\n")
@@ -78,6 +84,12 @@ def run(args):
         raise SystemExit(f"crop_farming differed on {len(differences)} ticks. First differences (Java, Horizon) {differences[:4]}. See {output}")
     check_crop_age_boundary(args, expected[0][1])
     print(f"crop_farming matched all {len(actual)} Java ticks. Immature-crop rejection and mature harvesting passed.")
+
+
+def inventory_counts(control):
+    """Return chest-minecart stack counts for loss/duplication checks."""
+    dump = control.command("/data get entity @e[type=minecraft:chest_minecart,limit=1] Items")
+    return sorted(int(value) for value in ITEM_COUNT.findall(dump))
 
 
 def check_crop_age_boundary(args, first_world_time):

@@ -3753,12 +3753,13 @@ Commands, run with isolated headless worlds on the candidate build:
 python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check crop-farming --check ploughing --check contraption-controls
 ```
 
-This is a partial gameplay pass. The current references do not establish
-exact item counts, and these runs do not cover guest collection or actor-specific
-idle and active save/reopen. Those consequential
-multiplayer and persistence gates remain open for APP-2006; all-crop/loot and
-other tool interactions remain nonblocking broader follow-ups. Full 1:1 stays
-Open.
+The crop replay also records every chest-minecart stack count after the
+moving harvest and compares the complete count vector after a world restart;
+the candidate retained the exact vector, with no loss or duplication. This is
+a bounded Horizon persistence/conservation check, not an exact Java reload
+trace. Guest collection and a separate plough active-reopen replay remain
+open; all-crop/loot and other tool interactions remain nonblocking broader
+follow-ups. Full 1:1 stays Open.
 
 ## Windmill Bearing
 
