@@ -231,15 +231,20 @@ def run(args):
                 f"/data get block {path}" for path in watch
             )]
 
-        print(f"Saved dock: {world.clock()}, {dock_status()}", flush=True)
+        saved_dock = dock_status()
+        saved_cargo = observe(world)
+        print(f"Saved dock: {world.clock()}, {saved_dock}", flush=True)
         world.call("save")
         world.restart()
-        print(f"Reopened dock: {world.clock()}, {dock_status()}", flush=True)
-        reopened = observe(world)
-        cargo_conserved(reopened)
+        reopened_dock = dock_status()
+        print(f"Reopened dock: {world.clock()}, {reopened_dock}", flush=True)
+        assert saved_dock[3] == "1b" and reopened_dock[:4] == saved_dock[:4], (
+            "Docked reopen changed the working positions or bearing angle", saved_dock, reopened_dock
+        )
         try:
             wait_for_state(world, lambda s: (
-                min(s[2]) > 4 and s[0][2][PAPER] > reopened[0][2][PAPER] and s[1][1] > reopened[1][1]
+                min(s[2]) > 4 and s[0][2][PAPER] > saved_cargo[0][2][PAPER]
+                and s[1][1] > saved_cargo[1][1]
             ), 16, "Both transfers advanced after docked reopen")
         except AssertionError:
             print(f"Dock after bounded reacquisition: {world.clock()}, {dock_status()}", flush=True)

@@ -4331,8 +4331,9 @@ boundary to their respective fixed receivers.
 - A survival LAN guest operates the bearing lever, observes both fixed
   interfaces extend, and opens the receiving chest. The host reads
   authoritative cargo amounts.
-- A docked save/reopen followed by up to 16 stepped ticks to observe both
-  exchanges advance. Disassembly restores the two moving heads facing east,
+- A docked save/reopen that preserves the working positions and bearing
+  angle, with up to 16 stepped ticks to observe both exchanges advance.
+  Disassembly restores the two moving heads facing east,
   then an idle save/reopen checks both connections closed and the cargo
   unchanged. The balance is 16 paper, eight emeralds and 13,000 mB water
   across the mounted and fixed inventories throughout these phases.
@@ -4347,22 +4348,31 @@ Java traces above. It measures Horizon gameplay persistence and guest
 convergence. Exact Java cold-start and network publication timing for the
 paired rig, and broader layout, speed and automation combinations remain open.
 
-All six checks passed on `native-9f42064-698ea7382493`, built from `e8b3918`
-using launcher 0.2.67 and Create pack SHA-256
-`655718478f03817b343b070bcb7aeb5ff456078bcaeb5a61498e2c5a8b60a248`.
-The solo and LAN fixtures both found valid contact after 66 further ticks,
-filled the mounted tank in 30 ticks, and observed both extraction paths
-within nine ticks of reversal. Both transfers advanced four ticks after the
-first solo reopen observation and five ticks after the first reopen
-observation in the LAN case. The guest disconnected before the host reopened
-that save. Both idle reopens retained the cargo and orientation of all four
-ports. The original extraction and drain matched all 253 and 65 Java
-samples. The LAN fluid and idle item comparator checks matched all 71 and
-141 samples, including release and retraction.
+The six cases initially passed on `native-9f42064-698ea7382493`. The
+integration build `native-9f42064-645e120d2506` reproduced an active reopen
+failure in both paired cases. The saved chunks still contained both working
+positions, the bearing angle and stall, and both receiver timers. A frozen
+startup retained that state and the first four stepped ticks maintained it.
+Ordinary startup could tick the bearing before the receiver chunk was
+available and clear the dock. A stationary bearing now preserves its saved
+working positions and any actor stall while the receiver chunk loads. Once a
+valid receiver is available, the bearing reconnects if the saved owner or
+last contact is stale.
 
-An earlier diagnostic on `native-9f42064-340cbe866fa7` lost both docks
-during an active reopen. The same short LAN timing probe passed on
-`698ea7382493`, alongside the two standard paired cases.
+All six checks passed on `native-9f42064-48b8f8ede99a`, built on main
+`86baa97` with launcher 0.2.67 and Create pack SHA-256
+`85c5cd1eb79740f2bba2a8e0f30a9c213ea49e7fbb51621bb1310cdbe9b65645`.
+The fixed client also loaded a copy of the exact failing save and exchanged
+both resources at the original bearing angle. Both paired fixtures found
+valid contact after 66 further ticks, filled the mounted tank in 30 ticks,
+and observed both extraction paths within nine ticks of reversal. Their
+docked reopens kept both working positions and the original bearing angle.
+Both transfers had advanced at the first solo observation and within three
+additional steps after the first LAN observation. The guest disconnected
+before the host reopened that save. Both idle reopens retained the cargo and
+orientation of all four ports. The original extraction and drain matched all
+253 and 65 Java samples. The LAN fluid and idle item comparator checks
+matched all 71 and 141 samples, including release and retraction.
 
 ```sh
 python3 tools/test-parity.py CTL CLIENT RESOURCES --jobs 2 \
