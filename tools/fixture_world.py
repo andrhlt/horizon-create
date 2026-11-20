@@ -50,7 +50,8 @@ def last_command_message(record):
 
 
 @contextmanager
-def fixture_world(args, world, template=None, *, render=False, env=None, pack=None, terrain_seed=None):
+def fixture_world(args, world, template=None, *, render=False, env=None, pack=None, terrain_seed=None,
+                  artifact_dir=None):
     with tempfile.TemporaryDirectory(prefix="hc-fixture-") as tmp:
         scratch = Path(tmp)
         socket = scratch / "ctl.sock"
@@ -76,8 +77,9 @@ def fixture_world(args, world, template=None, *, render=False, env=None, pack=No
                 control.stop()
             log = scratch / "ctl.log"
             if log.exists():
-                (ROOT / ".local").mkdir(exist_ok=True)
-                copy2(log, ROOT / f".local/horizon-{world.lower()}.log")
+                artifacts = artifact_dir or ROOT / ".local"
+                artifacts.mkdir(parents=True, exist_ok=True)
+                copy2(log, artifacts / f"horizon-{world.lower()}.log")
 
 
 class FixtureWorld:
