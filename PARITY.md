@@ -818,8 +818,125 @@ python3 tools/test-multiplayer-hand-crank.py /path/to/horizon-ctl /path/to/horiz
 python3 tools/test-hand-crank-motor.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
 
-Sound playback timing, specialized adjacent shaft types, equal-speed and slower
-generators, and the Extendo Grip exemption remain to be compared.
+The [Java GameTest capture](tools/java-hand-crank-edges-trace.patch) ran on
+Create `ac0c444d9828da3453ae8cc65338e8de063286fb` with Java 21. Applying the
+patch to a clean checkout and running `./gradlew --offline runGameTestServer`
+passes all 21 required tests (five edge tests and 16 matrix cases). The patch
+SHA-256 is `fd64c9c045cd6244ae49240735cf94b516589144bcd18f37d38346083887a8d2`.
+The capture verifies the empty-food interaction, although the GameTest mock
+player does not report the advancement through its tracker; delivery remains
+source-verified rather than claimed as a Java runtime check. Copy the CSV
+fields from the `CREATE_HAND_CRANK_EDGE_PLACEMENT`,
+`CREATE_HAND_CRANK_EDGE_GRIP`, `CREATE_HAND_CRANK_EDGE_MOTOR`, and
+`CREATE_HAND_CRANK_MATRIX` records into their respective fixtures.
+
+- [Eight placement cases](fixtures/hand-crank-placement-java.csv) cover both
+  axial ends of a Brass Encased Cogwheel, active and perpendicular stressometer
+  axes, sneaking, and a second shaft on a conflicting axis. The Horizon baseline
+  missed both exposed cog ends and the active gauge axis, and aligned with the
+  regular shaft in the conflicting-axis case.
+- [Three survival uses](fixtures/hand-crank-grip-java.csv) record the active
+  timer, RPM, exhaustion change, and grip damage. The main-hand Extendo Grip
+  prevents 0.32 exhaustion and uses zero durability. The empty and offhand-only
+  cases charge 0.32. The Horizon baseline charged all three.
+- [Two motor rigs](fixtures/hand-crank-edges-motor-java.csv) record ticks 0–28,
+  with strokes after samples 4, 9, and 16. The replay compares ticks 1–28 after
+  kinetic initialization. When reversed against a 32 RPM motor, Java breaks
+  the crank and drops one item at tick 17. The Horizon baseline instead ran the
+  intact crank at −32 RPM. With a 16 RPM motor, both engines accepted the
+  reversal. Java returned to +16 RPM and 262144 SU at tick 26, one tick ahead of
+  the Horizon baseline shaft.
+
+### Measured Hand Crank motor matrix, November 19 2026
+
+The expanded [Java capture](fixtures/hand-crank-matrix-java.csv) adds 16
+deduplicated rigs: stopped, 31/32/33/64 RPM, opposing 32 RPM, speed and sign
+changes before and during use, Wrench-held normal and sneaking use, and all six
+crank facings.
+Each capture includes ticks 0–28; Horizon is compared at ticks 1–28 after
+kinetic initialization (448 tick comparisons). Fields include motor setting
+and existence, crank existence/timer/direction/RPM, shaft and network RPM,
+capacity, stress, overload, and crank/motor drops. Strokes occur at ticks 4, 9,
+and 16; speed and sign changes occur at tick 2 (before use) or tick 7 (during
+use). The Wrench is neither an `IWrenchable` crank nor in Create's
+`wrench_pickup` tag, so both normal and sneaking Wrench uses continue to crank
+the block instead of rotating or removing it. The Java captures show two
+distinct source-conflict paths: an idle crank
+trying to join an oppositely rotating network breaks even against a slower
+source, while a crank already driving the network can reverse against a slower
+31 RPM motor. Changing the attached weaker motor from +16 to −16 during crank
+use instead breaks and drops the motor; when the crank expires, the shaft stops.
+
+The first captures exposed three gameplay gaps: opposing-generator behavior on
+first crank use, motor sign changes against an active crank, and Creative Motor
+loot-table normalization. All three now follow the captured Java behavior.
+An initial overbroad fix also broke the valid reversal against a slower motor;
+the capture distinguished an idle crank joining a network from an active crank
+reversing its own network. The refined rule passed all 448 final observations.
+The Java capture patch is
+[`tools/java-hand-crank-edges-trace.patch`](tools/java-hand-crank-edges-trace.patch)
+(SHA-256 `fd64c9c045cd6244ae49240735cf94b516589144bcd18f37d38346083887a8d2`);
+the matrix CSV SHA-256 is
+`63b534639ddabc6b3265ef63ae258f85b5caa21542679dd7d4d80a6d2a9af342`.
+Java revision remains `ac0c444d9828da3453ae8cc65338e8de063286fb`; all 21
+required Java GameTests passed. The final rebuilt Horizon verification used build
+`native-9f42064-7f4d88c9778e`, client SHA-256
+`bdc37f62b0eba075233a3db5ba80695d34a257156708361430ed514edc8435df`,
+ctl SHA-256 `1cca267a26d8e85ed00e7fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`,
+and prepared pack SHA-256
+`d907f9a6dc2129d83bad5eab4ef80e713ad4d8308841ca1f9946198fbb50bd04`.
+The fresh rebuild's bounded batch passed 11/12 checks on its parallel first
+run; its sole gauge-facing placement mismatch passed when rerun in isolation on
+the same build. Thus each of the 12 selected checks passed, including crank,
+equal/slower/faster motor behavior, multiplayer, persistence, grip, placement,
+and neighboring shaft/cogwheel/valve placement. The bounded LAN rerun passed: the
+host drove +32 RPM and a survival guest reversed the authoritative shaft to
+−32 RPM; guest convergence is checked, not Java packet-arrival timing. The
+expanded persistence rerun passed both idle and active setups: idle crank state
+and zero-speed network survived reopen; the active save retained its attached
+16 RPM motor and, after the crank stroke naturally ended during cold startup, the
+connected shaft resumed at +16 RPM. Exact Java active-timer reload parity remains
+unverified. Nonvisual matrix, placement, motor, LAN and persistence runs use
+`--headless`; only the motor-setting UI and rendered animation comparison use
+isolated offscreen clients. Shared code touched here includes `native/machines.rs`
+and motor loot/settings support used by [APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and)
+and [APP-1950](https://linear.app/appstu/issue/APP-1950/create-full-parity-creative-motor); this PR records the crank-facing source conflict coverage and the focused checks run.
+
+The final source comment clarifying the stopped-versus-active conflict rule
+forced a fresh incremental build with `tools/build-native.sh`: 97 seconds, build
+`native-9f42064-7f4d88c9778e`. The bounded crank/regression batch took about
+three minutes plus the isolated placement rerun.
+
+Measured workflow elapsed about 135 minutes from the workflow comment to the
+latest Wrench-case regression run: Java/source inspection and capture setup
+about 9 minutes; implementation and repair about 63 minutes; native builds
+about 16 minutes;
+pack preparation under a minute; fast standalone logic comparisons 0 minutes
+(the matrix runs production Horizon to include its engine/network path); Horizon
+solo matrix and focused comparisons about 27 minutes; host/guest integration
+and focused regressions about 6 minutes; harness/environment debugging about
+10 minutes. Durations are rounded from recorded command runs and wall clock.
+Full-family parity stays open: exact animation/sound timing and remaining
+applicable placement, generator-layout, manual-break/drop, and action/presentation
+combinations still need evidence. Wrench behavior is covered: Java does not mark the
+Hand Crank as wrenchable, so ordinary and sneaking wrench use cranks it.
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-7f4d88c9778e/horizon-ctl .local/patched-launcher/versions/native-9f42064-7f4d88c9778e/horizon-client /Users/andrewholt/dev/horizon-create/.local/baselines/2026-11-19-pre-mechanical-piston-b2405826c686/build/.local/horizon-client/26.3 --jobs 2 --check hand-crank --check 'hand-crank-*' --check cogwheel-placement --check shaft-placement --check copper-valve-handle-placement
+```
+
+These cases use exact comparison for placement,
+mounted state, countdown, and item counts, with an absolute tolerance of
+0.00002 for floating-point fields.
+The persistence check compares an idle reopen and an active connected setup. The
+active crank’s ten-tick stroke may finish during cold launcher startup; the
+reopened motor setting and resumed connected shaft operation are verified, while
+exact active-timer reload parity remains unverified.
+
+Sound timing remains open. Java requests the layers from each client's crank
+block-entity tick before decrementing its active timer, using the local animation
+clock. Horizon requests them from the server's world clock. A client-side timing
+comparison and additional shaft types and generator layouts remain open.
 
 ## Flywheel
 

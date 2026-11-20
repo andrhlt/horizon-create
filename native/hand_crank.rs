@@ -8,6 +8,7 @@ use horizon_world::registry::BlockStateId;
 use crate::containers::ModBlockEntity;
 use horizon_client::first_person::Hand;
 
+use super::create_extendo_grip_wear::GRIP;
 use super::create_fan::facing;
 use super::create_machines::{crank_input_rpm, float, int, reading, set_float};
 use super::native_block_entity_draw::BlockEntityDraw;
@@ -63,6 +64,22 @@ pub(super) fn preferred_in_directions(
             | "create:clutch"
             | super::create_speed_controller::CONTROLLER
             | "create:rope_pulley" => name("axis") == Some(axis_value),
+            "create:speedometer" | "create:stressometer" => {
+                name("facing").and_then(|face| {
+                    super::create_machines::gauge_axis(
+                        face,
+                        name("axis_along_first") == Some("true"),
+                    )
+                }) == Some(axis)
+            }
+            block if super::create_cogwheel::encased_size(block).is_some() => {
+                let shaft = if delta[axis] < 0 {
+                    "top_shaft"
+                } else {
+                    "bottom_shaft"
+                };
+                name("axis") == Some(axis_value) && name(shaft) == Some("true")
+            }
             super::create_sequencer::SEQUENCER => {
                 if name("vertical") == Some("true") {
                     axis == 1
@@ -71,7 +88,9 @@ pub(super) fn preferred_in_directions(
                 }
             }
             "create:creative_motor" => neighbor_facing == Some(direction.opposite()),
-            CRANK | "create:encased_fan" | "create:mechanical_bearing" => neighbor_facing == Some(direction),
+            CRANK | "create:encased_fan" | "create:mechanical_bearing" => {
+                neighbor_facing == Some(direction)
+            }
             name if super::create_valve::is_handle(name) => neighbor_facing == Some(direction),
             "create:water_wheel" => neighbor_facing.is_some_and(|face| face.normal()[axis] != 0),
             "create:gearbox" => name("axis").is_some_and(|value| value != axis_value),
@@ -107,28 +126,40 @@ pub(super) fn click(game: &mut Game<'_>, pos: [i32; 3]) -> bool {
         return true;
     }
     let backwards = game.native_sneaking();
-    let changed_rotation = game.native_with_mod_block_entity(pos, |crank| {
-        let previous = int(&crank.nbt, "Backwards") == Some(1);
-        let stopped = int(&crank.nbt, "InUse").unwrap_or(0) == 0;
-        crank.nbt.insert("InUse".into(), Tag::Int(USE_TICKS));
-        crank
-            .nbt
-            .insert("Backwards".into(), Tag::Byte(i8::from(backwards)));
-        stopped || previous != backwards
-    });
-    if changed_rotation == Some(true)
-        && let Some(face) = facing(game, game.world.block(pos[0], pos[1], pos[2]))
-    {
-        // A faster source drives the crank. Java breaks the crank if it
-        // tries to turn against that source.
+    let (was_stopped, changed_rotation) = game
+        .native_with_mod_block_entity(pos, |crank| {
+            let previous = int(&crank.nbt, "Backwards") == Some(1);
+            let stopped = int(&crank.nbt, "InUse").unwrap_or(0) == 0;
+            crank.nbt.insert("InUse".into(), Tag::Int(USE_TICKS));
+            crank
+                .nbt
+                .insert("Backwards".into(), Tag::Byte(i8::from(backwards)));
+            (stopped, stopped || previous != backwards)
+        })
+        .unwrap_or((true, false));
+    if changed_rotation && let Some(face) = facing(game, game.world.block(pos[0], pos[1], pos[2])) {
+        // A stopped crank's first click joins the existing network, so even a
+        // slower opposing source rejects it. Once driving, it can reverse a
+        // slower source, but an equal or faster opposing source breaks it.
         let external = crank_input_rpm(game, pos);
         let negative_face = matches!(face, Direction::Down | Direction::West | Direction::North);
-        if external.abs() > RPM && (external < 0.0) != (backwards ^ negative_face) {
+        let opposing = external != 0.0 && (external < 0.0) != (backwards ^ negative_face);
+        if opposing && (was_stopped || external.abs() >= RPM) {
             game.native_machine_destroy_block(pos, None, false);
         }
     }
-    if let Some(player) = game.player.as_mut() {
+    if !game.held().is_some_and(|stack| stack.item.as_ref() == GRIP)
+        && let Some(player) = game.player.as_mut()
+    {
         player.cause_food_exhaustion(RPM * 0.01);
+    }
+    if game
+        .player
+        .as_ref()
+        .is_some_and(|player| player.health.food.food == 0)
+    {
+        let player = game.native_acting_id();
+        game.native_trigger_criterion(player, "create:hand_crank_000_builtin", |_| true);
     }
     game.swing_arm();
     true
