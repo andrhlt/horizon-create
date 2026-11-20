@@ -2045,6 +2045,37 @@ throw owner. Level contact also moved the Package before its travel step.
 The separated control kept its owner and pose. Multiple simultaneous
 contacts and player-side interpolation still need checks.
 
+## APP-2020: Cardboard packages and rare variants
+
+The bounded gameplay baseline reuses the package captures above and the
+independent Cardboard prerequisite completed by APP-2019. The finite cases
+and outcomes are:
+
+| Case | Evidence and result |
+| --- | --- |
+| Normal and representative rare opening; exact item contents | [`package-open`](tools/test-package-open.py) and [`package-open-lan`](tools/test-package-open.py) match seven Java openings in host and guest roles. Java row 3 opens a `rare_creeper_package` containing four apples; the suite compares exact inventory and overflow, package consumption, and pig spawning. |
+| Rare form survival and world conversion | [`package-placement`](tools/test-package-placement.py) covers rare Creeper and Vector forms with six-face placement and pickup. [`package-drop-rare`](tools/test-package-drop.py) and its LAN case verify rare Creeper drop conversion and cargo preservation. The supported rare entity also retains UUID, pose, address and contents through the captured save/reopen case above. |
+| Address assignment/edit and matching | [`package-filter-editor`](tools/test-package-filter-editor.py) matches seven Java saves, reopen, blank/reset behavior and the 25-character limit for host and guest. [`package-address-matching`](tools/test-package-address-matching.py) matches 40 Java cases across all 14 package forms, with 120 inventory/component/fluid readings per role. |
+| Throw and pickup | [`package-charge`](tools/test-package-throw.py) matches 12 Java charge cases in solo and LAN; [`package-flight`](tools/test-package-throw.py) matches 13 unlanded frames. Placement checks include blocked overlaps and empty-hand pickup. |
+| Collision and damage control | [`package-damage`](tools/test-package-destruction.py) matches nine Java damage cases and kill behavior in solo and LAN. The selected vertical-contact, player-contact and stack cases cover representative collision boundaries. |
+| Guest custody and persistence | Opening, damage, placement and drop checks run with a live guest. The extended [`package-stack-reopen`](tools/test-package-stack.py) check saves two stacked packages with distinct addresses and cargo, then verifies both exact item components, entity count, positions and absence of duplicate loose items after cold reopen. |
+
+The Packager's rare selection rule is source-aligned: Java chooses the rare
+pool on one `nextInt(7500) == 0` result, and `native/packager.rs` uses the
+same 1-in-7,500 branch with all ten rare IDs. The bounded captures exercise a
+rare package's opening, placement and drop paths; they do not claim a sampled
+end-to-end Packager rare roll. Exact rare presentation and wider collision
+geometry remain follow-ups. The extended reopen check passed 25 Java-aligned
+stacking frames plus ten post-reopen ticks on
+`native-9f42064-daabfba12364`; controller SHA-256 is
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`, client
+SHA-256 is `ee0d1744b4d6817e5087ccac64fea054127f28c38a7d9c4b4c70d2561d6dff84`,
+and the matching pack SHA-256 is
+`7ea5f1ceb3e9fe8fca602aa24b64877f0b8e3da9f043caa04fbf45353483f7f5`.
+The command was `python3 tools/test-package-stack.py <horizon-ctl> <horizon-client>
+<prepared-26.3> --reopen --pack .local/exact-builds/stack-disguise-train.4eMBqP/create.hmod`.
+These representative results do not close Full 1:1.
+
 The [Packager replay](tools/test-packager-redstone.py) matched all
 [67 Java ticks](fixtures/packager-redstone-java.csv) in solo and with a live
 LAN operator on `15dc7ec61901`. The first pulse packs from an attached
