@@ -30,6 +30,12 @@ def check(cat):
     assert iron, cat
     assert any(o["chance"] == 1 and o["min"] == 1 and o["max"] == 1
                for r in iron for o in r["outputs"] if o["stack"]["item"] == "create:iron_sheet"), iron
+    for ingot, sheet in (
+        ("minecraft:gold_ingot", "create:golden_sheet"),
+        ("minecraft:copper_ingot", "create:copper_sheet"),
+    ):
+        recipes = matching(cat, ingot, sheet)
+        assert recipes, f"Missing pressing route {ingot} -> {sheet}: {cat}"
     chance = matching(cat, "minecraft:diamond", "minecraft:gold_ingot")
     assert any(o["chance"] == 0.5 and o["min"] == 2 and o["max"] == 2
                for r in chance for o in r["outputs"] if o["stack"]["item"] == "minecraft:gold_ingot"), chance
