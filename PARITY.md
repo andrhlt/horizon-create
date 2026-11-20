@@ -92,6 +92,49 @@ on the original 7f build with the archived original pack and on d542
 with the new pack. The pinned Java probe also passed the upstream
 barrel assertion. The original run’s failure remains in its raw log.
 
+## APP-1990 Spout source audit
+
+The pinned source checkout at `ac0c444d9828da3453ae8cc65338e8de063286fb`
+was reviewed read-only. `SpoutBlockEntity.onItemReceived` and
+`whenItemHeld` define the empty-tank, incompatible-input, and fluid-shortage
+decisions; the held-item callback starts a 20-tick cycle and fills at remaining
+tick 5. `SpoutBlockEntity.tick` advances that timer independently of kinetic
+speed, while belt `whenItemHeld`/held-item processing is what delivers the
+completed bottle after movement resumes. The Horizon paths in
+`native/spout.rs`, `native/belt.rs`, `native/depot.rs`, and `native/ejector.rs`
+were checked against those rules.
+The Horizon paths in `native/spout.rs`, `native/belt.rs`, `native/depot.rs`,
+and `native/ejector.rs` were checked against those rules. No reproducible
+behavior mismatch was established, so this source audit made no runtime logic
+change.
+
+The existing bottle, potion-crafting, nine-lane spouting, and Blaze Cake
+fixtures passed on isolated build `native-9f42064-6a3da367a9bb`; potion crafting,
+nine-lane spouting, and Blaze Cake are the full archived replay checks, while
+the bottle check passed its factory assertion. New isolated harnesses are
+registered as `spout-lan-feed-collect`, `spout-output-backpressure`,
+`spout-input-timing-boundaries`, and `spout-reopen` in `tools/test-parity.py`.
+The boundary case checks a 249 mB shortage against a 250 mB water-bottle
+requirement and passes cobblestone through. It then removes belt RPM after a
+valid bottle is held: the independent Spout timer reaches -1 while the bottle
+stays centered and 250 mB remains; restoring RPM invokes the held-item callback
+and produces exactly one output while consuming 250 mB. These are
+source-aligned checks, not Java tick traces. LAN feed/collection, output
+backpressure, and idle/partway save/reopen cover the remaining ticket gates.
+
+Run the new cases together with the existing Java replays using:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 \
+  --check water-filling-bottle --check spout-crafting --check spouting \
+  --check spout-lan-feed-collect --check spout-output-backpressure \
+  --check spout-input-timing-boundaries --check spout-reopen
+```
+
+The zero-RPM timing gate intentionally distinguishes the Spout machine tick
+from belt-held-item processing: timer completion alone does not fill the bottle
+until belt movement resumes.
+
 ## Freestanding paired doors
 
 The [pinned GameTest](tools/java-world-paired-doors.patch) recorded 24
