@@ -3656,6 +3656,41 @@ replay captures the original rotating head and break effects. Moving
 contraptions, cobblestone generator optimization, entity damage and
 exact sound or visual timing still need comparison.
 
+### APP-1983 bounded gameplay baseline (partial)
+
+On 2026-11-20, the stationary replay was rerun from the APP-1983 worktree
+against the pinned Java tick fixture. All 93 sampled ticks matched RPM, break
+progress, retry delay, target block and collected drops; this includes stone
+and dirt breaking, the bedrock control, power stop/resume and the neighboring-
+block retry. The existing placement replay also passed its two player cases:
+shaft-oriented placement and waterlogged source-water placement. Existing
+survival-crafting evidence records production of one Mechanical Drill from
+its original recipe. These results retain the scope of the stationary fixture
+and do not establish moving behavior.
+
+Runtime identity for the fresh replays: Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client build
+`native-9f42064-6bdf8691aa42` (client SHA-256
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`),
+pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`,
+and prepared Minecraft 26.3 resources from the same evidence directory.
+Commands were `python3 tools/test-mechanical-drill.py --visual ... --pack ...`
+and `python3 tools/test-mechanical-drill.py --configure ... --pack ...` with
+that build's `horizon-ctl`, `horizon-client`, and prepared resources. The
+initial sandboxed launch could not create its temporary control socket; the
+same isolated checks passed when rerun with local socket access.
+
+The bounded acceptance gates for APP-1983 remain incomplete. Source review of
+the pinned `DrillMovementBehaviour` and this port's `native/drill.rs` confirms
+that the port currently ticks only a stationary block entity; no moving drill
+actor callback mines blocks on a contraption. That is the required straight-
+line mounted-mining case and remains a gameplay blocker. Guest operation and
+idle/active save-reopen are also not established by the stationary replay.
+Do not treat the 93-tick result as a family gameplay pass; Full 1:1 remains
+Open. Moving contraptions, multiplayer convergence and save/reopen need
+follow-up evidence after the movement path is implemented.
+
 ```sh
 python3 tools/test-mechanical-drill.py --visual /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-mechanical-drill.py --configure /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
