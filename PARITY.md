@@ -6072,8 +6072,10 @@ impulse at the scan tick. The guest observed item movement and removal.
 The final isolated solo and LAN replays on `native-9f42064-2765e8093db7` saved
 and reopened a placed Nozzle with its aligned Fan, matched all seven item
 cases and push/pull zombie impulses, and verified host/guest item receipt and
-removal. The LAN guest player check also verified push/pull displacement. The
-player path uses synchronized Fan network speed, a six-tick acquisition
+removal. Solo and LAN player checks verify push/pull displacement for both the
+host and the guest, then remove the Fan and verify no new signed player
+acceleration is added (residual movement is allowed). The player path uses
+synchronized Fan network speed, a six-tick acquisition
 counter, Java's crouch/creative-flight exclusions, and the Nozzle visibility
 ray. Because Horizon reconstructs guest velocity from client-known movement,
 the server preserves the authoritative impulse by advancing the guest's

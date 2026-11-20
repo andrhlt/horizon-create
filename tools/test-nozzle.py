@@ -230,7 +230,7 @@ def airflow(host, actor, player):
             host.step_to(start + tick)
         if rpm:
             assert speed(host, fan) == rpm, (name, speed(host, fan), rpm)
-        check_player = actor is not host and name in ("push", "pull")
+        check_player = name in ("push", "pull")
         if check_player:
             mob_x = center[0] + distance
             host.commands(("/fill 13 171 19 16 171 21 minecraft:stone",
@@ -295,6 +295,17 @@ def airflow(host, actor, player):
             delta_x = player_after["position"][0] - player_before["position"][0]
             assert delta_x * expected_x > 0 and abs(delta_x) >= abs(expected_x) * .25, (
                 name, player_before, player_after, expected_x)
+            stop_before = player_after
+            host.command(f"/setblock {xyz(fan)} minecraft:air")
+            previous_velocity = stop_before["velocity"][0]
+            for _ in range(6):
+                host.step_to(host.clock() + 1)
+                stopped = actor.call("state")["player"]
+                velocity_delta = stopped["velocity"][0] - previous_velocity
+                assert velocity_delta * expected_x < abs(expected_x) * .25, (
+                    name, stop_before, stopped, expected_x)
+                previous_velocity = stopped["velocity"][0]
+            print(f"{name}: player airflow stopped without a new impulse after Fan removal.", flush=True)
         host.command(f"/kill {ITEM}")
         if check_mob:
             host.command(f"/kill {MOB}")
