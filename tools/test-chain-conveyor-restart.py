@@ -21,7 +21,11 @@ def run(args):
     edge = chain.WHEELS[args.scenario]
     b = tuple(x + delta for x, delta in zip(A, edge))
     motor = (8, 101, -10)
-    saved = expected[0]
+    # Horizon needs one tick after changing the motor value to publish its new
+    # RPM. That tick also advances the conveyor's transient reversal state, so
+    # the rising case starts at Java tick 0 rather than the pre-tick tick -1.
+    first_sample = 1 if args.scenario == "rising_reversal" else 0
+    saved = expected[first_sample]
     with fixture_world(args, f"ChainRestart-{args.scenario}", pack=args.pack) as world:
         chain.setup(world, A, b, motor, (17, 100, -10), edge, True)
         if args.scenario == "rising_reversal":
@@ -40,7 +44,7 @@ def run(args):
         # The original Java server's first observation is its first loaded
         # tick. Its blocks have deserialized but its conveyor states have not
         # advanced yet. Match that state while the reopened Horizon is frozen.
-        for sample in expected[1:]:
+        for sample in expected[first_sample + 1:]:
             tick = int(sample["tick"])
             if tick:
                 world.step_to(clock + tick)
