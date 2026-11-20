@@ -2454,8 +2454,8 @@ adds the signed Clipboard actions above:
   bounded controller suite, APP-1943 source-conflict check and selected neighbor
   regressions passed 21/21. This build includes the APP-1943 merge and the
   shared Wrench changes from main through `716e57e`; checks used this build's
-  `horizon-client` and resource directory. The compatible-launcher rebuild took
-  8m00s (incremental). Test outputs are retained in `.local/parity/`.
+  `horizon-client` and resource directory. The compatible-launcher rebuild
+  took 8m00s (incremental). Test outputs are retained in `.local/parity/`.
 
 The formerly blocking shared-network mismatch from
 [APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and)
