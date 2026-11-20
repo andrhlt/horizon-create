@@ -600,6 +600,7 @@ CHECKS = (
     ("dispensers-dont-fight", "test-gantry-dispensers", "dispensers_dont_fight"),
     ("dispensers-refill", "test-gantry-dispensers", "dispensers_refill"),
     ("gantry-lan-reload", "test-multiplayer-gantry", "--pack", str(ROOT / ".local/create.hmod")),
+    ("mounted-drill-gantry-lan-reload", "test-multiplayer-gantry", "--drill", "--pack", str(ROOT / ".local/create.hmod")),
     ("roller-filling", "test-rollers", "roller_filling"),
     ("roller-paving-and-clearing", "test-rollers", "roller_paving_and_clearing"),
     ("vaults-protect-fuel", "test-vault-fuel"),
