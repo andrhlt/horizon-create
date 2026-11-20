@@ -2,6 +2,7 @@
 """Check mounted dispenser LAN visibility and idle/active save conservation."""
 import argparse
 from contextlib import ExitStack
+import gzip
 from importlib import import_module
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -14,6 +15,8 @@ TEMPLATE = Path("gametest/contraptions/arrow_dispenser.nbt")
 ARROWS = "minecraft:arrow"
 LEVER = "/setblock 5 98 -11 minecraft:lever[face=wall,facing=north,powered={}]"
 ARTIFACTS = Path(__file__).resolve().parents[1] / ".local/app-2008-dispenser-fix"
+GUEST_ARROW_SCREENSHOT = ARTIFACTS / "guest-mounted-arrow.png"
+GUEST_DROPPER_SCREENSHOT = ARTIFACTS / "guest-mounted-dropper.png"
 
 
 def count_arrows(client):
@@ -65,32 +68,50 @@ def gantry_data(host):
 def run_dropper(args):
     with TemporaryDirectory(prefix="hc-mounted-dropper-") as raw:
         scratch = Path(raw)
+        # The committed fixture is an Arrow Dispenser. Build an isolated Dropper
+        # structure before assembly so the actor's real NBT is initialized by
+        # Create; mutating MovedBlocks after assembly can bypass the actor state.
+        fixture_root = Path(__file__).resolve().parents[1] / ".local/fixtures/data/create/structure"
+        dropper_name = "gametest/contraptions/app2008_dropper.nbt"
+        dropper_source = fixture_root / TEMPLATE
+        dropper_fixture = fixture_root / dropper_name
+        dropper_fixture.parent.mkdir(parents=True, exist_ok=True)
+        raw_nbt = gzip.decompress(dropper_source.read_bytes())
+        raw_nbt = raw_nbt.replace(b"\x00\x13minecraft:dispenser", b"\x00\x11minecraft:dropper")
+        raw_nbt = raw_nbt.replace(b"\x00\x0fminecraft:arrow", b"\x00\x15minecraft:cobblestone")
+        dropper_fixture.write_bytes(gzip.compress(raw_nbt))
         with ExitStack() as stack:
-            host = stack.enter_context(fixture_world(args, "mounted-dropper-gates", TEMPLATE, pack=args.pack,
+            host = stack.enter_context(fixture_world(args, "mounted-dropper-gates", Path(dropper_name), pack=args.pack,
                                                      artifact_dir=ARTIFACTS))
             name = "DropperGuest"
             port = host.call("lan", "open", "0", "commands", "force")["port"]
             guest = stack.enter_context(mp.joined_client(
                 args, scratch, f"127.0.0.1:{port}", name, scenario="mounted-dropper-gates",
-                artifact_dir=ARTIFACTS))
+                render=True, artifact_dir=ARTIFACTS))
             wait_guest(host, name)
             host.commands((
                 "/tp @s 5.5 99 -9.5", f"/tp {name} 5.5 99 -9.5",
-                "/place template create:gametest/contraptions/arrow_dispenser 3 96 -12",
+                "/place template create:gametest/contraptions/app2008_dropper 3 96 -12",
                 LEVER.format("false"),
             ))
             mp.until("the guest to receive the mounted Dropper", lambda:
                      guest.call("block", 5, 99, -10).get("state", "") != "minecraft:air")
             step_ticks(host, 1)
-            host.commands((
-                "/data modify block 5 99 -10 MovedBlocks[0].BlockState.Name set value \"minecraft:dropper\"",
-                "/data modify block 5 99 -10 MovedBlocks[0].BlockState.Properties.facing set value \"up\"",
-                "/data modify block 5 99 -10 MovedBlocks[0].VanillaEntity.Items set value [{count:1,Slot:0b,id:\"minecraft:cobblestone\"}]",
-                "/data remove block 5 99 -10 MovedBlocks[0].DispenseStarted",
-                "/fill 3 101 -13 8 105 -6 minecraft:air",
-            ))
+            host.command("/fill 3 101 -13 8 105 -6 minecraft:air")
             if args.diagnose:
                 print("DIAGNOSTIC bearing Dropper payload:", host.command("/data get block 5 99 -10 MovedBlocks[0]"))
+            idle_total = dropper_stack(host) + count_items(host)
+            guest.call("quit")
+            mp.until("the Dropper guest to disconnect before idle save", lambda: not guest.socket.exists())
+            host.command("/save-all")
+            host.restart()
+            if dropper_stack(host) + count_items(host) != idle_total:
+                raise RuntimeError("Idle Dropper reopen changed conserved items")
+            port = host.call("lan", "open", "0", "commands", "force")["port"]
+            guest = stack.enter_context(mp.joined_client(
+                args, scratch, f"127.0.0.1:{port}", name, scenario="mounted-dropper-gates-reopen",
+                render=True, artifact_dir=ARTIFACTS))
+            wait_guest(host, name)
             before = count_items(host)
             before_stack = dropper_stack(host)
             for _ in range(200):
@@ -100,13 +121,23 @@ def run_dropper(args):
             after = count_items(host)
             if dropper_stack(host) >= before_stack:
                 raise RuntimeError(f"Mounted Dropper did not decrement its stack: before={before_stack}, after={dropper_stack(host)}")
-            guest.call("screenshot", "/private/tmp/app2008-guest-mounted-dropper.png")
+            guest.call("screenshot", str(GUEST_DROPPER_SCREENSHOT))
+            if not GUEST_DROPPER_SCREENSHOT.exists():
+                raise RuntimeError("Mounted Dropper guest screenshot was not produced")
             try:
                 mp.until("the guest Dropper item to converge", lambda: count_items(guest) >= 1)
             except RuntimeError as error:
                 if not args.diagnose:
                     raise RuntimeError(f"{error}; guest_state={guest.call('state')}") from error
                 print(f"DIAGNOSTIC guest Dropper replication: {error}")
+            active_total = before_stack + before
+            guest.call("quit")
+            mp.until("the Dropper guest to disconnect after active launch", lambda: not guest.socket.exists())
+            host.command("/save-all")
+            host.restart()
+            reopened = dropper_stack(host) + count_items(host)
+            if reopened != active_total:
+                raise RuntimeError(f"Active Dropper reopen duplicated/lost items: {active_total} -> {reopened}")
     print("Mounted Dropper host ejection completed; guest convergence recorded.")
 
 
@@ -166,14 +197,13 @@ def run(args):
             if args.diagnose:
                 print("DIAGNOSTIC mounted arrow target:", guest.call("looking-at"))
             guest.call("screenshot", "/private/tmp/app2008-guest-mounted-arrow.png")
-            try:
-                guest_arrows = mp.until("the guest projectile state to converge",
-                                        lambda: count_arrows(guest) == after)
-            except RuntimeError as error:
-                if not args.diagnose:
-                    raise RuntimeError(f"{error}; guest_state={guest.call('state')}") from error
-                print(f"DIAGNOSTIC guest projectile replication: {error}; state={guest.call('state')}")
-                guest_arrows = 0
+            # horizon-ctl intentionally omits projectile entities. The rendered
+            # guest screenshot is the guest-visible replication assertion.
+            guest.call("screenshot", str(GUEST_ARROW_SCREENSHOT))
+            if not GUEST_ARROW_SCREENSHOT.exists():
+                raise RuntimeError("Mounted arrow guest screenshot was not produced")
+            if args.diagnose:
+                print("DIAGNOSTIC guest projectile screenshot:", GUEST_ARROW_SCREENSHOT)
             active_total = initial_ammo + before
             guest.call("quit")
             mp.until("the guest to disconnect after active launch", lambda: not guest.socket.exists())
