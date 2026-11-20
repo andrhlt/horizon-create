@@ -515,6 +515,40 @@ the sampled block states and inventory counts in solo and live LAN.
 Each player also matched the Java climb height and vertical velocity on
 every sampled player tick, including the grounded starting state.
 
+## Andesite and Brass Tunnel gameplay baseline (APP-2013)
+
+APP-2013 reuses the pinned Create GameTests and fixtures at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`. The bounded routing comparison
+covers 552 Java ticks: andesite split (30); brass filtering (82), split (61),
+round robin (111), prefer nearest (99), and synchronized input (169). The
+existing [runner](tools/test-parity.py) checks every sampled inventory count;
+andesite also compares belt stack and position. All seven routing checks passed.
+The separate [settings replay](tools/test-brass-tunnel-settings.py) checks all
+seven mode buttons, group propagation, and East-side filter set/clear without
+consuming the held stack.
+
+The APP-2013 [lifecycle replay](tools/test-brass-tunnel-lifecycle.py) adds the
+finite boundary cases. It saves/reopens an idle connected group and checks its
+mode; naturally loads ten brass casings into the connected tunnel group; stops
+the belt at the lever-controlled clutch; saves/reopens with all ten buffered;
+then restarts the belt and checks all ten arrive in the three depots. The
+[LAN settings replay](tools/test-brass-tunnel-settings.py) performs all seven
+mode changes and East-filter set/clear as a guest, checking the host's
+authoritative group and filter state and the guest's unchanged item count.
+Guest convergence is checked; Java packet arrival timing is not claimed.
+
+The belt/funnel prerequisites are complete in [APP-1968](https://linear.app/appstu/issue/APP-1968/create-gameplay-baseline-mechanical-belt-and-belt-connector)
+and [APP-1970](https://linear.app/appstu/issue/APP-1970/create-gameplay-baseline-andesite-and-brass-funnels).
+
+All nine registered cases passed on `native-9f42064-6bdf8691aa42`, Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, with the matching Create pack
+SHA-256 `a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+This available main-synchronized build is from source commit `781c0ef`; the
+tunnel and belt implementation files match the ticket checkout. It was reused
+instead of compiling a new client because this worktree has no private launcher
+compilation cache. Exact Java reload behavior, every routing mode/layout
+cross-product, animation curves, and pixel-level presentation remain open.
+
 ## Behavior audit
 
 | Family | Evidence already available | Next behavior to compare |
