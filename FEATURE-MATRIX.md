@@ -145,7 +145,7 @@ the two measure different levels of evidence.
 
 | Feature | In game | Basic tested | Java comparison | Full 1:1 | Remaining work |
 | --- | --- | --- | --- | --- | --- |
-| Train Track, curved spans and Railway Casing | Yes | Pass | Straight/curved construction, survival placement and sequenced crafting | Open | Remaining branch geometries, skins, crossings and rendering |
+| Train Track, curved spans and Railway Casing | Yes | Pass | [APP-2045 evidence](PARITY.md#train-track-and-railway-casing-app-2045) covers survival crafting and casing acquisition, straight, curved, ascending and crossing placement, curve removal refunds, LAN guest placement, saved graph and train travel through a curve | Open | Remaining branch geometries, direct curve targeting, skins and exact rendering |
 | Fake Track | Partial | Pass | [Curve fixture](tools/test-fake-track.py) created markers, retained them for 120 ticks, cleared them on physical break and command replacement, and restored water when a standalone marker expired | Open | Shared markers and exact raster comparison across curve geometries |
 | Track Observer | Partial | Pass | Selected and attached to track through player interaction. [Both original survival recipes](tools/test-track-observer.py) passed across all five pressure-plate choices. The [moving-train replay](tools/test-track-observer-train.py) powered an adjacent wire at strength 15 and cleared it after passage | Open | Java timing comparison, cargo filter, curves, diagonal track and LAN |
 | Bogeys and train assembly | Yes | Pass | Small/large bogeys, assembly, manual control and disassembly | Open | More multi-carriage layouts, tracks, transitions and persistence |

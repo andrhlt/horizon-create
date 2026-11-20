@@ -1161,6 +1161,8 @@ CHECKS = (
     ("rope-payload", "test-rope-payload"),
     ("rope-payload-detach", "test-rope-payload", "--detach"),
     ("track-curve", "test-track-curve"),
+    ("track-lifecycle", "test-track-lifecycle"),
+    ("track-lifecycle-lan", "test-track-lifecycle", "--lan"),
     ("track-station", "test-track-station"),
     ("track-station-name", "test-track-station-name"),
     ("track-station-name-lan", "test-track-station-name", "--multiplayer"),
