@@ -5019,6 +5019,21 @@ bindings = [
   { name = "canceled", ty = "&bool", value = "&*canceled" },
 ]
 
+[[injection]]
+id = "track_prepare_break"
+target = "horizon_client::game::native_hooks::Game<'_>::native_destroy_block"
+kind = "AFTER_CALL"
+selector = "mod_api::dispatch_destroy_block"
+result = "()"
+ordinal = 0
+require = 1
+helper = "track_prepare_break.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+  { name = "canceled", ty = "&bool", value = "&*canceled" },
+]
+
 [[module]]
 id = "train_postbox_registry"
 file = "crates/horizon-client/src/game.rs"

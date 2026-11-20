@@ -108,7 +108,7 @@ def measured(args, temporary):
     with (ROOT / "fixtures/attribute-filter-names-java.csv").open(newline="") as file:
         names = list(csv.reader(file))
     assert len(rows) == 53 and len(names) == 11
-    with fixture_world(args, "AttributeFilterKinds", render=True, pack=args.pack) as host:
+    with fixture_world(args, "AttributeFilterKinds", render=not args.lan, pack=args.pack) as host:
         host.commands((
             "/fill 4 100 -14 16 100 -4 minecraft:smooth_stone",
             "/fill 4 101 -14 16 110 -4 minecraft:air",

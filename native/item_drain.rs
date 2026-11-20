@@ -289,7 +289,12 @@ pub(super) fn click(game: &mut Game<'_>, pos: [i32; 3], canceled: &mut bool) {
                 }
             }
         }
-    } else if game.held().is_none() {
+    } else {
+        // Non-fluid block items retain normal placement priority. Other held
+        // items fall through to cargo collection, as in ItemDrainBlock.useItemOn.
+        if game.held().is_some_and(|stack| game.native_default_state(&stack.item).is_some()) {
+            return;
+        }
         let item = game.native_with_mod_block_entity(pos, |entity| {
             let item = entity.items.first_mut().and_then(Option::take);
             entity.nbt.remove(&"HeldItem".into());
@@ -299,8 +304,6 @@ pub(super) fn click(game: &mut Game<'_>, pos: [i32; 3], canceled: &mut bool) {
             give(game, pos, item);
             game.native_block_entity_sync(pos);
         }
-    } else {
-        return;
     }
     game.swing_arm();
     *canceled = true;

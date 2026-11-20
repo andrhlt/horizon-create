@@ -1,0 +1,13 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "patch_sha256": "3224637d436b6ccd412508423c97e76296ffd853fcc2605c9299f35ba090960a",
+  "records": 5,
+  "seconds": 512,
+  "elapsed_source": "Gradle BUILD SUCCESSFUL in 8m 32s (includes fresh NeoForge artifact preparation); GameTest 1.983 s",
+  "scope": "Actual BlockState.useItemOn with FakePlayer; block-item callback pass-through, stick and empty-hand collection/repeat. Callback does not place block. No Java reload or network timing claim.",
+  "java": "Homebrew OpenJDK 21.0.13.1 aarch64",
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.219",
+  "result": "One required GameTest passed; Gradle exit 0",
+  "raw_log": ".local/java-drain-collection/capture-private-approved.log"
+}
