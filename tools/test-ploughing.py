@@ -53,6 +53,14 @@ def run(args):
                 control.step_to(start + tick)
             actual.append(sample(control, tick))
         if actual == expected:
+            active_before_reload = sample(control, len(expected) - 1)[2:]
+            control.restart()
+            active_after_reload = sample(control, len(expected) - 1)[2:]
+            if active_after_reload[1] != active_before_reload[1] or not active_after_reload[0]:
+                raise RuntimeError(f"Active plough state was not retained across save/reopen: {active_before_reload} -> {active_after_reload}")
+            # Restart advances the server clock while the client reconnects;
+            # align the legacy extension loop's tick-10 origin to that clock.
+            start = control.clock() - len(expected) + 1
             # The original fixture uses "place when returned". The extra
             # Horizon-only extension/retraction checks below exercise mode 0.
             control.command("/data merge block 27 98 -11 {ScrollValue:0}")
