@@ -213,12 +213,12 @@ and textured icons. Screenshots and widget IDs are archived in
 The [pinned Java tab inventory](tools/java-creative-tabs-inventory.patch)
 captured [203 Base and 377 Palettes display entries](fixtures/creative-tabs-java.csv).
 The prepared pack uses those display memberships and the Java Palettes
-order. The [headless replay](tools/test-create-creative-tabs.py) checked
+order. The [offscreen replay](tools/test-create-creative-tabs.py) checked
 both memberships, Palettes order, and both first live pages on
 `native-9f42064-89e551a852ca`. The 16-color seat search also passed.
 Base keeps the port’s existing relative order pending a Java client
-capture of its 3D-first sort. Search-only entries and attribution
-still need comparison.
+capture of its 3D-first sort. The APP-2095 replay below compares
+representative search-only entries and attribution.
 
 ## Inventory
 
@@ -5078,6 +5078,102 @@ conservation bounds. Exact Java save/reopen and guest packet timing,
 further fluid reactions, complex filter configurations, chunk boundaries,
 and additional model and animation combinations remain open.
 
+## Mechanical Pump gameplay baseline (APP-1973)
+
+This finite pass preserves the original world-pumping, open-pipe,
+split/combine and startup-pressure references. The new
+[pump gameplay replay](tools/test-mechanical-pump-gameplay.py) reuses the
+APP-1972 player, storage and tick helpers and the existing pinned
+[crafting reference](fixtures/machine-crafting-java.csv).
+
+At the pinned Create revision, `PumpBlock.getStateForPlacement` inherits
+look/shaft preference, chooses the nearest connectable fluid neighbor on
+another axis for ordinary placement, and preserves source waterlogging.
+`PumpBlock.getRotatedBlockState` flips facing regardless of the clicked
+face. `PumpBlockEntity.isPullingOnSide` depends on facing alone: changing
+the sign of RPM does **not** reverse fluid transfer. Pressure uses absolute
+RPM; a facing flip reverses the inlet and outlet. These source-derived
+rules guide the added checks; they are distinct from tick-by-tick Java
+runtime comparisons.
+
+| Finite case | Evidence |
+| --- | --- |
+| Survival acquisition | Original shapeless Cogwheel + Fluid Pipe recipe, exact one-Pump output and no remaining inputs |
+| Placement and Wrench | North view, sneaking reversal, adjacent Tank preference; two facing flips and exactly one item returned by sneaking Wrench, solo and acting LAN guest |
+| RPM and direction | Both motor signs at magnitude 128 retain upward transfer; facing reversal swaps ports and transfers downward |
+| Start/stop and storage | Zero RPM and zero pump pressure halt transfer; restoring drive resumes without changing the 7,000 mB total |
+| Full, empty, blocked and non-water | Reuse APP-1972 `fluid-pipe-lifecycle`, including a full Tank, empty powered source, blocked/reconnected pipe and separate water/lava lanes; `honey-pipe` retains the existing non-water Java reference |
+| Branch pressure | Reuse the eight exact Java `pump-startup-pressure` samples and the 402 split/combine samples |
+| Persistence | Wet idle Pump retains facing; powered and stopped two-Tank setups retain fluid and resume or remain stopped after reopen |
+
+The original runtime `native-9f42064-6bde2ea90cf2` passed the new ten-stage
+source-derived lifecycle check. Its log and CSV were preserved separately
+as `.local/mechanical-pump-baseline-lifecycle-unsandboxed.log` and
+`.local/mechanical-pump-lifecycle-baseline-horizon.csv`. The first two
+launches were invalid because sandbox restrictions prevented the control
+socket from opening; their logs remain in `.local`. A survival attempt
+with an extra crafted Pump in the inventory was also invalid; the fixture
+now clears that item before setting up each placement case.
+
+The valid original-runtime probe recorded north-facing placement from a
+north-looking player, where Java requires south. A Wrench click on a
+south-facing Pump left it facing south, where Java requires north. The
+actual states are preserved in
+`.local/mechanical-pump-baseline-probe-final.log`. The narrow repair adds
+Pump placement to the existing fluid placement helper and adds Pump to
+the Wrench's facing-flip and pickup paths.
+
+The [placement callback probe](tools/java-mechanical-pump-placement.patch)
+ran in the disposable `.local/java-pump-reference` clone at the pinned
+commit with JDK 21.0.13.1. It captured three actual Java placement and
+Wrench-facing pairs: ordinary south/north, sneaking north/south and Tank
+preference west/east. The
+[three-row reference](fixtures/mechanical-pump-placement-java.csv) is read
+by both solo and LAN tests. These are exact block-state expectations from
+the Java callbacks, not a Java network or save comparison. The Gradle
+GameTest passed in 5 minutes 26 seconds; patch SHA-256 is
+`48edd159971f5683d3f8de68bb06946f4dc5948e6fec991777da9b3abcc27d63`.
+Capture metadata is in
+[the reference metadata](fixtures/mechanical-pump-placement-java.metadata.json).
+
+The final runtime `native-9f42064-1bafbe76cae9` used Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` and mixins
+`5a64af938ec86b00d53d16a408aabc0038fb3e57`. The rebuilt client SHA-256 is
+`8f2875a3e675b18b86491f6183b51abf36213495b14f180e9b90f86dfa51356b`; the
+pack SHA-256 is `6d73c6a59c48085fe929e00603f980f95337047a212ed0bb79d4f92a9bb368ac`.
+The finite check list passed all eight selected checks on this build: Pump
+survival placement/Wrench, acting LAN placement/Wrench, pump lifecycle,
+startup pressure, original world pumping, open pipes, branched pipes, pipe
+lifecycle, and honey pipe. The lifecycle samples matched both RPM signs,
+absolute pressure, zero-pressure stop, restart, reopen, and reversed-facing
+transfer. The updated placement/Wrench checks matched all three Java rows.
+The initial sandboxed batch could not open control sockets; the successful
+batch ran with the documented headless/offscreen helpers and isolated worlds.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 \
+  --jobs 1 --check mechanical-pump-gameplay --check mechanical-pump-gameplay-lan \
+  --check mechanical-pump-lifecycle --check pump-startup-pressure --check world-pump \
+  --check open-pipes --check branched-pipes --check fluid-pipe-lifecycle --check honey-pipe
+```
+
+Syntax checks (`tools/check-source.py`) and `git diff --check` passed.
+
+Run the bounded checks with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 \
+  --jobs 2 --check 'mechanical-pump-*' --check pump-startup-pressure \
+  --check world-pump --check open-pipes --check branched-pipes \
+  --check fluid-pipe-lifecycle --check honey-pipe
+```
+
+LAN results establish authoritative host state and eventual guest block
+convergence, not Java packet arrival timing. Reopen checks establish the
+Horizon gameplay baseline, not exact Java reload parity. More network
+layouts, speed/pressure cross-products, chunk boundaries, other fluids and
+exact animation, sound and rendering remain open.
+
 ## Encased Fluid Pipe
 
 The [original Java probe](tools/java-encased-fluid-pipe-trace.patch)
@@ -7468,6 +7564,67 @@ and verified that Blaze Cake Base appears and Chromatic Compound is excluded.
 The existing tab replay passed the Base and Palettes display membership checks,
 Palettes ordering, and the first live page of each. Java client Base ordering
 and the remaining search interactions are open.
+
+## APP-2095 creative inventory baseline
+
+On the archived Horizon `native-9f42064-340cbe866fa7` client built from
+`adfa875` with the 0.2.67 launcher, the
+[tab replay](tools/test-create-creative-tabs.py) matched 203 Base and
+377 Palettes display entries, Java Palettes order, and both first live pages.
+The [search replay](tools/test-create-creative-search.py) matched all
+265 Base and 392 Palettes search entries in the pack. Live Search returned
+Blaze Cake Base and excluded Chromatic Compound. Both checks passed in
+25.93 seconds. The [colored seat search](tools/test-colored-seats.py) and
+[Ponder Back replay](tools/test-ponder-creative-back.py) also passed on
+the same client and pack.
+
+The [LAN replay](tools/test-create-creative-lan.py) passed in 60.95 seconds.
+A guest joined a local host, entered Creative, opened both Create tabs,
+and saw the same first 45 entries per tab as the pack. Closing and reopening
+the guest inventory retained the selected Building Blocks tab and its first
+page. Search returned Netherite Diving Boots, Ornate Iron Window and its
+pane, and Blaze Cake Base in three queries. Chromatic Compound, Incomplete
+Precision Mechanism, and Incomplete Track each returned an empty grid.
+The game state in scope is the selected tab during the current client
+session. These checks do not cover a cold process restart.
+
+Guest screenshots showed the Create and Create’s Building Blocks titles
+with their Cogwheel and Ornate Iron Window icons. Search rendered names
+and textured icons for the hovered boots, window, and Blaze Cake Base.
+The boots and window displayed their respective blue tab attribution.
+Blaze Cake Base is present in Search but lacks the blue Create line on
+this build. Pinned Java's `CreativeModeTab.contains` uses the tab's search
+membership, so its `SEARCH_TAB_ONLY` entries are credited. Horizon's
+tooltip lookup uses display membership and omits the label for this
+entry. The screenshot for the Palette tab also shows overlapping vanilla
+and Create tab hover labels. The selected panel title remains legible.
+The captures are in the worktree’s `.local/creative-lan-*.png`.
+
+Client SHA-256
+`39712c37f7f666a2d730506198523f0d0b42ef7b4a15c0ea9142a95b450224ea`.
+Matching content pack SHA-256
+`0dc4da44753fdf6dd94d1cdd8d26b82bc35446899a3ad1219a9990377e74b852`.
+The prepared Horizon 26.3 resources came from the
+`native-9f42064-6ce68a31b125` installation on the same upstream pin.
+The Java reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb` with NeoForge 21.1.219.
+The [capture patch](tools/java-creative-tabs-inventory.patch) SHA-256 is
+`b7efc29a0446decff4ffe4e2a66c1564843917812ed128a370396ba6d19dd8ee`.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 \
+  --check create-creative-tabs --check create-creative-search
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 \
+  --check create-creative-lan
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 \
+  --check create-creative-lan --check colored-seats-search --check ponder-creative-back
+```
+
+The first LAN fixture stopped on the host's empty chat reply after a
+targeted game-mode command. The replay now waits for the guest's reported
+game mode. An earlier sandboxed invocation reached client startup and
+could not bind its local control socket. The offscreen results above used
+isolated game directories and a local socket-enabled run.
 
 ## Tank bucket interaction
 
