@@ -1,0 +1,3 @@
+lane,powered_before,destroyed,air_after,gearshift_drops
+0,false,true,true,1
+1,true,true,true,1

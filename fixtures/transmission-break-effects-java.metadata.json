@@ -1,0 +1,17 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_tests": ["TestMisc.clutchGearshiftReconnect", "TestMisc.gearshiftReverseTwoSources"],
+  "base_patch_sha256": "152e816e279e436506ddcb8df43853404a080d2bd8717f93e92e0d5ef154f9cb",
+  "effects_patch_sha256": "e43d044204ce784d9363b297917d979b114af1c2da5688a814758dac00bf1328",
+  "gearshift_base_patch_sha256": "606fd343952cc273e69fba1a20a2df0cfadf856458e7c09fce0c9a70cc0cd67a",
+  "gearshift_effects_patch_sha256": "3610cbb719f22037f5ad9bb31a685804dc19417189df5c816f5ac5e52477db1c",
+  "trace_sha256": "c48e9970b08d5f91bbfd292c53b9e1f406cb12976793ac034d55fe360d59c4a5",
+  "records": 9,
+  "gradle_elapsed_seconds": [16, 18],
+  "capture_reconnect": "Apply tools/java-clutch-gearshift-reconnect.patch and tools/java-transmission-break-effects-trace.patch, then run ./gradlew --offline --no-daemon runGameTestServer.",
+  "capture_gearshift": "Apply tools/java-transmission-transition-trace.patch. Apply only paths matching *TransmissionBreakEffectTraceMixin.java and src/main/resources/create.mixins.json from tools/java-transmission-break-effects-trace.patch using git apply --include. Apply tools/java-gearshift-break-effects-trace.patch and run the same Gradle task.",
+  "sampling": "The mixin records Java's level event 2001 with the pre-break state and its sound parameters. The GameTests log the mapping from game time to fixture tick. The Horizon replays compare scheduled sound IDs and counts. Their counters do not expose per-cue gain, pitch or direct block-destruction particles."
+}

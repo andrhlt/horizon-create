@@ -1,0 +1,13 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_test": "TestMisc.pendingClutchReopen",
+  "patch_sha256": "bac65a28996000f41d0e0b718d3b141a39c02b1f8c3ce768ca5c9caf7466a901",
+  "trace_sha256": "cd5501c5b90b13c3b452efed9a624a7087c22bcb71179fcb39ad1f3c0dac560c",
+  "records": 232,
+  "capture": "Run ./gradlew --offline --no-daemon runGameTestServer with CREATE_PENDING_CLUTCH=write, then run it again with CREATE_PENDING_CLUTCH=read. Repeat in the separate world selected by CREATE_PENDING_CLUTCH_DROPS=on or off. GameTest startup resets block drops, so the off case disables it in both processes before the first restored kinetic tick.",
+  "layout": "Two X-axis Clutch rigs with a +32 Creative Motor and a second adjacent motor. The opposite branch runs at -64 in lane 0 and +64 in lane 1. Redstone powers the Clutch on tick 3 and releases it on tick 8. The write world shuts down on the closing action tick while reconnection is queued.",
+  "sampling": "Phase tick counts from GameTest start in each process. Java records the queuing and first restored updates; its game clock can start at a different absolute time on reopen. Horizon compares the saved outcome at write tick 8 and the settled read tick 48 outcome over three ticks after a cold native launch."
+}

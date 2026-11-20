@@ -1,0 +1,43 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "recipes": {
+    "clutch": {
+      "type": "minecraft:crafting_shapeless",
+      "category": "misc",
+      "ingredients": [
+        {
+          "item": "create:andesite_casing"
+        },
+        {
+          "item": "create:shaft"
+        },
+        {
+          "tag": "c:dusts/redstone"
+        }
+      ],
+      "result": {
+        "count": 1,
+        "id": "create:clutch"
+      }
+    },
+    "gearshift": {
+      "type": "minecraft:crafting_shapeless",
+      "category": "misc",
+      "ingredients": [
+        {
+          "item": "create:andesite_casing"
+        },
+        {
+          "item": "create:cogwheel"
+        },
+        {
+          "tag": "c:dusts/redstone"
+        }
+      ],
+      "result": {
+        "count": 1,
+        "id": "create:gearshift"
+      }
+    }
+  }
+}

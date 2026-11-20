@@ -10,7 +10,9 @@ use horizon_client::first_person::Hand;
 
 use super::create_extendo_grip_wear::GRIP;
 use super::create_fan::facing;
-use super::create_machines::{crank_input_rpm, float, int, reading, set_float};
+use super::create_machines::{
+    crank_input_rpm, float, int, reading, refresh_connected_network, set_float,
+};
 use super::native_block_entity_draw::BlockEntityDraw;
 use super::{Game, GameLevel};
 
@@ -146,6 +148,8 @@ pub(super) fn click(game: &mut Game<'_>, pos: [i32; 3]) -> bool {
         let opposing = external != 0.0 && (external < 0.0) != (backwards ^ negative_face);
         if opposing && (was_stopped || external.abs() >= RPM) {
             game.native_machine_destroy_block(pos, None, false);
+        } else {
+            refresh_connected_network(game, pos);
         }
     }
     if !game.held().is_some_and(|stack| stack.item.as_ref() == GRIP)
