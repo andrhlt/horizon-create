@@ -72,6 +72,9 @@ def run(args):
                 control.step_to(start + tick)
             check_blocks(control, ((26, "create:piston_extension_pole"),
                                    (28, "create:mechanical_plough"), (29, "minecraft:air")))
+            control.restart()
+            check_blocks(control, ((26, "create:piston_extension_pole"),
+                                   (28, "create:mechanical_plough"), (29, "minecraft:air")))
     with (ROOT / ".local/ploughing-horizon.csv").open("w", newline="") as out:
         writer = csv.writer(out, lineterminator="\n")
         writer.writerow(header[:2] + header[3:])

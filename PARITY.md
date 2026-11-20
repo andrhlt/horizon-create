@@ -3759,8 +3759,13 @@ the candidate retained the exact vector, with no loss or duplication. This is
 a bounded Horizon persistence/conservation check, not an exact Java reload
 trace. The plough replay now also reopens while the payload is moving and
 retains its active payload and farmland state before the extension/retraction
-checks. Guest collection remains open; all-crop/loot and other tool
-interactions remain nonblocking broader follow-ups. Full 1:1 stays Open.
+checks, then reopens the idle extended state. An alternate LAN replay dropped
+the authoritative six-carrot output from the chest minecart and the guest
+collected exactly six items, establishing host/guest count convergence and no
+loss/duplication. This deliberately dropped-item path complements the moving
+entity targeting limitation; direct chest-minecart guest opening remains
+unverified. All-crop/loot and other tool interactions remain nonblocking
+broader follow-ups. Full 1:1 stays Open.
 
 ## Windmill Bearing
 
