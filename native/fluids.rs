@@ -191,6 +191,59 @@ pub(super) fn place_pipe(
 ) -> Option<BlockStateId> {
     let block = level.native_state_block(state)?;
     let state = match block {
+        PUMP => {
+            let looking = context.nearest_looking_direction();
+            let yaw_index = ((f64::from(context.yaw) / 90.0 + 0.5).floor() as i32)
+                .rem_euclid(4) as usize;
+            let horizontal = [
+                Direction::South,
+                Direction::West,
+                Direction::North,
+                Direction::East,
+            ][yaw_index];
+            let target = if context.sneaking {
+                looking
+            } else {
+                looking.opposite()
+            };
+            let mut facing = if context.sneaking {
+                if matches!(looking, Direction::Up | Direction::Down) {
+                    horizontal
+                } else {
+                    target
+                }
+            } else {
+                super::create_hand_crank::preferred_direction(level, context.pos)
+                    .unwrap_or(if matches!(looking, Direction::Up | Direction::Down) {
+                        horizontal
+                    } else {
+                        target
+                    })
+            };
+            // PumpBlock chooses the closest connectable neighbor, keeping the
+            // last equal-distance candidate in Java's direction iteration order.
+            let mut best = None;
+            let mut best_distance = i32::MAX;
+            for side in Direction::ALL {
+                if !pipe_neighbor(level, context.pos, side) {
+                    continue;
+                }
+                let distance = side.normal().into_iter().zip(target.normal())
+                    .map(|(a, b)| (a - b).pow(2))
+                    .sum();
+                if distance <= best_distance {
+                    best = Some(side);
+                    best_distance = distance;
+                }
+            }
+            if !context.sneaking
+                && let Some(side) = best
+                && along(side) != along(target)
+            {
+                facing = side;
+            }
+            level.native_state_with_property(state, "facing", name(facing))?
+        }
         PIPE => {
             // Java's default has no open sides. Keep that placement input
             // distinct from the straight state used by the Horizon registry.

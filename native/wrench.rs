@@ -8,7 +8,7 @@ use crate::items::ItemStack;
 use super::Game;
 use super::create_clockwork::{self, CLOCKWORK};
 use super::create_cogwheel::encased_size;
-use super::create_fluids::{self, GLASS_PIPE, PIPE, SMART_PIPE, name};
+use super::create_fluids::{self, GLASS_PIPE, PIPE, PUMP, SMART_PIPE, name};
 use super::create_machines::{self, GEARBOX};
 use super::create_portable_interface::{FLUID as FLUID_PORT, ITEM as ITEM_PORT};
 use super::create_speed_controller::{self, CONTROLLER as SPEED_CONTROLLER};
@@ -100,6 +100,16 @@ pub(super) fn change_pose(game: &mut Game<'_>, pos: [i32; 3], face: Direction, b
             ("axis", create_speed_controller::cross_axis(&prior), prior)
         }
         _ if encased_size(block).is_some() => return change_cased_cog(game, pos, face),
+        PUMP => {
+            let Some(prior) = game.native_block_property(pos, "facing") else {
+                return false;
+            };
+            let Some(direction) = Direction::ALL.into_iter().find(|&side| name(side) == prior) else {
+                return false;
+            };
+            // PumpBlock.getRotatedBlockState reverses flow on every face.
+            ("facing", name(direction.opposite()), prior)
+        }
         "create:shaft" | "create:cogwheel" | GEARBOX | "create:clutch"
         | "create:gearshift" => {
             let Some(prior) = game.native_block_property(pos, "axis") else {
@@ -240,7 +250,7 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> boo
             | super::create_controller_rail::RAIL
             | super::create_rose_lamp::LAMP
             | super::create_encased_fluid_pipe::BLOCK
-            | PIPE | GLASS_PIPE | SMART_PIPE
+            | PIPE | GLASS_PIPE | SMART_PIPE | PUMP
     ) || encased_size(&block).is_some() || ladder;
     let sneaking = game.native_sneaking();
     if !sneaking && matches!(block.as_str(), super::create_fluid_tank::TANK | super::create_fluid_tank::CREATIVE) {

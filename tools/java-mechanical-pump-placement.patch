@@ -1,0 +1,49 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..10bd658 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(test -> test.testName().equals("TestMisc.pumpPlacement")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..fb47fbe 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,32 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 80)
++	public static void pumpPlacement(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var support = new BlockPos(-12, 160, -9);
++		level.setChunkForced(support.getX() >> 4, support.getZ() >> 4, true);
++		for (var pos : BlockPos.betweenClosed(support.offset(-2,-1,-2), support.offset(2,3,2)))
++			level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
++		level.setBlock(support, Blocks.STONE.defaultBlockState(), 2);
++		var block = com.simibubi.create.AllBlocks.MECHANICAL_PUMP.get();
++		var stack = com.simibubi.create.AllBlocks.MECHANICAL_PUMP.asStack();
++		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
++		player.setPos(support.getX()+.5, support.getY()+1, support.getZ()+2.5);
++		var hit = new net.minecraft.world.phys.BlockHitResult(
++			new net.minecraft.world.phys.Vec3(support.getX()+.5, support.getY()+1, support.getZ()+.5),
++			net.minecraft.core.Direction.UP, support, false);
++		for (int scenario = 0; scenario < 3; scenario++) {
++			player.setYRot(180); player.setYHeadRot(180); player.setXRot(0); player.setShiftKeyDown(scenario == 1);
++			level.setBlock(support.above().west(), scenario == 2 ? com.simibubi.create.AllBlocks.FLUID_TANK.getDefaultState() : Blocks.AIR.defaultBlockState(), 3);
++			var context = new net.minecraft.world.item.context.BlockPlaceContext(player, net.minecraft.world.InteractionHand.MAIN_HAND, stack, hit);
++			var placed = block.getStateForPlacement(context);
++			var rotated = block.getRotatedBlockState(placed, net.minecraft.core.Direction.SOUTH);
++			System.out.printf("CREATE_PUMP_PLACEMENT,%d,%s,%s%n", scenario,
++				placed.getValue(net.minecraft.world.level.block.DirectionalBlock.FACING),
++				rotated.getValue(net.minecraft.world.level.block.DirectionalBlock.FACING));
++		}
++		helper.succeed();
++	}
+ }
