@@ -677,6 +677,7 @@ CHECKS = (
     ("open-pipes", "test-open-pipes"),
     ("branched-pipes", "test-branched-pipes"),
     ("brass-mixing", "test-brass-mixing"),
+    ("mixer-chance", "test-mixer-chance"),
     ("heated-fluid-food", "test-fluid-food"),
     ("basin-dry-alloy", "test-material-recipes", "--basin-only", "--scenario", "iron_alloy",
      "--scenario", "zinc_alloy"),

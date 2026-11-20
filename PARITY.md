@@ -303,6 +303,44 @@ passed on `native-9f42064-1f2743f4b4c4` with this archive. The
 
 ## Survival machine recipes
 
+### Probabilistic mixer outputs
+
+The pinned [Create 6.0.10 `ProcessingOutput`](https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/content/processing/recipe/ProcessingOutput.java)
+rolls once per output item when `chance < 1`, retaining that item when the
+random float is at most the chance. Guaranteed outputs consume no random value.
+Horizon's Mixer had treated every item output as guaranteed. It now preserves
+the recipe's output order and resolves chance rolls when applying the recipe,
+not during repeated recipe lookups. This keeps lookup and tick validation from
+rerolling an output. Fluid outputs are unaffected.
+
+The Rust helper test supplies three fixed rolls and checks the count and order
+of interleaved guaranteed and probabilistic outputs. The [runtime replay](tools/test-mixer-chance.py)
+loads a world datapack with one diamond input, 64 gold nugget rolls at 50% each
+and two guaranteed items. It closes the host while the mixer is running with
+at least 20 processing ticks left. On reopening, the same recipe still has its
+diamond and a positive countdown. After 80 more stepped ticks, the diamond is
+gone and the mixer is idle. The survival guest picks up the rolled stack from
+the depot and checks its exact count against the host. After an idle reopen,
+the depot still holds the iron nugget and the basin still holds the queued
+copper ingot. This checks output order, custody and persistence.
+
+The combined client `native-9f42064-12f8cd8053b7` produced 30 gold nuggets in
+the first completed replay. The game uses the level RNG, so the count varies
+between runs. The pinned 26.3 resources used `create.hmod` SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The client SHA-256 is
+`0d8c15ef73ed7f31847b91f961a3ac9423887292b1275e8347aa7c54c270374c`.
+
+The combined build and the earlier `native-9f42064-ffe4b00e329a` both passed
+the following 11 neighboring checks:
+`wheat-milling`, `milling-recipes`, `depot-pressing`, `pressing-category`,
+`basin-dry-alloy`, `basin-wet-materials`, `heated-fluid-food`,
+`water-filling-bottle`, `spouting`, `mixing-lookup` and `recipe-navigation`.
+These cover accepted and rejected inputs, basin routing, fluid processing,
+spouting and guest recipe/tag synchronization on reload. Run the same named
+checks and `mixer-chance` with `tools/test-parity.py` on the combined build.
+Exact RNG stream alignment with Java and guest packet timing remain unverified.
+
 The [Java crafting probe](tools/java-machine-crafting-trace.patch) resolves
 24 original recipe IDs through the game's recipe manager and records the
 grid, result stack and crafting remainders. The
