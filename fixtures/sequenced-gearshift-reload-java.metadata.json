@@ -1,0 +1,15 @@
+{
+  "reference": {
+    "repository": "Creators-of-Create/Create",
+    "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+    "version": "6.0.10",
+    "source": "src/main/java/com/simibubi/create/content/kinetics/transmission/sequencer/SequencedGearshiftBlockEntity.java"
+  },
+  "serialization": {
+    "writeFields": ["InstructionIndex", "InstructionDuration", "InstructionProgress", "Timer", "PrevPowered", "Instructions"],
+    "readFields": ["InstructionIndex", "InstructionDuration", "InstructionProgress", "Timer", "PrevPowered", "Instructions"],
+    "program": "fixtures/sequenced-gearshift-program-java.snbt",
+    "activeCheckpoint": {"runtimeTrace": "fixtures/sequenced-gearshift-editor-java.csv", "tick": 5}
+  },
+  "notes": "Field list and read/write behavior are transcribed from the pinned Java BlockEntity source. Runtime checkpoint values and tick-4 power/tick-5 post-sample redstone removal actions come from the existing Java GameTest trace. The reload replay pauses between the tick-5 observation and its same-tick redstone removal."
+}

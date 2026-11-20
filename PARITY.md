@@ -1227,6 +1227,39 @@ saw the same delayed step and comparator output. The
 [Java GameTest patch](tools/java-sequenced-gearshift-comparator-trace.patch)
 cover the powered turn, delay, redstone wait, distance step and active save.
 
+The [reload replay](tools/test-sequenced-gearshift-reload.py) saves an idle
+configured program and an active turn, closes and reopens the same world, then
+checks the persisted Java fields and continuation from tick 5 to tick 6. The
+[metadata](fixtures/sequenced-gearshift-reload-java.metadata.json) records the
+pinned Java BlockEntity read/write fields and links the active checkpoint to
+the existing Java GameTest trace. Other instruction types and persistence
+boundaries remain open.
+
+On rebased `origin/main` (`1f2f317`),
+`sh tools/build-native.sh /Applications/Horizon.app/Contents/MacOS/horizon-launcher
+'/private/tmp/horizon-create-app1949-build'` produced build
+`native-9f42064-f1e8907217b7`. The sequenced-gearshift parity group passed all
+11 checks using that build's `horizon-ctl` and `horizon-client` binaries:
+editor, render, LAN editing, comparator, stop, reload, gantry distance limit,
+orientation and Wrench. The reopened active sequencer
+matched Java's tick-6 state on its first resumed tick. On the same build, the
+sequenced pulley consumer trace passed, as did 13 affected piston, gantry,
+roller and bearing regressions (including piston modes, moving actors and
+reload, both mounted dispenser cases, both roller tracks, and the 105-tick
+contraption-controls trace). Checks that did not need rendering used the
+headless client.
+
+The [sequenced gantry replay](tools/test-sequenced-gearshift-gantry.py) uses
+the existing roller-filling fixture's live motor, gearbox, pinion and carriage.
+It verifies that a 1-block sequence at 128 RPM stops the downstream 32 RPM
+gantry at 0.25 blocks, following Java's relative distance context through the
+gearbox, then restores the carriage. This headless check passed on
+`native-9f42064-f1e8907217b7`. The
+[sequenced piston replay](tools/test-sequenced-gearshift-piston.py) checks
+during-motion offset plus remaining distance, then verifies the piston settles
+at the 1-block endpoint after the sequence finishes. It also passed on that
+exact build. Full 1:1 remains open.
+
 When the original threshold-switch pulley finishes its rotation while the
 lever remains powered, the downstream pulley stops and the gearshift retains
 64 RPM. The [original fixture](fixtures/threshold_switch_pulley-java.csv)
@@ -7728,3 +7761,19 @@ actual-player old-world reopen/extension guard passed on the refactored build.
 ## Expanded fluid-tank workflow — November 18, 2026
 
 The [tank evidence matrix](TANK-PARITY.md) records 31/31 scripts and 1,430 exact Java records passing through headless Horizon `92ef2557669b`. Its applicable shared production core also passes 19/19 scripts (1,093 records). The integrated build closes sampled split, component, creative, clone/move, window, boiler, comparator, source-light and real container inventory gaps. Original steam timing matches all 13 ticks. Physical local/reopen/LAN light, imported ownership through partial/full unload, vanilla clone inventory, solo/LAN bucket and muted sound-event guards pass. Java client rendering/particles, propagated-light and unload timing, audio pitch verification, mounted storage and remaining consumers are still open. Full-family parity was not promoted.
+
+## APP-1949 sequencer validation on latest main — November 19, 2026
+
+After rebasing onto `origin/main` at `9341ef5cb462c3bb3f13c028b54a38c6c7ce2853`,
+the updated `tools/build-native.sh` produced build
+`native-9f42064-41316457f440`. The build's `horizon-client` SHA256 is
+`ac4d4b543c70c0e5217b38b7ff37690d0c9f39f1cc9aa147fcd3009ca7a48ced`.
+All checks below ran against that build and the pinned 9f42064 resource pack.
+
+The bounded sequenced-gearshift host/guest, editor, comparator/stop, reload,
+gantry/piston distance, orientation, Wrench and rendering checks passed 11/11.
+Affected mechanical-piston, dispenser, roller and contraption-controls
+regressions passed 13/13. The sequenced-pulley cross-regression passed 1/1,
+including its 56-tick trace. These results replace earlier APP-1949 build
+identifiers; broader combinations and the matrix's Full 1:1 column remain
+open.
