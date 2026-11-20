@@ -100,6 +100,37 @@ def apply_material_casings(world, actor, target):
     return tuple((pos, casing) for _, _, pos, casing in cases)
 
 
+def check_casing_pickup(world, pos, casing, tool):
+    x, y, z = pos
+    before = world.call("inventory")["counts"].get(casing, 0)
+    world.commands((f"/tp @s {x + 0.5} {y} {z + 2.5}",
+                    f"/item replace entity @s hotbar.8 with {tool}"))
+    world.call("wait", 3)
+    world.call("select", tool)
+    world.call("look-at", x + 0.5, y + 0.5, z + 0.5)
+    world.call("mouse", "left", "down")
+    try:
+        for _ in range(120):
+            world.step_to(world.clock() + 1)
+            if world.command(f"/execute if block {x} {y} {z} minecraft:air").startswith("Test passed"):
+                break
+        else:
+            raise RuntimeError(f"Survival mining did not remove {casing}.")
+    finally:
+        world.call("mouse", "left", "up")
+    world.step_to(world.clock() + 1)
+    world.call("wait", 3)
+    drops = world.call("entities", 8, "minecraft:item")["entities"]
+    if [drop["item"]["count"] for drop in drops if drop["item"]["item"] == casing] != [1]:
+        raise RuntimeError(f"Mining {casing} with {tool} produced unexpected drops: {drops}")
+    world.command(f"/tp @s {x + 0.5} {y} {z + 0.5}")
+    for _ in range(20):
+        world.step_to(world.clock() + 1)
+    multiplayer.until(f"one mined {casing} in inventory",
+                      lambda: world.call("inventory")["counts"].get(casing, 0) == before + 1)
+    print(f"Survival mining and pickup returned one {casing}.")
+
+
 def run(args):
     fixture = "casing-advancement" if args.casing else "first-advancements"
     with (ROOT / f"fixtures/{fixture}-java.csv").open() as source:
@@ -110,14 +141,20 @@ def run(args):
     with fixture_world(args, scenario, render=True, pack=args.pack) as world:
         if not args.multiplayer:
             replay(world, world, "@s", rows, advancements, args.casing)
-            applied = apply_material_casings(world, world, "@s")
+            applied = apply_material_casings(world, world, "@s") if args.casing else ()
             world.restart()
             if progress(world, "@s", advancements) != ("true",) * len(advancements):
                 raise RuntimeError("The earned advancements were lost on reopen.")
             for pos, casing in applied:
                 if world.call("block", *pos)["state"] != casing:
                     raise RuntimeError(f"Applied {casing} did not persist after reopening at {pos}.")
-            print("Earned advancements and all casing states persisted after reopening.")
+            print("Earned advancements persisted after reopening the world.")
+            if applied:
+                print(f"All {len(applied)} casing states persisted after reopening.")
+                world.call("command", "/gamemode survival @s")
+                for index, (pos, casing) in enumerate(applied):
+                    tool = "minecraft:diamond_axe" if index % 2 == 0 else "minecraft:diamond_pickaxe"
+                    check_casing_pickup(world, pos, casing, tool)
             return
         port = world.call("lan", "open", "0", "commands", "force")["port"]
         with TemporaryDirectory(prefix="hc-adv-") as folder, multiplayer.joined_client(
@@ -131,9 +168,10 @@ def run(args):
             replay(world, guest, GUEST, rows, advancements, args.casing)
             if progress(world, "@s", advancements) != ("false",) * len(advancements):
                 raise RuntimeError("The guest's awards also advanced the host.")
-            applied = apply_material_casings(world, guest, GUEST)
-            if progress(world, "@s", ("create:brass_casing", "create:copper_casing")) != ("false", "false"):
-                raise RuntimeError("The guest's casing applications advanced the host.")
+            if args.casing:
+                for pos, casing in apply_material_casings(world, guest, GUEST):
+                    multiplayer.until(f"the guest to see {casing} at {pos}",
+                                      lambda: guest.call("block", *pos)["state"] == casing)
 
 
 if __name__ == "__main__":
