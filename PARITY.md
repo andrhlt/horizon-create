@@ -2243,32 +2243,39 @@ A [save/reopen replay](tools/test-creative-motor-reload.py) keeps `ScrollValue`
 and regenerates speed for two motors each connected to its own shaft at −24 RPM
 and one disconnected motor at +40 RPM.
 
-The Java probe also records
-`fixtures/creative-motor-competition-java.csv` for two motors on one shaft,
-including a sign change, source removal and re-add. On the final PR tree,
-build `native-9f42064-1dcba217c926` reports 107 of 144 samples differing.
-These are gameplay failures, not settling noise: in the equal-speed lane,
-Horizon starts with the opposite motor's −16 RPM source, gives the shaft and
-second motor the wrong sign, and removes the first motor by tick 4 while Java
-keeps all three blocks at +16 through tick 4. Flipping that motor at tick 5
-makes Java tear down all three blocks; Horizon instead reverses the surviving
-shaft and motor to +16. In the other lane, Java propagates the expected −16 RPM
-after the tick-5 reversal and retains the shaft and driven motor when the
-opposing motor is removed at tick 12. Horizon removes the opposing motor at
-tick 5, then reports zero shaft speed and loses the driven motor after tick 12.
-At re-add, the block/speed state still does not match Java. Thus the remaining
-gate is source selection and direction, conflict teardown, and network
-recovery; this trace has no stress/capacity field and cannot assess stress.
+The direct two-motor replay checks the presence and signed speed of the two
+motors and their shaft in each lane. The original combined Java capture
+`fixtures/creative-motor-competition-java.csv` placed both GameTests in the
+same batch. At competition tick 5 the render GameTest placed its five-block
+wide template over the first lane, removing those blocks before the settings
+callback. The original capture is preserved for diagnosis. Capture the
+competition GameTest in isolation with
+`python3 tools/capture-creative-motor-java.py --competition-only` to regenerate
+`fixtures/creative-motor-competition-isolated-java.csv` at the pinned revision.
+The replay compares all 144 samples over ticks 0–23, with settings, removal and
+re-add applied after sampling ticks 5, 12 and 18 respectively.
 
-The [kinetic source-transition check](tools/test-kinetic-network-sources.py)
-passes on the same final build, confirming the merged APP-1943 coverage but
-not the direct two-motor-on-one-shaft case. Six registered `creative-motor*`
-checks also pass on this build. A candidate startup-order change reduced this
-motor diagnostic to 87 differences on `native-9f42064-5c202877bda0` but still
-did not match Java, so that unverified change was not retained. Horizon samples
-are saved in `.local/creative-motor-competition-horizon.csv`. Keep this
-consequential gap linked to [APP-1943](https://linear.app/appstu/issue/APP-1943);
-the diagnostic is not registered and this gameplay gate remains open.
+In Java, the first initialized motor drives the default-speed lane at +16 RPM
+through tick 12, even though its attached motor initially has an opposing
+setting. After the source is removed, the attached motor drives at +16 RPM.
+That lane accepts a same-direction re-add. The other lane already has a source
+because its initial setting invokes the callback during setup. Its reversal
+moves all three blocks to −16 RPM at tick 6. Removing its driven motor leaves
+the shaft and source at −16 RPM. Re-adding the opposed motor destroys the new
+motor while preserving the running shaft and source. The fixture measures
+presence and speed. Stress and capacity remain outside this comparison.
+
+The [corrected competition replay](tools/test-creative-motor-competition.py)
+matches all 144 isolated Java samples on final build
+`native-9f42064-1e629580d78f`. The fixture uses the isolated Java reference
+and samples before each corresponding action; the original combined capture
+and prior 70/144 comparison remain available for audit. The six registered
+motor family checks also pass on this build, including the competition check.
+The source-transition regression passes on the same build and still covers
+the bridge, split and reopen cases from
+[APP-1943](https://linear.app/appstu/issue/APP-1943). This competition fixture
+only measures block presence and speed; stress and capacity remain unverified
+by this fixture.
 
 ```sh
 python3 tools/test-creative-motor.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
@@ -2277,6 +2284,7 @@ python3 tools/test-creative-motor-render.py /path/to/horizon-ctl /path/to/horizo
 python3 tools/test-creative-motor-render.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --lan
 python3 tools/test-creative-motor-reload.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-multiplayer-creative-motor.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-creative-motor-competition.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
 
 ## Rotation Speed Controller

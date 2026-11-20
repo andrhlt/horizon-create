@@ -226,6 +226,7 @@ CHECKS = (
     ("creative-motor-render", "test-creative-motor-render"),
     ("creative-motor-render-lan", "test-creative-motor-render", "--lan"),
     ("creative-motor-reload", "test-creative-motor-reload"),
+    ("creative-motor-competition", "test-creative-motor-competition"),
     ("creative-motor-lan", "test-multiplayer-creative-motor"),
     ("rotation-speed-controller", "test-rotation-speed-controller"),
     ("rotation-speed-controller-loaded", "test-rotation-speed-controller", "--loaded"),
