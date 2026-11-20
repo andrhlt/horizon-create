@@ -270,6 +270,9 @@ def main():
     if differences:
         raise SystemExit(f"Hose Pulley transfer differs on {len(differences)} ticks. "
                          f"First differences (Java, Horizon): {differences[:8]}. See {output}")
+    if args.ticks is not None:
+        print(f"Original Hose Pulley transfer matched all {len(expected)} requested Java samples.")
+        return
     verify_lifecycle(args, expected)
     verify_bottomless(args, "Hose-water-9999", "minecraft:water", 9999, 0)
     verify_bottomless(args, "Hose-water-10000", "minecraft:water", 10000, 1)
