@@ -1,6 +1,9 @@
 {
   "replace": false,
   "values": [
+    "create:andesite_casing",
+    "create:brass_casing",
+    "create:copper_casing",
     "create:cogwheel",
     "create:large_cogwheel",
     "create:andesite_encased_cogwheel",
