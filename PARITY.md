@@ -5858,15 +5858,25 @@ drop, the original crafting result, and seven [radial airflow impulses](fixtures
 The airflow cases cover push, pull, the pull dead zone, maximum reach,
 positions outside the scan range, obstruction, and a stopped Fan.
 
-The [Horizon replay](tools/test-nozzle.py) passed in solo and LAN on
+The existing [Horizon replay](tools/test-nozzle.py) passed in solo and LAN on
 `native-9f42064-70205eb8ade6`. All eight placements or rejections
 matched Java, including applicable shape planes and the ordinary Wrench
 result. Removing the support dropped one Nozzle. The original recipe was
 crafted in solo survival. The seven dropped-item inputs showed no early
 motion on the first five Horizon ticks and matched the forced Java
 impulse at the scan tick. The guest observed item movement and removal.
-Continuous Java airflow cadence, player and mob movement, configurable
-range, saturation, and presentation effects remain open.
+The final isolated solo and LAN replays on `native-9f42064-2765e8093db7` saved
+and reopened a placed Nozzle with its aligned Fan, matched all seven item
+cases and push/pull zombie impulses, and verified host/guest item receipt and
+removal. The LAN guest player check also verified push/pull displacement. The
+player path uses synchronized Fan network speed, a six-tick acquisition
+counter, Java's crouch/creative-flight exclusions, and the Nozzle visibility
+ray. Because Horizon reconstructs guest velocity from client-known movement,
+the server preserves the authoritative impulse by advancing the guest's
+authoritative position in the same tick; this avoids duplicate client/server
+impulses while keeping the correction visible to the guest. Client effects,
+continuous Java airflow cadence, configurable range, saturation, and exact
+presentation remain open.
 
 ## Turntable crafting, placement and mob contact
 

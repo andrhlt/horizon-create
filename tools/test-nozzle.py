@@ -23,6 +23,7 @@ OFFSETS = {
     "south": (0, 0, 1), "west": (-1, 0, 0), "east": (1, 0, 0),
 }
 ITEM = '@e[type=minecraft:item,tag=NozzleProbe,limit=1]'
+MOB = '@e[type=minecraft:zombie,tag=NozzleMobProbe,limit=1]'
 
 
 def reference(name):
@@ -165,9 +166,32 @@ def placement(host, actor, player, pack):
             assert host.clock() == start, (face, start, host.clock())
         print(f"{name}: Java facing, placement outcome, item use and applicable outline or wrench matched.", flush=True)
 
+    # A Nozzle has no active operation to resume, so persistence is its placed
+    # state and support relationship. Exercise that static before/after state
+    # across a real world close and reopen.
+    if actor is host:
+        support = (4, 172, 20)
+        target = add(support, OFFSETS["east"])
+        host.commands((f"/setblock {xyz(support)} {FAN}[facing=east]",
+                       f"/setblock {xyz(target)} {NOZZLE}[facing=east]"))
+        expected = f"{NOZZLE}[facing=east]"
+        mp.until("the persistence Nozzle to be placed", lambda: state(host, target) == expected)
+        host.command("/save-all")
+        host.restart()
+        mp.until("the placed Nozzle to remain after world reopen", lambda: state(host, target) == expected)
+        assert state(host, support) == f"{FAN}[facing=east]"
+        print("Placed Nozzle and aligned Fan support survived save/reopen.", flush=True)
+
 
 def motion(host):
     reply = host.command(f"/data get entity {ITEM} Motion")
+    match = re.search(r"\[([^\[\]]+)\]\s*$", reply)
+    assert match, reply
+    return tuple(float(value.strip().rstrip("dDfF")) for value in match[1].split(","))
+
+
+def entity_motion(host, selector):
+    reply = host.command(f"/data get entity {selector} Motion")
     match = re.search(r"\[([^\[\]]+)\]\s*$", reply)
     assert match, reply
     return tuple(float(value.strip().rstrip("dDfF")) for value in match[1].split(","))
@@ -206,6 +230,16 @@ def airflow(host, actor, player):
             host.step_to(start + tick)
         if rpm:
             assert speed(host, fan) == rpm, (name, speed(host, fan), rpm)
+        check_player = actor is not host and name in ("push", "pull")
+        if check_player:
+            mob_x = center[0] + distance
+            host.commands(("/fill 13 171 19 16 171 21 minecraft:stone",
+                           f"/tp {player} 7.5 173 16.5"))
+            mp.until("the player to reach the Nozzle airflow sample", lambda: (
+                (state := actor.call("state")["player"])
+                and abs(state["position"][0] - 7.5) < .01
+                and abs(state["position"][2] - 16.5) < .01
+            ))
         host.command(f"/setblock {xyz(nozzle)} {NOZZLE}[facing=east]")
         start = host.clock()
         host.step_to(start + 1)
@@ -215,6 +249,12 @@ def airflow(host, actor, player):
         host.command(f'/summon minecraft:item {xyz(sample)} {{NoGravity:1b,PickupDelay:32767s,'
                      'Item:{id:"minecraft:paper",count:1},Motion:[0d,0d,0d],Tags:["NozzleProbe"]}')
         assert motion(host) == (0, 0, 0), name
+        mob_sample = add(center, (distance, 0, 0))
+        check_mob = name in ("push", "pull")
+        if check_mob:
+            host.command(f'/summon minecraft:zombie {xyz(mob_sample)} {{NoAI:1b,NoGravity:1b,'
+                         'PersistenceRequired:1b,Motion:[0d,0d,0d],Tags:["NozzleMobProbe"]}')
+            assert entity_motion(host, MOB) == (0, 0, 0), name
         if actor is not host:
             def guest_paper():
                 return next((entry["pos"] for entry in actor.call("entities", 12, "minecraft:item")["entities"]
@@ -229,17 +269,45 @@ def airflow(host, actor, player):
                         if tick == 6 else (0, 0, 0))
             actual = motion(host)
             assert all(near(a, b) for a, b in zip(actual, expected, strict=True)), (name, tick, actual, expected)
+            if check_mob:
+                mob_expected = ((float(row["delta_x"]) * 4.0, 0.0, 0.0)
+                                if tick == 6 else (0.0, 0.0, 0.0))
+                mob_actual = entity_motion(host, MOB)
+                assert all(near(a, b) for a, b in zip(mob_actual, mob_expected, strict=True)), (
+                    name, tick, mob_actual, mob_expected)
         impulse = float(row["delta_x"])
         if actor is not host and impulse:
-            host.step_to(start + 7)
-            sign = 1 if impulse > 0 else -1
-            mp.until(f"the guest to see the {name} impulse move its probe", lambda: (
-                (at := guest_paper()) is not None and (at[2] - sample[2]) * sign > abs(impulse) / 2
-            ))
+            mp.until(f"the guest to receive the {name} impulse probe", lambda: guest_paper() is not None)
+        if check_player:
+            teleport_start = host.clock()
+            host.command(f"/tp {player} {mob_x} 172 {center[2]}")
+            host.step_to(teleport_start + 1)
+            player_before = actor.call("state")["player"]
+            for _ in range(12):
+                host.step_to(host.clock() + 1)
+            player_after = actor.call("state")["player"]
+            position = player_after["position"]
+            diff = tuple(value - origin for value, origin in zip(position, center, strict=True))
+            player_distance = sum(value * value for value in diff) ** .5
+            pushing = rpm > 0
+            sign = 1.0 if pushing else -1.0
+            expected_x = sign * (float(row["range"]) - player_distance) * diff[0] / player_distance / 32.0
+            delta_x = player_after["position"][0] - player_before["position"][0]
+            assert delta_x * expected_x > 0 and abs(delta_x) >= abs(expected_x) * .25, (
+                name, player_before, player_after, expected_x)
         host.command(f"/kill {ITEM}")
+        if check_mob:
+            host.command(f"/kill {MOB}")
+        if check_player:
+            host.command(f"/tp {player} 7.5 173 16.5")
         if actor is not host:
             mp.until(f"the guest to receive the {name} probe's removal", lambda: guest_paper() is None)
-        print(f"{name}: Horizon matched Java's radial impulse on its sixth Nozzle tick.", flush=True)
+        coverage = "item impulse"
+        if check_mob:
+            coverage += ", mob impulse"
+        if check_player:
+            coverage += ", local player impulse"
+        print(f"{name}: Horizon matched the Java {coverage} on the sixth Nozzle tick.", flush=True)
 
 
 def run(args):
