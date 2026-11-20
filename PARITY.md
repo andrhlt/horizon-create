@@ -3757,9 +3757,10 @@ The crop replay also records every chest-minecart stack count after the
 moving harvest and compares the complete count vector after a world restart;
 the candidate retained the exact vector, with no loss or duplication. This is
 a bounded Horizon persistence/conservation check, not an exact Java reload
-trace. Guest collection and a separate plough active-reopen replay remain
-open; all-crop/loot and other tool interactions remain nonblocking broader
-follow-ups. Full 1:1 stays Open.
+trace. The plough replay now also reopens while the payload is moving and
+retains its active payload and farmland state before the extension/retraction
+checks. Guest collection remains open; all-crop/loot and other tool
+interactions remain nonblocking broader follow-ups. Full 1:1 stays Open.
 
 ## Windmill Bearing
 
