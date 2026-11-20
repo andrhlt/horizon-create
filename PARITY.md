@@ -856,6 +856,54 @@ in place. Run `tools/test-wrench.py --tagged` with the standard Horizon
 arguments. Broader Create block overrides, tagged inventory contents,
 sound playback timing, and the animated Wrench gear remain open.
 
+The APP-2076 bounded pass ran on `native-9f42064-558283db0c26` with pack
+SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+It passed the base and tagged fixtures, a new survival Wrench recipe test,
+18 gearbox rotation/pickup cases plus 11 powered Java samples, guest gearbox
+rotation, guest shaft/cogwheel wrench operations, and shaft save/reopen.
+The focused final suite comprises `wrench`, `wrench-tagged`,
+`wrench-crafting`, `gearbox-wrench`, `gearbox-wrench-lan`,
+`gearbox-wrench-retained`, `shaft-casing-lan`, `shaft-reopen`, and
+`brass-cogwheel-casing-lan`. A first aggregate gearbox run reported three
+missed pickup rows; the complete standalone Java comparison and later focused
+checks passed on the same build. The initial observation and its limits are
+preserved in `.local/parity/APP-2076-first-gearbox-observation.md`: the rows
+were initial X/south to Y, X/west to X, and Y/east to Z, each leaving the
+gearbox in place without a refund. The first aggregate's raw log was replaced
+by the rerun; this summary records the captured mismatch. An instrumented sweep
+hit the target but missed one pickup in 18 actions; 12 repetitions of the
+south-face case then succeeded with the player crouching.
+
+To investigate those three cases without retrying a failed interaction,
+`tools/test-wrench-pickup-probe.py` made three fresh-world repetitions of each
+original setup on the same build and pack. All nine attempts, including the
+original three setup/action combinations, recorded a block ray at `[8, 180,
+23]` on the west face, `sneaking=true`, successful rotation interaction with
+the expected axis, click input accepted (`ok=true`), post-click block `air`,
+and exactly one expected gearbox item returned while retaining the Wrench.
+The rotation interaction reports its before/after state; the mouse result only
+acknowledges input, so removal and inventory are the semantic pickup evidence.
+All nine passed with zero explicit frames between aiming and ray inspection;
+the fixture also passed nine repetitions with a one-frame settle. No gameplay
+defect reproduced, and the ray target was reliable in this focused check. The
+original cause remains uncertain: the original raw log was overwritten, and
+the ray inspection itself adds a control round trip before the click. The
+Wrench fixture now waits one frame after aiming and refuses to click unless the
+ray hits the intended block, so a future targeting miss is reported rather
+than retried or hidden.
+
+Reproduction command from the worktree root:
+
+```sh
+python3 tools/test-parity.py \
+  .local/patched-launcher/versions/native-9f42064-558283db0c26/horizon-ctl \
+  .local/patched-launcher/versions/native-9f42064-558283db0c26/horizon-client \
+  .local/patched-launcher/versions/native-9f42064-558283db0c26/.local/horizon-client/26.3 \
+  --jobs 2 --check 'wrench*' --check 'gearbox-wrench*' \
+  --check 'shaft-casing-lan' --check 'shaft-reopen' \
+  --check 'brass-cogwheel-casing-lan'
+```
+
 ## Item Drain
 
 The pinned [Java fixture](tools/java-item-drain-trace.patch) exercises honey

@@ -31,6 +31,11 @@ def sneak_click(control, aim):
     control.call("wait", 4)
     try:
         control.call("look-at", *aim)
+        control.call("wait", 1)
+        looking = control.call("looking-at")
+        hit = looking.get("block") or {}
+        if looking.get("kind") != "block" or hit.get("pos") != list(POSITION):
+            raise RuntimeError(f"Wrench pickup aim missed {POSITION}: {looking}")
         control.call("mouse", "right", "click")
         control.call("wait", 3)
     finally:
@@ -125,11 +130,51 @@ def run_tagged(args):
     print(f"Wrench tagged pickup matched all {len(targets)} original Java cases and their inventory items.")
 
 
+def run_crafting(args):
+    table = (9, 95, -9)
+    inputs = (
+        ("create:golden_sheet", 3, (100, 101, 103)),
+        ("create:cogwheel", 1, (104,)),
+        ("minecraft:stick", 1, (107,)),
+    )
+    with fixture_world(args, "Wrench-crafting", render=True, pack=args.pack) as control:
+        control.commands((
+            "/gamemode survival",
+            f"/setblock {' '.join(map(str, table))} minecraft:crafting_table",
+            "/tp @s 7.5 95 -9.5",
+            *(f"/item replace entity @s hotbar.{index} with {item} {count}"
+              for index, (item, count, _) in enumerate(inputs)),
+        ))
+        control.call("wait", 3)
+        control.call("interact", *table, "west")
+        for item, _, slots in inputs:
+            inventory = control.call("inventory")
+            carried = [*inventory["hotbar"], *inventory["main"]]
+            source = next(entry["slot"] for entry in carried if entry.get("item") == item)
+            control.call("click-slot", source)
+            for slot in slots:
+                control.call("click-slot", slot, "right")
+        menu = control.call("menu")
+        result_slot = next((entry for entry in menu["slots"] if entry["slot"] == 200), None)
+        if result_slot is None:
+            raise RuntimeError(f"Crafting table did not expose its result slot: {menu}")
+        result = result_slot["stack"]
+        if (result["item"], result["count"]) != ("create:wrench", 1):
+            raise RuntimeError(f"Expected the Java Wrench recipe result, got {result}")
+        control.call("click-slot", 200, "shift")
+        counts = control.call("inventory")["counts"]
+        expected = {"create:wrench": 1}
+        if counts != expected:
+            raise RuntimeError(f"Wrench crafting inventory: expected {expected}, got {counts}")
+    print("Survival crafting consumed the three golden sheets, Cogwheel and Stick for one Wrench.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pack", type=Path)
     parser.add_argument("--tagged", action="store_true")
+    parser.add_argument("--craft", action="store_true")
     for name in ("ctl", "client", "resources"):
         parser.add_argument(name, type=lambda value: Path(value).resolve(strict=True))
     args = parser.parse_args()
-    (run_tagged if args.tagged else run)(args)
+    (run_crafting if args.craft else run_tagged if args.tagged else run)(args)
