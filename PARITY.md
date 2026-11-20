@@ -9819,6 +9819,48 @@ dedicated baseline check passed these bounded cases:
   from +32 to −32 RPM. Its idle and active save/reopen cases passed; the active
   16 RPM motor and shaft resumed after reopening.
 
+## Bogeys and train assembly (APP-2047)
+
+The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+`StationBlockEntity.refreshAssemblyInfo()` takes its axis from the selected
+track edge and target direction, starts one block along that axis, and checks
+bogeys at the track's up normal. Its default bogey limit is 20.
+`isValidBogeyOffset()` rejects positions less than three blocks from an existing
+bogey. During `assemble()`, each captured carriage must contain its ordered
+second bogey at the next discovered bogey position when it has one. The rig
+follows those rules: target `[9,112,-8]`,
+direction `+X`, track at `y=112`, and bogeys at `[10,113,-8]`,
+`[13,113,-8]`, `[17,113,-8]`, and `[20,113,-8]`. Two independent Glue regions
+connect each pair to its own plank body, controls and barrel.
+
+The first Horizon fixture attempt showed four placed bogeys but a disabled
+assembly button. Instrumentation confirmed target `[9,112,-8]`, direction `+X`,
+and a 24-block track scan. The station had cached a zero count on the first
+assembly-mode tick, before the fixture placed the bogeys; frozen game time then
+prevented another scan before the UI was reopened. Stepping one game tick after
+placement makes the station discover all four bogeys before the menu opens. No
+station direction or scan change was needed. The registered
+[multi-carriage replay](tools/test-train-multi-carriage.py) now checks assembly
+and all four bogey offsets, host save/reopen, guest convergence on the assembled
+and restored blocks, cargo restoration for both carriages, and a separate
+40-tick manual drive where all eight track points move.
+
+On `native-9f42064-4d9ec02143c5` (Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`), with pack SHA-256
+`cb9a737fce8e9f26c0b0f4f0a8fc2af332959c39f1d4cb3ca06f9a3583e28fcc`, the
+multi-carriage test and affected `train-bogeys`, `manual-train`,
+`train-disassembly`, and `train-standing-disassembly` regressions passed. The
+multi-carriage movement assertion verifies movement and all eight track-point
+updates, not Java-equivalent multi-carriage speed timing. Broader layouts,
+curved multi-carriage movement, and full Java parity remain open.
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-4d9ec02143c5/horizon-ctl .local/patched-launcher/versions/native-9f42064-4d9ec02143c5/horizon-client .local/horizon-client/26.3 --jobs 2 --check train-multi-carriage --check train-bogeys --check manual-train --check train-disassembly --check train-standing-disassembly
+```
+
+Final client SHA-256: `6e33963a1eeae1b6e0344f22ee9af92aa4acb9f740343a3ad4465e31b2e290f0`;
+control tool SHA-256: `1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`.
+
 ## APP-1978 Super Glue and assembly selection
 
 The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
