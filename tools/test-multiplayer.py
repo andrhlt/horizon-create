@@ -29,7 +29,7 @@ def install_pack(home, pack=None):
 
 
 @contextmanager
-def dedicated(args, scratch, *, scenario="multiplayer", overrides=None, pack=None):
+def dedicated(args, scratch, *, scenario="multiplayer", overrides=None, pack=None, artifact_dir=None):
     home = scratch / "server"
     install_pack(home, pack)
     with socket.socket() as reservation:
@@ -52,7 +52,9 @@ def dedicated(args, scratch, *, scenario="multiplayer", overrides=None, pack=Non
         "".join(f"{k}={v}\n" for k, v in properties.items() if v is not None)
     )
     (home / "eula.txt").write_text("eula=true\n")
-    logfile = ROOT / f".local/{scenario}-server.log"
+    artifacts = artifact_dir or ROOT / ".local"
+    artifacts.mkdir(parents=True, exist_ok=True)
+    logfile = artifacts / f"{scenario}-server.log"
     with logfile.open("w") as log:
         server = subprocess.Popen(
             [args.client, "--resources", args.resources, "--dedicated", "--nogui"],
@@ -82,7 +84,8 @@ def dedicated(args, scratch, *, scenario="multiplayer", overrides=None, pack=Non
 
 
 @contextmanager
-def joined_client(args, scratch, address, name, *, render=False, scenario="multiplayer", pack=None, env=None):
+def joined_client(args, scratch, address, name, *, render=False, scenario="multiplayer", pack=None, env=None,
+                  artifact_dir=None):
     home = scratch / name
     install_pack(home, pack)
     ctl = FixtureWorld(args.ctl, home / "ctl.sock", env)
@@ -97,7 +100,9 @@ def joined_client(args, scratch, address, name, *, render=False, scenario="multi
             until(f"{name} to quit", lambda: not ctl.socket.exists(), 10)
         log = home / "ctl.log"
         if log.exists():
-            copy2(log, ROOT / f".local/{scenario}-{name.lower()}.log")
+            artifacts = artifact_dir or ROOT / ".local"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            copy2(log, artifacts / f"{scenario}-{name.lower()}.log")
 
 
 def count(client, item):
