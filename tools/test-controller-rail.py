@@ -56,6 +56,25 @@ def placement_power(args):
             actual_count = re.search(r"\bcount: (\d+)", held)
             if "Test passed" not in block or not actual_count or actual_count[1] != count:
                 failures.append((row, control.call("block", x, y, z), held))
+        # A rail cannot be placed in mid-air. Keep this separate from the Java
+        # placement trace: this is a negative survival interaction boundary.
+        x, y, z = 34, 170, 28
+        control.commands(("/clear @s create:controller_rail",
+                          "/give @s create:controller_rail 1",
+                          f"/setblock {x} {y} {z} minecraft:stone",
+                          f"/setblock {x} {y-1} {z+1} minecraft:air",
+                          f"/setblock {x} {y} {z+1} minecraft:air"))
+        # Approach from the south across intact floor and target the support
+        # block's south face; the destination at z+1 has no block underneath.
+        control.call("tp", x + 0.5, y, z + 2.5)
+        control.call("look-at", x + 0.5, y + 0.1, z + 0.5)
+        control.call("select", "create:controller_rail")
+        control.call("interact", x, y, z, "south")
+        unsupported, held = control.commands((f"/execute if block {x} {y} {z+1} minecraft:air",
+                                               "/data get entity @s SelectedItem"))
+        held_count = re.search(r"\bcount: (\d+)", held)
+        if "Test passed" not in unsupported or not held_count or held_count[1] != "1":
+            failures.append(("unsupported placement", control.call("block", x, y, z+1), held))
         for failure in failures:
             print("Placement", failure)
     with fixture_world(args, "ControllerRailPower", pack=args.pack) as control:

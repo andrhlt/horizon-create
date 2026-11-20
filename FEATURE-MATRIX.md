@@ -139,7 +139,7 @@ the two measure different levels of evidence.
 | Display Link and Display Board | Yes | Pass | [Chest counts and redstone gating](tools/test-display-link.py) matched 146 Java ticks. [Depot items, Board text and RPM](tools/test-depot-display.py) matched 121 Java ticks. Basin and Nixie outputs are also covered. [LAN lifecycle](tools/test-display-board-lifecycle.py) exercises survival target and stock source selection, second-row output, missing-target controls and two world reopens | Open | Remaining sources, targets, configuration options, exact flap rendering, Java reload and network timing |
 | Nixie Tubes and dyed variants | Yes | Pass | All 16 dye cases, sampled bright/dark palettes, output and orange drop | Open | Per-frame flicker, full placement/reopen and presentation |
 | Rose Quartz Lamp | Yes | Pass | Redstone behavior in solo and LAN | Open | Renderer and more neighbor/power combinations |
-| Controller Rail | Yes | Pass | Gradient, rail transport, placement, Wrench, crafting and Cart Assembler | Open | Remaining slopes, crossings and powered combinations |
+| Controller Rail | Yes | Pass | [APP-2044 finite baseline](PARITY.md#app-2044-finite-gameplay-baseline): supported ascending and rejected placement, 221 signal and 490 gradient/comparator samples, cart motion, survival crafting, Wrench/pickup, active save/reopen, LAN guest observation, and assembler regression | Open | Remaining slopes, crossings and powered combinations |
 
 ## Trains
 

@@ -2,7 +2,6 @@
 """Replay Java wrench rotation and survival Controller Rail item exchanges."""
 import argparse
 import csv
-from importlib import import_module
 from pathlib import Path
 import re
 
@@ -14,6 +13,22 @@ COORDINATE = re.compile(r"([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)d\b")
 def rows(variant):
     with (ROOT / "fixtures" / f"controller-rail-{variant}-java.csv").open() as fixture:
         return list(csv.reader(fixture))[1:]
+
+
+def sneak_click_at(control, position, aim):
+    control.call("key", "shift", "down")
+    control.call("wait", 4)
+    try:
+        control.call("look-at", *aim)
+        control.call("wait", 1)
+        looking = control.call("looking-at")
+        hit = looking.get("block") or {}
+        if looking.get("kind") != "block" or hit.get("pos") != list(position):
+            raise RuntimeError(f"Controller Rail pickup aim missed {position}: {looking}")
+        control.call("mouse", "right", "click")
+        control.call("wait", 3)
+    finally:
+        control.call("key", "shift", "up")
 
 
 def wrench(args):
@@ -60,7 +75,6 @@ def wrench(args):
 
 
 def pickup(args):
-    sneak_click = import_module("test-wrench").sneak_click
     expected = rows("pickup")
     actual = []
     with fixture_world(args, "ControllerRailPickup", render=True, pack=args.pack) as control:
@@ -78,7 +92,7 @@ def pickup(args):
             control.command("/clear @s create:controller_rail")
             control.command(f"/setblock {x} {y} {z} create:controller_rail[waterlogged={wet}]")
             control.call("tp", x + 0.5, y, z + 2.5)
-            sneak_click(control, (x + 0.5, y + 0.06, z + 0.5))
+            sneak_click_at(control, (x, y, z), (x + 0.5, y + 0.06, z + 0.5))
             block = control.call("block", x, y, z)
             source = "true" if block["state"] == "minecraft:water[level=0]" else "false"
             count = control.call("inventory")["counts"].get("create:controller_rail", 0)

@@ -527,6 +527,8 @@ CHECKS = (
     ("controller-rail-craft", "test-controller-rail", "--craft"),
     ("controller-rail-wrench", "test-controller-rail-tools"),
     ("controller-rail-assembler", "test-controller-rail-tools", "--assembler"),
+    ("controller-rail-persistence", "test-controller-rail-baseline", "--persistence"),
+    ("controller-rail-lan", "test-controller-rail-baseline", "--lan"),
     ("sandpaper", "test-sandpaper"),
     ("sandpaper-lan", "test-sandpaper-lan"),
     ("shearing", "test-shearing"),
