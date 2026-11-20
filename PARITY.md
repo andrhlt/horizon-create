@@ -9077,3 +9077,36 @@ coverage; Full 1:1 stays Open.
 
 APP-1978 bounded outcomes do not claim exact Java packet timing or exhaustive
 connectivity, inventory, rendering or effect parity. Full 1:1 remains Open.
+
+
+## Millstone gameplay baseline (APP-1958)
+
+On `native-9f42064-c9fa0f927bed` (Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`) with the pinned Create source
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and prepared pack SHA-256
+`8c375b36ab5485aad9e4e2793bc416182c9971428107e4df3269622c80553557`, all six
+registered checks passed:
+
+- `wheat-milling`: all 81 samples (ticks 0–80) matched the upstream fixture,
+  including RPM, timer and item transfers.
+- `milling-recipes`: clay, wool and bone each matched 106 fixture rows.
+- `millstone-lifecycle`: stopped idle contents/timer and a partway active wheat
+  cycle survived world reopen; the resumed result was within the pinned recipe's
+  guaranteed and chance-output bounds.
+- `millstone-backpressure`: a full result slot paused processing without
+  consuming the input, and freeing capacity let the wheat cycle complete.
+- `millstone-lan`: a survival guest supplied wheat and collected the flour;
+  host and guest inventories converged after the LAN interaction.
+- `milling-lookup`: clay and wheat recipes opened in solo and LAN lookup.
+
+The lifecycle and backpressure replays are source-aligned Horizon gameplay
+checks, not exact Java save/reload trace comparisons. The LAN check establishes
+eventual inventory state, not packet timing. These representative cases do not
+establish exhaustive recipe, chance distribution, layout, rendering or effect
+parity; Full 1:1 remains Open.
+
+Run the six checks together with:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-c9fa0f927bed/horizon-ctl .local/patched-launcher/versions/native-9f42064-c9fa0f927bed/horizon-client .local/patched-launcher/versions/native-9f42064-c9fa0f927bed/.local/horizon-client/26.3 --jobs 1 --check wheat-milling --check milling-recipes --check millstone-lifecycle --check millstone-backpressure --check millstone-lan --check milling-lookup
+```
