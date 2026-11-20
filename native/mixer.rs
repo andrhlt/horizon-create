@@ -1,6 +1,7 @@
 use std::hash::{Hash, Hasher};
 
 use horizon_core::geometry::{Direction, trig};
+use horizon_core::random::RandomSource;
 use horizon_world::nbt::{Compound, Tag};
 
 use crate::containers::ModBlockEntity;
@@ -27,6 +28,22 @@ const SHAFTLESS_COG: &str = "create:block/cogwheel_shaftless";
 const POLE: &str = "create:block/mechanical_mixer/pole";
 const WHISK: &str = "create:block/mechanical_mixer/head";
 
+fn rolled_output_counts<T>(
+    outputs: Vec<(T, u32, Option<f32>)>,
+    mut roll: impl FnMut() -> f32,
+) -> Vec<(T, u32)> {
+    outputs
+        .into_iter()
+        .map(|(item, count, chance)| {
+            let count = chance.map_or(count, |chance| {
+                (0..count).filter(|_| roll() <= chance).count() as u32
+            });
+            (item, count)
+        })
+        .filter(|(_, count)| *count > 0)
+        .collect()
+}
+
 pub(super) fn models(models: &mut Vec<String>) {
     models.extend([SHAFTLESS_COG, POLE, WHISK].map(String::from));
 }
@@ -34,7 +51,7 @@ pub(super) fn models(models: &mut Vec<String>) {
 pub(super) struct Recipe {
     pub(super) id: String,
     inputs: Vec<u32>,
-    outputs: Vec<ItemStack>,
+    outputs: Vec<(ItemStack, Option<f32>)>,
     fluid_output: Option<Fluid>,
     brewed: Option<Brewed>,
     drained: [i32; 4],
@@ -168,12 +185,14 @@ fn recipe(game: &Game<'_>, pos: [i32; 3], wanted: Option<&str>) -> Option<Recipe
                         components: None,
                     });
                 } else {
-                    outputs.push(game.native_recipe_result(result)?);
+                    let output = game.native_recipe_result(result)?;
+                    let chance = result["chance"].as_f64().unwrap_or(1.0) as f32;
+                    outputs.push((output, (chance < 1.0).then_some(chance)));
                 }
             }
             if !outputs
                 .iter()
-                .all(|stack| accepts(game.items(), &basin.nbt, stack))
+                .all(|(stack, _)| accepts(game.items(), &basin.nbt, stack))
             {
                 return None;
             }
@@ -202,6 +221,25 @@ fn recipe(game: &Game<'_>, pos: [i32; 3], wanted: Option<&str>) -> Option<Recipe
                 None
             }
         })
+}
+
+#[cfg(test)]
+mod recipe_output_tests {
+    use super::rolled_output_counts;
+
+    #[test]
+    fn mixing_outputs_keep_recipe_order_and_roll_each_item() {
+        let mut rolls = [0.1, 0.4, 0.9].into_iter();
+        let actual = rolled_output_counts(
+            vec![
+                ("first", 1, None),
+                ("chance", 3, Some(0.5)),
+                ("last", 1, None),
+            ],
+            || rolls.next().unwrap(),
+        );
+        assert_eq!(actual, vec![("first", 1), ("chance", 2), ("last", 1)]);
+    }
 }
 
 fn processing_inputs(
@@ -288,7 +326,7 @@ pub(super) fn compacting_recipe(
         recipe
             .outputs
             .iter()
-            .all(|stack| accepts(game.items(), &basin.nbt, stack))
+            .all(|(stack, _)| accepts(game.items(), &basin.nbt, stack))
             && (spout || basin_output(game, basin, recipe).is_some())
     };
     let explicit = game
@@ -305,7 +343,7 @@ pub(super) fn compacting_recipe(
             Some(Recipe {
                 id: recipe.id.clone(),
                 inputs,
-                outputs,
+                outputs: outputs.into_iter().map(|stack| (stack, None)).collect(),
                 fluid_output: None,
                 brewed: None,
                 drained,
@@ -331,7 +369,7 @@ pub(super) fn compacting_recipe(
             Some(Recipe {
                 id: id.clone(),
                 inputs,
-                outputs: vec![result.create()],
+                outputs: vec![(result.create(), None)],
                 fluid_output: None,
                 brewed: None,
                 drained: [0; 4],
@@ -585,7 +623,7 @@ fn basin_output(
     for (slot, count) in output.iter_mut().zip(plan.inputs.iter().skip(9)) {
         subtract(slot, *count);
     }
-    for stack in &plan.outputs {
+    for (stack, _) in &plan.outputs {
         let limit = game.native_max_stack_size(&stack.item).unwrap_or(64);
         if insert(&mut output, stack, limit) > 0 {
             return None;
@@ -627,16 +665,37 @@ fn basin_fluid_output(
 }
 
 pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], planned: Recipe) -> bool {
+    if !mod_entity(game, pos).is_some_and(|basin| basin.id == BASIN && basin.items.len() >= 18) {
+        return false;
+    }
+    let spout = basin_has_spout(game, pos);
+    if spout && mod_entity(game, pos).is_some_and(|basin| !processed(&basin.nbt).is_empty()) {
+        return false;
+    }
+    let mut planned = planned;
+    planned.outputs = rolled_output_counts(
+        planned
+            .outputs
+            .drain(..)
+            .map(|(stack, chance)| {
+                let count = stack.count;
+                (stack, count, chance)
+            })
+            .collect(),
+        || game.world.random.next_float(),
+    )
+    .into_iter()
+    .map(|(mut stack, count)| {
+        stack.count = count;
+        (stack, None)
+    })
+    .collect();
     let Some(basin) =
         mod_entity(game, pos).filter(|basin| basin.id == BASIN && basin.items.len() >= 18)
     else {
         return false;
     };
-    let spout = basin_has_spout(game, pos);
     let output = if spout {
-        if !processed(&basin.nbt).is_empty() {
-            return false;
-        }
         None
     } else {
         let Some(output) = basin_output(game, basin, &planned) else {
@@ -694,7 +753,12 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], planned: Recipe) -> bool
             for (slot, count) in basin.items.iter_mut().zip(planned.inputs) {
                 subtract(slot, count);
             }
-            write_overflow(basin, &planned.outputs);
+            let outputs = planned
+                .outputs
+                .iter()
+                .map(|(stack, _)| stack.clone())
+                .collect::<Vec<_>>();
+            write_overflow(basin, &outputs);
         }
         true
     })

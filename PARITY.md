@@ -303,6 +303,33 @@ passed on `native-9f42064-1f2743f4b4c4` with this archive. The
 
 ## Survival machine recipes
 
+### Probabilistic mixer outputs
+
+The pinned [Create 6.0.10 `ProcessingOutput`](https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/content/processing/recipe/ProcessingOutput.java)
+rolls once per output item when `chance < 1`, retaining that item when the
+random float is at most the chance. Guaranteed outputs consume no random value.
+Horizon's Mixer had treated every item output as guaranteed. It now preserves
+the recipe's output order and resolves chance rolls when applying the recipe,
+not during repeated recipe lookups. This keeps lookup and tick validation from
+rerolling an output. Fluid outputs are unaffected.
+
+Source and focused helper checks cover interleaved guaranteed and probabilistic
+outputs and the count resulting from independent rolls. Runtime verification
+with a probabilistic mixer recipe, including host/guest and active save/reopen,
+remains open; existing deterministic mixing traces do not cover that case.
+
+The isolated build `native-9f42064-ffe4b00e329a` used the pinned 26.3 resources
+and `create.hmod` SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Its `horizon-client` SHA-256 is
+`07a4122cea6aca83ee27239677f8e8707fc600f6e117377fc189ba57ecb2c2e4`.
+The focused integration batch passed all 11 checks: `wheat-milling`,
+`milling-recipes`, `depot-pressing`, `pressing-category`, `basin-dry-alloy`,
+`basin-wet-materials`, `heated-fluid-food`, `water-filling-bottle`, `spouting`,
+`mixing-lookup` and `recipe-navigation`. These cover existing deterministic
+recipe behavior, basin routing, fluid processing, spouting and recipe sync;
+they do not exercise probabilistic output execution.
+
 The [Java crafting probe](tools/java-machine-crafting-trace.patch) resolves
 24 original recipe IDs through the game's recipe manager and records the
 grid, result stack and crafting remainders. The
