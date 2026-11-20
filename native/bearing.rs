@@ -11,7 +11,9 @@ use crate::items::ItemStack;
 use super::Game;
 use super::create_depot::{compound, encode};
 use super::create_fan::facing;
-use super::create_machines::{float, int, mod_entity, offset, set_float};
+use super::create_machines::{
+    GEARBOX, axis_index, float, int, mod_entity, offset, reset_moved_gearbox, set_float,
+};
 use super::native_entities::NativeDisplay;
 
 struct GlueBox {
@@ -506,6 +508,24 @@ fn rotated_state(
     if let Some(rotated) = super::create_linear_chassis::rotated(game, state, axis, angle) {
         return rotated;
     }
+    if game
+        .pack
+        .assets
+        .registry
+        .state(state)
+        .is_some_and(|block| block.name == GEARBOX)
+        && let Some(original) = game.native_block_state_property(state, "axis").and_then(axis_index)
+    {
+        let mut normal = [0.0; 3];
+        normal[original] = 1.0;
+        let rotated = rotate(normal, axis, angle);
+        if let Some(along) = rotated.iter().position(|coordinate| coordinate.abs() > 0.5) {
+            let name = ["x", "y", "z"][along];
+            return game
+                .with_level(|_, level, _| level.native_state_with_property(state, "axis", name))
+                .unwrap_or(state);
+        }
+    }
     let Some(face) = facing(game, state) else {
         return state;
     };
@@ -573,7 +593,8 @@ pub(super) fn restore(
             })
             .unwrap_or(state);
         if game.native_set_block(dimension, pos, state, flags::UPDATE_ALL) {
-            game.native_with_mod_block_entity(pos, |target| {
+            let tick = game.world.game_time;
+            let restored_gearbox = game.native_with_mod_block_entity(pos, |target| {
                 if let Some(data) = compound(block, "Entity") {
                     target.nbt = data.clone();
                 }
@@ -587,7 +608,16 @@ pub(super) fn restore(
                         }
                     }
                 }
+                if target.id == GEARBOX {
+                    reset_moved_gearbox(target, tick);
+                    true
+                } else {
+                    false
+                }
             });
+            if restored_gearbox == Some(true) {
+                game.native_block_entity_sync(pos);
+            }
             if let Some(data) = block.get(&"VanillaEntity".into()) {
                 game.set_block_entity_checked(pos, data.clone());
             }

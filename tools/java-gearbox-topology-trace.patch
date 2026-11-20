@@ -1,0 +1,175 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..875b5d0 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.gearboxTopologyMatrix"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..40b1d2c 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -2,8 +2,16 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ 
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Map;
++
++import com.google.gson.JsonObject;
+ import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
++import com.simibubi.create.content.kinetics.gearbox.GearboxBlockEntity;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+ import com.simibubi.create.content.schematics.SchematicItem;
+@@ -14,6 +22,8 @@ import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
+ import com.simibubi.create.infrastructure.gametest.GameTestGroup;
+ 
+ import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.core.registries.BuiltInRegistries;
+ import net.minecraft.gametest.framework.GameTest;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.sounds.SoundSource;
+@@ -26,6 +36,7 @@ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.item.Items;
+ import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.RedstoneLampBlock;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
+@@ -115,4 +126,122 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	private record GearboxTopologyCase(String name, Direction.Axis aAxis, Direction.Axis bAxis,
++		Direction link, Direction input, int dial, Integer backupDial) {}
++
++	@GameTest(template = "shearing", timeoutTicks = 200)
++	public static void gearboxTopologyMatrix(CreateGameTestHelper helper) {
++		var x = Direction.Axis.X;
++		var y = Direction.Axis.Y;
++		var z = Direction.Axis.Z;
++		var n = Direction.NORTH;
++		var s = Direction.SOUTH;
++		var e = Direction.EAST;
++		var w = Direction.WEST;
++		var u = Direction.UP;
++		var d = Direction.DOWN;
++		var cases = List.of(
++			new GearboxTopologyCase("x_to_y", x, y, s, u, 32, null),
++			new GearboxTopologyCase("x_to_z", x, z, d, n, -48, null),
++			new GearboxTopologyCase("y_to_x", y, x, n, w, 48, null),
++			new GearboxTopologyCase("z_to_x", z, x, u, e, -24, null),
++			new GearboxTopologyCase("z_to_y", z, y, e, d, -24, null),
++			new GearboxTopologyCase("x_to_x", x, x, u, s, 16, null),
++			new GearboxTopologyCase("y_to_y", y, y, w, e, 40, null),
++			new GearboxTopologyCase("z_to_z", z, z, d, w, 56, null),
++			new GearboxTopologyCase("closed_link", x, y, e, n, 32, null),
++			new GearboxTopologyCase("compatible_tie", x, x, u, d, 32, -32),
++			new GearboxTopologyCase("incompatible_tie", x, x, u, d, 32, 32)
++		);
++		for (int i = 0; i < cases.size(); i++) {
++			var test = cases.get(i);
++			int tick = 1 + i * 13;
++			helper.runAtTickTime(tick, () -> runGearboxTopologyCase(helper, test, tick));
++		}
++		helper.runAtTickTime(cases.size() * 13, helper::succeed);
++	}
++
++	private static void runGearboxTopologyCase(CreateGameTestHelper helper, GearboxTopologyCase test, int tick) {
++		BlockPos a = new BlockPos(12, 7, 5);
++		BlockPos b = a.relative(test.link());
++		for (BlockPos cell : BlockPos.betweenClosed(a.offset(-2,-2,-2), a.offset(2,2,2)))
++			helper.setBlock(cell, Blocks.AIR);
++		Map<String, BlockPos> points = new LinkedHashMap<>();
++		points.put("a", a);
++		points.put("b", b);
++		for (Direction face : Direction.values()) {
++			if (face != test.link()) {
++				BlockPos pos = a.relative(face);
++				points.put("a_" + face.getSerializedName(), pos);
++				if (face == test.input())
++					gearboxTopologyMotor(helper, pos, face.getOpposite(), test.dial());
++				else
++					gearboxTopologyShaft(helper, pos, face.getAxis());
++			}
++			if (face != test.link().getOpposite()) {
++				BlockPos pos = b.relative(face);
++				points.put("b_" + face.getSerializedName(), pos);
++				if (face == test.link() && test.backupDial() != null)
++					gearboxTopologyMotor(helper, pos, face.getOpposite(), test.backupDial());
++				else
++					gearboxTopologyShaft(helper, pos, face.getAxis());
++			}
++		}
++		helper.setBlock(a, AllBlocks.GEARBOX.getDefaultState().setValue(BlockStateProperties.AXIS, test.aAxis()));
++		var joiningState = AllBlocks.GEARBOX.getDefaultState().setValue(BlockStateProperties.AXIS, test.bAxis());
++		if (test.backupDial() == null) {
++			helper.setBlock(b, joiningState);
++			helper.runAtTickTime(tick + 6, () -> sampleGearboxTopology(helper, test, "settled", points));
++		} else {
++			helper.runAtTickTime(tick + 6, () -> {
++				sampleGearboxTopology(helper, test, "before_join", points);
++				helper.setBlock(b, joiningState);
++			});
++			helper.runAtTickTime(tick + 7, () -> sampleGearboxTopology(helper, test, "joined_1", points));
++			helper.runAtTickTime(tick + 10, () -> sampleGearboxTopology(helper, test, "joined_4", points));
++		}
++	}
++
++	private static void sampleGearboxTopology(CreateGameTestHelper helper, GearboxTopologyCase test, String phase,
++		Map<String, BlockPos> points) {
++		JsonObject row = new JsonObject();
++		row.addProperty("case", test.name());
++		row.addProperty("a_axis", test.aAxis().getSerializedName());
++		row.addProperty("b_axis", test.bAxis().getSerializedName());
++		row.addProperty("link", test.link().getSerializedName());
++		row.addProperty("input", test.input().getSerializedName());
++		row.addProperty("dial", test.dial());
++		if (test.backupDial() != null)
++			row.addProperty("backup_dial", test.backupDial());
++		row.addProperty("phase", phase);
++		JsonObject measured = new JsonObject();
++		var level = helper.getLevel();
++		for (var point : points.entrySet()) {
++			var pos = helper.absolutePos(point.getValue());
++			var state = level.getBlockState(pos);
++			JsonObject reading = new JsonObject();
++			reading.addProperty("block", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
++			if (level.getBlockEntity(pos) instanceof KineticBlockEntity kinetic) {
++				reading.addProperty("rpm", kinetic.getSpeed());
++				if (kinetic instanceof GearboxBlockEntity gearbox) {
++					reading.addProperty("axis", state.getValue(BlockStateProperties.AXIS).getSerializedName());
++					String source = gearbox.hasSource() ? gearbox.getSourceFacing().getSerializedName() : "none";
++					reading.addProperty("source", source);
++				}
++			}
++			measured.add(point.getKey(), reading);
++		}
++		row.add("points", measured);
++		System.out.println("CREATE_GEARBOX_TOPOLOGY " + row);
++	}
++
++	private static void gearboxTopologyMotor(CreateGameTestHelper helper, BlockPos pos, Direction facing, int speed) {
++		helper.setBlock(pos, AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(BlockStateProperties.FACING, facing));
++		helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), pos).generatedSpeed.setValue(speed);
++	}
++
++	private static void gearboxTopologyShaft(CreateGameTestHelper helper, BlockPos pos, Direction.Axis axis) {
++		helper.setBlock(pos, AllBlocks.SHAFT.getDefaultState().setValue(BlockStateProperties.AXIS, axis));
++	}
+ }

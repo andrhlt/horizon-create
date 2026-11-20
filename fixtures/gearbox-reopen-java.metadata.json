@@ -1,0 +1,49 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "create": "6.0.10",
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.219",
+  "java": "21.0.13.1",
+  "patch_sha256": "a8fef32d5d45aea06f8ae08786e9d316207737fd73a3d9a0d99cd971a840f66e",
+  "trace_sha256": "f397e1df454aedcd5534deb6549fe5158887d248427f6469cb9aaee458d2fe19",
+  "save_seconds": 14.78,
+  "reopen_seconds": 12.13,
+  "scope": "Separate dedicated server processes with a clean shutdown and reopen of the same saved world. Powered X with negative vertical drive, stopped Z with a blocked motor, source removal and opposite-sign replacement from the south.",
+  "java_samples": "ServerTickEvent.Post at tick 12 before shutdown, then reopened ticks 1, 8, 9 and 10.",
+  "java_tags": {
+    "before_save": {
+      "powered": "{Network:{Capacity:524288.0f,Id:2199023288423L,Size:2,Stress:0.0f},Source:[I;8,103,8],Speed:-32.0f}",
+      "stopped": "{Speed:0.0f}"
+    },
+    "after_load": {
+      "powered": "{NeedsSpeedUpdate:1b,Network:{Capacity:524288.0f,Id:2199023288423L,Size:2,Stress:0.0f},Source:[I;8,103,8],Speed:-32.0f}",
+      "stopped": "{NeedsSpeedUpdate:1b,Speed:0.0f}"
+    },
+    "settled": {
+      "powered": "{Network:{Capacity:524288.0f,Id:2199023288423L,Size:2,Stress:0.0f},Source:[I;8,103,8],Speed:-32.0f}",
+      "stopped": "{Speed:0.0f}"
+    },
+    "source_removed": {
+      "powered": "{Speed:0.0f}",
+      "stopped": "{Speed:0.0f}"
+    },
+    "source_replaced": {
+      "powered": "{Network:{Capacity:393216.0f,Id:2199023292520L,Size:4,Stress:0.0f},Source:[I;8,104,9],Speed:24.0f}",
+      "stopped": "{Speed:0.0f}"
+    }
+  },
+  "resolved_server_properties_sha256": "fc0d931a261b10fad35a1a8b8144e005b3327a87290c22f71acad32050ab6aea",
+  "server_properties": {
+    "level-name": "gearbox-reopen",
+    "level-type": "minecraft:flat",
+    "level-seed": 1479,
+    "server-ip": "127.0.0.1",
+    "server-port": 0,
+    "online-mode": false,
+    "enforce-secure-profile": false,
+    "view-distance": 4,
+    "simulation-distance": 4,
+    "spawn-protection": 0,
+    "pause-when-empty-seconds": -1
+  }
+}
