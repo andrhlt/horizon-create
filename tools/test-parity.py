@@ -304,6 +304,7 @@ CHECKS = (
     ("depot-display", "test-depot-display"),
     ("depot-display-settings", "test-depot-display", "--configure"),
     ("display-link-placement", "test-display-link", "--configure"),
+    ("display-board-lifecycle", "test-display-board-lifecycle", "--visual"),
     ("milling-recipes", "test-milling-recipes"),
     ("millstone-lifecycle", "test-millstone-lifecycle"),
     ("millstone-backpressure", "test-millstone-backpressure"),
