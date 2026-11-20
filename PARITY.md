@@ -213,12 +213,12 @@ and textured icons. Screenshots and widget IDs are archived in
 The [pinned Java tab inventory](tools/java-creative-tabs-inventory.patch)
 captured [203 Base and 377 Palettes display entries](fixtures/creative-tabs-java.csv).
 The prepared pack uses those display memberships and the Java Palettes
-order. The [headless replay](tools/test-create-creative-tabs.py) checked
+order. The [offscreen replay](tools/test-create-creative-tabs.py) checked
 both memberships, Palettes order, and both first live pages on
 `native-9f42064-89e551a852ca`. The 16-color seat search also passed.
 Base keeps the port’s existing relative order pending a Java client
-capture of its 3D-first sort. Search-only entries and attribution
-still need comparison.
+capture of its 3D-first sort. The APP-2095 replay below compares
+representative search-only entries and attribution.
 
 ## Inventory
 
@@ -303,6 +303,44 @@ passed on `native-9f42064-1f2743f4b4c4` with this archive. The
 
 ## Survival machine recipes
 
+### Probabilistic mixer outputs
+
+The pinned [Create 6.0.10 `ProcessingOutput`](https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/content/processing/recipe/ProcessingOutput.java)
+rolls once per output item when `chance < 1`, retaining that item when the
+random float is at most the chance. Guaranteed outputs consume no random value.
+Horizon's Mixer had treated every item output as guaranteed. It now preserves
+the recipe's output order and resolves chance rolls when applying the recipe,
+not during repeated recipe lookups. This keeps lookup and tick validation from
+rerolling an output. Fluid outputs are unaffected.
+
+The Rust helper test supplies three fixed rolls and checks the count and order
+of interleaved guaranteed and probabilistic outputs. The [runtime replay](tools/test-mixer-chance.py)
+loads a world datapack with one diamond input, 64 gold nugget rolls at 50% each
+and two guaranteed items. It closes the host while the mixer is running with
+at least 20 processing ticks left. On reopening, the same recipe still has its
+diamond and a positive countdown. After 80 more stepped ticks, the diamond is
+gone and the mixer is idle. The survival guest picks up the rolled stack from
+the depot and checks its exact count against the host. After an idle reopen,
+the depot still holds the iron nugget and the basin still holds the queued
+copper ingot. This checks output order, custody and persistence.
+
+The combined client `native-9f42064-12f8cd8053b7` produced 30 gold nuggets in
+the first completed replay. The game uses the level RNG, so the count varies
+between runs. The pinned 26.3 resources used `create.hmod` SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The client SHA-256 is
+`0d8c15ef73ed7f31847b91f961a3ac9423887292b1275e8347aa7c54c270374c`.
+
+The combined build and the earlier `native-9f42064-ffe4b00e329a` both passed
+the following 11 neighboring checks:
+`wheat-milling`, `milling-recipes`, `depot-pressing`, `pressing-category`,
+`basin-dry-alloy`, `basin-wet-materials`, `heated-fluid-food`,
+`water-filling-bottle`, `spouting`, `mixing-lookup` and `recipe-navigation`.
+These cover accepted and rejected inputs, basin routing, fluid processing,
+spouting and guest recipe/tag synchronization on reload. Run the same named
+checks and `mixer-chance` with `tools/test-parity.py` on the combined build.
+Exact RNG stream alignment with Java and guest packet timing remain unverified.
+
 The [Java crafting probe](tools/java-machine-crafting-trace.patch) resolves
 24 original recipe IDs through the game's recipe manager and records the
 grid, result stack and crafting remainders. The
@@ -320,6 +358,26 @@ Each returns one default stack and clears the Create component, custom
 name and custom data. The [Horizon replay](tools/test-crafting-reset.py)
 checks the authoritative inventory before crafting and after taking the
 result in survival.
+
+## Vanilla recipe save and reopen
+
+The `vanilla-recipe-reopen` check in [the parity runner](tools/test-parity.py)
+saves two White Wool stacks in separate hotbar slots, reopens the same world and
+confirms both persisted. It puts one wool in the player's 2×2 crafting grid
+and verifies the incomplete recipe has no result, then adds the second wool
+and crafts three White Carpet. This is a bounded gameplay persistence check
+for one ordinary vanilla crafting recipe; it does not establish full catalog,
+recipe-book unlock, stonecutting or cooking parity.
+
+The surrounding recipe evidence remains sampled: `survival-crafting` covers
+starter Create parts, `machine-crafting` compares 24 Java recipes including
+remainders, `cooking-materials --cooking-only` compares 609 Java samples for
+smelting bread, smoking bread and smelting Scoria, and
+`test-extra-material-recipes.py` has a campfire Dough-to-Bread case.
+`test-zinc-progression.py --heating` compares the
+existing smelting and blasting recipes. `vanilla-stone-palettes-lan` passed
+seven guest Stonecutter cases on retry; its first run transiently missed an
+output before the successful retry. Full catalog equivalence remains open.
 
 ## Zinc mining and processing
 
@@ -2182,6 +2240,59 @@ settings box opens the board on the sixth client tick, and releasing it
 confirms the selected value. A three-tick press stays in the world and a
 left-click on the board leaves the setting pending.
 
+The overload replay uses an 8 RPM water wheel supplying 256 SU through a
+gearbox and controller. One fan on the cog side applies 254, 256 or 258 SU
+at targets 127, 128 and 129 RPM. The fan runs at equality and stalls at
+258 SU. The replay recovers first at +128 and then at −127 after another
+overload at −129. Java records the fan's effective RPM directly. The Horizon
+replay computes it from the fan's saved speed, capacity and stress, and
+independently samples the speedometer target, which drops to zero during
+overload. Build
+`native-9f42064-4ce381fec622` matched all 17 samples after the 70-tick
+water-wheel warmup. Horizon sets the target with the server NBT command.
+The tested pack SHA-256 is
+`d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`.
+[Java trace](fixtures/rotation-speed-controller-overload-java.csv)
+
+Apply the overload patch to the pinned Java checkout and run
+`./gradlew --offline runGameTestServer` with Java 21. Extract the CSV fields
+after `CREATE_CONTROLLER_OVERLOAD `. The patch SHA-256 is
+`f5fd02e889371390358e0766d782927bb0369297f7c5c2c797a21f7dc8efd6d8`.
+[Capture patch](tools/java-rotation-speed-controller-overload.patch)
+
+The boundary replay compares both drive directions on ticks 1–23 after
+setup. The negative row's zero column selects −1 RPM. The board also sets
+−73, −256, +256 and +23 RPM. A true zero target after ticks 9 and 18 stops
+the regulated side while the input stays at 24 RPM. Java invokes
+`SpeedControllerPeripheral.setTargetSpeed(0)`. The Horizon replay injects
+`ScrollValue:0` with the server's `/data merge block` command. The comparison
+covers the resulting settings and all seven speeds at four decimal places.
+[Java trace](fixtures/rotation-speed-controller-boundaries-java.csv) ·
+[Capture patch](tools/java-rotation-speed-controller-boundaries.patch)
+
+Apply the boundary patch to Create 6.0.10 at `ac0c444d9828da3453ae8cc65338e8de063286fb`
+and run `./gradlew --offline runGameTestServer` on Java 21. Extract the CSV
+fields after `CREATE_SPEED_CONTROLLER_BOUNDS `. The patch SHA-256 is
+`142a5e1dcb914680c5d953b5d4ad0a996aeb5c53435e509376af19ec9e4348ee`.
+Existing build `native-9f42064-711c7991bebd` matched all 23 ticks with
+prepared pack SHA-256 `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`.
+
+A cold reopen replay saves four powered rigs at signed targets −73 and +83,
+plus a zero target in each drive direction. A fresh Java server process
+loads the same world. The trace records the target and five block RPM
+readings before save, at the first loaded pre-tick, and for six more ticks.
+Horizon closes and relaunches its world process and takes the first sample
+before stepping the reopened world. Build `native-9f42064-711c7991bebd`
+matched all 32 rows using prepared pack SHA-256
+`d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`.
+[Java trace](fixtures/rotation-speed-controller-reopen-java.csv)
+
+Apply the reopen patch to the pinned Create 6.0.10 checkout. With Java 21,
+run `python3 tools/capture-java-rotation-speed-controller-reopen.py /path/to/checkout --output /path/to/empty-capture-dir --offline`.
+The patch SHA-256 is
+`14af0eca9f174c4e1f475ddf576dd16f3c180acdc03b6ac7f548d6dea912845d`.
+[Capture patch](tools/java-rotation-speed-controller-reopen.patch)
+
 The 40-tick cascade replay loads two regulators with fans in all three
 sections. It compares six rotational speeds and both controllers’ stress and
 capacity while changing signed settings, removing the first motor, then
@@ -2206,17 +2317,198 @@ shaft. A live host sets 64 RPM, and a guest reverses the server output to
 −32 RPM, then attaches a large cog to a second controller and spends one item.
 The original recipe passes the survival crafting fixture.
 
+An integrated hidden Java host and guest also opened the survival settings
+board and sent real `ValueSettingsPacket` edits through the LAN server. At
+frozen world tick 283 the host's +64 and guest's −32 edits were both accepted
+by the server and appeared on both clients' controller block entities at that
+tick. This verifies authority and replication for those edits. The frozen
+world reports effective RPM zero, so this capture does not establish the
+unfrozen shaft or rendered replication delay; LAN timing remains open.
+
+The survival Wrench replay starts with 24 RPM through a bare controller
+set to −73. A top click rotates the axis to X and stops the downstream
+shaft. The side click leaves the axis at X, and a bottom click restores the
+Z axis and 24 RPM. The setting survives both turns. Sneak-clicking picks up
+one controller and stops its former output shaft. The original motor
+keeps running. Baseline `native-9f42064-711c7991bebd` differed in six rows.
+Candidate `native-9f42064-4ce381fec622` matched all eleven samples from
+ticks 1–11 using the same prepared pack.
+[Java trace](fixtures/rotation-speed-controller-wrench-java.csv)
+
+Apply the Wrench patch to the pinned Java checkout and run
+`./gradlew --offline runGameTestServer`, then extract the fields after
+`CREATE_CONTROLLER_WRENCH `. The patch SHA-256 is
+`0d9c40a415a15cf22afcef6a832446f0d9b83da33d60a269cfd1d4aa0f82dcae`.
+[Capture patch](tools/java-rotation-speed-controller-wrench.patch)
+
+The render replay checks the X and Z controller shafts at +16 and −16 RPM.
+Both clients submit shaft and bracket geometry in an enclosed fixture with
+distinct block light at the controller and cog. The hidden Java client uses
+the fallback renderer with Flywheel disabled. The six stages cover an empty
+top, vertical large cogs, Brass and Andesite Encased Large Cogwheels, bare
+horizontal cogs, their removal, and reinstallation. Each stage contributes
+two actual frame submissions per axis after the Java bracket has settled.
+
+The comparison measures emitted vertex counts and light exactly. Local
+bounds have a tolerance of 0.0001 blocks and shaft angles have a tolerance
+of 0.003 degrees. Shaft bounds use the pose before spin, and angle
+comparisons align the clients' reported render times and fractions.
+Baseline `native-9f42064-c717808ff817` used block light 12 from the controller
+for all eight bracket submissions. Java used light 13 from the cog cell.
+Build `native-9f42064-2ffe2a07cde0` matched all 24 submissions using prepared
+pack SHA-256 `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`.
+[Java trace](fixtures/rotation-speed-controller-render-java.csv)
+
+Apply the render patch to the pinned Create checkout, then use Java 21 and
+run `python3 tools/capture-java-rotation-speed-controller-render.py /path/to/checkout --output /path/to/empty-capture-dir --offline`.
+The patch SHA-256 is
+`0006d6ed092875363bb9376f300202b02e7f7fd2524ac50fdb1df49ddd5fc2b9`.
+[Capture patch](tools/java-rotation-speed-controller-render.patch)
+
+Six more rigs check survival placement under Brass and Andesite Encased Large
+Cogwheels, both regulation directions, and isolation for parallel, vertical
+and small cogs. The shaft-driven andesite rig has both casing shaft ends
+closed. A pre-oriented brass rig tests transmission independently of
+placement. Java removes each 24 RPM motor after tick 4 and reinstalls it at
+32 RPM after tick 8. Horizon compares all 72 rows from ticks 1–12, measuring
+controller, cog and output shaft RPM to four decimal places, controller axis
+and remaining item count. Tick 0 records the Java setup state.
+[Java trace](fixtures/rotation-speed-controller-encased-java.csv) ·
+[Capture patch](tools/java-rotation-speed-controller-placement.patch)
+
+The encased capture uses Create 6.0.10 at `ac0c444d9828da3453ae8cc65338e8de063286fb`
+with Java 21. Apply the capture patch in a disposable checkout and run
+`./gradlew --offline runGameTestServer`, then extract the comma-separated
+fields after `CREATE_SPEED_CONTROLLER_ENCASED,`. The patch SHA-256 is
+`63dfba533978470a8864971de85229f1300e18aac6bd8a039f9d82ac847540ce`.
+Baseline `native-9f42064-a5156e57df79` differed in 32 rows.
+Build `native-9f42064-3bf392fcd9c8` matched all 72 rows with prepared
+pack SHA-256 `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`.
+
+Four additional rigs use the controller's settings board to check which block
+breaks at the default kinetic limit. A shaft-driven large cog turns a small
+cog at 256 RPM with a setting of ±128. At ±129 the large cog breaks before the
+next sample, leaving the controller, small cog and motor in place. After
+setting ±48, replacing the large cog restores both gear speeds. All blocks
+survive the same edits with the motor missing or driving from the large-cog
+side. The replay compares exact block presence and setting plus RPM to four
+decimal places from ticks 1–18. Tick 0 records the Java setup state.
+[Java trace](fixtures/rotation-speed-controller-break-java.csv) ·
+[Capture patch](tools/java-rotation-speed-controller-break.patch)
+
+Apply the break-order patch to the pinned Java checkout and run the same
+GameTest command, then extract the fields after
+`CREATE_SPEED_CONTROLLER_BREAK `. The patch SHA-256 is
+`5728675450d454a0fad2a505b331105c16412e97288d8dc0ec24faa1d91d1bd4`.
+Baseline `native-9f42064-3bf392fcd9c8` differed in 12 rows.
+Build `native-9f42064-711c7991bebd` matched all 72 rows using the same
+prepared pack and passed all 13 selected regressions.
+
 ```sh
 python3 tools/test-rotation-speed-controller.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-rotation-speed-controller.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --loaded
+python3 tools/test-rotation-speed-controller-overload.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --boundaries
+python3 tools/test-rotation-speed-controller-reopen.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-rotation-speed-controller-cascade.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-rotation-speed-controller-competing.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-rotation-speed-controller-placement.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-encased.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-break.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-wrench.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-render.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-multiplayer-rotation-speed-controller.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-multiplayer-rotation-speed-controller-timing.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-clipboard.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-clipboard.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --lan
 ```
 
-Competing cascades, loop conflicts, and the decision about which existing
-block breaks when a setting changes remain outside these fixtures.
+A diagnostic four-gearbox bypass confirmed a loop conflict at initial motor
+attachment. The Java loop at a +24 RPM target breaks the controller and
+first gearbox. The Horizon baseline keeps the loop in place and publishes
+different gear speeds. In Java, the loop with a −24 RPM target runs until a
+setting edit to −48 breaks the controller, large cog and first gearbox.
+Installing the missing gearbox while the +24 RPM loop is already powered
+breaks the newly placed gearbox in Java by the next sample. Horizon keeps
+the gearbox and reverses the large cog from +24 to −24 RPM.
+
+The [LAN replay](tools/test-multiplayer-rotation-speed-controller.py)
+checks host and guest settings, shaft RPM after a server step, and guest
+cog placement. The [timing replay](tools/test-multiplayer-rotation-speed-controller-timing.py)
+uses the real settings screen on an offscreen host and guest. It freezes the
+world between packet acceptance and the next server tick. Java 6.0.10's
+settings callback immediately updates theoretical output RPM to +64 for the
+host and −32 for the guest. The host and guest block entities both receive
+each setting on that tick. Effective kinetic RPM is zero while Java is frozen.
+The four [captured Java observations](fixtures/rotation-speed-controller-lan-timing-java.csv)
+cover both actors and both recipients.
+
+The Horizon settings callback now refreshes every connected kinetic member
+after the target changes, matching Java's remove-and-reattach path. The
+headless client cannot expose the controller settings screen to the test
+driver, so the two-client settings interaction uses offscreen rendering. In
+the fresh build after cherry-picking `16af87f`, the Horizon timing replay
+matched Java: host +64 and guest −32 were visible on the output shaft at
+acceptance, before another server step. The targeted parity selection passed
+17/17 checks, including the LAN timing replay.
+
+The Java reference uses a disposable offline-profile setup and explicit IPv4
+loopback binding. On the pinned Create checkout, apply the render patch first
+and then the LAN timing patch; run
+`python3 tools/capture-java-rotation-speed-controller-lan.py /path/to/checkout /path/to/empty-capture-dir`
+with Java 21. The LAN patch SHA-256 is
+`830572544d2ac0733dcac1770da2d0cf02a6f603c81562add49ef78fd84a1427`.
+[Capture patch](tools/java-rotation-speed-controller-lan-timing.patch)
+
+The [Clipboard replay](tools/test-rotation-speed-controller-clipboard.py)
+copies the controller's signed setting using Create's `Speed` key and
+`Row`/`Value` payload, then pastes −64 and +96 RPM into a second controller.
+Solo and LAN guest replays check that Clipboard interactions leave the
+simulation tick unchanged. The LAN host is headless; only the interacting
+client renders offscreen.
+
+### APP-1951 bounded gameplay pass
+
+The finite matrix for this delivery retains the existing Java comparisons and
+adds the signed Clipboard actions above:
+
+* Six survival placement cases cover both controller axes, blocked-top fallback,
+  large-cog placement and shaft-preferred orientation. Encased cog checks cover
+  horizontal valid layouts and parallel, vertical and small-cog controls.
+* Settings checks cover −256, −73, −1, zero, +23, +83, +128, +256 and the
+  overload boundary at ±129, plus positive/negative reversal and passthrough.
+  The 23-tick boundary fixture compares seven connected speeds per sample.
+* The 40-tick loaded cascade changes both controller targets, removes the first
+  source and powers from the opposite end. The 24-tick competing-motor fixture
+  covers a stronger same-direction source and an opposing source that breaks.
+  Both compare connected speed/sign; the cascade also compares stress/capacity.
+* Persistence saves four connected rigs: active −73 and +83 RPM outputs, plus
+  zero-target outputs in both drive directions while their inputs remain active.
+  It samples the saved state, the first reopened tick and six resumed ticks;
+  all 32 Java rows matched.
+* LAN coverage includes a host setting +64 RPM, a guest editing it to −32 RPM,
+  guest large-cog placement and guest Clipboard copy/paste. Resulting host state
+  matches; settings/clipboard delivery checks do not claim Java packet-arrival
+  or interpolation timing.
+* The powered four-gearbox/controller loop-close replay matches the saved Java
+  outcome: the newly inserted gearbox loses its block entity by tick 8 and is
+  air by tick 9, while the original network retains +24 RPM.
+* On the fresh combined build `native-9f42064-5a0a0aaed520` (Horizon source
+  `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, prepared pack SHA-256
+  `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`), the
+  bounded controller suite, APP-1943 source-conflict check and selected neighbor
+  regressions passed 21/21. This build includes the APP-1943 merge and the
+  shared Wrench changes from main through `716e57e`; checks used this build's
+  `horizon-client` and resource directory. The compatible-launcher rebuild
+  took 8m00s (incremental). Test outputs are retained in `.local/parity/`.
+
+The formerly blocking shared-network mismatch from
+[APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and)
+is resolved and checked on the combined build. Full 1:1 parity remains open.
+
+Nonblocking follow-ups are exact bracket-transition timing, Flywheel
+instancing, overload tint/particles, cosmetic feedback-sound timing, other
+Clipboard settings families and unfrozen LAN frame-arrival timing.
 
 ## Analog Lever
 
@@ -2245,6 +2537,25 @@ python3 tools/test-analog-lever.py --removal /path/to/horizon-ctl /path/to/horiz
 python3 tools/test-analog-lever.py --craft /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-multiplayer-analog-lever.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
+
+## Survival progression baseline (APP-2094)
+
+The bounded progression path passed on the isolated build
+`native-9f42064-b2e225daec86`, built from Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, with the pack prepared from the
+pinned Create checkout. All 12 focused checks passed: the six-recipe survival
+craft replay includes Andesite Alloy; brass Basin mixing matched 186 Java
+ticks; and brass Depot pressing matched 71 Java ticks and four impact cues.
+
+Advancement checks matched the original 14-tick Alloy and casing traces in solo
+and LAN. The placer alone earned casing progress. Small Water Wheel score and
+ownership matched 32 Java ticks in solo, LAN, and after reopening the placed
+wheel; a LAN guest could earn the award while the host remained a bystander.
+Press ownership matched 33 Java ticks in both LAN role directions, with only
+the placer earning the award. The first advancement check also retained earned
+progress after a solo reopen. This covers the recorded host/guest ownership
+cases and representative persistence; other advancement criteria, rewards and
+progression combinations remain follow-ups. Full 1:1 remains Open.
 
 ## First Create advancements
 
@@ -2383,6 +2694,44 @@ Build `73a19a6be80d` matched the [original slide sound](fixtures/depot-slide-jav
 on the deposit tick at volume .125 and pitch 1.5. In LAN the guest moved
 the items and both clients heard one slide. Retrieval produced no
 second slide.
+
+The Depot baseline checks on `native-9f42064-d7e37b705c75` added
+[survival crafting, placement and loaded idle reopen](tools/test-depot-baseline.py):
+the player crafts and places the Depot, swaps complete ingot stacks, reopens
+the world, then retrieves the held stack with all counts conserved. Its
+[pushing Funnel custody case](tools/test-depot-baseline.py) holds both a matching
+and a different incoming stack outside occupied Depots for 16 ticks, then
+transfers exactly one ingot after each Depot is cleared. The registered checks
+`depot-survival-reopen` and `depot-pushing-custody` passed with
+`depot-first-click`, `depot-first-click-lan`, `depot-pulling-funnel`,
+`depot-pulling-funnel-lan`, `depot-comparator`, `depot-pressing`,
+`press-lifecycle`, `weighted-ejector-belt-input-lan`, and
+`weighted-ejector-occupied-lan`. The press lifecycle check confirms empty and
+active save/reopen; the LAN first-click and pulling cases cover guest actions.
+The original first-click checks matched all three Java states solo and in LAN;
+the pulling Funnel checks matched all 96 Java rows in both modes, comparator
+matched 17 ticks, and pressing matched 71.
+The pushing test checks the occupied ordinary Depot's rejection behavior;
+Weighted Ejector merge remains covered separately by its original Java trace.
+The worktree base commit is `be02d33b1331352ed5a69cba28d93e6f04fafeb7`, with the
+pinned Horizon revision `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` and pack
+SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+To reproduce the finite set on that build:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-d7e37b705c75/horizon-ctl .local/patched-launcher/versions/native-9f42064-d7e37b705c75/horizon-client .local/patched-launcher/versions/native-9f42064-d7e37b705c75/.local/horizon-client/26.3 --jobs 2 \
+  --check depot-survival-reopen --check depot-pushing-custody \
+  --check depot-first-click --check depot-first-click-lan \
+  --check depot-pulling-funnel --check depot-pulling-funnel-lan \
+  --check depot-comparator --check depot-pressing --check press-lifecycle \
+  --check weighted-ejector-belt-input-lan --check weighted-ejector-occupied-lan
+```
+
+All eleven selected checks passed. Three initially failed because the isolated
+worktree lacked the copied structure fixtures at their expected path or the new
+script indexed chat output from a no-op game-mode command; both harness issues
+were corrected and those checks reran successfully. The updated runner includes
+the two new focused Depot checks. Full 1:1 remains Open.
 
 The [vertical Depot replay](tools/test-depot-drop-press.py) on build
 `beea127aa56c` matched all [41 original Java ticks](fixtures/depot-drop-press-java.csv).
@@ -2524,10 +2873,11 @@ placement and original Smart Observer belt-and-funnel replays passed.
 
 The [stationary Depot Funnel replay](tools/test-depot-pulling-funnel.py)
 matched [96 Java tick rows](fixtures/depot-pulling-funnel-java.csv) in solo
-and LAN on `693db180302a`. The open barrel accepted three ingots on tick 13.
+and LAN on `native-9f42064-d7e37b705c75`. The open barrel accepted three ingots on tick 13.
 The powered Funnel held its items through tick 18 and resumed on tick 19.
 The partly full barrel accepted one on tick 13 and the other two on tick
-21 after space cleared. The guest retrieved the eight remaining ingots
+21 after space cleared. The full barrel held its Depot output until space
+opened, then resumed delivery. The guest retrieved the eight remaining ingots
 from the barrels. Ejector Funnel, Depot placement and slide, and powered
 Press controls also passed.
 
@@ -4510,6 +4860,39 @@ matched for distinct compartments. The same-compartment Java action
 throws during link removal. Horizon deliberately completes the
 pickup and returns both stacks.
 
+### APP-2083 Toolbox gameplay baseline — November 19, 2026
+
+The bounded replay batch passed 15/15 checks on the archived
+`2026-11-19-pre-mechanical-piston-b2405826c686` Horizon 26.3 client
+(client SHA-256
+`63d4babf8091fe41f7712bc92d85b7467beecc4721dc54e0dfc50da7a5c97887`)
+with the Create content pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The Horizon source pin is `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`;
+Java is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+The batch selected `toolbox-storage`, `toolbox-portable`, `toolbox-menu`,
+`toolbox-menu-lan`, `toolbox-deposit-lan`, `toolbox-confirm-lan`,
+`toolbox-link`, `toolbox-link-lan`, `toolbox-link-lan-reconnect`,
+`toolbox-pickup-linked-host`, `toolbox-pickup-linked-guest`,
+`toolbox-placed-dye`, `toolbox-crafting`, `toolbox-tagged-dye` and
+`toolbox-reopen`. It covers all 16 placed colors, representative and tagged
+survival dye crafts, storage and GUI actions, Java-referenced link/refill and
+range exit/reentry samples, reconnect, both LAN pickup directions, and player
+binding plus compartment state across a cold world reopen. The reopen check
+verified the player's saved link sidecar and filter, then refilled a 10-item
+hotbar stack to 32 while the compartment fell from 32 to 10. This establishes
+Horizon save/reopen behavior, not exact Java reload parity. The exact range
+threshold, unselected HUD markers, radial visuals, GUI preview, broader
+orientations and audible playback remain follow-ups.
+
+Command (with the archived client paths substituted):
+
+```sh
+python3 tools/test-parity.py BUILD/horizon-ctl BUILD/horizon-client BUILD/.local/horizon-client/26.3 --jobs 2 --check toolbox-storage --check toolbox-portable --check toolbox-menu --check toolbox-menu-lan --check toolbox-deposit-lan --check toolbox-confirm-lan --check toolbox-link --check toolbox-link-lan --check toolbox-link-lan-reconnect --check toolbox-pickup-linked-host --check toolbox-pickup-linked-guest --check toolbox-placed-dye --check toolbox-crafting --check toolbox-tagged-dye --check toolbox-reopen
+```
+
 
 ## Train Trapdoor and Framed Glass Trapdoor
 
@@ -4614,6 +4997,179 @@ retained its 284 air. Right-clicking it equipped it in the chest slot on the
 same tick, preserved its name and charge, and restored source water. Diving
 movement, wearable breathing and full presentation remain open.
 
+
+## Fluid Pipe, Glass Fluid Pipe and Smart Fluid Pipe
+
+APP-1972 covers the two basic survival recipes, Smart Fluid Pipe crafting,
+and Glass Fluid Pipe acquisition by wrenching a basic pipe. The pinned
+`FluidPipeBlock` and `AxisPipeBlock` callbacks define the connection and
+conversion rules. A side click converts a straight pipe to glass, glass
+uncases back to a basic pipe and reconnects, and both conversions keep
+waterlogging and cached flow. The Glass variant returns a basic pipe when
+dismantled. `SmartFluidPipeBlock` uses the Y axis for wall placement, and
+`SmartFluidPipeBlockEntity` tests incoming fluid against its filter. The
+filter slot accepts a replacement sample or clears with an empty hand.
+
+The [gameplay replays](tools/test-fluid-pipe-gameplay.py) exercise those
+interactions in survival and with an acting LAN guest. They check the
+authoritative host state and eventual guest block-state convergence.
+The solo save cases reopen a wet Glass Pipe and a configured Smart Pipe
+while idle, then reopen a powered vertical line with water still moving.
+The powered runs cover accepting and rejecting fluid, a full receiver, an
+empty source, independent water and lava lanes, and a blocked segment
+removed and reconnected while the pump remains powered. Tank contents are
+measured in millibuckets and checked separately by fluid ID.
+
+The existing [split/combine replay](tools/test-branched-pipes.py) is the
+402-tick Java comparison for single-fluid branch traffic. The
+[collision GameTest patch](tools/java-fluid-pipe-collision.patch) changes the
+north source in the same combine template to lava and runs only that test.
+Apply it to a disposable Create checkout at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`, then run
+`./gradlew --offline --no-daemon --max-workers=2 runGameTestServer` on JDK 21.
+The `CREATE_MIXED_PIPE` rows form the
+[26-sample reference](fixtures/fluid-pipe-collision-java.csv).
+The patch SHA-256 is
+`fac5fc6cf0e6007c76f9201c3fe6f6341125fa751fcfa68fa59ef65eccb426b4`.
+
+Both engines were sampled from tick 0 after switching the pump to combine.
+The junction block, dropped basic-pipe item count, destination fluid and
+amount, and three source amounts all matched at zero tolerance. The
+junction became cobblestone and dropped one basic pipe on tick 15.
+All three sources retained their initial fluid and the destination stayed
+empty through tick 25. Horizon server commands sample authoritative block
+state because the local client block view showed the change one tick later.
+The player stands outside pickup range for the drop count.
+
+The baseline at `native-9f42064-6ce68a31b125` left the junction intact
+despite completed water and lava fronts and transferred 126 mB of lava.
+It also left basic pipes unchanged on a side wrench, kept an empty-hand
+filter click from clearing the slot, and placed a disjoint pipe beside a
+tank. The original Encased Pipe static replay now supports the three-way
+junction during its actual player click and removes those neighbors once
+encased. The Java probe stops after the block interaction returns
+`PASS_TO_DEFAULT_BLOCK_INTERACTION`, before the held casing can place next to
+the pipe and cause a shape update.
+
+The final runtime is `native-9f42064-14b1dcb81282`, built using launcher
+0.2.67 and the pinned Horizon revision
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. The clean build after syncing
+current `main` took 148 seconds. The client SHA-256 is
+`efe122e6573776f9194188ffe7af2cb497003ef7c958764b68dffbc90fde9245`.
+The pack was prepared from the pinned Java checkout with `tools/prepare.py`.
+Its SHA-256 is
+`6ca7517cee3017056b629d6649f837334c6d36bf5f1714a577b12bc813abe1cc`.
+The focused regression run passed all 14 selected checks on this runtime and
+pack, including solo and LAN pipe gameplay, collision, lifecycle, encased
+transfer, branch traffic, and dependent fluid regressions.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 \
+  --jobs 3 --check 'fluid-pipe-*' --check 'encased-fluid-pipe*' \
+  --check branched-pipes --check open-pipes --check world-pump \
+  --check pump-startup-pressure --check fluid-observer --check fluid-valve-neighbors
+```
+
+The new interaction and lifecycle cases use source-derived properties and
+conservation bounds. Exact Java save/reopen and guest packet timing,
+further fluid reactions, complex filter configurations, chunk boundaries,
+and additional model and animation combinations remain open.
+
+## Mechanical Pump gameplay baseline (APP-1973)
+
+This finite pass preserves the original world-pumping, open-pipe,
+split/combine and startup-pressure references. The new
+[pump gameplay replay](tools/test-mechanical-pump-gameplay.py) reuses the
+APP-1972 player, storage and tick helpers and the existing pinned
+[crafting reference](fixtures/machine-crafting-java.csv).
+
+At the pinned Create revision, `PumpBlock.getStateForPlacement` inherits
+look/shaft preference, chooses the nearest connectable fluid neighbor on
+another axis for ordinary placement, and preserves source waterlogging.
+`PumpBlock.getRotatedBlockState` flips facing regardless of the clicked
+face. `PumpBlockEntity.isPullingOnSide` depends on facing alone: changing
+the sign of RPM does **not** reverse fluid transfer. Pressure uses absolute
+RPM; a facing flip reverses the inlet and outlet. These source-derived
+rules guide the added checks; they are distinct from tick-by-tick Java
+runtime comparisons.
+
+| Finite case | Evidence |
+| --- | --- |
+| Survival acquisition | Original shapeless Cogwheel + Fluid Pipe recipe, exact one-Pump output and no remaining inputs |
+| Placement and Wrench | North view, sneaking reversal, adjacent Tank preference; two facing flips and exactly one item returned by sneaking Wrench, solo and acting LAN guest |
+| RPM and direction | Both motor signs at magnitude 128 retain upward transfer; facing reversal swaps ports and transfers downward |
+| Start/stop and storage | Zero RPM and zero pump pressure halt transfer; restoring drive resumes without changing the 7,000 mB total |
+| Full, empty, blocked and non-water | Reuse APP-1972 `fluid-pipe-lifecycle`, including a full Tank, empty powered source, blocked/reconnected pipe and separate water/lava lanes; `honey-pipe` retains the existing non-water Java reference |
+| Branch pressure | Reuse the eight exact Java `pump-startup-pressure` samples and the 402 split/combine samples |
+| Persistence | Wet idle Pump retains facing; powered and stopped two-Tank setups retain fluid and resume or remain stopped after reopen |
+
+The original runtime `native-9f42064-6bde2ea90cf2` passed the new ten-stage
+source-derived lifecycle check. Its log and CSV were preserved separately
+as `.local/mechanical-pump-baseline-lifecycle-unsandboxed.log` and
+`.local/mechanical-pump-lifecycle-baseline-horizon.csv`. The first two
+launches were invalid because sandbox restrictions prevented the control
+socket from opening; their logs remain in `.local`. A survival attempt
+with an extra crafted Pump in the inventory was also invalid; the fixture
+now clears that item before setting up each placement case.
+
+The valid original-runtime probe recorded north-facing placement from a
+north-looking player, where Java requires south. A Wrench click on a
+south-facing Pump left it facing south, where Java requires north. The
+actual states are preserved in
+`.local/mechanical-pump-baseline-probe-final.log`. The narrow repair adds
+Pump placement to the existing fluid placement helper and adds Pump to
+the Wrench's facing-flip and pickup paths.
+
+The [placement callback probe](tools/java-mechanical-pump-placement.patch)
+ran in the disposable `.local/java-pump-reference` clone at the pinned
+commit with JDK 21.0.13.1. It captured three actual Java placement and
+Wrench-facing pairs: ordinary south/north, sneaking north/south and Tank
+preference west/east. The
+[three-row reference](fixtures/mechanical-pump-placement-java.csv) is read
+by both solo and LAN tests. These are exact block-state expectations from
+the Java callbacks, not a Java network or save comparison. The Gradle
+GameTest passed in 5 minutes 26 seconds; patch SHA-256 is
+`48edd159971f5683d3f8de68bb06946f4dc5948e6fec991777da9b3abcc27d63`.
+Capture metadata is in
+[the reference metadata](fixtures/mechanical-pump-placement-java.metadata.json).
+
+The final runtime `native-9f42064-1bafbe76cae9` used Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` and mixins
+`5a64af938ec86b00d53d16a408aabc0038fb3e57`. The rebuilt client SHA-256 is
+`8f2875a3e675b18b86491f6183b51abf36213495b14f180e9b90f86dfa51356b`; the
+pack SHA-256 is `6d73c6a59c48085fe929e00603f980f95337047a212ed0bb79d4f92a9bb368ac`.
+The finite check list passed all eight selected checks on this build: Pump
+survival placement/Wrench, acting LAN placement/Wrench, pump lifecycle,
+startup pressure, original world pumping, open pipes, branched pipes, pipe
+lifecycle, and honey pipe. The lifecycle samples matched both RPM signs,
+absolute pressure, zero-pressure stop, restart, reopen, and reversed-facing
+transfer. The updated placement/Wrench checks matched all three Java rows.
+The initial sandboxed batch could not open control sockets; the successful
+batch ran with the documented headless/offscreen helpers and isolated worlds.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 \
+  --jobs 1 --check mechanical-pump-gameplay --check mechanical-pump-gameplay-lan \
+  --check mechanical-pump-lifecycle --check pump-startup-pressure --check world-pump \
+  --check open-pipes --check branched-pipes --check fluid-pipe-lifecycle --check honey-pipe
+```
+
+Syntax checks (`tools/check-source.py`) and `git diff --check` passed.
+
+Run the bounded checks with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 \
+  --jobs 2 --check 'mechanical-pump-*' --check pump-startup-pressure \
+  --check world-pump --check open-pipes --check branched-pipes \
+  --check fluid-pipe-lifecycle --check honey-pipe
+```
+
+LAN results establish authoritative host state and eventual guest block
+convergence, not Java packet arrival timing. Reopen checks establish the
+Horizon gameplay baseline, not exact Java reload parity. More network
+layouts, speed/pressure cross-products, chunk boundaries, other fluids and
+exact animation, sound and rendering remain open.
 
 ## Encased Fluid Pipe
 
@@ -5129,6 +5685,24 @@ The [same fixture](tools/test-lit-blaze-burner.py) on
 observed comparator wire strengths of 1, 2 and 0 across the three
 states. The same build observed passive boiler heat from both flame
 states and its loss after extinguishing. Presentation remains open.
+
+On `native-9f42064-b0213de77789`, the Blaze Burner survival replay passed
+normal fuel and Blaze Cake, refuel threshold and overflow, rejected fuel,
+expiry, lava-bucket remainder, and idle/active save-reopen. Acquisition mode
+captured a Blaze with an empty burner and placed the resulting burner. The LAN
+fueling replay passed with a survival guest consuming coal into a cold burner;
+the host observed 1,600 fuel ticks and kindled heat, and the guest observed the
+kindled state. The first fixture placed host and guest at the same coordinates,
+so the guest targeted the host entity instead of the burner. Separating the
+players corrected the fixture; no multiplayer production-code change was
+needed. These replays are registered as `blaze-burner`,
+`blaze-burner-acquisition`, and `blaze-burner-lan` in
+`tools/test-parity.py`. The earlier [heated-fluid replay](tools/test-fluid-food.py)
+matches three Basin recipes over 86 ticks; its first four samples keep all
+three burners smouldering and each mixer idle before fuel is applied,
+providing the insufficient-heat control. Source review also corrected
+creative capture to preserve the empty burner, matching
+`BlazeBurnerBlockItem.giveBurnerItemTo` at the pinned Java revision.
 
 ## Minecart Contraption items
 
@@ -6988,6 +7562,67 @@ The existing tab replay passed the Base and Palettes display membership checks,
 Palettes ordering, and the first live page of each. Java client Base ordering
 and the remaining search interactions are open.
 
+## APP-2095 creative inventory baseline
+
+On the archived Horizon `native-9f42064-340cbe866fa7` client built from
+`adfa875` with the 0.2.67 launcher, the
+[tab replay](tools/test-create-creative-tabs.py) matched 203 Base and
+377 Palettes display entries, Java Palettes order, and both first live pages.
+The [search replay](tools/test-create-creative-search.py) matched all
+265 Base and 392 Palettes search entries in the pack. Live Search returned
+Blaze Cake Base and excluded Chromatic Compound. Both checks passed in
+25.93 seconds. The [colored seat search](tools/test-colored-seats.py) and
+[Ponder Back replay](tools/test-ponder-creative-back.py) also passed on
+the same client and pack.
+
+The [LAN replay](tools/test-create-creative-lan.py) passed in 60.95 seconds.
+A guest joined a local host, entered Creative, opened both Create tabs,
+and saw the same first 45 entries per tab as the pack. Closing and reopening
+the guest inventory retained the selected Building Blocks tab and its first
+page. Search returned Netherite Diving Boots, Ornate Iron Window and its
+pane, and Blaze Cake Base in three queries. Chromatic Compound, Incomplete
+Precision Mechanism, and Incomplete Track each returned an empty grid.
+The game state in scope is the selected tab during the current client
+session. These checks do not cover a cold process restart.
+
+Guest screenshots showed the Create and Create’s Building Blocks titles
+with their Cogwheel and Ornate Iron Window icons. Search rendered names
+and textured icons for the hovered boots, window, and Blaze Cake Base.
+The boots and window displayed their respective blue tab attribution.
+Blaze Cake Base is present in Search but lacks the blue Create line on
+this build. Pinned Java's `CreativeModeTab.contains` uses the tab's search
+membership, so its `SEARCH_TAB_ONLY` entries are credited. Horizon's
+tooltip lookup uses display membership and omits the label for this
+entry. The screenshot for the Palette tab also shows overlapping vanilla
+and Create tab hover labels. The selected panel title remains legible.
+The captures are in the worktree’s `.local/creative-lan-*.png`.
+
+Client SHA-256
+`39712c37f7f666a2d730506198523f0d0b42ef7b4a15c0ea9142a95b450224ea`.
+Matching content pack SHA-256
+`0dc4da44753fdf6dd94d1cdd8d26b82bc35446899a3ad1219a9990377e74b852`.
+The prepared Horizon 26.3 resources came from the
+`native-9f42064-6ce68a31b125` installation on the same upstream pin.
+The Java reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb` with NeoForge 21.1.219.
+The [capture patch](tools/java-creative-tabs-inventory.patch) SHA-256 is
+`b7efc29a0446decff4ffe4e2a66c1564843917812ed128a370396ba6d19dd8ee`.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 \
+  --check create-creative-tabs --check create-creative-search
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 \
+  --check create-creative-lan
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 \
+  --check create-creative-lan --check colored-seats-search --check ponder-creative-back
+```
+
+The first LAN fixture stopped on the host's empty chat reply after a
+targeted game-mode command. The replay now waits for the guest's reported
+game mode. An earlier sandboxed invocation reached client startup and
+could not bind its local control socket. The offscreen results above used
+isolated game directories and a local socket-enabled run.
+
 ## Tank bucket interaction
 
 The [pinned Java probe](tools/java-tank-bucket-trace.patch) captured [eight
@@ -7020,6 +7655,17 @@ Six [Java-captured recipes](fixtures/intermediate-crafting-java.csv) matched the
 Rose Quartz, Sand Paper, Red Sand Paper and Andesite Alloy using an iron nugget.
 The [Java probe](tools/java-intermediate-crafting-trace.patch) checked recipe
 IDs, outputs, counts and crafting remainders.
+
+The [LAN craft and reopen replay](tools/test-multiplayer-common-parts.py) passed
+on `native-9f42064-6ce68a31b125` with pack SHA256
+`fae54c37367475be514f4565f2bc8f72b089e129601cde3275bc9486c8799187`.
+A survival guest crafted one Andesite Alloy from two Andesite and two Iron
+Nuggets in the player grid. Both inputs were consumed, and the host and guest
+agreed on the resulting inventory. After the guest disconnected, the host
+world was reopened and the guest rejoined with the alloy retained. This checks
+the meaningful persistence path for an instantaneous craft; an active machine
+case does not apply to this recipe fixture. It checks resulting state after
+guest convergence, not exact packet-arrival timing.
 
 ## Sweet Roll, Chocolate Glazed Berries and Honeyed Apple use timing
 
@@ -7933,3 +8579,133 @@ python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-b2e
 
 Branch layouts and direct LAN guest observation of this source merge remain
 follow-ups; Full 1:1 stays Open.
+
+
+### APP-2102 server configuration, permissions and persistence — November 19, 2026
+
+On the available Horizon client `native-9f42064-6ce68a31b125` (Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, mixins
+`5a64af938ec86b00d53d16a408aabc0038fb3e57`) with the content pack prepared
+from Create `ac0c444d9828da3453ae8cc65338e8de063286fb` (SHA-256
+`9a84fcfb00af7a5ffd52d1fe61a0ef853af78e197e557f192f5842cd8c383f0e`), the
+dedicated baseline check passed these bounded cases:
+
+- A generated `server.properties` retained the default `spawn-protection=16`;
+  setting `difficulty=hard` was observable from the connected operator.
+- The operator executed `/give`; the nonoperator's same command did not grant
+  an item. The server's `ops.json` retained the operator at permission level 4.
+- A guest received paper, disconnected, rejoined with the same identity, and
+  retained the item.
+- The existing LAN Hand Crank check passed guest reversal: shaft speed changed
+  from +32 to −32 RPM. Its idle and active save/reopen cases passed; the active
+  16 RPM motor and shaft resumed after reopening.
+
+## APP-1978 Super Glue and assembly selection
+
+The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+`SuperGlueSelectionHandler` cancels an active selection on sneak, while
+`SuperGlueSelectionPacket` creates the selected region and calls
+`SuperGlueSelectionHelper.collectGlueFromInventory` once for availability and
+again for consumption. Despite its `simulate` argument, that helper calls
+`hurtAndBreak` in both invocations and scans the selected slot followed by the
+remaining inventory. Super Glue durability is 99 (`AllItems.SUPER_GLUE`).
+
+The baseline mismatch was reproduced on `native-9f42064-59c1049d0f04` with the
+new isolated spare-stack case: start with damage-99 Glue in hotbar slot 0 and a
+fresh Glue in slot 1, then select two connected blocks. The region was created
+and slot 0 broke, but Horizon left slot 1 at damage 0. Java consumes one point
+from slot 1 during the second helper call. The original check log was replaced
+by the final run; the observed baseline command, state and failed assertion are
+preserved in `.local/parity/super-glue-selection-baseline-spare-stack-failure.txt`.
+
+Horizon now searches Glue in Java's selected-then-inventory order. It swaps a
+spare stack through the selected slot while calling the ordinary durability
+path, preserving wear handling and break effects, then restores the changed
+stack to its original slot. Guest actions mark the inventory for resend. Glue
+use remains main-hand only, matching Java's client handler. Removal now accepts
+a left-click on a block whose center lies inside a Glue region, when main-hand
+Glue is held and the acting player is within Java's 32-block range. It removes
+the nearest matching region and cancels breaking the underlying block. This
+block-hit route is a usable approximation: the marker has no Java entity
+hitbox, so exact entity ray picking, hit plane presentation, particles and
+sound remain unverified.
+
+On `native-9f42064-8cc365d013ad`, the isolated solo check passed selection,
+saved-region reopen, damage-97/98 last-charge edges, spare-stack final-charge
+fallback, sneak cancellation, two overlapping regions and block-preserving
+removal. The LAN guest check passed normal region/durability, spare-stack
+consumption into slot 1 (damage 1), and guest removal with the block retained.
+The existing train assembly check matched all 125 Java motion ticks, and the
+multiplayer train check assembled on the dedicated server and observed 37
+Java-matching guest motion ticks. These train checks are representative
+integration coverage; they do not establish every glue configuration or full
+train parity. The suite output is in `.local/parity/`.
+
+Runtime identity: client SHA256
+`d78524837d9c33c4d7790a8ce9febcacb7c58679ff1543a98e8958d0714267c2`; control
+tool SHA256 `1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`;
+content pack SHA256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The unchanged train structure fixture used for the isolated worktree has SHA256
+`ff7048a951a87371c5cbe6fc7b98a2f087a6137be85d73b21d43975003cd5c58`.
+
+Commands:
+
+```sh
+python3 tools/test-server-baseline.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack .local/create.hmod
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check hand-crank-lan --check hand-crank-persistence
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-ctl .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-client .local/patched-launcher/versions/native-9f42064-8cc365d013ad/.local/horizon-client/26.3 --jobs 1 --check super-glue-selection
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-ctl .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-client .local/patched-launcher/versions/native-9f42064-8cc365d013ad/.local/horizon-client/26.3 --jobs 1 --check super-glue-selection-lan
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-ctl .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-client .local/patched-launcher/versions/native-9f42064-8cc365d013ad/.local/horizon-client/26.3 --jobs 1 --check manual-train --check multiplayer-train
+```
+
+The new dedicated check is registered as `server-baseline` in
+`tools/test-parity.py`. This scoped config case exercises Minecraft's
+`server.properties`; it does not establish Create `create-server.toml`
+loading/import, network synchronization or migration. The existing hand-crank
+restart check is a local world reopen, while the multiplayer check exercises a
+dedicated LAN world. Those broader cases and Full 1:1 remain open.
+
+
+## Item Vault gameplay baseline (APP-2015)
+
+On `native-9f42064-6ce68a31b125` (Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`) with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`, the
+registered [bounded vault replay](tools/test-vault-groups.py) passed these
+state and interaction cases:
+
+- A Hopper inserted paper through the first member of a two-block group; a
+  second Hopper extracted it through the other member. Both blocks then read
+  empty.
+- Removing one empty member split the group and left its neighbor usable.
+- A surviving member was filled to all 20 slots (64 paper plus 19 stacks of
+  stone). Two additional paper remained in its Hopper across save/reopen; after
+  one slot was freed, the transfer completed without loss or duplication.
+- A LAN guest opened that output Hopper, retrieved its paper, and the host saw
+  the emptied slot after state convergence. This proves the resulting state,
+  not Java-equivalent packet arrival timing.
+- A complete 3×3×9 horizontal group reached the large state. This matches the
+  pinned `ItemVaultBlockEntity` width limit of 3 and length limit of
+  `width * 3`.
+
+The sampled checks use command-driven setup and state observation rather than
+a new Java tick trace. The behavior follows the pinned
+`ItemVaultBlock.java`, `ItemVaultBlockEntity.java`, and
+`ConnectivityHandler.java` rules. Existing Java comparisons remain the 69-tick
+comparator, 151-tick storage, and 20-tick fuel protection fixtures. The
+[survival recipe replay](tools/test-machine-crafting.py) also covers the
+original Item Vault recipe among 12 matching recipes. Existing mounted cargo
+comparisons cover guest Hopper insertion and extraction with a mounted Vault.
+
+Run the bounded group replay with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check vault-groups --check vault-groups-lan
+```
+
+Other dimensions, storage groupings and material combinations remain follow-up
+coverage; Full 1:1 stays Open.
+
+APP-1978 bounded outcomes do not claim exact Java packet timing or exhaustive
+connectivity, inventory, rendering or effect parity. Full 1:1 remains Open.

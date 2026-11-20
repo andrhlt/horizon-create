@@ -1,0 +1,95 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..218ffcf 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..fd121d3 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.rotationSpeedControllerOverload"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..7ca876f 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,63 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 100)
++	public static void rotationSpeedControllerOverload(CreateGameTestHelper helper) {
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var north = net.minecraft.core.Direction.NORTH;
++		var up = net.minecraft.core.Direction.UP;
++		var east = net.minecraft.core.Direction.EAST;
++		var x = net.minecraft.core.Direction.Axis.X;
++		var z = net.minecraft.core.Direction.Axis.Z;
++		for (int column = -1; column <= 4; column++) {
++			helper.setBlock(new BlockPos(13, 1, column), Blocks.SMOOTH_STONE);
++			helper.setBlock(new BlockPos(12, 2, column), Blocks.SMOOTH_STONE);
++			helper.setBlock(new BlockPos(14, 2, column), Blocks.SMOOTH_STONE);
++		}
++		helper.setBlock(new BlockPos(13, 2, -1), Blocks.SMOOTH_STONE);
++		helper.setBlock(new BlockPos(13, 2, 4), Blocks.SMOOTH_STONE);
++		var wheelAt = new BlockPos(12, 2, 2);
++		var controllerAt = wheelAt.above().east();
++		var cogAt = controllerAt.above();
++		var fanAt = cogAt.north();
++		var gaugeAt = cogAt.south();
++		helper.setBlock(wheelAt, com.simibubi.create.AllBlocks.WATER_WHEEL.getDefaultState().setValue(facing, up));
++		helper.setBlock(wheelAt.above(), com.simibubi.create.AllBlocks.GEARBOX.getDefaultState().setValue(axis, z));
++		helper.setBlock(controllerAt, com.simibubi.create.AllBlocks.ROTATION_SPEED_CONTROLLER.getDefaultState()
++			.setValue(horizontal, x));
++		helper.setBlock(cogAt, com.simibubi.create.AllBlocks.LARGE_COGWHEEL.getDefaultState().setValue(axis, z));
++		helper.setBlock(fanAt, com.simibubi.create.AllBlocks.ENCASED_FAN.getDefaultState().setValue(facing, north));
++		helper.setBlock(gaugeAt, com.simibubi.create.AllBlocks.SPEEDOMETER.getDefaultState()
++			.setValue(facing, east)
++			.setValue(com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock.AXIS_ALONG_FIRST_COORDINATE, false));
++		helper.setBlock(new BlockPos(13, 2, 3), Blocks.WATER);
++
++		var registry = helper.getLevel().registryAccess();
++		var regulator = helper.getBlockEntity(AllBlockEntityTypes.ROTATION_SPEED_CONTROLLER.get(), controllerAt);
++		var wheel = helper.getBlockEntity(AllBlockEntityTypes.WATER_WHEEL.get(), wheelAt);
++		var cog = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), cogAt);
++		var fan = helper.getBlockEntity(AllBlockEntityTypes.ENCASED_FAN.get(), fanAt);
++		var gauge = helper.getBlockEntity(AllBlockEntityTypes.SPEEDOMETER.get(), gaugeAt);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick() - 70;
++			helper.assertTrue(tick >= 0, "Waiting for the water wheel to settle");
++			var network = regulator.saveWithoutMetadata(registry).getCompound("Network");
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_CONTROLLER_OVERLOAD %d,%d,%.4f,%.4f,%b,%.4f,%.4f,%.4f,%.4f,%.4f%n",
++				tick, regulator.targetSpeed.getValue(), network.getFloat("Capacity"), network.getFloat("Stress"),
++				regulator.isOverStressed(), wheel.getTheoreticalSpeed(), regulator.getTheoreticalSpeed(),
++				cog.getTheoreticalSpeed(), fan.getSpeed(), gauge.dialTarget);
++			switch ((int) tick) {
++				case 2 -> regulator.targetSpeed.setValue(127);
++				case 4, 8 -> regulator.targetSpeed.setValue(128);
++				case 6 -> regulator.targetSpeed.setValue(129);
++				case 10 -> regulator.targetSpeed.setValue(-129);
++				case 12 -> regulator.targetSpeed.setValue(-127);
++			}
++			helper.assertTrue(tick >= 16, "Sampling load and recovery");
++		});
++	}
+ }

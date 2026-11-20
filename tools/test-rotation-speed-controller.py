@@ -18,6 +18,8 @@ COG_SHAFT_OUTPUT = (15, 102, -10)
 SHAFT_THROUGH = (14, 101, -9)
 GEAR_MOTOR = (5, 102, -10)
 SETTINGS = {4: (1, 64), 12: (0, 32), 21: (1, 0), 28: (1, 256), 45: (1, 12)}
+BOUNDARY_SETTINGS = {3: (0, 0), 6: (0, 73), 12: (0, 256), 15: (1, 256), 21: (1, 23)}
+ZERO_TARGET_TICKS = {9, 18}
 
 
 def coords(pos):
@@ -73,16 +75,22 @@ def sample(control, *, loaded=False):
     return values
 
 
-def configure(control, pos, row, column, *, check_press=False):
+def configure(control, pos, row, column, *, check_press=False, axis="z"):
     x, y, z = pos
-    control.command(f"/tp @s {x - 2.0} {y} {z + 0.5}")
+    if axis == "x":
+        control.command(f"/tp @s {x + 0.5} {y} {z - 2.0}")
+    else:
+        control.command(f"/tp @s {x - 2.0} {y} {z + 0.5}")
     control.call("wait", 3)
-    choose_setting(control, pos, row, column, check_press=check_press)
+    choose_setting(control, pos, row, column, check_press=check_press, axis=axis)
 
 
-def choose_setting(control, pos, row, column, *, check_press=False):
+def choose_setting(control, pos, row, column, *, check_press=False, axis="z"):
     x, y, z = pos
-    control.call("look-at", x + 0.03, y + 0.6875, z + 0.5)
+    if axis == "x":
+        control.call("look-at", x + 0.5, y + 0.6875, z + 0.03)
+    else:
+        control.call("look-at", x + 0.03, y + 0.6875, z + 0.5)
     control.call("mouse", "right", "down")
     control.call("wait", 7)
 
@@ -149,7 +157,13 @@ def verify_input_trace(log):
 
 
 def verify(args):
-    stem = "rotation-speed-controller-loaded" if args.loaded else "rotation-speed-controller"
+    stem = "rotation-speed-controller"
+    settings = SETTINGS
+    if args.boundaries:
+        stem += "-boundaries"
+        settings = BOUNDARY_SETTINGS
+    elif args.loaded:
+        stem += "-loaded"
     with (ROOT / f"fixtures/{stem}-java.csv").open() as data:
         header, *expected = list(csv.reader(data))
     actual = []
@@ -167,10 +181,14 @@ def verify(args):
             for key, wanted, got in zip(header[1:], row[1:], values, strict=True):
                 if not isclose(float(wanted), got, abs_tol=0.00005, rel_tol=0.0):
                     differences.append((tick, key, wanted, got))
-            if settings := SETTINGS.get(tick):
+            if selection := settings.get(tick):
                 for pos in (ABOVE, FROM_SHAFT):
-                    configure(control, pos, *settings, check_press=tick == 4 and pos == ABOVE)
-            if tick == 36:
+                    configure(control, pos, *selection, check_press=tick == 4 and pos == ABOVE)
+            if args.boundaries and tick in ZERO_TARGET_TICKS:
+                control.commands(
+                    f"/data merge block {coords(pos)} {{ScrollValue:0}}" for pos in (ABOVE, FROM_SHAFT)
+                )
+            if not args.boundaries and tick == 36:
                 control.command(f"/data merge block {coords(GEAR_MOTOR)} {{ScrollValue:40}}")
         verify_input_trace(control.socket.parent / "ctl.log")
     output = args.output or ROOT / f".local/{stem}-horizon.csv"
@@ -188,7 +206,9 @@ def main():
     for arg in ("ctl", "client", "resources"):
         parser.add_argument(arg, type=lambda value: Path(value).resolve())
     parser.add_argument("--pack", type=Path)
-    parser.add_argument("--loaded", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--loaded", action="store_true")
+    mode.add_argument("--boundaries", action="store_true")
     parser.add_argument("--output", type=Path)
     verify(parser.parse_args())
 

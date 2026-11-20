@@ -8,9 +8,10 @@ use crate::items::ItemStack;
 use super::Game;
 use super::create_clockwork::{self, CLOCKWORK};
 use super::create_cogwheel::encased_size;
-use super::create_fluids::name;
+use super::create_fluids::{self, GLASS_PIPE, PIPE, PUMP, SMART_PIPE, name};
 use super::create_machines::{self, GEARBOX};
 use super::create_portable_interface::{FLUID as FLUID_PORT, ITEM as ITEM_PORT};
+use super::create_speed_controller::{self, CONTROLLER as SPEED_CONTROLLER};
 
 const WRENCH: &str = "create:wrench";
 
@@ -92,7 +93,23 @@ pub(super) fn change_pose(game: &mut Game<'_>, pos: [i32; 3], face: Direction, b
         super::create_shaft::GIRDER_SHAFT => {
             return super::create_shaft::remove_from_girder(game, pos);
         }
+        SPEED_CONTROLLER if axis(face) == "y" => {
+            let Some(prior) = game.native_block_property(pos, "axis") else {
+                return false;
+            };
+            ("axis", create_speed_controller::cross_axis(&prior), prior)
+        }
         _ if encased_size(block).is_some() => return change_cased_cog(game, pos, face),
+        PUMP => {
+            let Some(prior) = game.native_block_property(pos, "facing") else {
+                return false;
+            };
+            let Some(direction) = Direction::ALL.into_iter().find(|&side| name(side) == prior) else {
+                return false;
+            };
+            // PumpBlock.getRotatedBlockState reverses flow on every face.
+            ("facing", name(direction.opposite()), prior)
+        }
         "create:shaft" | "create:cogwheel" | GEARBOX | "create:clutch"
         | "create:gearshift" => {
             let Some(prior) = game.native_block_property(pos, "axis") else {
@@ -102,6 +119,15 @@ pub(super) fn change_pose(game: &mut Game<'_>, pos: [i32; 3], face: Direction, b
                 return false;
             };
             ("axis", axis(rotate(direction, face)), prior)
+        }
+        SMART_PIPE if axis(face) == "y" => {
+            let Some(prior) = game.native_block_property(pos, "facing") else {
+                return false;
+            };
+            let Some(direction) = Direction::ALL.into_iter().find(|&side| name(side) == prior) else {
+                return false;
+            };
+            ("facing", name(rotate(direction, face)), prior)
         }
         "create:sticker" | "create:creative_motor" | "create:encased_fan" | CLOCKWORK | FLUID_PORT | ITEM_PORT => {
             let Some(prior) = game.native_block_property(pos, "facing") else {
@@ -143,7 +169,7 @@ pub(super) fn pickup(game: &mut Game<'_>, pos: [i32; 3], block: &str) {
                 "minecraft:redstone_wall_torch" => "minecraft:redstone_torch",
                 "minecraft:tripwire" => "minecraft:string",
                 "create:gearbox" => super::create_shaft::gearbox_item(game, state),
-                super::create_encased_fluid_pipe::BLOCK => super::create_fluids::PIPE,
+                super::create_encased_fluid_pipe::BLOCK | GLASS_PIPE => PIPE,
                 _ => block,
             };
             game.native_max_stack_size(item)
@@ -210,6 +236,7 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> boo
             | "create:gearbox"
             | "create:clutch"
             | "create:gearshift"
+            | SPEED_CONTROLLER
             | "create:creative_motor"
             | "create:encased_fan"
             | "create:item_drain"
@@ -223,6 +250,7 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> boo
             | super::create_controller_rail::RAIL
             | super::create_rose_lamp::LAMP
             | super::create_encased_fluid_pipe::BLOCK
+            | PIPE | GLASS_PIPE | SMART_PIPE | PUMP
     ) || encased_size(&block).is_some() || ladder;
     let sneaking = game.native_sneaking();
     if !sneaking && matches!(block.as_str(), super::create_fluid_tank::TANK | super::create_fluid_tank::CREATIVE) {
@@ -282,6 +310,13 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> boo
     else {
         return false;
     };
+    if !sneaking && matches!(block.as_str(), PIPE | GLASS_PIPE) {
+        if create_fluids::wrench_pipe(game, pos, face, &block) {
+            game.swing_arm();
+            return true;
+        }
+        return false;
+    }
     let at = pos.map(|coordinate| f64::from(coordinate) + 0.5);
     if sneaking {
         pickup(game, pos, &block);
