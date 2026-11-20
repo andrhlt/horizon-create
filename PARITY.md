@@ -5504,6 +5504,75 @@ These cases cover the gameplay baseline only. Full Java player travel, latency, 
 
 Elapsed time: no new Java capture; environment provisioning and diagnosis about 15 minutes; restart-fixture repair and evidence updates about 25 minutes; initial isolated build 18m 08s, rebased incremental builds 7m 53s and 3m 20s; production-logic replay 1.5s; headless integration runs about 15 minutes across the builds. The wall-clock estimates exclude wait time between work sessions.
 
+### APP-2028 bounded gameplay baseline
+
+APP-2028 reused the pinned Java captures and the existing main-synchronized
+Horizon client `native-9f42064-6bdf8691aa42` (source commit `781c0ef`, client
+SHA-256 `703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`).
+The initial focused pass used ticket base `a167267`. After main advanced, the
+PR was rebased onto `66fc60d`; the Frogport and Chain Conveyor gameplay modules
+are unchanged from that client's source, and the registered four-check
+selection passed again on the rebased head. Horizon was
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, Create was
+`ac0c444d9828da3453ae8cc65338e8de063286fb`, and the pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+No new Java trace or native build was needed. Reused Java capture patch hashes
+are recorded in the APP-2027 section above.
+
+The finite acceptance cases passed:
+
+The four newly registered runner entries also passed together (4/4):
+`python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1
+--check 'frogport-*'`. They are `frogport-idle-reopen`,
+`frogport-inventory-lan`, `frogport-settings-lan`, and
+`frogport-active-reopen`; their logs are in `.local/parity/`.
+
+- `tools/test-chain-conveyor-player.py --lan` matched 31 Java ticks for
+  survival Frogport binding and addressed delivery. The guest bound at 135°;
+  the package entered the span at tick 1, reached the destination at tick 15,
+  was caught at tick 21, and reached inventory at tick 30.
+- `tools/test-frogport-menu.py` and `--lan` exercised slot 18 extraction,
+  rejection of Stone, package reinsertion, and inventory retention. The solo
+  case also saved and reopened an idle Frogport and retained its address,
+  target, package-port binding on the conveyor, and package inventory.
+- `tools/test-frogport-menu.py --settings --lan` matched the seven Java
+  settings observations. A guest changed the address and receive mode, the old
+  address was refused, the newly addressed package arrived, and settings
+  survived a world restart.
+- `tools/test-chain-conveyor-packages.py --scenario straight --reopen-at 27`
+  matched 80 Java world ticks and 100 package states. The active catch survived
+  save/reopen, restarted its animation, and delivered the package at Java tick
+  37 with its contents intact.
+- `tools/test-chain-conveyor-branch.py --lan` matched 70 Java ticks and 57
+  package states while host and guest loaded packages for separate endpoints.
+  Both destinations received only their addressed package.
+- `tools/test-chain-conveyor-branch.py --relink --lan` matched 230 Java ticks
+  and 234 package states. Removing the span at tick 10 left the package waiting
+  after its route expired at tick 101. Restoring the span at tick 112 restored
+  the route at tick 183 and delivered the package at tick 223.
+- `tools/test-chain-conveyor-retrieval.py --scenario straight --lan` returned
+  loop and span packages to the guest, preserving the Java-matched payloads and
+  inventory counts.
+- `tools/test-chain-conveyor-adjacent.py --blocked --visual --lan` matched 18
+  Java observations: a full destination blocked export at tick 37, accepted the
+  package when space opened at tick 48, and the guest saw the warning clear.
+
+The sandboxed launch initially could not create its control socket; rerunning
+the same isolated fixtures with local socket access passed. Two fixture
+iterations were corrected before the final passes: use the original package
+item for menu insertion and normalize whitespace in serialized NBT checks.
+Those were test setup/assertion issues, not gameplay mismatches.
+An initial runner selection was 3/4 because its active-reopen entry omitted
+the required pack argument; the entry was fixed and the full selection passed.
+
+Approximate effort: runtime/evidence setup 15 minutes; fixture update and
+debugging 20 minutes; Java capture 0; native build 0 (reused the identified
+main-synchronized client); syntax/diff checks under one minute; focused
+integration runs about nine minutes including the post-rebase selection. No
+gameplay code defect was found.
+Full 1:1 remains Open for additional route layouts, packet arrival and
+interpolation timing, and exact cosmetic presentation.
+
 ### Frogport inventory
 
 Right-click opens the 18 package slots with the original Frogport
