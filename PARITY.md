@@ -7799,3 +7799,74 @@ regressions passed 13/13. The sequenced-pulley cross-regression passed 1/1,
 including its 56-tick trace. These results replace earlier APP-1949 build
 identifiers; broader combinations and the matrix's Full 1:1 column remain
 open.
+## APP-1943 kinetic source transitions — November 19, 2026
+
+The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+Source review of `RotationPropagator.propagateNewSource` confirms that incompatible
+nonzero conveyed speeds destroy the newly added position with drops. Horizon's
+kinetic source generation is shared with network traversal, and a conflicting
+new kinetic member is now removed; the surviving adjacent networks are then
+republished so their saved capacity and stress reflect the split immediately.
+
+`tools/test-kinetic-network-sources.py` covers two separated creative-motor line
+networks at +16 and -16 RPM, idle save/reopen, and insertion of a three-shaft
+connection whose final shaft must break for equal and weaker opposing sources.
+It also checks a stronger opposing source, matching +16 sources merging to
+capacity 524288, same-direction slower-source transitions, separation after
+removal, and an active merged save/reopen. The headless regression passed on
+freshly built Horizon `native-9f42064-b2e225daec86` (focused source regression rerun after rebase). The existing
+small/large-waterwheel, loaded-stressometer, rotation-speed-controller-cascade,
+rotation-speed-controller-competing and rotation-speed-controller-LAN checks
+also passed on that exact build (6/6). Commands:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-ctl .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-client .local/horizon-client/26.3 --jobs 1 --check kinetic-network-sources
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-ctl .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-client .local/horizon-client/26.3 --jobs 1 --check small-waterwheel --check large-waterwheel --check loaded-stressometer --check rotation-speed-controller-cascade --check rotation-speed-controller-competing --check rotation-speed-controller-lan
+```
+
+These Horizon outcomes are integration regressions, not captured Java trace
+equivalence. Branch layouts and LAN guest observation of this source-merge
+case remain follow-ups. Full 1:1 remains Open.
+
+
+### APP-1943 stress-capacity boundary — November 19, 2026
+
+Extended the existing `tools/test-loaded-stressometer.py` rig; no new load
+family or separate fixture. The small water wheel supplies 8 RPM and 256 SU.
+Seven, eight and nine attached millstones produce 224, 256 and 288 SU. The
+check observes every connected millstone plus the wheel, shaft, stressometer
+and a connected speedometer. It then removes all mills and checks recovery.
+
+Expected behavior comes from pinned Java `KineticNetwork.calculateCapacity`,
+`calculateStress` and `getStressMultiplierForSpeed`,
+`KineticBlockEntity.updateFromNetwork` (`capacity < stress`) and `getSpeed`,
+`StressGaugeBlockEntity.updateFromNetwork`, and
+`SpeedGaugeBlockEntity.onSpeedChanged`. The already captured Java
+`fixtures/loaded_stressometer-java.csv` provides the same 256-SU source and
+prior below/above/recovery samples; the strict at-capacity outcome follows
+the pinned Java comparison (`256 < 256` is false). This case checks both the
+stored theoretical ±8 RPM across the connected gear train and the effective
+speedometer response: it stays active below/at capacity, reads zero at 288 SU,
+and resumes after removing the load.
+
+On fresh build `native-9f42064-b2e225daec86`, the 105-tick existing Java trace
+and Goggles comparison passed, followed by the added boundary states:
+
+| Load | Java expected capacity/stress | Connected stored RPM | Effective speedometer | Result |
+| --- | --- | --- | --- | --- |
+| 7 mills | 256 / 224 SU | Wheel/shaft/gauges +8; millstones alternate ±8 | Moving | Pass |
+| 8 mills | 256 / 256 SU | Wheel/shaft/gauges +8; millstones alternate ±8 | Moving at equality | Pass |
+| 9 mills | 256 / 288 SU | Theoretical values remain signed ±8 | 0 while overstressed | Pass |
+| Mills removed | 256 / 0 SU | Wheel/shaft/gauges +8 | Moving again | Pass |
+
+The overloaded effective-speed comparison uses Java `getSpeed()` (zero while
+overstressed); the saved per-member `Speed` remains the theoretical signed
+RPM, as in Java. The stressometer value was 0.875, 1.0 and 1.125 respectively,
+then returned to zero on recovery. Command:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-ctl .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-client .local/horizon-client/26.3 --jobs 1 --check loaded-stressometer
+```
+
+Branch layouts and direct LAN guest observation of this source merge remain
+follow-ups; Full 1:1 stays Open.

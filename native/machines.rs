@@ -997,7 +997,9 @@ fn network(game: &Game<'_>, start: [i32; 3], ticking: &ModBlockEntity) -> Networ
         // face. Evaluate each isolated side without counting the other load.
         let mut isolated = ticking.clone();
         let mut input = |side| {
-            isolated.nbt.insert("ClutchInputSide".into(), Tag::Int(side));
+            isolated
+                .nbt
+                .insert("ClutchInputSide".into(), Tag::Int(side));
             walk_network(game, start, (start, &isolated), true, |_, _| {})
         };
         if let Some(side @ (-1 | 1)) = int(&ticking.nbt, "ShaftInputSide") {
@@ -1040,6 +1042,79 @@ pub(super) fn chain_gearshift_overspeed(game: &Game<'_>, pos: [i32; 3]) -> bool 
             mod_entity(game, neighbor).map_or(1.0, create_chain_gearshift::modifier);
         rpm > MAX_RPM || rpm * (modifier / other_modifier) > MAX_RPM
     })
+}
+
+fn generated_source(
+    game: &Game<'_>,
+    pos: [i32; 3],
+    block: Kinetic,
+    entity: &ModBlockEntity,
+) -> (f32, f32) {
+    match block {
+        Kinetic::Motor(facing) => {
+            let detaching = matches!(entity.nbt.get(&"MotorSourceDetachTime".into()),
+                Some(Tag::Long(tick)) if *tick == game.world.game_time);
+            let speed = if detaching {
+                0.0
+            } else {
+                motor_speed(facing, &entity.nbt)
+            };
+            (speed, 16384.0)
+        }
+        Kinetic::Handle(face) => create_valve::generator(game, pos, &entity.nbt, face),
+        Kinetic::HandCrank(face) => (create_hand_crank::generated(&entity.nbt, face), 8.0),
+        Kinetic::Wheel(_, large) => {
+            let sign = int(&entity.nbt, "FlowScore").unwrap_or(0).signum() as f32;
+            if large {
+                (sign * 4.0, 128.0)
+            } else {
+                (sign * 8.0, 32.0)
+            }
+        }
+        Kinetic::PoweredShaft(axis) => create_steam::generator(game, pos, axis),
+        Kinetic::Windmill(_) => (create_bearing::windmill_generated(&entity.nbt), 512.0),
+        _ => (0.0, 0.0),
+    }
+}
+
+fn resolve_kinetic_conflict(game: &mut Game<'_>, pos: [i32; 3]) -> bool {
+    if Kinetic::at(game, pos).is_none() {
+        return false;
+    }
+    let Some(entity) = mod_entity(game, pos).cloned() else {
+        return false;
+    };
+    let mut directions = HashSet::new();
+    walk_network(game, pos, (pos, &entity), true, |member, ratio| {
+        let (Some(member_block), Some(member_entity)) =
+            (Kinetic::at(game, member), mod_entity(game, member))
+        else {
+            return;
+        };
+        let generated = generated_source(game, member, member_block, member_entity).0;
+        let network_speed = generated * ratio;
+        if network_speed != 0.0 {
+            directions.insert(network_speed.is_sign_positive());
+        }
+    });
+    if directions.len() < 2 {
+        return false;
+    }
+    game.native_machine_destroy_block(pos, None, true);
+    for direction in [
+        Direction::Down,
+        Direction::Up,
+        Direction::North,
+        Direction::South,
+        Direction::West,
+        Direction::East,
+    ] {
+        let neighbor = offset(pos, direction.normal());
+        if Kinetic::at(game, neighbor).is_some() {
+            refresh_connected_network(game, neighbor);
+        }
+    }
+    true
 }
 
 fn walk_network(
@@ -1091,31 +1166,7 @@ fn walk_network(
                 clutch_reconnected |= matches!(entity.nbt.get(&"ClutchReconnected".into()),
                     Some(Tag::Long(tick)) if (now.saturating_sub(1)..=now).contains(tick));
             }
-            let (generated, capacity_per_rpm) = match block {
-                Kinetic::Motor(facing) => {
-                    let detaching = matches!(entity.nbt.get(&"MotorSourceDetachTime".into()),
-                        Some(Tag::Long(tick)) if *tick == game.world.game_time);
-                    let speed = if detaching {
-                        0.0
-                    } else {
-                        motor_speed(facing, &entity.nbt)
-                    };
-                    (speed, 16384.0)
-                }
-                Kinetic::Handle(face) => create_valve::generator(game, pos, &entity.nbt, face),
-                Kinetic::HandCrank(face) => (create_hand_crank::generated(&entity.nbt, face), 8.0),
-                Kinetic::Wheel(_, large) => {
-                    let sign = int(&entity.nbt, "FlowScore").unwrap_or(0).signum() as f32;
-                    if large {
-                        (sign * 4.0, 128.0)
-                    } else {
-                        (sign * 8.0, 32.0)
-                    }
-                }
-                Kinetic::PoweredShaft(axis) => create_steam::generator(game, pos, axis),
-                Kinetic::Windmill(_) => (create_bearing::windmill_generated(&entity.nbt), 512.0),
-                _ => (0.0, 0.0),
-            };
+            let (generated, capacity_per_rpm) = generated_source(game, pos, block, entity);
             let supplied = generated * ratio;
             if supplied.abs() > network.rpm.abs() {
                 network.rpm = supplied;
@@ -1441,6 +1492,9 @@ fn resolve_motor_speed(game: &mut Game<'_>, pos: [i32; 3], speed: f32) {
     }
     if speed != 0.0 && opposing_controller_output(game, pos, entity, speed) {
         game.native_machine_destroy_block(pos, None, false);
+        return;
+    }
+    if speed != 0.0 && resolve_kinetic_conflict(game, pos) {
         return;
     }
     game.native_with_mod_block_entity(pos, |entity| {
@@ -2614,6 +2668,12 @@ pub(super) fn string(nbt: &Compound, key: &str) -> Option<String> {
 }
 
 pub(super) fn block_entity_tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity) {
+    if Kinetic::at(game, pos).is_some()
+        && network_values(&entity.nbt)[1] == 0.0
+        && resolve_kinetic_conflict(game, pos)
+    {
+        return;
+    }
     if entity.id == LARGE_WHEEL {
         super::create_large_wheel::tick(game, pos, entity);
     }
@@ -3387,16 +3447,22 @@ fn transmission_reconnect_pending(entity: &ModBlockEntity, now: i64) -> bool {
 }
 
 fn finish_pending_transmission_reconnect(game: &mut Game<'_>, pos: [i32; 3], now: i64) -> bool {
-    let Some(entity) = mod_entity(game, pos).filter(|entity| transmission_reconnect_pending(entity, now)) else {
+    let Some(entity) =
+        mod_entity(game, pos).filter(|entity| transmission_reconnect_pending(entity, now))
+    else {
         return false;
     };
     // On disk load the kinetic data slots are empty. Java initializes the
     // branch motors from their saved sources before the queued callback.
-    let restored_motor = entity.data.is_empty()
+    let restored_motor = entity
+        .data
+        .is_empty()
         .then(|| restored_opposing_motor(game, pos, entity, now))
         .flatten();
     game.native_with_mod_block_entity(pos, |transmission| {
-        transmission.nbt.remove(&"TransmissionReconnectPending".into());
+        transmission
+            .nbt
+            .remove(&"TransmissionReconnectPending".into());
     });
     let Some(motor) = restored_motor else {
         return false;
@@ -3438,7 +3504,8 @@ fn restored_opposing_motor(
     {
         return None;
     }
-    let (conveyed, generated) = transmission_branch_speeds(game, pos, entity, transmission, input, now);
+    let (conveyed, generated) =
+        transmission_branch_speeds(game, pos, entity, transmission, input, now);
     // Java initializes an already-sourced Creative Motor only when its
     // configured speed exceeds its theoretical speed as a signed value.
     if matches!(transmission, Kinetic::Gearshift(..)) && generated <= conveyed {
@@ -3469,12 +3536,15 @@ fn transmission_reconnects_into_opposing_drive(game: &Game<'_>, pos: [i32; 3], n
             };
             (axis, source)
         }
-        Kinetic::Gearshift(axis, _) if !entity.nbt.contains_key(&"KineticsTick".into()) => (axis, -1),
+        Kinetic::Gearshift(axis, _) if !entity.nbt.contains_key(&"KineticsTick".into()) => {
+            (axis, -1)
+        }
         _ => return false,
     };
     let mut input = [0; 3];
     input[axis] = source;
-    let (conveyed, output) = transmission_branch_speeds(game, pos, entity, transmission, input, now);
+    let (conveyed, output) =
+        transmission_branch_speeds(game, pos, entity, transmission, input, now);
     opposing_branch_speeds(conveyed, output)
 }
 
@@ -3514,8 +3584,8 @@ fn transmission_branch_speed(
     side: [i32; 3],
 ) -> f32 {
     let neighbor = offset(ticking.0, side);
-    let Some(drive) = Kinetic::at(game, neighbor)
-        .filter(|block| transmission.ratio_to(*block, side).is_some())
+    let Some(drive) =
+        Kinetic::at(game, neighbor).filter(|block| transmission.ratio_to(*block, side).is_some())
     else {
         return 0.0;
     };
