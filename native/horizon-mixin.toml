@@ -4168,6 +4168,15 @@ file = "crates/horizon-client/src/game.rs"
 name = "create_nozzle"
 source = "nozzle.rs"
 
+[[injection]]
+id = "nozzle_player_tick"
+target = "horizon_client::game::native_hooks::Game<'_>::native_player_tick"
+kind = "HEAD"
+helper = "nozzle_player_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "self" },
+]
+
 [[module]]
 id = "toolbox"
 file = "crates/horizon-client/src/game.rs"
@@ -4884,6 +4893,27 @@ bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
   { name = "pos", ty = "[i32; 3]", value = "pos" },
   { name = "stack", ty = "&crate::items::ItemStack", value = "stack" },
+]
+
+[[injection]]
+id = "postbox_break_contents_capture"
+target = "horizon_client::game::block_breaking::Game<'_>::player_break_block"
+kind = "HEAD"
+helper = "postbox_break_contents_capture.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+]
+
+[[injection]]
+id = "postbox_break_contents_drop"
+target = "horizon_client::game::block_breaking::Game<'_>::player_break_block"
+kind = "RETURN"
+helper = "postbox_break_contents_drop.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "self" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+  { name = "result", ty = "Result<bool>", value = "$value" },
 ]
 
 [[injection]]

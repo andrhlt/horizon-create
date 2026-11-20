@@ -59,6 +59,12 @@ def sample(control):
     )
 
 
+def advance(control, ticks):
+    """Advance a frozen fixture by one server tick at a time."""
+    for _ in range(ticks):
+        control.step_to(control.clock() + 1)
+
+
 def run(args):
     with (ROOT / "fixtures/analog-lever-java.csv").open() as data:
         expected = tuple(csv.DictReader(data))
@@ -164,6 +170,34 @@ def run_crafting(args):
     print("Survival crafting made and placed an Analog Lever with both Java mining tags.")
 
 
+def run_reopen(args):
+    """Verify the durable lever value and connected output across a restart."""
+    with fixture_world(args, "Analog-lever-reopen", pack=args.pack) as control:
+        setup(control)
+        for _ in range(7):
+            control.call("interact", *LEVER)
+            advance(control, 16)
+        before = sample(control)
+        if before[:2] != (7, 0) or before[2:] != (7, 7):
+            raise RuntimeError(f"Unexpected pre-save Analog Lever state: {before}")
+        saved_clock = control.clock()
+        control.call("save")
+        control.env["HORIZON_STILL"] = "1"
+        control.restart()
+        after = sample(control)
+        if after != before:
+            raise RuntimeError(f"Analog Lever changed across reopen: before={before}, after={after}")
+        control.call("look-at", "8.5", "180.16", "8.5")
+        control.call("key", "shift", "down")
+        control.call("interact", *LEVER)
+        control.call("key", "shift", "up")
+        advance(control, 16)
+        lowered = sample(control)
+        if lowered[:2] != (6, 0) or lowered[2:] != (6, 6):
+            raise RuntimeError(f"Reopened Analog Lever did not resume operation: {lowered}")
+    print("Analog Lever value and both connected redstone outputs survived save/reopen and resumed operation.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("ctl", "client", "resources"):
@@ -174,6 +208,7 @@ if __name__ == "__main__":
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--removal", action="store_const", const=run_removal, dest="run", default=run)
     scenario.add_argument("--craft", action="store_const", const=run_crafting, dest="run")
+    scenario.add_argument("--reopen", action="store_const", const=run_reopen, dest="run")
     parser.add_argument("--destroy", action="store_true")
     args = parser.parse_args()
     args.run(args)

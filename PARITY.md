@@ -103,10 +103,8 @@ speed, while belt `whenItemHeld`/held-item processing is what delivers the
 completed bottle after movement resumes. The Horizon paths in
 `native/spout.rs`, `native/belt.rs`, `native/depot.rs`, and `native/ejector.rs`
 were checked against those rules.
-The Horizon paths in `native/spout.rs`, `native/belt.rs`, `native/depot.rs`,
-and `native/ejector.rs` were checked against those rules. No reproducible
-behavior mismatch was established, so this source audit made no runtime logic
-change.
+No runtime logic change was needed: Spout timing and belt-held item processing
+are separate callbacks, and the belt pauses its held item at zero speed.
 
 The existing bottle, potion-crafting, nine-lane spouting, and Blaze Cake
 fixtures passed on isolated build `native-9f42064-6a3da367a9bb`; potion crafting,
@@ -118,15 +116,28 @@ The boundary case checks a 249 mB shortage against a 250 mB water-bottle
 requirement and passes cobblestone through. It then removes belt RPM after a
 valid bottle is held: the independent Spout timer reaches -1 while the bottle
 stays centered and 250 mB remains; restoring RPM invokes the held-item callback
-and produces exactly one output while consuming 250 mB. These are
-source-aligned checks, not Java tick traces. LAN feed/collection, output
-backpressure, and idle/partway save/reopen cover the remaining ticket gates.
+and produces exactly one output while consuming 250 mB. The test follows that
+output to the Depot, confirms the route is clear, the timer is idle, and there
+is no duplicate. These are source-aligned checks, not Java tick traces. LAN
+feed/collection, output backpressure, and idle/partway save/reopen cover the
+remaining ticket gates.
+
+On the merged tree, all 12 APP-1990 and affected belt checks passed against
+gameplay build `native-9f42064-6a3da367a9bb`, with pack SHA-256
+`8921cd3502ce28d0bf6662e9d46eb33e81ca3cb9d914a6abd9c2aa4ee9047d1c`:
+`water-filling-bottle`, `spout-crafting`, `spouting`, `heated-fluid-food`,
+`spout-lan-feed-collect`, `spout-output-backpressure`,
+`spout-input-timing-boundaries`, `spout-reopen`, `horizontal-belt`,
+`belt-output-backpressure`, `belt-reopen`, and
+`horizontal-belt-lan-guest-placement`. The changed Spout, belt, Depot, and
+ejector runtime sources match the verified build; the follow-up changes only
+correct harness setup and assert delivery through the Depot.
 
 Run the new cases together with the existing Java replays using:
 
 ```sh
 python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 \
-  --check water-filling-bottle --check spout-crafting --check spouting \
+  --check water-filling-bottle --check spout-crafting --check spouting --check heated-fluid-food \
   --check spout-lan-feed-collect --check spout-output-backpressure \
   --check spout-input-timing-boundaries --check spout-reopen
 ```
@@ -514,6 +525,40 @@ player. The [player replay](tools/test-metal-ladder-wrench.py) matched
 the sampled block states and inventory counts in solo and live LAN.
 Each player also matched the Java climb height and vertical velocity on
 every sampled player tick, including the grounded starting state.
+
+## Andesite and Brass Tunnel gameplay baseline (APP-2013)
+
+APP-2013 reuses the pinned Create GameTests and fixtures at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`. The bounded routing comparison
+covers 552 Java ticks: andesite split (30); brass filtering (82), split (61),
+round robin (111), prefer nearest (99), and synchronized input (169). The
+existing [runner](tools/test-parity.py) checks every sampled inventory count;
+andesite also compares belt stack and position. All seven routing checks passed.
+The separate [settings replay](tools/test-brass-tunnel-settings.py) checks all
+seven mode buttons, group propagation, and East-side filter set/clear without
+consuming the held stack.
+
+The APP-2013 [lifecycle replay](tools/test-brass-tunnel-lifecycle.py) adds the
+finite boundary cases. It saves/reopens an idle connected group and checks its
+mode; naturally loads ten brass casings into the connected tunnel group; stops
+the belt at the lever-controlled clutch; saves/reopens with all ten buffered;
+then restarts the belt and checks all ten arrive in the three depots. The
+[LAN settings replay](tools/test-brass-tunnel-settings.py) performs all seven
+mode changes and East-filter set/clear as a guest, checking the host's
+authoritative group and filter state and the guest's unchanged item count.
+Guest convergence is checked; Java packet arrival timing is not claimed.
+
+The belt/funnel prerequisites are complete in [APP-1968](https://linear.app/appstu/issue/APP-1968/create-gameplay-baseline-mechanical-belt-and-belt-connector)
+and [APP-1970](https://linear.app/appstu/issue/APP-1970/create-gameplay-baseline-andesite-and-brass-funnels).
+
+All nine registered cases passed on `native-9f42064-6bdf8691aa42`, Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, with the matching Create pack
+SHA-256 `a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+This available main-synchronized build is from source commit `781c0ef`; the
+tunnel and belt implementation files match the ticket checkout. It was reused
+instead of compiling a new client because this worktree has no private launcher
+compilation cache. Exact Java reload behavior, every routing mode/layout
+cross-product, animation curves, and pixel-level presentation remain open.
 
 ## Behavior audit
 
@@ -2890,14 +2935,25 @@ a block, with both circuits synchronized and both inventories intact.
 
 The fixtures use the original base, handle and indicator models and block
 texture. The visual run captures the low and raised handle in Horizon.
-Wall and ceiling power, restart timing, visual tick timing, audio playback,
-ambient particles, and Wrench behavior still need comparison.
+The [save/reopen replay](tools/test-analog-lever.py) raises the lever to State 7,
+saves after the 15-tick debounce has settled, reopens the same world, and checks
+State 7, ChangeTimer 0, and both connected redstone wires before lowering it and
+checking State 6 and both outputs. This is source-aligned gameplay persistence
+evidence; it does not claim Java restart-timing parity. Wall and ceiling power,
+visual tick timing, audio playback, and ambient particles remain follow-ups. The
+pinned Java Analog Lever is not `IWrenchable`; Horizon likewise leaves a
+Wrench-held interaction unchanged, so Wrench behavior is source-aligned and no
+separate gameplay fix is required.
+
+The isolated replay passed on `native-9f42064-d6dc2ad18d3f` with pack
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
 
 ```sh
 python3 tools/test-analog-lever.py --visual /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-analog-lever.py --removal --destroy /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-analog-lever.py --removal /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-analog-lever.py --craft /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-analog-lever.py --reopen /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-multiplayer-analog-lever.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
 
@@ -3610,6 +3666,60 @@ shaft or preserves source water when placing it upright. The visual
 replay captures the original rotating head and break effects. Moving
 contraptions, cobblestone generator optimization, entity damage and
 exact sound or visual timing still need comparison.
+
+### APP-1983 bounded gameplay baseline
+
+On 2026-11-20, the stationary replay was rerun from the APP-1983 worktree
+against the pinned Java tick fixture. All 93 sampled ticks matched RPM, break
+progress, retry delay, target block and collected drops; this includes stone
+and dirt breaking, the bedrock control, power stop/resume and the neighboring-
+block retry. The existing placement replay also passed its two player cases:
+shaft-oriented placement and waterlogged source-water placement. Existing
+survival-crafting evidence records production of one Mechanical Drill from
+its original recipe. These results retain the scope of the stationary fixture
+and do not establish moving behavior.
+
+Runtime identity for the fresh replays: Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client build
+`native-9f42064-6bdf8691aa42` (client SHA-256
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`),
+pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`,
+and prepared Minecraft 26.3 resources from the same evidence directory.
+Commands were `python3 tools/test-mechanical-drill.py --visual ... --pack ...`
+and `python3 tools/test-mechanical-drill.py --configure ... --pack ...` with
+that build's `horizon-ctl`, `horizon-client`, and prepared resources. The
+initial sandboxed launch could not create its temporary control socket; the
+same isolated checks passed when rerun with local socket access.
+
+### APP-1983 mounted drilling
+
+Mounted straight-line drilling now uses the existing gantry and mechanical
+piston actor callbacks. It applies the pinned forward-motion gate and block
+eligibility checks, persists each actor's target and break progress, stalls
+movement during mining, puts drops into payload cargo before spawning
+leftovers, and clears break progress when motion ends. Linear contraptions may
+cross a blocked cell only when a forward-facing drill can mine that exact
+eligible target. Create tracks, non-breakable blocks, liquids, air and
+collision-free blocks remain obstructions.
+
+On 2026-11-20, final build `native-9f42064-581916b5f99f` (Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client SHA-256
+`cc8272cfcb393bc4e793c53d43bcf87014aa415cc032c2c7fa875af495631884`) passed
+all six selected regressions: stationary 93-tick drill trace, drill placement,
+mounted gantry LAN/save-reopen, existing gantry LAN/save-reopen,
+mechanical-piston actor regression, and ploughing. The mounted LAN scenario
+starts from an idle saved gantry, lets a guest power the drive and observe it
+move, then saves while the drill has a persistent active `BreakingPos`. After
+reopen the drill breaks stone, accounts for exactly one cobblestone/stone drop
+in cargo or the world, leaves bedrock unchanged, and stops the gantry. The
+stationary trace still matches all 93 Java samples; plough timing and piston
+actor regressions pass on the same final native build.
+
+These are representative bounded gameplay gates, not exhaustive 1:1 parity.
+Full 1:1 remains Open; other moving contraption types, wider block/drop
+combinations, cobblestone optimization and exact effects/presentation remain
+follow-ups.
 
 ```sh
 python3 tools/test-mechanical-drill.py --visual /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
@@ -4847,13 +4957,35 @@ The complete collision shape and exact animation remain open.
 ## Powered redstone latches
 
 The [pinned Java fixture](tools/java-create-latches.patch) records
-[41 ticks](fixtures/create-latches-java.csv) of Powered Latch and Powered
-Toggle Latch state, rear and side redstone inputs, and output read by
-adjacent dust. It includes short pulses, manual interactions and a
-sneaking interaction. The [physical Horizon replay](tools/test-create-latches.py)
-matched all 41 ticks in solo and with a guest operating both latches on
-`native-9f42064-e6e755d336c6`. Both survival recipes were exercised in
-solo. This replay covers the tested orientation and wire layout.
+[41 ticks](fixtures/create-latches-java.csv), ticks 0–40, of Powered Latch
+and Powered Toggle Latch state, rear and side inputs, and output read by
+adjacent dust. It covers short and held rear signals, a side signal, accepted
+manual toggles, rejection while rear and side power disagree, and sneaking.
+The [physical Horizon replay](tools/test-create-latches.py) matched every
+sample in solo and LAN on `native-9f42064-6bdf8691aa42`; the guest operated
+both latches and its observed state converged at every sample. Both survival
+recipes also passed in solo.
+
+The [persistence replay](tools/test-create-latches-persistence.py) checks
+idle saved outputs, active rear inputs on both latches, the Powered Latch's
+side input, and state retention across world restart. After reopening, it
+removes the rear input and then the remaining side input, confirming the
+Toggle Latch holds its output and the Powered Latch resets when both paths
+are off. These are instantaneous block states, so active persistence means
+retaining powered state and connections through restart and observing their
+subsequent reset transitions; no tile-entity contents apply. It passed on the
+same identified build. The registered checks are `redstone-latches`,
+`redstone-latches-lan`, and `redstone-latches-persistence`.
+
+Java source: Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+Capture patch SHA-256: `5ccdffe850690369dae4f659a23b4d4b4a8f732bf313813829d868fa8bc8e2c3`;
+trace SHA-256: `496e0d3ff609bd125b92fb466e081b12cea298ed0fc3cf04cd1b109b12c37c2c`.
+Horizon: `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client build
+`native-9f42064-6bdf8691aa42`, pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Run the three named checks with the documented `tools/test-parity.py`
+command. Exact visual presentation and other orientations/mixed layouts
+remain outside this bounded gameplay pass.
 
 ## Brass pulse diodes
 
@@ -5021,6 +5153,42 @@ these reference fixtures.
 - Verify both players can walk while the cabin moves and exit through
   a paired landing door. Check that both leaves open and close in both
   clients.
+
+## Elevator bounded gameplay baseline (APP-2001)
+
+The Rope Pulley and Redstone Contact prerequisites are Done in APP-1999 and
+APP-2000. The bounded two-floor baseline passed on 2026-11-20 using
+`native-9f42064-395b15d09945` and the `create.hmod` pack with SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. The
+build uses Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0a` and was produced
+from commit `5cd93bb`; the current main commit is `a167267`. The post-build
+main changes do not modify elevator, rope or contact modules. Java comparisons
+reuse the pinned Create 6.0.10 traces at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+| Bounded case | Result |
+| --- | --- |
+| Original two-pulley cabin, Redstone trip and return | `elevator`: all 67 Java ticks matched. |
+| Active and idle save/reopen, retained cargo and return/disassembly | `elevator-reload`: reopened at trip tick 42; all 66 return ticks matched Java; cabin and seat disassembled, and the cow remained at the upper landing after idle reopen. |
+| Two named floors, guest floor selection, door modes/interlock, indicator and sound | `elevator-service`: 101 Java ticks, 85 indicator samples on both clients, and 66 standing-player positions matched. |
+| Host and guest board the elevator seats and dismount in survival | `elevator-grounded`: both players boarded, rode to the upper landing, shift-dismounted and remained grounded. |
+| Standing host and guest ride to both endpoints and dismount | `elevator-standing`: both players remained unmounted and supported for all 134 travel ticks, then jumped and landed independently. |
+| Walking on the moving cabin and crossing paired doors | `elevator-walkthrough`: both players walked while rising, stopped at closed doors, and crossed after the paired doors opened; both clients observed the door states. |
+| Host/guest selected-floor trip and shared state | `multiplayer-elevator`: all 92 Java ticks matched for both clients, including names, lamps, cabin position and seated riders. Guest state was checked after convergence. |
+
+Run these checks together with the exact build's `horizon-ctl`,
+`horizon-client` and prepared `26.3` resources using
+`python3 tools/test-parity.py <build>/horizon-ctl <build>/horizon-client <build>/.local/horizon-client/26.3 --jobs 2 --check elevator --check elevator-reload --check elevator-service --check elevator-grounded --check elevator-standing --check elevator-walkthrough --check multiplayer-elevator`.
+All seven passed. Raw logs and sampled Horizon CSVs are retained under
+`.local/app-2001-evidence/` in the development environment.
+
+The two registered contacts bound this pass's travel range; upward and
+downward trips both settled at their selected endpoints. Closed landing doors
+blocked player exit until the guest opened them. APP-1999 independently checks
+the shared Rope Pulley blocked-assembly and zero-rope upper-limit behavior.
+The checks establish this baseline for the two-floor configuration, not every
+height or layout. Full 1:1 remains open for additional layouts, camera and
+interpolation timing, delayed updates and remaining edge interactions.
 
 ## Copper roofs
 
@@ -5452,6 +5620,19 @@ produced identical snapshots in two headless runs. The exact build
 also matches all 83 [original Redstone Link signal ticks](tools/test-redstone-link.py)
 and passes the live Clipboard, wrapping and brass-diode copy replays.
 
+APP-2032's bounded Redstone Link baseline reuses that trace for ordered
+frequencies, analog strengths, independent channel separation, mismatch and
+reconnection, source removal, and the downstream lamp. Its survival setup
+check verifies placement, receiver toggling, both frequency slots and sample
+retention. Existing LAN coverage verifies that a guest can configure a
+receiver and observe host power; the handheld-controller binding check covers
+the supported held-device path. The new `--persistence` mode saves and reopens
+the same world with the rig active and idle, checking the channel bindings and
+the sender/receiver output state. Run it with the normal
+`tools/test-redstone-link.py` client, control and resource arguments. Range
+edge cases, overlapping network combinations and the remaining facings remain
+outside this finite pass. Full 1:1 stays Open.
+
 The [Clipboard selection replay](tools/test-clipboard-editor.py)
 passes in solo and LAN on `native-9f42064-7a700098bbf4`. Double-click
 selects a word without its following space, and dragging selects text
@@ -5716,9 +5897,35 @@ parcel, keeps it across a menu reopen, and saves the address. The
 placement replay compares facing and waterlogging, and comparator
 values are sampled after settling.
 
-Train station attachment, train delivery, full world reload, the
-animated flag and remaining presentation checks are open. This work
-used isolated builds and muted offscreen menu replays.
+The APP-2029 follow-up replay used build `native-9f42064-6bdf8691aa42`
+(client SHA256 `703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`),
+pack SHA256 `a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`,
+and that evidence build's prepared 26.3 resources. The standalone replay
+passed in solo and LAN; the solo cold-reopen extension set `Warehouse` and
+`Dispatch` through each box's menu, retained the package in slot 17, and
+restored both boxes closed. A survival pickaxe break then exposed an item-loss
+defect: both Postbox blocks dropped, but their addressed package did not. The
+source fix captures package contents before the player-break callback and
+drops them only when that callback reports success. The rebuild has not
+completed: the available source cache failed on the advancement patch, and
+reusing its newer patched tree produced duplicate tree-fertilizer definitions.
+An initial compile also identified a mismatch between the checkout's Item
+Hatch hook and the cached Horizon source. The fix therefore remains unverified
+and removal is still an acceptance blocker. The existing offline buffer check
+in `tools/test-train-postbox-target.py` does not cover ordinary player break.
+
+Reproduce the baseline commands with the matching `horizon-ctl`, client and
+26.3 resources from the build above:
+
+```sh
+python3 tools/test-postbox.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 --pack /path/to/create.hmod
+python3 tools/test-postbox.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 --pack /path/to/create.hmod --lan
+python3 tools/test-postbox.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 --pack /path/to/create.hmod --craft
+```
+
+Train station attachment, train delivery, exact animated flag motion and
+remaining presentation checks stay open. This work used isolated worlds and
+muted offscreen menu replays.
 
 
 ## Nozzle placement and dropped-item airflow
@@ -5730,15 +5937,25 @@ drop, the original crafting result, and seven [radial airflow impulses](fixtures
 The airflow cases cover push, pull, the pull dead zone, maximum reach,
 positions outside the scan range, obstruction, and a stopped Fan.
 
-The [Horizon replay](tools/test-nozzle.py) passed in solo and LAN on
+The existing [Horizon replay](tools/test-nozzle.py) passed in solo and LAN on
 `native-9f42064-70205eb8ade6`. All eight placements or rejections
 matched Java, including applicable shape planes and the ordinary Wrench
 result. Removing the support dropped one Nozzle. The original recipe was
 crafted in solo survival. The seven dropped-item inputs showed no early
 motion on the first five Horizon ticks and matched the forced Java
 impulse at the scan tick. The guest observed item movement and removal.
-Continuous Java airflow cadence, player and mob movement, configurable
-range, saturation, and presentation effects remain open.
+The final isolated solo and LAN replays on `native-9f42064-2765e8093db7` saved
+and reopened a placed Nozzle with its aligned Fan, matched all seven item
+cases and push/pull zombie impulses, and verified host/guest item receipt and
+removal. The LAN guest player check also verified push/pull displacement. The
+player path uses synchronized Fan network speed, a six-tick acquisition
+counter, Java's crouch/creative-flight exclusions, and the Nozzle visibility
+ray. Because Horizon reconstructs guest velocity from client-known movement,
+the server preserves the authoritative impulse by advancing the guest's
+authoritative position in the same tick; this avoids duplicate client/server
+impulses while keeping the correction visible to the guest. Client effects,
+continuous Java airflow cadence, configurable range, saturation, and exact
+presentation remain open.
 
 ## Turntable crafting, placement and mob contact
 
@@ -9996,6 +10213,48 @@ dedicated baseline check passed these bounded cases:
   from +32 to −32 RPM. Its idle and active save/reopen cases passed; the active
   16 RPM motor and shaft resumed after reopening.
 
+## Bogeys and train assembly (APP-2047)
+
+The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+`StationBlockEntity.refreshAssemblyInfo()` takes its axis from the selected
+track edge and target direction, starts one block along that axis, and checks
+bogeys at the track's up normal. Its default bogey limit is 20.
+`isValidBogeyOffset()` rejects positions less than three blocks from an existing
+bogey. During `assemble()`, each captured carriage must contain its ordered
+second bogey at the next discovered bogey position when it has one. The rig
+follows those rules: target `[9,112,-8]`,
+direction `+X`, track at `y=112`, and bogeys at `[10,113,-8]`,
+`[13,113,-8]`, `[17,113,-8]`, and `[20,113,-8]`. Two independent Glue regions
+connect each pair to its own plank body, controls and barrel.
+
+The first Horizon fixture attempt showed four placed bogeys but a disabled
+assembly button. Instrumentation confirmed target `[9,112,-8]`, direction `+X`,
+and a 24-block track scan. The station had cached a zero count on the first
+assembly-mode tick, before the fixture placed the bogeys; frozen game time then
+prevented another scan before the UI was reopened. Stepping one game tick after
+placement makes the station discover all four bogeys before the menu opens. No
+station direction or scan change was needed. The registered
+[multi-carriage replay](tools/test-train-multi-carriage.py) now checks assembly
+and all four bogey offsets, host save/reopen, guest convergence on the assembled
+and restored blocks, cargo restoration for both carriages, and a separate
+40-tick manual drive where all eight track points move.
+
+On `native-9f42064-4d9ec02143c5` (Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`), with pack SHA-256
+`cb9a737fce8e9f26c0b0f4f0a8fc2af332959c39f1d4cb3ca06f9a3583e28fcc`, the
+multi-carriage test and affected `train-bogeys`, `manual-train`,
+`train-disassembly`, and `train-standing-disassembly` regressions passed. The
+multi-carriage movement assertion verifies movement and all eight track-point
+updates, not Java-equivalent multi-carriage speed timing. Broader layouts,
+curved multi-carriage movement, and full Java parity remain open.
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-4d9ec02143c5/horizon-ctl .local/patched-launcher/versions/native-9f42064-4d9ec02143c5/horizon-client .local/horizon-client/26.3 --jobs 2 --check train-multi-carriage --check train-bogeys --check manual-train --check train-disassembly --check train-standing-disassembly
+```
+
+Final client SHA-256: `6e33963a1eeae1b6e0344f22ee9af92aa4acb9f740343a3ad4465e31b2e290f0`;
+control tool SHA-256: `1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`.
+
 ## APP-1978 Super Glue and assembly selection
 
 The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
@@ -10259,3 +10518,56 @@ These representative cases establish the finite gameplay baseline. They do
 not claim exhaustive Java parity for every inventory, airflow, branch,
 mounted, visual, effect or packet-timing combination.
 
+## Redstone Contact gameplay baseline (APP-2000)
+
+The pinned Java `RedstoneContactBlock.hasValidContact` accepts either a
+Redstone Contact or an Elevator Contact when their facing values oppose.
+Before the fix, the old Horizon client powered the Redstone-to-Redstone pair
+and kept a mismatched pair off, but failed the Redstone-to-Elevator pair. The
+preserved reproduction is `.local/evidence/app-2000/pre-fix-redstone-contacts.log`.
+`native/contact.rs` now reads facing from both registered contact IDs for
+placement adjacency, neighbor updates and the scheduled contact tick.
+
+The finite baseline cases passed:
+
+- A player placed a contact against a support block; its facing matched the
+  pinned Java look-direction default. A matching pair, a nonmatching pair,
+  and a mixed Redstone/Elevator pair produced the expected static output.
+- Both connected states survived idle save/reopen. Removing each paired
+  contact deactivated the remaining Redstone Contact.
+- The original vertical Gantry trace matched all 111 samples, ticks 0–110,
+  for carriage height (tolerance `1e-6`), three powered states (exact), and
+  diamond-block height (exact). Trace origin is the first fixture sample.
+- An active Gantry/contact save at fixture tick 12 reopened and matched the
+  Java trace at tick 20 after server startup advanced the saved world.
+- On a dedicated server, host and guest agreed on matching, mismatched, mixed
+  pairs and deactivation. This confirms guest convergence, not packet-arrival
+  timing equivalence.
+
+The Java fixture is `fixtures/redstone_contacts-java.csv` from Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; the capture patch hash is
+`9746209a1df14aa1c3907c22d3e5f7c2529cb447b1608b943fc8bf44c6fa8419`.
+No Java recapture was needed. The final Horizon build is
+`native-9f42064-395b15d09945` on pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`; its client SHA-256 is
+`e7fce2430c800def29c42730261f9b79030c52bff3cf361522357956c3403145` and
+the pack SHA-256 is
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The solo trace output is `.local/redstone_contacts-horizon.csv` (112 rows
+including its header). The test log is `.local/parity/redstone-contacts.log`.
+
+Run the scoped checks with the pinned client and prepared 26.3 resources:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \
+  --check redstone-contacts --check redstone-contacts-lan
+```
+
+Both checks passed. `py_compile` for the two test scripts and runner, plus
+`git diff --check`, passed. Work time: setup/evidence reuse about 5 minutes;
+implementation and debugging about 25 minutes; private first build 533 seconds
+and incremental build 169 seconds; syntax/diff checks under a second; focused
+integration runs about 8 minutes across final-main reruns. The latest-main sync
+after those checks required no engine rebuild.
+No exhaustive contraption layouts, cosmetic timing or Java packet timing was
+claimed. Full 1:1 remains Open.
