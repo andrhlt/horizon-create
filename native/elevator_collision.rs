@@ -31,6 +31,12 @@ struct Anchor {
     collision_previous_y: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     rotation: Option<[f32; 4]>,
+    #[serde(default, skip_serializing_if = "is_zero_pivot")]
+    pivot: [f64; 3],
+}
+
+fn is_zero_pivot(pivot: &[f64; 3]) -> bool {
+    *pivot == [0.0; 3]
 }
 
 #[derive(Default)]
@@ -140,10 +146,46 @@ fn visit(game: &Game<'_>, mut each: impl FnMut(Shape, Anchor)) {
             position,
             collision_previous_y: collision_previous_y(game, load, position[1]),
             rotation: None,
+            pivot: [0.0; 3],
         };
         for block in blocks {
             for bounds in collision_bounds(block.get(COLLISION)) {
                 each(Shape { display, bounds, local_bounds: None }, anchor);
+            }
+        }
+    }
+    // Mechanical bearings keep their moving blocks in the bearing block
+    // entity. Use the display entity as a stable per-payload sync key and
+    // rotate the captured collision shapes around the bearing anchor.
+    for (&(x, y, z), block_entity) in game.world.block_entities.iter() {
+        let horizon_client::containers::BlockEntity::Mod(entity) = block_entity else { continue };
+        if entity.id != "create:mechanical_bearing" { continue }
+        let Some(Tag::List(blocks)) = entity.nbt.get(&"MovedBlocks".into()) else { continue };
+        let bearing = [x, y, z];
+        let Some(face) = super::create_fan::facing(game, game.world.block(x, y, z)) else { continue };
+        let normal = face.normal();
+        let origin = offset(bearing, normal);
+        let display = blocks.iter().find_map(|block| match block {
+            Tag::Compound(block) => int(block, "Display").map(|id| id as u32),
+            _ => None,
+        });
+        let Some(display) = display else { continue };
+        let angle = f64::from(float(&entity.nbt, "Angle").unwrap_or(0.0)).to_radians();
+        let axis = normal.iter().position(|&step| step != 0).unwrap_or(1);
+        let (sin, cos) = (angle * 0.5).sin_cos();
+        let mut rotation = [0.0, 0.0, 0.0, cos as f32];
+        rotation[axis] = sin as f32;
+        let anchor = Anchor {
+            display,
+            position: origin.map(f64::from),
+            collision_previous_y: f64::from(origin[1]),
+            rotation: Some(rotation),
+            pivot: [0.5; 3],
+        };
+        for block in blocks {
+            let Tag::Compound(block) = block else { continue };
+            for local in collision_bounds(block.get(&COLLISION.into())) {
+                each(Shape { display, bounds: rotated_bounds(local, rotation), local_bounds: Some(local) }, anchor);
             }
         }
     }
@@ -154,7 +196,7 @@ fn visit(game: &Game<'_>, mut each: impl FnMut(Shape, Anchor)) {
         let Some(pose) = super::create_train::Pose::for_collision(game, data) else { continue };
         let Some(Tag::List(blocks)) = data.get(&"Blocks".into()) else { continue };
         let position = pose.position(glam::Vec3::ZERO);
-        let anchor = Anchor { display: carriage.id, position, collision_previous_y: position[1], rotation: Some(pose.rotation.to_array()) };
+        let anchor = Anchor { display: carriage.id, position, collision_previous_y: position[1], rotation: Some(pose.rotation.to_array()), pivot: [0.0; 3] };
         for block in blocks {
             for bounds in train_collision_bounds(game, block, pose) {
                 each(Shape { display: carriage.id, bounds: train_bounds(pose, bounds, position), local_bounds: Some(bounds) }, anchor);
@@ -206,6 +248,24 @@ fn train_bounds(pose: super::create_train::Pose, bounds: [f64; 6], origin: [f64;
     if up.x.abs() < 1e-6 && up.z.abs() < 1e-6 {
         result[1] = bounds[1];
         result[4] = bounds[4];
+    }
+    result
+}
+
+fn rotated_bounds(bounds: [f64; 6], rotation: [f32; 4]) -> [f64; 6] {
+    let rotation = precise_rotation(rotation);
+    let mut result = [f64::INFINITY, f64::INFINITY, f64::INFINITY,
+                      f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY];
+    for x in [bounds[0], bounds[3]] {
+        for y in [bounds[1], bounds[4]] {
+            for z in [bounds[2], bounds[5]] {
+                let point = rotation * glam::DVec3::new(x - 0.5, y - 0.5, z - 0.5);
+                for axis in 0..3 {
+                    result[axis] = result[axis].min(point[axis] + 0.5);
+                    result[axis + 3] = result[axis + 3].max(point[axis] + 0.5);
+                }
+            }
+        }
     }
     result
 }
@@ -486,20 +546,26 @@ fn anchor_motion(previous: Anchor, current: Anchor, body: Aabb) -> Vec3 {
     let min = body.min_position();
     let max = body.max_position();
     let point = [(min.x + max.x) * 0.5, min.y, (min.z + max.z) * 0.5];
-    let mut offset = [0.0; 3];
+    let mut offset: [f64; 3] =
+        std::array::from_fn(|i| current.position[i] - previous.position[i]);
     if let (Some(old), Some(new)) = (previous.rotation, current.rotation) {
-        let local = glam::DVec3::from_array(std::array::from_fn(|i| point[i] - previous.position[i]));
+        let previous_pivot: [f64; 3] =
+            std::array::from_fn(|i| previous.position[i] + previous.pivot[i]);
+        let current_pivot: [f64; 3] =
+            std::array::from_fn(|i| current.position[i] + current.pivot[i]);
+        let local = glam::DVec3::from_array(std::array::from_fn(|i| point[i] - previous_pivot[i]));
         let rotation = precise_rotation(new) * precise_rotation(old).inverse();
         let rotated = rotation * local;
         let values = rotated.to_array();
-        for i in 0..3 { offset[i] = values[i] - local[i]; }
+        let mut rotation_delta: [f64; 3] = std::array::from_fn(|i| {
+            current.pivot[i] - previous.pivot[i] + values[i] - local[i]
+        });
         // A horizontal turn has no vertical contact-point motion.
         let up = rotation * glam::DVec3::Y;
-        if up.x.abs() < 1e-6 && up.z.abs() < 1e-6 { offset[1] = 0.0; }
+        if up.x.abs() < 1e-6 && up.z.abs() < 1e-6 { rotation_delta[1] = 0.0; }
+        for i in 0..3 { offset[i] += rotation_delta[i]; }
     }
-    Vec3::new(current.position[0] - previous.position[0] + offset[0],
-              current.position[1] - previous.position[1] + offset[1],
-              current.position[2] - previous.position[2] + offset[2])
+    Vec3::new(offset[0], offset[1], offset[2])
 }
 
 pub(super) fn carry_train(
@@ -512,13 +578,13 @@ pub(super) fn carry_train(
     let previous = before.position(glam::Vec3::ZERO);
     let supported = blocks.iter().any(|block| train_collision_bounds(game, block, before).into_iter().any(|bounds| {
         let shape = Shape { display: 0, bounds: train_bounds(before, bounds, previous), local_bounds: Some(bounds) };
-        let anchor = Anchor { display: 0, position: previous, collision_previous_y: previous[1], rotation: Some(before.rotation.to_array()) };
+        let anchor = Anchor { display: 0, position: previous, collision_previous_y: previous[1], rotation: Some(before.rotation.to_array()), pivot: [0.0; 3] };
         supported_by_shape(shape, anchor, body)
     }));
     if supported {
         let next = after.position(glam::Vec3::ZERO);
-        let old = Anchor { display: 0, position: previous, collision_previous_y: previous[1], rotation: Some(before.rotation.to_array()) };
-        let new = Anchor { display: 0, position: next, collision_previous_y: next[1], rotation: Some(after.rotation.to_array()) };
+        let old = Anchor { display: 0, position: previous, collision_previous_y: previous[1], rotation: Some(before.rotation.to_array()), pivot: [0.0; 3] };
+        let new = Anchor { display: 0, position: next, collision_previous_y: next[1], rotation: Some(after.rotation.to_array()), pivot: [0.0; 3] };
         carry_motion(game, body, anchor_motion(old, new, body));
     }
 }
