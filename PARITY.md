@@ -10752,3 +10752,21 @@ integration runs about 8 minutes across final-main reruns. The latest-main sync
 after those checks required no engine rebuild.
 No exhaustive contraption layouts, cosmetic timing or Java packet timing was
 claimed. Full 1:1 remains Open.
+
+## APP-2008 Dispensers, droppers and mounted actors
+
+The bounded comparison reused the pinned Create `ac0c444d9828da3453ae8cc65338e8de063286fb` references. The mounted dispenser implementation in this checkout is byte-identical to its source at `7f44b58c28df6a797c73e187dced78fe8575741e`; source review covered `MountedDispenseBehavior`, `DefaultMountedDispenseBehavior`, `DropperMovementBehaviour`, and `DispenserMovementBehaviour`. No consequential source mismatch appeared in the bounded cases, so no runtime edit was warranted.
+
+The following checks passed on `native-9f42064-d6dc2ad18d3f` (Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client SHA-256 `006bfe15a198b29d6af7633d353dcadaa07039121ae66c2081927299835a8811`) with the freshly prepared pinned pack (SHA-256 `ec0ee28f53e79af557cf6de5777d6f7c96497333be277d1aa005bbd606870e61`):
+
+| Case | Java comparison / outcome |
+| --- | --- |
+| Mounted arrow dispenser on a moving bearing | All 142 observations matched, including actor pose, ammo decrement, projectile count and launch direction across four successive launches. |
+| Two Gantry dispensers | All 68 samples matched for actor ordering and no duplicate/fighting effects. |
+| Refilled Gantry dispensers | All 68 samples matched for ammo refill from mounted cargo and subsequent firing. |
+| Dropper into Creative Crate, solo and LAN | Both 26-observation replays passed. |
+| Dropper into Chute, solo and LAN | Both registered cargo-transfer checks passed. |
+
+The focused command was `python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 --check arrow-dispenser --check dispensers-dont-fight --check dispensers-refill --check creative-crate-dropper --check creative-crate-dropper-lan --check package-dropper-chute --check package-dropper-chute-lan`. The first three outputs are `.local/arrow_dispenser-horizon.csv`, `.local/dispensers_dont_fight-horizon.csv`, and `.local/dispensers_refill-horizon.csv`; individual logs are in `.local/parity/`.
+
+The Dropper LAN cases establish guest operation and convergence for those adjacent item-transfer paths. The mounted Gantry/bearing cases above were solo only. Mounted actor guest convergence and idle/active dispenser inventory save/reopen were not exercised in this pass and remain required baseline gates; host/guest timing equivalence and all other payload/mounting combinations also remain unverified. Keep this family Partial and the issue In Progress until the mounted guest and persistence cases pass. Full 1:1 remains Open.
