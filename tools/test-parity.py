@@ -37,6 +37,7 @@ CHECKS = (
     ("ponder-gearshift", "test-ponder-gearshift"),
     ("shaft-casing", "test-shaft-casing"),
     ("shaft-casing-lan", "test-multiplayer-shaft-casing"),
+    ("shaft-reopen", "test-shaft-reopen"),
     ("metal-girder-placement", "test-metal-girder-placement"),
     ("metal-girder-shapes", "test-metal-girder-placement", "--shapes"),
     ("metal-girder-placement-lan", "test-multiplayer-metal-girder-placement"),
