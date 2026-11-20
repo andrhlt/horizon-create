@@ -722,6 +722,8 @@ CHECKS = (
         "filtering", "split", "round_robin", "prefer_nearest", "sync_input",
     )),
     ("brass-tunnel-settings", "test-brass-tunnel-settings"),
+    ("brass-tunnel-settings-lan", "test-brass-tunnel-settings", "--lan"),
+    ("brass-tunnel-lifecycle", "test-brass-tunnel-lifecycle"),
     ("attribute-filters", "test-item-inventories", "attribute_filters"),
     ("belt-coaster", "test-item-inventories", "belt_coaster"),
     ("fan-depot", "test-fan-depot"),
