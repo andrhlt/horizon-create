@@ -280,6 +280,8 @@ CHECKS = (
     ("observer-filter-poses", "test-smart-observer-filter", "--poses"),
     ("observer-filter-input", "test-smart-observer-filter"),
     ("observer-filter-input-lan", "test-smart-observer-filter", "--lan"),
+    ("observer-lifecycle", "test-smart-observer-lifecycle"),
+    ("observer-lifecycle-lan", "test-smart-observer-lifecycle", "--lan"),
     ("observer-placement", "test-smart-observer-placement"),
     ("observer-placement-lan", "test-smart-observer-placement", "--lan"),
     ("observer-wrench", "test-smart-observer-placement", "--wrench"),

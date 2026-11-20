@@ -1,0 +1,54 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..71edf78 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -37 +37,3 @@ public class CreateGameTests {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.smartObserverDoubleChest"))
++			.toList();
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..ee6c6af 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -117,0 +118,40 @@ public class TestMisc {
++
++	@GameTest(template = "shearing", timeoutTicks = 45)
++	public static void smartObserverDoubleChest(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var observerPos = new BlockPos(10, 7, 5);
++		var attachedChest = observerPos.south();
++		var farChest = attachedChest.east();
++		var lamp = observerPos.above();
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
++		var type = net.minecraft.world.level.block.state.properties.BlockStateProperties.CHEST_TYPE;
++		var half = net.minecraft.world.level.block.state.properties.ChestType.LEFT;
++		var north = net.minecraft.core.Direction.NORTH;
++		var observerPower = com.simibubi.create.content.redstone.smartObserver.SmartObserverBlock.POWERED;
++		var filtering = com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour.TYPE;
++		var observer = com.simibubi.create.AllBlocks.SMART_OBSERVER.get();
++		var chest = Blocks.CHEST.defaultBlockState().setValue(facing, north);
++		helper.setBlock(attachedChest, chest.setValue(type, half));
++		helper.setBlock(farChest, chest.setValue(type, half.getOpposite()));
++		helper.setBlock(lamp, Blocks.REDSTONE_LAMP);
++		helper.setBlock(observerPos, observer.defaultBlockState().setValue(facing, net.minecraft.core.Direction.SOUTH));
++		var near = (net.minecraft.world.level.block.entity.ChestBlockEntity) world.getBlockEntity(helper.absolutePos(attachedChest));
++		var far = (net.minecraft.world.level.block.entity.ChestBlockEntity) world.getBlockEntity(helper.absolutePos(farChest));
++		near.setItem(0, new ItemStack(Items.DIRT, 8));
++		var be = helper.getBlockEntity(AllBlockEntityTypes.SMART_OBSERVER.get(), observerPos);
++		be.getBehaviour(filtering).setFilter(new ItemStack(Items.STONE, 3));
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			if (tick == 8 || tick == 10 || tick == 22 || tick == 24) {
++				if (helper.getBlockState(attachedChest).getValue(type) != half
++					|| helper.getBlockState(farChest).getValue(type) != half.getOpposite())
++					helper.fail("Observer fixture did not form a double chest");
++				System.out.printf("SMART_OBSERVER_DOUBLE_CHEST,%d,%d,%d,%d,%b,%b%n",
++					tick - 8, be.getBehaviour(filtering).getFilter().getCount(), far.getItem(0).getCount(),
++					be.turnOffTicks, helper.getBlockState(observerPos).getValue(observerPower),
++					helper.getBlockState(lamp).getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT));
++				far.setItem(0, tick == 8 || tick == 22 ? new ItemStack(Items.STONE, 1) : ItemStack.EMPTY);
++			}
++			helper.assertTrue(tick == 24, "sampling double chest filter and output");
++		});
++	}
