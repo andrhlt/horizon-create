@@ -1905,6 +1905,15 @@ stone block each matched [18 Java slot transforms](fixtures/stockpile-switch-fil
 and submitted item geometry. When a guest selects a sample, both players see
 it on all three active faces of the tested wall-mounted switch.
 
+The bounded gameplay lifecycle check is `stockpile-switch-lifecycle`. It saves
+and reopens a barrel-backed item switch and a water-tank switch with configured
+thresholds, checking their stored contents and idle readings. It then crosses
+the item switch's upper threshold, saves while active, and confirms its powered
+output and sampled count after reopening. This is a Horizon save/reopen check;
+it does not claim Java reload parity. The check is registered in
+`tools/test-parity.py`; its run remains pending a provisioned pinned client and
+pack.
+
 ## Smart Observer filter
 
 The [72 original slot cases](fixtures/smart-observer-filter-poses-java.csv)
@@ -10471,6 +10480,44 @@ python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 2 \
 
 Full 1:1 remains Open, including broader target and filter combinations and
 Java-equivalent packet timing.
+
+# APP-2021 Packager gameplay baseline
+
+The finite APP-2021 baseline covers survival placement beside a stocked Barrel,
+addressed package dispatch on a redstone pulse, unpacking, full-target handling,
+and idle and in-flight save/reopen. The Java replay covers package creation,
+cargo and address retention, pickup, unpacking and a second pulse in solo and
+LAN. Stock Link dispatch is covered by the linked Packager checks below. Full
+1:1 remains Open for other inventory capabilities, multi-source ordering,
+effects, and exact Java packet and reload timing.
+
+The focused Packager checks passed on pinned Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` in client build
+`native-9f42064-99eb016dfcb1`. The Packager pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+
+| Check | Evidence |
+| --- | --- |
+| `packager-placement` | Survival placement faced the stocked Barrel; a pulse sent five iron and two redstone with the sign address. |
+| `packager-lifecycle` | Orientation and stock persisted through idle reopen; an addressed in-flight package resumed after reopen and was retrievable; a full 27-slot Barrel rejected dispatch without changing the held package and accepted it after capacity opened. |
+| `packager`, `packager-lan` | Both roles matched all 67 Java Packager state and wire samples; visual pose sampling covered 11 poses in each role. Guest convergence was observed. |
+| `stock-link-packager`, `stock-link-packager-lan` | Solo and LAN each matched 26 Java Stock Link snapshots. |
+
+Run the focused gameplay checks with the compatible launcher and prepared
+resources. `test-parity.py` uses the repository's `.local/create.hmod`; place
+the verified Packager HMOD there (SHA-256 above) before invoking this batch.
+The two new checks also accept `--pack` when run directly:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 2 \
+  --check packager-placement --check packager-lifecycle \
+  --check packager --check packager-lan \
+  --check stock-link-packager --check stock-link-packager-lan
+```
+
+The isolated lifecycle cases verify Horizon reopen behavior; they do not claim
+exact Java save/reload parity. Guest convergence does not establish exact
+packet-arrival or interpolation parity.
 # APP-1971 Chute and Smart Chute gameplay baseline
 
 The finite APP-1971 baseline covers survival acquisition, representative
