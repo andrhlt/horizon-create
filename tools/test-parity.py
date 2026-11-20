@@ -460,6 +460,8 @@ CHECKS = (
     ("cardboard-sword-base-knockback-lan", "test-cardboard-sword-base-knockback", "--lan"),
     ("list-filter-editor", "test-list-filter-editor"),
     ("list-filter-editor-lan", "test-list-filter-editor", "--lan"),
+    ("item-filter-chute", "test-item-filter-chute"),
+    ("item-filter-chute-lan", "test-item-filter-chute", "--lan"),
     ("attribute-filter-kinds", "test-attribute-filter-kinds"),
     ("attribute-filter-kinds-lan", "test-attribute-filter-kinds", "--lan"),
     ("attribute-filter-editor", "test-attribute-filter-editor"),
