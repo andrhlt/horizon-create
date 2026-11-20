@@ -557,6 +557,8 @@ CHECKS = (
     ("schematicannon", "test-schematicannon"),
     ("mounted-item-extract", "test-mounted-storage", "mounted_item_extract"),
     ("mounted-fluid-drain", "test-mounted-storage", "mounted_fluid_drain"),
+    ("dual-port-bearing", "test-dual-port-bearing"),
+    ("dual-port-bearing-lan", "test-dual-port-bearing", "--lan"),
     ("mounted-item-port-comparator", "test-mounted-port-comparator"),
     ("mounted-item-port-comparator-lan", "test-mounted-port-comparator", "--multiplayer"),
     ("mounted-fluid-port-comparator", "test-mounted-port-comparator", "--fluid"),

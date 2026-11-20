@@ -4369,6 +4369,72 @@ on other train routes and bearing docking sequences, larger schedule lists and
 scroll animation, unloaded or cross-dimension station suggestions, and
 the exact close cooldown remain under comparison.
 
+### APP-2009 paired bearing gameplay
+
+The [paired bearing check](tools/test-dual-port-bearing.py) adds one mounted
+Fluid Tank and Portable Fluid Interface below the original item bearing
+payload. Both actors rotate with the same bearing and cross the chunk
+boundary to their respective fixed receivers.
+
+- An unpowered item receiver beyond both candidate cells and a fluid
+  receiver facing the same direction as the moving head. The actors pass
+  those controls for 28 stepped ticks before the valid receivers are fitted.
+- Both pairs connected while the five-slot extracting Hopper and the fixed
+  tank are full. The feed Hopper and reversed pump then send cargo to the
+  contraption, filling its 8,000 mB tank. The final flow sends items and water
+  back to the fixed chest and tank.
+- A survival LAN guest operates the bearing lever, observes both fixed
+  interfaces extend, and opens the receiving chest. The host reads
+  authoritative cargo amounts.
+- A docked save/reopen that preserves the working positions and bearing
+  angle, with up to 16 stepped ticks to observe both exchanges advance.
+  Disassembly restores the two moving heads facing east,
+  then an idle save/reopen checks both connections closed and the cargo
+  unchanged. The balance is 16 paper, eight emeralds and 13,000 mB water
+  across the mounted and fixed inventories throughout these phases.
+
+The pinned Java movement rule in `PortableStorageInterfaceMovement` scans
+the active cell and the next cell in the transformed facing direction. It
+requires an opposing face and the matching interface type.
+`PortableStorageInterfaceBlockEntity` provides the transfer window and
+the item and fluid subclasses renew it on a successful exchange.
+The paired bearing check uses those rules and the existing single-interface
+Java traces above. It measures Horizon gameplay persistence and guest
+convergence. Exact Java cold-start and network publication timing for the
+paired rig, and broader layout, speed and automation combinations remain open.
+
+The six cases initially passed on `native-9f42064-698ea7382493`. The
+integration build `native-9f42064-645e120d2506` reproduced an active reopen
+failure in both paired cases. The saved chunks still contained both working
+positions, the bearing angle and stall, and both receiver timers. A frozen
+startup retained that state and the first four stepped ticks maintained it.
+Ordinary startup could tick the bearing before the receiver chunk was
+available and clear the dock. A stationary bearing now preserves its saved
+working positions and any actor stall while the receiver chunk loads. Once a
+valid receiver is available, the bearing reconnects if the saved owner or
+last contact is stale.
+
+All six checks passed on `native-9f42064-48b8f8ede99a`, built on main
+`86baa97` with launcher 0.2.67 and Create pack SHA-256
+`85c5cd1eb79740f2bba2a8e0f30a9c213ea49e7fbb51621bb1310cdbe9b65645`.
+The fixed client also loaded a copy of the exact failing save and exchanged
+both resources at the original bearing angle. Both paired fixtures found
+valid contact after 66 further ticks, filled the mounted tank in 30 ticks,
+and observed both extraction paths within nine ticks of reversal. Their
+docked reopens kept both working positions and the original bearing angle.
+Both transfers had advanced at the first solo observation and within three
+additional steps after the first LAN observation. The guest disconnected
+before the host reopened that save. Both idle reopens retained the cargo and
+orientation of all four ports. The original extraction and drain matched all
+253 and 65 Java samples. The LAN fluid and idle item comparator checks
+matched all 71 and 141 samples, including release and retraction.
+
+```sh
+python3 tools/test-parity.py CTL CLIENT RESOURCES --jobs 2 \
+  --check 'dual-port-bearing*' --check mounted-item-extract --check mounted-fluid-drain \
+  --check mounted-fluid-port-comparator-lan --check mounted-idle-port-comparator-lan
+```
+
 ## Train conductor Schedule handoff
 
 The [pinned Java GameTest](tools/java-train-conductor-trace.patch) assembles

@@ -137,10 +137,15 @@ pub(super) fn update_bearing(
         let point = active(angle);
         let cell = point.map(|value| value.floor() as i32);
         let entered_cell = old.map(|value| value.floor() as i32) != cell;
-        let prior = match block.get(&"WorkingPos".into()) {
+        let prior: Option<[i32; 3]> = match block.get(&"WorkingPos".into()) {
             Some(Tag::IntArray(pos)) => pos.as_slice().try_into().ok(),
             _ => None,
         };
+        // On reopen the bearing may tick before its receiver's chunk is loaded.
+        if previous == angle && prior.is_some_and(|[x, _, z]| !game.world.loaded(x, z)) {
+            stalled |= int(block, "Stalled") == Some(1);
+            continue;
+        }
         let kind = game
             .pack
             .assets
@@ -178,11 +183,19 @@ pub(super) fn update_bearing(
         };
         let (timer, first_live) = game
             .native_with_mod_block_entity(station, |entity| {
+                let owns_receiver = matches!(
+                    entity.nbt.get(&"Bearing".into()),
+                    Some(Tag::IntArray(owner)) if owner.as_slice() == bearing
+                );
+                let recent_contact = matches!(
+                    time(&entity.nbt, "LastContact"),
+                    Some(last) if last == now || last == now - 1
+                );
                 entity
                     .nbt
                     .insert("Bearing".into(), Tag::IntArray(bearing.to_vec()));
                 entity.nbt.insert("LastContact".into(), Tag::Long(now));
-                if prior != Some(station) {
+                if prior != Some(station) || !owns_receiver || !recent_contact {
                     entity.nbt.insert(CONNECTED_AT.into(), Tag::Long(now));
                     entity.nbt.remove(&FIRST_EXCHANGE.into());
                     entity
