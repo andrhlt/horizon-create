@@ -40,8 +40,8 @@ def item_count(text, item):
     return 0
 
 
-def interact(actor, face):
-    actor.call("look-at", DEPLOYER[0] + .5, DEPLOYER[1] + .5, DEPLOYER[2] + .5)
+def interact(actor, face, aim=None):
+    actor.call("look-at", *(aim or (DEPLOYER[0] + .5, DEPLOYER[1] + .5, DEPLOYER[2] + .5)))
     actor.call("interact", *DEPLOYER, face)
 
 
@@ -63,6 +63,8 @@ def controls(args, lan):
             ))
         host.commands((
             "/setblock 10 96 16 minecraft:smooth_stone",
+            "/setblock 7 96 16 minecraft:smooth_stone",
+            "/setblock 9 96 14 minecraft:smooth_stone",
             f"/setblock {at(DEPLOYER)} create:deployer[facing=east,axis_along_first=true]",
             f"/tp {player} 10.5 97 16.5",
             f"/gamemode survival {player}",
@@ -90,15 +92,50 @@ def controls(args, lan):
             raise RuntimeError(f"{error}; deployer={data(host)} inventory={actor.call('inventory')}") from error
         assert mp.count(actor, "minecraft:iron_ingot") == 0, "Guest inventory kept a duplicate stack"
         interact(actor, "east")
-        mp.until("the guest to recover the Deployer's held stack", lambda:
-                 mp.count(actor, "minecraft:iron_ingot") == 3
+        try:
+            mp.until("the guest to recover the Deployer's held stack", lambda:
+                     mp.count(actor, "minecraft:iron_ingot") == 3
+                     and item_count(data(host, "Items"), "minecraft:iron_ingot") == 0)
+        except RuntimeError as error:
+            raise RuntimeError(f"{error}; deployer={data(host)} inventory={actor.call('inventory')}") from error
+
+        host.command(f"/tp {player} 7.5 97 16.5")
+        actor.call("wait", 3)
+        actor.call("select", "minecraft:iron_ingot")
+        interact(actor, "west")
+        assert mp.count(actor, "minecraft:iron_ingot") == 3
+        assert item_count(data(host, "Items"), "minecraft:iron_ingot") == 0, "The rear face exchanged a stack"
+
+        host.command(f"/tp {player} 10.5 97 16.5")
+        host.command(f"/clear {player} minecraft:iron_ingot")
+        host.command(f"/give {player} minecraft:iron_ingot 65")
+        mp.until("the actor to receive 65 iron ingots", lambda: mp.count(actor, "minecraft:iron_ingot") == 65)
+        actor.call("select", "minecraft:iron_ingot")
+        interact(actor, "east")
+        mp.until("the Deployer to hold one maximum-size iron stack", lambda:
+                 item_count(data(host, "Items"), "minecraft:iron_ingot") == 64
+                 and mp.count(actor, "minecraft:iron_ingot") == 1)
+        interact(actor, "east")
+        mp.until("all 65 iron ingots to return to the actor", lambda:
+                 mp.count(actor, "minecraft:iron_ingot") == 65
                  and item_count(data(host, "Items"), "minecraft:iron_ingot") == 0)
 
+        host.command(f"/tp {player} 9.5 97 14.5")
+        actor.call("wait", 3)
+        host.command(f"/give {player} create:filter 2")
+        mp.until("the actor to receive two Create filters", lambda: mp.count(actor, "create:filter") == 2)
+        actor.call("select", "create:filter")
+        interact(actor, "north", (9.375, 97.5, 16.03))
+        mp.until("one filter item to be stored and consumed", lambda:
+                 item_count(data(host, "Filter"), "create:filter") == 1
+                 and mp.count(actor, "create:filter") == 1)
         actor.call("select", "minecraft:iron_ingot")
-        interact(actor, "north")
-        mp.until("the host to store the Deployer filter sample", lambda:
-                 item_count(data(host, "Filter"), "minecraft:iron_ingot") == 1)
-        assert mp.count(actor, "minecraft:iron_ingot") == 3, "Ordinary filter samples should not be consumed"
+        interact(actor, "north", (9.375, 97.5, 16.03))
+        mp.until("the replaced filter item to be returned", lambda:
+                 item_count(data(host, "Filter"), "minecraft:iron_ingot") == 1
+                 and mp.count(actor, "create:filter") == 2)
+        assert mp.count(actor, "minecraft:iron_ingot") == 65, "Filter sampling consumed an ordinary item"
+
         assert field(data(host), "Mode") == "USE"
     print(f"{mode}: Wrench mode, hand exchange, filter sample, and guest/host inventory convergence passed.")
 

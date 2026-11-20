@@ -78,6 +78,15 @@ fn deployer_axis(direction: Direction) -> u8 {
     }
 }
 
+fn deployer_rotation_axis(facing: Direction, along_first: bool) -> u8 {
+    match (deployer_axis(facing), along_first) {
+        (0, true) | (2, false) => 1,
+        (0, false) | (1, false) => 2,
+        (1, true) | (2, true) => 0,
+        _ => unreachable!(),
+    }
+}
+
 pub(super) const DIRECTIONS: [[i32; 3]; 6] = [
     [1, 0, 0],
     [-1, 0, 0],
@@ -91,10 +100,11 @@ pub(super) fn deployer_interact(game: &mut Game<'_>, pos: [i32; 3], face: [i32; 
     if !game.may_build() || game.native_block(pos) != DEPLOYER {
         return false;
     }
-    let Some(facing) = game
-        .native_block_property(pos, "facing")
-        .and_then(|name| Direction::ALL.into_iter().find(|&side| create_fluids::name(side) == name))
-    else {
+    let Some(facing) = game.native_block_property(pos, "facing").and_then(|name| {
+        Direction::ALL
+            .into_iter()
+            .find(|&side| create_fluids::name(side) == name)
+    }) else {
         return false;
     };
     let Some(clicked_face) = Direction::ALL
@@ -103,9 +113,9 @@ pub(super) fn deployer_interact(game: &mut Game<'_>, pos: [i32; 3], face: [i32; 
     else {
         return false;
     };
-    if deployer_axis(clicked_face) == deployer_axis(facing) {
-        let Some(machine_item) = mod_entity(game, pos)
-            .and_then(|entity| entity.items.first().cloned())
+    if clicked_face == facing {
+        let Some(machine_item) =
+            mod_entity(game, pos).map(|entity| entity.items.first().cloned().flatten())
         else {
             return false;
         };
@@ -115,6 +125,9 @@ pub(super) fn deployer_interact(game: &mut Game<'_>, pos: [i32; 3], face: [i32; 
         }
         let changed = game
             .native_with_mod_block_entity(pos, |entity| {
+                if entity.items.is_empty() {
+                    entity.items.push(None);
+                }
                 let slot = entity.items.first_mut()?;
                 std::mem::swap(slot, &mut player_item);
                 Some(())
@@ -133,8 +146,18 @@ pub(super) fn deployer_interact(game: &mut Game<'_>, pos: [i32; 3], face: [i32; 
 
     if game.native_sneaking()
         || deployer_axis(clicked_face) == deployer_axis(facing)
+        || deployer_axis(clicked_face)
+            == deployer_rotation_axis(
+                facing,
+                game.native_block_property(pos, "axis_along_first")
+                    .as_deref()
+                    == Some("true"),
+            )
         || game.held().is_none_or(|stack| {
-            matches!(stack.item.as_ref(), "create:wrench" | "create:mechanical_arm")
+            matches!(
+                stack.item.as_ref(),
+                "create:wrench" | "create:mechanical_arm"
+            )
         })
     {
         return false;
@@ -142,7 +165,10 @@ pub(super) fn deployer_interact(game: &mut Game<'_>, pos: [i32; 3], face: [i32; 
     let Some(stack) = game.held().cloned() else {
         return false;
     };
-    let mut sample = ItemStack { count: 1, ..stack.clone() };
+    let mut sample = ItemStack {
+        count: 1,
+        ..stack.clone()
+    };
     if sample.item.as_ref() == "create:filter"
         || sample.item.as_ref() == "create:attribute_filter"
         || sample.item.as_ref() == "create:package_filter"

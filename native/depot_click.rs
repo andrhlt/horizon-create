@@ -5,6 +5,17 @@ fn depot_click(
     canceled: &mut bool,
 ) {
     if !*canceled
+        && game.native_block(pos) == "create:deployer"
+        && game.hand == super::Hand::Main
+        && !game
+            .held()
+            .is_some_and(|stack| stack.item.as_ref() == "create:wrench")
+        && crate::game::create_machines::deployer_interact(game, pos, face)
+    {
+        *canceled = true;
+        return;
+    }
+    if !*canceled
         && (crate::game::create_chain_conveyor_target::click(game, pos)
             || crate::game::create_chain_conveyor_connect::click(game, pos)
             || crate::game::create_clipboard_block::sneak_pickup(game, pos)

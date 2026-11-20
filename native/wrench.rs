@@ -84,12 +84,18 @@ fn change_cased_cog(game: &mut Game<'_>, pos: [i32; 3], face: Direction) -> bool
     })
 }
 
-pub(super) fn change_pose(game: &mut Game<'_>, pos: [i32; 3], face: Direction, block: &str) -> bool {
+pub(super) fn change_pose(
+    game: &mut Game<'_>,
+    pos: [i32; 3],
+    face: Direction,
+    block: &str,
+) -> bool {
     if block == "create:deployer" {
-        let Some(prior) = game
-            .native_block_property(pos, "facing")
-            .and_then(|name| Direction::ALL.into_iter().find(|&side| create_fluids::name(side) == name))
-        else {
+        let Some(prior) = game.native_block_property(pos, "facing").and_then(|name| {
+            Direction::ALL
+                .into_iter()
+                .find(|&side| create_fluids::name(side) == name)
+        }) else {
             return false;
         };
         let turned = rotate(prior, face);
@@ -249,19 +255,21 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> boo
     };
     let block = game.native_block(pos);
     if block == "create:deployer" {
-        let Some(facing) = game
-            .native_block_property(pos, "facing")
-            .and_then(|name| Direction::ALL.into_iter().find(|&side| create_fluids::name(side) == name))
-        else {
+        let Some(facing) = game.native_block_property(pos, "facing").and_then(|name| {
+            Direction::ALL
+                .into_iter()
+                .find(|&side| create_fluids::name(side) == name)
+        }) else {
             return false;
         };
-        if axis(face) == axis(facing) {
+        if face == facing {
             game.native_with_mod_block_entity(pos, |entity| {
-                let next = if create_machines::string(&entity.nbt, "Mode").as_deref() == Some("PUNCH") {
-                    "USE"
-                } else {
-                    "PUNCH"
-                };
+                let next =
+                    if create_machines::string(&entity.nbt, "Mode").as_deref() == Some("PUNCH") {
+                        "USE"
+                    } else {
+                        "PUNCH"
+                    };
                 entity.nbt.insert("Mode".into(), Tag::String(next.into()));
             });
             game.native_block_entity_sync(pos);
