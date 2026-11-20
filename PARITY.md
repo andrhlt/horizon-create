@@ -4814,6 +4814,31 @@ seven. Run the [Horizon replay](tools/test-clipboard-copy.py) with
 `--funnel`. The exact build also passed the LAN Smart Chute transfer
 and all 30 original Funnel support changes in LAN.
 
+The [Clipboard lifecycle replay](tools/test-clipboard-lifecycle.py) passed in
+solo and LAN. A Clipboard carrying a Redstone Link payload leaves a Smart
+Chute's filter, amount, and mode intact, and the player's held Clipboard
+retains its exact component. At the pinned Java revision,
+`ClipboardValueSettingsHandler` consumes this attack and passes an empty
+compound to `FilteringBehaviour`. With no filter, row, or value in that
+compound, the paste changes no settings.
+
+After saving and reopening the world, both the held and placed Clipboards
+retain the Java two-page text, checkmarks, and remembered page. The held
+Clipboard also retains the copied Link payload, and the first target Link
+retains the pasted frequencies. In the LAN replay, the same guest rejoins,
+pastes into a second Link, and opens the placed Clipboard to check the
+existing entry on its remembered page. The host verifies both changes.
+The test checks saved gameplay state and guest convergence after completed
+edits. Exact Java world reload and packet timing remain unverified.
+
+Run `tools/test-parity.py` with `--check 'clipboard-lifecycle*'`. Both checks,
+the three-tick live share replay, and the six existing Link, Smart Chute,
+and Brass Funnel copy replays passed on `native-9f42064-6ce68a31b125` from
+main commit `43b2eb0` and pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The subsequent Clipboard dispatch change adds Rotation Speed Controller
+support, which was outside these replays.
+
 Additional machine settings families, desktop clipboard integration
 verification, and pixel parity remain open. The interaction checks
 compare simulation state around the input actions. Packet latency was
