@@ -119,14 +119,35 @@ def chassis_conversions(args):
     print("Both original shapeless 1:1 chassis conversions worked in the survival player crafting grid.")
 
 
+def belt_connector(args):
+    table = (9, 95, -9)
+    with fixture_world(args, "Belt-connector-crafting", STRUCTURE, render=True, pack=args.pack) as control:
+        control.commands((
+            "/fill 5 94 -12 13 94 -4 minecraft:smooth_stone",
+            f"/setblock {' '.join(map(str, table))} minecraft:crafting_table",
+            "/tp @s 7.5 95 -9.5",
+            "/gamemode survival",
+            "/item replace entity @s hotbar.0 with minecraft:dried_kelp 6",
+        ))
+        control.call("interact", *table, "up")
+        distribute(control, inventory_slot(control, "minecraft:dried_kelp"), (100, 101, 102, 103, 104, 105))
+        craft(control, "create:belt_connector", 1)
+        counts = control.call("inventory")["counts"]
+        if counts.get("minecraft:dried_kelp", 0) != 0 or counts.get("create:belt_connector") != 1:
+            raise RuntimeError(f"Belt Connector crafting left unexpected inventory: {counts}")
+    print("Survival crafting consumed six dried kelp and produced the Belt Connector.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("ctl", "client", "resources"):
         parser.add_argument(name, type=lambda value: Path(value).resolve())
     parser.add_argument("--pack", type=Path)
     parser.add_argument("--chassis-conversions", action="store_true")
+    parser.add_argument("--belt-connector", action="store_true")
     args = parser.parse_args()
-    (chassis_conversions if args.chassis_conversions else run)(args)
+    action = belt_connector if args.belt_connector else chassis_conversions if args.chassis_conversions else run
+    action(args)
 
 
 if __name__ == "__main__":
