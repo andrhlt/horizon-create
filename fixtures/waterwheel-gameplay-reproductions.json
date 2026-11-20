@@ -69,7 +69,7 @@
     "scope": "Proves incorrect predicted inventory after successful material application. Diagnostic later died before activation because players had no safe floor; it is not active-generation gate evidence. Tracked harness adds a safe floor."
   },
   "final_build_validation": {
-    "runtime": "native-9f42064-78cd07b754c9",
+    "runtime": "native-9f42064-be0b42422906",
     "scoped_gates": "7/7 pass: placement, axes, survival crafting, small/large idle-active reopen, small/large host-guest LAN",
     "affected_regressions": "19/19 pass: small/large flow, award, LAN, reopen, magma awards, materials and loaded stressometer",
     "placement_ray_fix": "Offscreen placement harness now verifies target position, hit face, reach, held wheel and actual sneak state before mouse click; the small fixture clears its adjacent stressometer before testing the south-facing no-shaft case.",

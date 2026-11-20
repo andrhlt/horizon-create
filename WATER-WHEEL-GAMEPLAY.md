@@ -23,7 +23,7 @@ The reopen checks use Java source invariants, not a new Java reload capture. Gen
 ## Final build and results
 
 - Horizon pin: `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` (Minecraft 26.3).
-- Final native build: `native-9f42064-78cd07b754c9`, built with the documented compatible launcher and isolated worktree cache.
+- Final rebased native build: `native-9f42064-be0b42422906`, built with the documented compatible launcher and isolated worktree cache.
 - Create pack SHA-256: `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
 - Prepared 26.3 resource manifest SHA-256: `42d0494870e78ed6d74aa79162a60279aaccdedf82bdfc3f3b5f0851ed167a09`.
 - Scoped gameplay gates: **7/7 pass**.
