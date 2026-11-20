@@ -5509,8 +5509,10 @@ Elapsed time: no new Java capture; environment provisioning and diagnosis about 
 APP-2028 reused the pinned Java captures and the existing main-synchronized
 Horizon client `native-9f42064-6bdf8691aa42` (source commit `781c0ef`, client
 SHA-256 `703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`).
-The ticket checkout is at `a167267`; its Frogport and Chain Conveyor gameplay
-modules match that client's source. Horizon was
+The initial focused pass used ticket base `a167267`. After main advanced, the
+PR was rebased onto `66fc60d`; the Frogport and Chain Conveyor gameplay modules
+are unchanged from that client's source, and the registered four-check
+selection passed again on the rebased head. Horizon was
 `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, Create was
 `ac0c444d9828da3453ae8cc65338e8de063286fb`, and the pack SHA-256 was
 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
@@ -5566,7 +5568,8 @@ the required pack argument; the entry was fixed and the full selection passed.
 Approximate effort: runtime/evidence setup 15 minutes; fixture update and
 debugging 20 minutes; Java capture 0; native build 0 (reused the identified
 main-synchronized client); syntax/diff checks under one minute; focused
-integration runs about five minutes. No gameplay code defect was found.
+integration runs about nine minutes including the post-rebase selection. No
+gameplay code defect was found.
 Full 1:1 remains Open for additional route layouts, packet arrival and
 interpolation timing, and exact cosmetic presentation.
 
