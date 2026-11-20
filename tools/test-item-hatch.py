@@ -198,6 +198,110 @@ def filter_input(host, actor, player):
         print(f"{name}: Java filter and held stack matched via an actual value-box click.", flush=True)
 
 
+def unsided_input(host, actor, player):
+    """ItemHatchBlock.useItemOn queries ItemHandler.BLOCK with a null side.
+
+    A horizontal hopper can only reach furnace fuel; the unsided hatch must
+    reach the input slot instead. Expected state follows the pinned Java
+    ItemHatchBlock + NeoForge unsided InvWrapper, not Horizon's slot rules.
+    """
+    expected = reference("unsided")[0]
+    at, storage = (7, 172, 33), (7, 172, 32)
+    host.commands((f"/setblock {xyz(storage)} minecraft:furnace",
+                   f"/setblock {xyz(at)} {HATCH}", f"/clear {player}",
+                   f"/item replace entity {player} hotbar.0 with minecraft:raw_iron 9"))
+    trapdoors.prepare_actor(host, actor, player, (7.5, 171, 36.5))
+    mp.until("the unsided-input stack", lambda: mp.count(actor, "minecraft:raw_iron") == 9)
+    actor.call("key", "1", "tap")
+    nozzle.aim(actor, (7.5, 172.7, 33.2), at)
+    actor.call("wait", 2)
+    actor.call("mouse", "right", "click")
+    def transferred():
+        return (mp.count(actor, expected["input_item"]) == int(expected["held_count"]) and
+                item_counts(host, storage) == Counter({expected["input_item"]: int(expected["input_count"])}) and
+                block(host, at, "north", expected["open"]))
+    try:
+        mp.until("the unsided Furnace input to accept raw iron", transferred, seconds=4)
+    except RuntimeError as error:
+        raise AssertionError((mp.count(actor, "minecraft:raw_iron"), item_counts(host, storage),
+                              nozzle.state(host, at))) from error
+    reply = host.command(f"/data get block {xyz(storage)} Items")
+    assert re.search(r"Slot: 0b?\b", reply), reply
+    mp.until("the guest to see the unsided Hatch open", lambda: block(actor, at, "north", "true"))
+    print("Horizontal Hatch deposited nine raw iron into unsided Furnace input without loss.", flush=True)
+
+
+def attachments(host, actor, player):
+    for index, direction in enumerate(("north", "south", "east", "west")):
+        at = (7 + index * 6, 172, 43)
+        normal = nozzle.OFFSETS[direction]
+        storage = nozzle.add(at, normal)
+        feet = nozzle.add(at, (.5 - 3 * normal[0], -1, .5 - 3 * normal[2]))
+        host.commands((f"/setblock {xyz(storage)} minecraft:barrel",
+                       f"/setblock {xyz(at)} {HATCH}[facing={direction}]", f"/clear {player}",
+                       f"/item replace entity {player} hotbar.0 with minecraft:paper 9"))
+        trapdoors.prepare_actor(host, actor, player, feet)
+        mp.until("the attachment deposit stack", lambda: mp.count(actor, "minecraft:paper") == 9)
+        actor.call("key", "1", "tap")
+        point = nozzle.add(at, (.5 - .3 * normal[0], .7, .5 - .3 * normal[2]))
+        nozzle.aim(actor, point, at)
+        actor.call("wait", 2)
+        actor.call("mouse", "right", "click")
+        mp.until(f"the {direction} attachment transfer", lambda:
+                 mp.count(actor, "minecraft:paper") == 0 and
+                 item_counts(host, storage) == Counter({"minecraft:paper": 9}) and
+                 block(host, at, direction, "true") and block(actor, at, direction, "true"))
+    print("All four horizontal attachments accepted the held stack without loss.", flush=True)
+
+
+def lifecycle(args, env):
+    # A Hatch has no processing cycle: its active state is the ten-tick lid
+    # window following an instantaneous transfer. Preserve that meaningful
+    # after-transfer state and verify contents/filter and subsequent operation.
+    at, storage = (7, 172, 33), (7, 172, 32)
+    with fixture_world(args, "ItemHatchLifecycle", render=True, pack=args.pack, env=env) as host:
+        host.commands(("/gamemode survival", f"/setblock {xyz(storage)} minecraft:barrel",
+                       f"/setblock {xyz(at)} {HATCH}[waterlogged=true]",
+                       f'/data merge block {xyz(at)} {{Filter:{{id:"minecraft:paper",count:3}}}}',
+                       f"/item replace block {xyz(storage)} container.0 with minecraft:paper 5"))
+        def retained():
+            reply = host.command(f"/data get block {xyz(at)} Filter")
+            assert "minecraft:paper" in reply and re.search(r"count: 3\b", reply), reply
+            assert nozzle.state(host, at) in (
+                f"{HATCH}[facing=north,open=false,waterlogged=true]",
+                f"{HATCH}[facing=north,open=true,waterlogged=true]"), nozzle.state(host, at)
+        host.restart()
+        retained()
+        assert block(host, at, "north", "false", "true")
+        assert item_counts(host, storage) == Counter({"minecraft:paper": 5})
+        for amount in (9, 4):
+            host.commands(("/clear @s", f"/item replace entity @s hotbar.0 with minecraft:paper {amount}"))
+            trapdoors.prepare_actor(host, host, "@s", (7.5, 171, 36.5))
+            mp.until("the reopened Hatch input", lambda: mp.count(host, "minecraft:paper") == amount)
+            host.call("key", "1", "tap")
+            nozzle.aim(host, (7.5, 172.7, 33.2), at)
+            host.call("wait", 2)
+            host.call("mouse", "right", "click")
+            mp.until("the active Hatch transfer", lambda:
+                     mp.count(host, "minecraft:paper") == 0 and block(host, at, "north", "true", "true"))
+            if amount == 9:
+                assert item_counts(host, storage) == Counter({"minecraft:paper": 14})
+                host.restart()
+                retained()
+                assert item_counts(host, storage) == Counter({"minecraft:paper": 14})
+                assert mp.count(host, "minecraft:paper") == 0
+                # Cold-launch ticks may finish the lid window before freeze.
+                # Remaining scheduled ticks must still close it within 10 ticks.
+                for _ in range(10):
+                    if block(host, at, "north", "false", "true"):
+                        break
+                    host.step_to(host.clock() + 1)
+                assert block(host, at, "north", "false", "true")
+        assert item_counts(host, storage) == Counter({"minecraft:paper": 18})
+        retained()
+    print("Idle and post-transfer reopen retained Hatch/filter/contents; lid closed and another deposit worked.", flush=True)
+
+
 def crafting(args, env):
     with fixture_world(args, "ItemHatchCraft", render=True, pack=args.pack, env=env) as host:
         host.commands(("/fill 8 169 22 16 169 28 minecraft:stone", "/setblock 12 170 24 minecraft:crafting_table",
@@ -209,6 +313,9 @@ def crafting(args, env):
 
 def run(args):
     env = {"HORIZON_NO_AUDIO": "1"}
+    if args.lifecycle:
+        lifecycle(args, env)
+        return
     with ExitStack() as stack:
         mode = "LAN" if args.lan else "Solo"
         host = stack.enter_context(fixture_world(args, f"ItemHatch{mode}", render=not args.lan,
@@ -224,12 +331,17 @@ def run(args):
             mp.until("the Hatch guest to join", lambda: any(guest["name"] == player and guest["placed"]
                      for guest in host.call("lan", "status")["guests"]))
         host.command(f"/gamemode survival {player}")
-        if args.filter_only:
+        if args.boundaries:
+            attachments(host, actor, player)
+            unsided_input(host, actor, player)
+        elif args.unsided_only:
+            unsided_input(host, actor, player)
+        elif args.filter_only:
             filter_input(host, actor, player)
         else:
             placement(host, actor, player, args.pack)
             deposit(host, actor, player)
-    if not args.lan and not args.filter_only:
+    if not args.lan and not args.filter_only and not args.unsided_only and not args.boundaries:
         crafting(args, env)
 
 
@@ -240,4 +352,7 @@ if __name__ == "__main__":
     parser.add_argument("--pack", type=Path, default=ROOT / ".local/create.hmod")
     parser.add_argument("--lan", action="store_true")
     parser.add_argument("--filter-only", action="store_true")
+    parser.add_argument("--unsided-only", action="store_true")
+    parser.add_argument("--boundaries", action="store_true")
+    parser.add_argument("--lifecycle", action="store_true")
     run(parser.parse_args())

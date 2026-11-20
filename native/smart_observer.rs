@@ -46,6 +46,16 @@ fn detects_fluid(game: &Game<'_>, at: [i32; 3], nbt: &Compound) -> bool {
     false
 }
 
+fn detects_inventory(game: &Game<'_>, [x, y, z]: [i32; 3], nbt: &Compound) -> bool {
+    let pos = (x, y, z);
+    // Create observes the unsided inventory capability, which combines paired chests.
+    std::iter::once(pos)
+        .chain(game.chest_other_half(pos))
+        .filter_map(|pos| game.world.block_entities.get(&pos))
+        .flat_map(|storage| storage.slots().iter().flatten())
+        .any(|stack| create_item_filters::accepts(game.items(), nbt, stack))
+}
+
 fn sampled_in_block_tick(game: &Game<'_>, pos: [i32; 3]) -> bool {
     is_chute(game, pos)
         || create_fluids::fluid_block(game, pos)
@@ -107,19 +117,7 @@ fn sample(
         } else {
             (remaining - 1).max(0)
         }
-    } else if detects_fluid(game, at, &entity.nbt)
-        || game
-            .world
-            .block_entities
-            .get(&(at[0], at[1], at[2]))
-            .is_some_and(|storage| {
-                storage
-                    .slots()
-                    .iter()
-                    .flatten()
-                    .any(|stack| create_item_filters::accepts(game.items(), &entity.nbt, stack))
-            })
-    {
+    } else if detects_fluid(game, at, &entity.nbt) || detects_inventory(game, at, &entity.nbt) {
         6
     } else {
         (remaining - 1).max(0)

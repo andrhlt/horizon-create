@@ -802,7 +802,7 @@ The assembler regression retains six rail exchange actions and 18 departure
 samples from its existing Java fixtures.
 
 All eight selected checks passed serially on `native-9f42064-fb8446effe86`,
-built from the Controller Rail source at `5e631ab` with Horizon pin
+built from the Controller Rail source at `781c0ef` with Horizon pin
 `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` and the prepared Minecraft 26.3
 resources. The installed Create pack SHA-256 was
 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
@@ -5549,9 +5549,93 @@ LAN. The original survival recipe passed solo. On
 `native-9f42064-02594efd9424`, direct clicks matched Java ordinary
 filter set and clear, preserved the held sample's stack size, and kept
 the filter intact on Wrench use. Solo and LAN passes also repeated
-the seeded placement, deposit and close fixtures. The port uses
-Horizon sided insertion. Unusual inventory handlers, visuals and exact
+the seeded placement, deposit and close fixtures. Those historical runs used
+Horizon sided insertion; the APP-2017 pass below identified a consequential
+unsided-inventory mismatch. Unusual inventory handlers, visuals and exact
 sound playback remain open.
+
+### APP-2017 unsided insertion and lifecycle pass
+
+Pinned Java `ItemHatchBlock.useItemOn` queries `ItemHandler.BLOCK` with a
+`null` side. The [additional actual Java capture](tools/java-item-hatch-gameplay.patch)
+on Create `ac0c444d9828da3453ae8cc65338e8de063286fb` recorded
+`SUCCESS,0,9,minecraft:raw_iron,true`: a survival player holding nine Raw Iron
+items deposits all nine into Furnace input slot 0 through a horizontal Hatch,
+leaving the hand empty and opening the Hatch. The
+[one-row reference](fixtures/item-hatch-unsided-java.csv) and
+[capture metadata](fixtures/item-hatch-unsided-java.metadata.json) retain this
+observation. The same capture exactly reproduced the five original fixture
+CSVs (placement, eight deposits, timing, ordinary filter interactions and
+crafting) unchanged. The isolated headless Java capture completed successfully
+in 2m37s with JDK 21 and a private Gradle cache; the shared checkout/cache were
+not modified.
+
+The pre-fix Horizon replay on `native-9f42064-6ce68a31b125` reproduced a
+mismatch: all nine Raw Iron remained held, the Furnace stayed empty and the
+Hatch stayed closed. Client SHA-256:
+`bdbafe5289f2c05ef76009c17070e0320a7c606e042dd5202b142e0e6d123fc9`;
+control SHA-256:
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`;
+pack SHA-256:
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The build's recorded Horizon pin is
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. The failed command was:
+
+```sh
+python3 tools/test-item-hatch.py /Users/andrewholt/dev/horizon-create/.local/patched-launcher/versions/native-9f42064-6ce68a31b125/horizon-ctl /Users/andrewholt/dev/horizon-create/.local/patched-launcher/versions/native-9f42064-6ce68a31b125/horizon-client /Users/andrewholt/dev/horizon-create/.local/patched-launcher/versions/native-9f42064-6ce68a31b125/.local/horizon-client/26.3 --unsided-only
+```
+
+`item-hatch-boundaries` and `item-hatch-boundaries-lan` add actual-player
+transfers through all four horizontal attachments and the Java Furnace case.
+`item-hatch-lifecycle` adds idle and post-transfer save/reopen with a waterlogged
+Hatch, retained ordinary filter and Barrel contents, subsequent lid closure and
+another manual transfer. A Hatch's operation is instantaneous; its meaningful
+active save state is the ten-tick lid window after the transfer. Cold-launch
+ticks may finish that window before the harness freezes the reopened world,
+so this check establishes continued usability and retained state rather than
+exact Java reload timing.
+
+The narrow fix adds `native_insert_item_unsided` in the Horizon native item
+helpers and uses it only for Item Hatch deposits. It preserves destination
+item rules, stack limits, existing item merges, and remaining held items; all
+other native consumers keep their sided API.
+
+The final build `native-9f42064-6bdf8691aa42` was built from APP-2017 base
+`781c0ef` and uses Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`.
+Its client SHA-256 is
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`;
+`horizon-ctl` SHA-256 is
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`; the
+prepared pack SHA-256 is
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+The main-synchronized rebuild completed in 13m12s. An earlier rebased build
+`native-9f42064-2777747110f8` on `c9a9d9b` also passed all seven checks;
+its logs remain preserved in `.local/parity-app-2017-c9a9d9b/`. The seven-check batch passed **7/7** on base `781c0ef`:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-6bdf8691aa42/horizon-ctl .local/patched-launcher/versions/native-9f42064-6bdf8691aa42/horizon-client .local/patched-launcher/versions/native-9f42064-6bdf8691aa42/.local/horizon-client/26.3 --jobs 2 --check 'item-hatch*'
+```
+
+This reran the four existing placement/deposit/filter checks in solo and LAN,
+including the original seven placements, eight deposits, ten-tick close and
+survival recipe. The new boundary checks transferred through all four
+horizontal attachment directions and deposited Raw Iron ×9 into Furnace
+input slot 0 in solo and with a LAN guest. The lifecycle check reopened an
+idle waterlogged Hatch with its paper filter and Barrel contents, reopened it
+after a transfer, observed the lid close within the ten-tick window, and
+completed another transfer without losing items. These checks establish
+continued gameplay and retained state; cold-launch ticks prevent a claim of
+exact Java reload timing. Logs are retained under `.local/parity/`.
+
+`python3 -m py_compile tools/test-item-hatch.py tools/test-parity.py`,
+`rustfmt --edition 2024 --check` on the patched `native_items.rs`, patch
+applicability against the pinned Horizon source, and `git diff --check` passed.
+The original pre-fix mismatch remains recorded at
+`.local/item-hatch-unsided-baseline.log`; an invalid block-item placement
+attempt remains labeled at
+`.local/item-hatch-unsided-baseline-invalid-block-item.log`. Broader specialized
+filter swaps, unusual inventory handlers, presentation and exact packet/audio
+timing remain follow-ups. Full 1:1 remains Open.
 
 ## Java runtime-generated processing recipes
 
@@ -9651,3 +9735,77 @@ Run the six checks together with:
 ```sh
 python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-c9fa0f927bed/horizon-ctl .local/patched-launcher/versions/native-9f42064-c9fa0f927bed/horizon-client .local/patched-launcher/versions/native-9f42064-c9fa0f927bed/.local/horizon-client/26.3 --jobs 1 --check wheat-milling --check milling-recipes --check millstone-lifecycle --check millstone-backpressure --check millstone-lan --check milling-lookup
 ```
+
+## Smart Observer gameplay baseline (APP-2040)
+
+The pinned Java Create `ac0c444d9828da3453ae8cc65338e8de063286fb` observes the
+unsided inventory capability of its target. In a double chest, either half
+exposes the combined inventory. The detector now uses Horizon's chest pairing
+to include the far half.
+
+The [Java GameTest](tools/java-smart-observer-double-chest.patch) produced
+[four samples](fixtures/smart-observer-double-chest-java.csv) after configuring a
+three-stone filter sample. Eight dirt in the attached half did not qualify. One
+stone in the far half sustained the six-tick countdown and powered the lamp.
+Removing that stone let the signal and lamp turn off, and replacing it restored
+both. GameTest tick 8 is the trace origin. In a disposable pinned checkout,
+run `git apply --unidiff-zero /path/to/tools/java-smart-observer-double-chest.patch`
+and then `./gradlew --offline --no-daemon --max-workers=2 runGameTestServer`
+with JDK 21. Extract the fields after `SMART_OBSERVER_DOUBLE_CHEST,`.
+The capture passed in 3m 14s. The patch and CSV SHA-256 hashes are
+`23e274596631537f54aaa0edde379613126464f15b05f0351ff1fe806318e4c7` and
+`5541fdf862d94163ab456b624d073a628478f2d0f5c52f305a68a740b1d07f0c`.
+
+The [lifecycle replay](tools/test-smart-observer-lifecycle.py) also configures a
+filtered barrel that stays idle and cold reopens both setups. The LAN variant
+applies both filters through guest survival input, then rejoins the cold
+reopened host and checks that the guest sees the same powered and idle states.
+The reload checks use Horizon saves. Guest checks assert convergence.
+
+Before the fix, both the solo and LAN lifecycle runs matched the rejection
+control and then failed the first matching-item sample on
+`native-9f42064-6ce68a31b125`: filter sample 3 and far-half count 1 agreed
+with Java, while the countdown was 0 and both the Observer and lamp stayed
+off. On that archived client, the existing storage, filtered storage,
+solo/LAN filter input, world, chute motion, belt/funnel and Display Link
+replays passed in 315 seconds.
+
+The incremental private launcher 0.2.67 build on Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` produced
+`native-9f42064-9d5ee01041b7` in 264 seconds. The client SHA-256 was
+`5b4e7bab7264ed05e78a49f9f26e2457bb79aa0203235104063d2eff5add5aea`
+and the pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Both `observer-lifecycle` and `observer-lifecycle-lan` matched all four Java
+samples and passed their cold-reopen checks in 78 seconds together. The LAN
+guest restored its view of both observers and lamps after reconnecting. The
+full ten-check batch passed on a rebuilt candidate after rebasing onto
+`036972379bc9b35b3fc371ae6755abcbb79f3f9f` (Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`). The rebuilt client
+`native-9f42064-9669a74fb4bf` has SHA-256
+`f504c88fadca21613d4e9a13436ee8686872791287e74c7d49e581637b05a9be`.
+
+The same candidate passed all eight selected regressions.
+
+| Check | Matching Java coverage |
+| --- | --- |
+| `observer-storage`, `observer-filtered-storage` | 46 unfiltered samples and 92 filtered samples across two lanes |
+| `observer-filter-input`, `observer-filter-input-lan` | 56 observations in each role, including filter changes and clearing |
+| `observer-world` | 72 samples across two block lanes and 46 chute samples |
+| `observer-chutes` | 18 ticks of chute item motion and the downstream piston |
+| `observer-belt-funnel` | 180 ticks of Observer output, item movement, pistons and Gantry |
+| `display-link` | 146 ticks of single and double chest counts and redstone gating |
+
+Run the focused batch with Python 3.10 or newer and the prepared resources:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 2 \
+  --check observer-lifecycle --check observer-lifecycle-lan \
+  --check observer-storage --check observer-filtered-storage \
+  --check observer-filter-input --check observer-filter-input-lan \
+  --check observer-world --check observer-chutes --check observer-belt-funnel \
+  --check display-link
+```
+
+Full 1:1 remains Open, including broader target and filter combinations and
+Java-equivalent packet timing.

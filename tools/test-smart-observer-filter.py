@@ -73,25 +73,23 @@ def verify_poses(args):
     print("All 72 original Smart Observer face and pointer cases matched with an unchanged sample count.")
 
 
-def click(host, actor, name, case, tick):
-    pos = POS[case]
+def set_filter(host, actor, name, pos, item, count):
     feet = (pos[0] + .5, 101, pos[2] - 2.5)
     host.command(f"/tp {name} {editor.xyz(feet)}")
     editor.wait_for(actor, "the actor to reach the Smart Observer filter", lambda:
         tuple(actor.call("state")["player"]["position"][:3]) == feet
     )
-    item = None if tick == 22 else ("minecraft:iron_ingot" if tick == 9 else "minecraft:stone")
-    filters.equip(host, actor, name, item, 3)
+    filters.equip(host, actor, name, item, count)
     filters.aim(actor, pos, "north", True)
     actor.call("mouse", "right", "click")
-    selected = (item, 3) if item else ("-", 0)
-    editor.wait_for(host, f"the filter change at tick {tick} in lane {case}", lambda:
+    selected = (item, count) if item else ("-", 0)
+    editor.wait_for(host, f"the filter change at {pos}", lambda:
         filters.filter_data(filters.read(host, pos)) == selected
     )
     assert actor.call("state")["screen"] == "playing"
     if item:
         editor.wait_for(actor, "the ordinary sample to remain in hand", lambda:
-            actor.call("inventory")["counts"].get(item) == 3
+            actor.call("inventory")["counts"].get(item) == count
         )
 
 
@@ -126,14 +124,15 @@ def verify_ticks(args, scratch):
                 if tick:
                     host.step_to(start + tick)
                 if tick in (4, 9, 13, 22):
-                    for case in range(len(POS)):
+                    item = {9: "minecraft:iron_ingot", 22: None}.get(tick, "minecraft:stone")
+                    for case, pos in enumerate(POS):
                         if scratch and tick == 4 and case == 0:
                             offsets = [(peer.socket.parent / "ctl.log").stat().st_size
                                        for peer in (host, actor)]
-                            click(host, actor, name, case, tick)
+                            set_filter(host, actor, name, pos, item, 3)
                             verify_guest_render(host, actor, offsets)
                         else:
-                            click(host, actor, name, case, tick)
+                            set_filter(host, actor, name, pos, item, 3)
                     assert host.clock() == start + tick
                 for case, pos in enumerate(POS):
                     tick_id, lane, item, count, wait, powered = expected[tick * 2 + case]
