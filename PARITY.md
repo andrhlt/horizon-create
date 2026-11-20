@@ -1474,6 +1474,28 @@ during-motion offset plus remaining distance, then verifies the piston settles
 at the 1-block endpoint after the sequence finishes. It also passed on that
 exact build. Full 1:1 remains open.
 
+## Gantry gameplay baseline (APP-2002)
+
+The bounded baseline reuses the live roller-filling fixture and covers idle
+assembly rejection, an idle save/reopen, a survival LAN guest switching the
+drive lever, host and guest convergence on the powered state, carriage
+movement, and a moving save/reopen that resumes along the shaft. The reload
+case exposed that loaded gantry shafts have no kinetic ticker to rebuild their
+network after the saved kinetic cache is empty. `power_shafts` now refreshes
+those loaded shaft networks once, when their kinetic data is empty.
+
+The [LAN and reload check](tools/test-multiplayer-gantry.py) passed on build
+`native-9f42064-b9c58fb2733d` with pack SHA256
+`b0b0640e75dc76ad6ba61dc8a83c868cf98f1ed0c668fdc0b87acba5504b60`. The
+same build passed the selected regression batch 9/9: gantry LAN reload,
+sequenced gantry distance, dispenser source/neighbor behavior, roller filling
+and paving/clearing, redstone contacts, observer belt funnel, and contraption
+controls. This supplements the existing sequenced gantry check, which compares
+the 0.25-block limit with the pinned Java sequencer and gantry sources. The
+guest check verifies state convergence; it does not measure Java packet or
+interpolation timing. Additional loads, actors and layout transitions remain
+untested, and Full 1:1 remains open.
+
 When the original threshold-switch pulley finishes its rotation while the
 lever remains powered, the downstream pulley stops and the gearshift retains
 64 RPM. The [original fixture](fixtures/threshold_switch_pulley-java.csv)
