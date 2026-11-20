@@ -23,7 +23,7 @@ the two measure different levels of evidence.
 
 | Feature | In game | Basic tested | Java comparison | Full 1:1 | Remaining work |
 | --- | --- | --- | --- | --- | --- |
-| Kinetic network propagation, speed, stress and overload | Yes | Pass | Small and large wheel networks, loaded meter, competing sources and controller cascades | Open | Broader split, merge and overload transitions across source and network types |
+| Kinetic network propagation, speed, stress and overload | Yes | Pass | Small and large wheel networks, loaded meter, competing sources and controller cascades. APP-1943 adds weaker/equal/stronger source transitions, matching-source merge, split, idle/active reopen on `native-9f42064-03cb1f8496d1` | Open | Branch layouts, exact-capacity transition and direct LAN guest interaction for source-network merges |
 | Shafts, andesite and brass encased shafts | Yes | Pass | Placement, casing, material and LAN interaction | Open | Remaining adjacency, rotation and effects |
 | Small and large cogwheels, encased cogwheels | Yes | Pass | Rim assists, gear engagement, casings and rendered geometry | Open | Remaining gear layouts, presentation and lifecycle |
 | Gearbox and Vertical Gearbox | Yes | Pass | Placement, drops, crafting, piston interaction and LAN rendering | Open | Remaining network orientations and reassembly |

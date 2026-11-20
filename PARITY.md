@@ -7317,3 +7317,33 @@ actual-player old-world reopen/extension guard passed on the refactored build.
 ## Expanded fluid-tank workflow — November 18, 2026
 
 The [tank evidence matrix](TANK-PARITY.md) records 31/31 scripts and 1,430 exact Java records passing through headless Horizon `92ef2557669b`. Its applicable shared production core also passes 19/19 scripts (1,093 records). The integrated build closes sampled split, component, creative, clone/move, window, boiler, comparator, source-light and real container inventory gaps. Original steam timing matches all 13 ticks. Physical local/reopen/LAN light, imported ownership through partial/full unload, vanilla clone inventory, solo/LAN bucket and muted sound-event guards pass. Java client rendering/particles, propagated-light and unload timing, audio pitch verification, mounted storage and remaining consumers are still open. Full-family parity was not promoted.
+
+
+## APP-1943 kinetic source transitions — November 19, 2026
+
+The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+Source review of `RotationPropagator.propagateNewSource` confirms that incompatible
+nonzero conveyed speeds destroy the newly added position with drops. Horizon's
+kinetic source generation is shared with network traversal, and a conflicting
+new kinetic member is now removed; the surviving adjacent networks are then
+republished so their saved capacity and stress reflect the split immediately.
+
+`tools/test-kinetic-network-sources.py` covers two separated creative-motor line
+networks at +16 and -16 RPM, idle save/reopen, and insertion of a three-shaft
+connection whose final shaft must break for equal and weaker opposing sources.
+It also checks a stronger opposing source, matching +16 sources merging to
+capacity 524288, same-direction slower-source transitions, separation after
+removal, and an active merged save/reopen. The headless regression passed on
+freshly built Horizon `native-9f42064-03cb1f8496d1`. The existing
+small/large-waterwheel, loaded-stressometer, rotation-speed-controller-cascade,
+rotation-speed-controller-competing and rotation-speed-controller-LAN checks
+also passed on that exact build (6/6). Commands:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-ctl .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-client .local/horizon-client/26.3 --jobs 1 --check kinetic-network-sources
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-ctl .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-client .local/horizon-client/26.3 --jobs 1 --check small-waterwheel --check large-waterwheel --check loaded-stressometer --check rotation-speed-controller-cascade --check rotation-speed-controller-competing --check rotation-speed-controller-lan
+```
+
+These Horizon outcomes are integration regressions, not captured Java trace
+equivalence. Branch layouts, the exact-capacity transition, and LAN guest
+observation of this source-merge case remain untested. Full 1:1 remains Open.
