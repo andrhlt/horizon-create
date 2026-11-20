@@ -1549,6 +1549,7 @@ CHECKS = (
     ("curved-train-standing", "test-curved-train-standing"),
     ("train-incline-standing", "test-train-incline-standing", "--updown"),
     ("train-disassembly", "test-simple-train", "--disassemble"),
+    ("train-multi-carriage", "test-train-multi-carriage"),
     ("train-signal", "test-train-signal", "--comparator"),
     ("train-signal-crafting", "test-train-signal", "--craft"),
     ("train-signal-lan", "test-train-signal", "--lan"),

@@ -3,7 +3,7 @@ use horizon_core::random::RandomSource;
 use horizon_world::level::flags;
 use horizon_world::nbt::{Compound, Tag};
 
-use super::create_bearing::{capture, relative, restore};
+use super::create_bearing::{capture_from, relative, restore};
 use super::create_depot::compound;
 use super::create_elevator_doors as doors;
 use super::create_elevator_seats as seats;
@@ -45,7 +45,10 @@ fn number(data: &mut Compound, key: &str, value: f64) {
 fn anchor(data: &Compound, axis: [i32; 3]) -> Option<[i32; 3]> {
     let track = coords(data, "ArrivedTrack").or_else(|| coords(data, "Track"))?;
     let spacing = if backwards_dock(data) {
-        int(data, "BogeySpacing").unwrap_or(0)
+        bogey_offsets(data)
+            .last()
+            .copied()
+            .unwrap_or_else(|| int(data, "BogeySpacing").unwrap_or(0))
     } else {
         0
     };
@@ -278,11 +281,56 @@ pub(super) fn assemble(
     if bogeys.first() != Some(&1) {
         return Err("Place the front bogey next to the station");
     }
-    if bogeys.len() > 2 {
-        return Err("This station cannot assemble more than one carriage yet");
+    if bogeys.windows(2).any(|pair| pair[1] - pair[0] < 3) {
+        return Err("Bogeys must be at least three blocks apart");
+    }
+    if bogeys.len() > super::create_station::MAX_BOGEYS {
+        return Err("A train can use at most twenty bogeys");
     }
     let anchor = offset(along(origin, axis, 1), [0, 1, 0]);
-    let mut blocks = capture(game, origin, anchor);
+    let mut blocks = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for &index in bogeys {
+        let bogey_pos = offset(along(origin, axis, index), [0, 1, 0]);
+        let component = capture_from(game, origin, anchor, [bogey_pos]);
+        let mut component_bogeys: Vec<_> = component
+            .iter()
+            .filter_map(|block| {
+                matches!(
+                    state_name(block).as_deref(),
+                    Some(SMALL_BOGEY | LARGE_BOGEY)
+                )
+                .then(|| relative(block))
+                .and_then(|position| {
+                    bogeys
+                        .iter()
+                        .position(|&bogey| position == axis.map(|step| step * (bogey - 1)))
+                })
+            })
+            .collect();
+        component_bogeys.sort_unstable();
+        component_bogeys.dedup();
+        if component_bogeys.is_empty()
+            || component_bogeys.len() > 2
+            || component_bogeys
+                .windows(2)
+                .any(|pair| pair[1] != pair[0] + 1)
+        {
+            return Err("Each glued carriage must contain one or two bogeys");
+        }
+        for block in component {
+            if seen.insert(relative(&block)) {
+                blocks.push(block);
+            }
+        }
+    }
+    if bogeys.iter().any(|&index| {
+        !blocks
+            .iter()
+            .any(|block| relative(block) == axis.map(|step| step * (index - 1)))
+    }) {
+        return Err("Glue each carriage to its bogeys");
+    }
     super::create_elevator_collision::capture(game, &mut blocks, anchor);
     doors::capture(&mut blocks);
     let mut attached = Vec::new();
@@ -322,13 +370,15 @@ pub(super) fn assemble(
         return Err("The world could not assemble the carriage");
     };
     conductor::capture(game, anchor, axis, &mut blocks);
-    let spacing = bogeys.get(1).map_or(0, |distance| distance - 1);
+    let offsets: Vec<_> = bogeys.iter().map(|distance| distance - 1).collect();
+    let spacing = offsets.get(1).copied().unwrap_or(0);
     let mut data = Compound::from([
         ("Axis".into(), Tag::IntArray(axis.to_vec())),
         ("Track".into(), Tag::IntArray(origin.to_vec())),
         ("Station".into(), Tag::IntArray(station.to_vec())),
         ("Controls".into(), Tag::IntArray(controls.to_vec())),
         ("BogeySpacing".into(), Tag::Int(spacing)),
+        ("BogeyOffsets".into(), Tag::IntArray(offsets.clone())),
         (
             "Blocks".into(),
             Tag::List(blocks.iter().cloned().map(Tag::Compound).collect()),
@@ -336,7 +386,7 @@ pub(super) fn assemble(
     ]);
     number(&mut data, "Speed", 0.0);
     number(&mut data, "Distance", -0.0);
-    let points = starts(origin, axis, spacing, 0.0);
+    let points = starts_for(&data, origin, axis, 0.0);
     wheels(&mut data, origin, axis, &points);
     let pose = Pose::new(axis, &points);
     let at = pose.controls(controls);
@@ -363,7 +413,7 @@ pub(super) fn assemble(
         );
     }
     seats::attach_train(game, id, anchor, &blocks);
-    draw(game, id, &blocks, axis, spacing, 0.0, &points, false);
+    draw(game, id, &blocks, axis, &offsets, 0.0, &points, false);
     Ok(())
 }
 
@@ -427,30 +477,41 @@ pub(super) fn disassemble(game: &mut Game<'_>, id: u32) -> bool {
     game.native_remove_entity(dimension, id)
 }
 
-fn starts(origin: [i32; 3], axis: [i32; 3], spacing: i32, distance: f64) -> Vec<Point> {
-    let mut positions = vec![0.5, 2.5];
-    if spacing > 0 {
-        positions.extend([0.5 + f64::from(spacing), 2.5 + f64::from(spacing)]);
+fn bogey_offsets(data: &Compound) -> Vec<i32> {
+    match data.get(&"BogeyOffsets".into()) {
+        Some(Tag::IntArray(offsets)) if !offsets.is_empty() => offsets.clone(),
+        _ => {
+            let spacing = int(data, "BogeySpacing").unwrap_or(0);
+            if spacing > 0 {
+                vec![0, spacing]
+            } else {
+                vec![0]
+            }
+        }
     }
-    positions
+}
+
+fn starts_for(data: &Compound, origin: [i32; 3], axis: [i32; 3], distance: f64) -> Vec<Point> {
+    bogey_offsets(data)
         .into_iter()
+        .flat_map(|offset| [0.5 + f64::from(offset), 2.5 + f64::from(offset)])
         .map(|at| Point::start(origin, axis, at - distance))
         .collect()
 }
 
 fn track_points(game: &Game<'_>, data: &Compound, origin: [i32; 3], axis: [i32; 3]) -> Vec<Point> {
-    let spacing = int(data, "BogeySpacing").unwrap_or(0);
     if let Some(Tag::List(tags)) = data.get(&"TrackPoints".into()) {
         if let Some(points) = tags
             .iter()
             .map(|tag| Point::read(game, tag))
             .collect::<Option<Vec<_>>>()
-            && points.len() == if spacing == 0 { 2 } else { 4 }
+            && points.len() >= 2
+            && points.len() % 2 == 0
         {
             return points;
         }
     }
-    starts(origin, axis, spacing, decimal(data, "Distance"))
+    starts_for(data, origin, axis, decimal(data, "Distance"))
 }
 
 pub(super) fn wheel_positions<'g>(
@@ -632,8 +693,11 @@ impl Pose {
 
     fn new(axis: [i32; 3], points: &[Point]) -> Self {
         let pivot = create_train_track::center(&points[..2]).components();
-        let heading = if points.len() == 4 {
-            direction(pivot, create_train_track::center(&points[2..]).components())
+        let heading = if points.len() > 2 {
+            direction(
+                pivot,
+                create_train_track::center(&points[points.len() - 2..]).components(),
+            )
         } else {
             direction(
                 points[0].location().components(),
@@ -689,7 +753,7 @@ fn draw(
     id: u32,
     blocks: &[Compound],
     axis: [i32; 3],
-    spacing: i32,
+    bogey_offsets: &[i32],
     distance: f64,
     points: &[Point],
     ports_only: bool,
@@ -727,8 +791,12 @@ fn draw(
         let relative = relative(block);
         let bogey = matches!(kind.as_deref(), Some(SMALL_BOGEY | LARGE_BOGEY));
         let (pos, rotation) = if bogey {
-            let rear = spacing > 0 && relative == axis.map(|v| v * spacing);
-            let index = usize::from(rear) * 2;
+            let offset = relative[0] * axis[0] + relative[2] * axis[2];
+            let index = bogey_offsets
+                .iter()
+                .position(|candidate| *candidate == offset)
+                .unwrap_or(0)
+                * 2;
             let pose = Pose::new(axis, &points[index..index + 2]);
             (pose.block([0; 3]), pose.rotation)
         } else {
@@ -1165,7 +1233,7 @@ pub(super) fn interact_trapdoor(game: &mut Game<'_>, entity: u32, location: [f64
             Tag::String(if open { "false" } else { "true" }.into()),
         );
     }
-    let spacing = int(&data, "BogeySpacing").unwrap_or(0);
+    let offsets = bogey_offsets(&data);
     let distance = decimal(&data, "Distance");
     let blocks: Vec<_> = match data.get(&"Blocks".into()) {
         Some(Tag::List(blocks)) => blocks
@@ -1180,7 +1248,7 @@ pub(super) fn interact_trapdoor(game: &mut Game<'_>, entity: u32, location: [f64
     if let Some(Tag::Compound(tag)) = game.persist.raw.get_mut(&id) {
         tag.insert(CARRIAGE.into(), Tag::Compound(data));
     }
-    draw(game, id, &blocks, axis, spacing, distance, &points, false);
+    draw(game, id, &blocks, axis, &offsets, distance, &points, false);
     if let Some(eye) = game.eye_position() {
         let at = [
             eye[0].floor() + 0.5,
@@ -1817,7 +1885,7 @@ pub(super) fn tick(game: &mut Game<'_>, phase: TickPhase) {
                     id,
                     &blocks,
                     axis,
-                    spacing,
+                    &bogey_offsets(&data),
                     next,
                     &points,
                     moved == 0.0 && !doors_changed && !missing_trapdoor_proxies,
