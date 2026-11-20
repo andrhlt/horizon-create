@@ -77,6 +77,7 @@ CHECKS = (
     ("encased-fluid-pipe-lan", "test-encased-fluid-pipe", "--lan"),
     ("encased-fluid-pipe-transfer", "test-encased-fluid-pipe", "--transfer"),
     ("encased-fluid-pipe-transfer-lan", "test-encased-fluid-pipe", "--transfer", "--lan"),
+    ("encased-fluid-pipe-lifecycle", "test-encased-fluid-pipe", "--lifecycle"),
     ("copper-diving-crafting", "test-machine-crafting", "--reference",
      str(ROOT / "fixtures/copper-diving-crafting-java.csv")),
     ("crushed-materials-heating", "test-zinc-progression", "--crushed"),
