@@ -9679,3 +9679,77 @@ Run the six checks together with:
 ```sh
 python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-c9fa0f927bed/horizon-ctl .local/patched-launcher/versions/native-9f42064-c9fa0f927bed/horizon-client .local/patched-launcher/versions/native-9f42064-c9fa0f927bed/.local/horizon-client/26.3 --jobs 1 --check wheat-milling --check milling-recipes --check millstone-lifecycle --check millstone-backpressure --check millstone-lan --check milling-lookup
 ```
+
+## Smart Observer gameplay baseline (APP-2040)
+
+The pinned Java Create `ac0c444d9828da3453ae8cc65338e8de063286fb` observes the
+unsided inventory capability of its target. In a double chest, either half
+exposes the combined inventory. The detector now uses Horizon's chest pairing
+to include the far half.
+
+The [Java GameTest](tools/java-smart-observer-double-chest.patch) produced
+[four samples](fixtures/smart-observer-double-chest-java.csv) after configuring a
+three-stone filter sample. Eight dirt in the attached half did not qualify. One
+stone in the far half sustained the six-tick countdown and powered the lamp.
+Removing that stone let the signal and lamp turn off, and replacing it restored
+both. GameTest tick 8 is the trace origin. In a disposable pinned checkout,
+run `git apply --unidiff-zero /path/to/tools/java-smart-observer-double-chest.patch`
+and then `./gradlew --offline --no-daemon --max-workers=2 runGameTestServer`
+with JDK 21. Extract the fields after `SMART_OBSERVER_DOUBLE_CHEST,`.
+The capture passed in 3m 14s. The patch and CSV SHA-256 hashes are
+`23e274596631537f54aaa0edde379613126464f15b05f0351ff1fe806318e4c7` and
+`5541fdf862d94163ab456b624d073a628478f2d0f5c52f305a68a740b1d07f0c`.
+
+The [lifecycle replay](tools/test-smart-observer-lifecycle.py) also configures a
+filtered barrel that stays idle and cold reopens both setups. The LAN variant
+applies both filters through guest survival input, then rejoins the cold
+reopened host and checks that the guest sees the same powered and idle states.
+The reload checks use Horizon saves. Guest checks assert convergence.
+
+Before the fix, both the solo and LAN lifecycle runs matched the rejection
+control and then failed the first matching-item sample on
+`native-9f42064-6ce68a31b125`: filter sample 3 and far-half count 1 agreed
+with Java, while the countdown was 0 and both the Observer and lamp stayed
+off. On that archived client, the existing storage, filtered storage,
+solo/LAN filter input, world, chute motion, belt/funnel and Display Link
+replays passed in 315 seconds.
+
+The incremental private launcher 0.2.67 build on Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` produced
+`native-9f42064-9d5ee01041b7` in 264 seconds. The client SHA-256 was
+`5b4e7bab7264ed05e78a49f9f26e2457bb79aa0203235104063d2eff5add5aea`
+and the pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Both `observer-lifecycle` and `observer-lifecycle-lan` matched all four Java
+samples and passed their cold-reopen checks in 78 seconds together. The LAN
+guest restored its view of both observers and lamps after reconnecting. The
+full ten-check batch passed on a rebuilt candidate after rebasing onto
+`036972379bc9b35b3fc371ae6755abcbb79f3f9f` (Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`). The rebuilt client
+`native-9f42064-9669a74fb4bf` has SHA-256
+`f504c88fadca21613d4e9a13436ee8686872791287e74c7d49e581637b05a9be`.
+
+The same candidate passed all eight selected regressions.
+
+| Check | Matching Java coverage |
+| --- | --- |
+| `observer-storage`, `observer-filtered-storage` | 46 unfiltered samples and 92 filtered samples across two lanes |
+| `observer-filter-input`, `observer-filter-input-lan` | 56 observations in each role, including filter changes and clearing |
+| `observer-world` | 72 samples across two block lanes and 46 chute samples |
+| `observer-chutes` | 18 ticks of chute item motion and the downstream piston |
+| `observer-belt-funnel` | 180 ticks of Observer output, item movement, pistons and Gantry |
+| `display-link` | 146 ticks of single and double chest counts and redstone gating |
+
+Run the focused batch with Python 3.10 or newer and the prepared resources:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 2 \
+  --check observer-lifecycle --check observer-lifecycle-lan \
+  --check observer-storage --check observer-filtered-storage \
+  --check observer-filter-input --check observer-filter-input-lan \
+  --check observer-world --check observer-chutes --check observer-belt-funnel \
+  --check display-link
+```
+
+Full 1:1 remains Open, including broader target and filter combinations and
+Java-equivalent packet timing.
