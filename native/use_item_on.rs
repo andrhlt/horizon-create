@@ -18,6 +18,18 @@ fn use_item_on(
         *claimed = true;
         return;
     }
+    if game.native_block(pos) == "create:deployer" {
+        if stack.item.as_ref() == "create:wrench"
+            && crate::game::create_wrench::apply(game, pos, face)
+        {
+            *claimed = true;
+            return;
+        }
+        if crate::game::create_machines::deployer_interact(game, pos, face) {
+            *claimed = true;
+            return;
+        }
+    }
     if !game.native_sneaking() {
         crate::game::create_clipboard_editor::open(game, stack, claimed);
     }
