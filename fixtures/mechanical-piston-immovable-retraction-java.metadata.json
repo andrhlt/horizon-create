@@ -1,0 +1,13 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "create": "6.0.10",
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.219",
+  "java": "21.0.13.1",
+  "patch_sha256": "2447a6b3ab93484a80b5ec5959f4537ebd3130155a5f2a1144bdd287db788d10",
+  "trace_sha256": "ce654b519ece1f0f0c2f5cb79accf5b315f5be6ad5b9ca079eeed03b80d7897f",
+  "records": 24,
+  "gradle_reported_seconds": 345,
+  "tick_origin": "GameTest tick 2 after the one-pole rig setup; place bedrock and reverse before sampling tick 10.",
+  "scope": "Sticky east piston extends, then retracts with immovable bedrock touching the head; apparatus returns without moving bedrock."
+}
