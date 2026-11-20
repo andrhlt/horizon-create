@@ -2410,14 +2410,15 @@ adds the signed Clipboard actions above:
 * The powered four-gearbox/controller loop-close replay matches the saved Java
   outcome: the newly inserted gearbox loses its block entity by tick 8 and is
   air by tick 9, while the original network retains +24 RPM.
-* On the fresh combined build `native-9f42064-9caf86d0e1ba` (Horizon source
+* On the fresh current-base build `native-9f42064-beea7c4ae30b` (Horizon source
   `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, prepared pack SHA-256
   `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`), the
   bounded controller suite, APP-1943 source-conflict check and selected neighbor
-  regressions passed 21/21. This build includes the merged APP-1943 change and
-  this branch's loop-close validation. The compatible-launcher rebuild took
-  3m40s (incremental); checks used this build's `horizon-client` and resource
-  directory. Test outputs are retained in `.local/parity/`.
+  regressions passed 21/21. This build includes the merged APP-1943 change,
+  this branch's loop-close validation and the latest `origin/main`. The
+  compatible-launcher rebuild took 4m29s (incremental); checks used this
+  build's `horizon-client` and resource directory. Test outputs are retained
+  in `.local/parity/`.
 
 The formerly blocking shared-network mismatch from
 [APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and)
