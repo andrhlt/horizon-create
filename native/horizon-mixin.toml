@@ -4248,6 +4248,25 @@ file = "crates/horizon-client/src/game.rs"
 name = "create_backtank"
 source = "backtank.rs"
 
+[[injection]]
+id = "diving_player_tick"
+target = "horizon_client::game::remote::Game<'_>::tick_remote_level"
+kind = "HEAD"
+helper = "diving_player_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "self" },
+]
+
+[[injection]]
+id = "backtank_player_tick"
+hook = "player_tick"
+hook_version = 1
+kind = "HEAD"
+helper = "backtank_player_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "self" },
+]
+
 [[module]]
 id = "encased_fluid_pipe"
 file = "crates/horizon-client/src/game.rs"
