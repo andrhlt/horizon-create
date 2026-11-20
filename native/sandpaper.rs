@@ -8,10 +8,9 @@ use super::create_depot::encode;
 use super::{Game, Hand};
 
 pub(super) const POLISHING: &str = "create:sand_paper_polishing";
+const POLISHING_RECIPE: &str = "create:sandpaper_polishing";
 const PAPER: &str = "create:sand_paper";
 const RED_PAPER: &str = "create:red_sand_paper";
-const ROSE_QUARTZ: &str = "create:rose_quartz";
-const POLISHED_QUARTZ: &str = "create:polished_rose_quartz";
 const USE_TICKS: i32 = 32;
 
 fn is_paper(stack: &ItemStack) -> bool {
@@ -37,8 +36,25 @@ fn polishing(stack: &ItemStack) -> Option<ItemStack> {
     ItemStack::from_nbt(data)
 }
 
-fn quartz(stack: &ItemStack) -> bool {
-    stack.count > 0 && stack.item.as_ref() == ROSE_QUARTZ
+fn polish_result(game: &Game<'_>, stack: &ItemStack) -> Option<ItemStack> {
+    if stack.count == 0 {
+        return None;
+    }
+    game.native_recipes_of_type(POLISHING_RECIPE)
+        .iter()
+        .find_map(|recipe| {
+            let [ingredient] = recipe.json["ingredients"].as_array()?.as_slice() else {
+                return None;
+            };
+            super::create_machines::ingredient_matches(game, ingredient, &stack.item)
+                .then(|| recipe.json["results"].as_array()?.first())
+                .flatten()
+                .and_then(|result| game.native_recipe_result(result))
+        })
+}
+
+fn can_polish(game: &Game<'_>, stack: &ItemStack) -> bool {
+    polish_result(game, stack).is_some()
 }
 
 fn ground(game: &Game<'_>) -> Option<(u32, ItemStack)> {
@@ -53,7 +69,7 @@ fn ground(game: &Game<'_>) -> Option<(u32, ItemStack)> {
         .iter()
         .find(|drop| {
             let location = drop.position.components();
-            quartz(&drop.stack)
+            can_polish(game, &drop.stack)
                 && drop.position.distance_squared(player) <= 9.0
                 && location
                     .into_iter()
@@ -73,7 +89,7 @@ pub(super) fn start(game: &mut Game<'_>, stack: &ItemStack, hand: Hand, canceled
         Hand::Main
     };
     let held = game.with_hand(other, |game| {
-        game.held().filter(|item| quartz(item)).cloned()
+        game.held().filter(|item| can_polish(game, item)).cloned()
     });
     let (mut input, ground_id) = if let Some(stack) = held {
         (stack, None)
@@ -117,10 +133,14 @@ pub(super) fn finish(
     hand: Hand,
     result: &mut Option<ItemStack>,
 ) {
-    if !is_paper(stack) || !polishing(stack).is_some_and(|item| quartz(&item)) {
+    if !is_paper(stack) {
         return;
     }
-    game.give_or_drop(ItemStack::new(POLISHED_QUARTZ, 1));
+    let Some(input) = polishing(stack) else {
+        return;
+    };
+    let output = polish_result(game, &input).unwrap_or(input);
+    game.give_or_drop(output);
     if let Some(held) = game.held_mut() {
         held.data_mut().set_other(POLISHING, None);
     }
@@ -186,9 +206,11 @@ fn trace(game: &Game<'_>, event: &str, tick: i32) {
     let row = serde_json::json!({
         "event": event,
         "tick": tick,
-        "input_in_hand": input.filter(|item| quartz(item)).map_or(0, |item| item.count),
-        "raw_quartz": total(ROSE_QUARTZ),
-        "polished_quartz": total(POLISHED_QUARTZ),
+        "input_in_hand": input
+            .filter(|item| item.item.as_ref() == "create:rose_quartz")
+            .map_or(0, |item| item.count),
+        "raw_quartz": total("create:rose_quartz"),
+        "polished_quartz": total("create:polished_rose_quartz"),
         "damage": held.map_or(0, |item| item.damage),
         "polishing": held.and_then(polishing).is_some(),
     });
