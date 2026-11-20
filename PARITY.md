@@ -10780,9 +10780,11 @@ The finite checks completed on the pinned Create reference
 - Existing Java comparisons `roller_filling` and `roller_paving_and_clearing`
   passed on the candidate client. Together they compare 146 captured ticks for
   fill, paving and clearing behavior, including the recorded material cases.
-- `roller-mode-ui` selected Tunnel Pave, Straight Fill and Wide Fill as host;
-  a LAN guest selected Wide Fill and the host observed the server value. The
-  selected mode persisted through `/save-all flush` and fixture restart. This
+- `roller-mode-ui` crafted a Roller from its pinned survival recipe, placed it
+  on a full floor, and confirmed the crafted item was consumed. It selected
+  Tunnel Pave, Straight Fill and Wide Fill as host; a LAN guest selected Wide
+  Fill and the host observed the server value. The selected mode persisted
+  through `/save-all flush` and fixture restart. This
   proves guest convergence and idle mode persistence, not packet-arrival timing
   parity.
 - Gantry Shaft/Carriage is already Done; its existing integrated regressions
@@ -10807,10 +10809,9 @@ full-block filter validation, and the Java slab-to-double-block filter state.
 existing Roller value board. `tools/test-roller-mode-ui.py` is the LAN/mode and
 idle-reopen check registered by the parity runner.
 
-This pass is partial. The current checks do not establish survival acquisition
-and mounting, invalid-filter rejection, exact consumed-material boundaries,
-active moving save/reopen, or actor transport. Those bounded gates remain open;
-we do not claim the whole APP-2007 baseline complete. The placement redirect
-and filter boundary code still need integration coverage before calling those
-paths verified. Additional terrain patterns, drum visuals, animation and exact
+This pass is partial. The current checks do not establish invalid-filter
+rejection, exact consumed-material boundaries, active moving save/reopen, or
+actor transport. Those bounded gates remain open;
+we do not claim the whole APP-2007 baseline complete. The placement redirect and filter boundary code still need focused integration
+coverage before calling those paths verified. Additional terrain patterns, drum visuals, animation and exact
 network timing remain follow-ups; Full 1:1 stays Open.

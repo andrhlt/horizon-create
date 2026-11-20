@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Select all Mechanical Roller modes as a host and LAN guest."""
+"""Craft and place a Mechanical Roller, then verify its host and LAN modes."""
 import argparse
 from pathlib import Path
 from runpy import run_path
@@ -48,6 +48,41 @@ def choose(control, value):
         raise RuntimeError("Confirming a Roller mode did not close the board")
 
 
+def craft_and_place(control):
+    control.commands((
+        "/item replace entity @s hotbar.0 with create:electron_tube",
+        "/item replace entity @s hotbar.1 with create:andesite_casing",
+        "/item replace entity @s hotbar.2 with create:crushing_wheel",
+    ))
+    control.call("interact", 6, 200, 42, "up")
+    for source, target in ((0, 100), (1, 103), (2, 106)):
+        control.call("click-slot", source)
+        control.call("click-slot", target, "right")
+    menu = control.call("menu")
+    result = next((slot["stack"] for slot in menu["slots"] if slot["slot"] == 200), None)
+    if not result or result.get("item") != "create:mechanical_roller":
+        raise RuntimeError(f"Survival recipe did not produce a Mechanical Roller: {result}")
+    control.call("click-slot", 200, "shift")
+    if control.call("inventory")["counts"].get("create:mechanical_roller") != 1:
+        raise RuntimeError("Crafting did not place one Mechanical Roller in the survival inventory")
+    control.call("close")
+    control.call("select", "create:mechanical_roller")
+    control.call("look-at", 8.5, 201, 42.5)
+    control.call("wait", 2)
+    control.call("mouse", "right", "down")
+    control.call("wait", 2)
+    control.call("mouse", "right", "up")
+    place_result = control.call("wait", 2)
+    state = control.call("block", *POS)["state"]
+    if not state.startswith("create:mechanical_roller"):
+        around = [control.call("block", 8, y, 42)["state"] for y in (199, 200, 201, 202)]
+        raise RuntimeError(f"Survival placement on a full floor failed: result={place_result}, blocks={around}")
+    if control.call("inventory")["counts"].get("create:mechanical_roller", 0):
+        raise RuntimeError("Roller placement did not consume its crafted item")
+    # Normalize the heading so the rendered control target is deterministic.
+    control.command(f"/setblock {' '.join(map(str, POS))} create:mechanical_roller[facing=north]")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("ctl", "client", "resources"):
@@ -65,7 +100,7 @@ def main():
             "/gamemode survival",
         ))
         host.step_to(host.clock() + 1)
-        host.command(f"/setblock {' '.join(map(str, POS))} create:mechanical_roller[facing=north]")
+        craft_and_place(host)
         for selected in (1, 2, 0):
             choose(host, selected)
             if mode(host) != selected:
