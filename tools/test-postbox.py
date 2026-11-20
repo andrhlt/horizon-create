@@ -153,6 +153,61 @@ def interactive(host, actor, player, shots):
     print("Postbox opened and closed, rejected Stone, retained a parcel, and saved the Warehouse address.")
 
 
+def persistence(host, actor):
+    second = (14, 100, -9)
+    second_feet = [14.5, 100.0, -6.5]
+    host.commands((
+        f"/setblock {packager.xyz(second)} create:blue_postbox[facing=north]",
+        f"/data merge block {packager.xyz(POS)} {{Items:[{{Slot:17b,id:\"{menu.PACKAGE}\",count:1}}]}}",
+        f"/data merge block {packager.xyz(second)} {{Items:[]}}",
+    ))
+    actor.call("interact", *second, "south")
+    mp.until("the second Postbox address menu to open", lambda:
+             host.call("state")["screen"] == "container")
+    actor.call("click-button", "Frogport Address")
+    actor.call("type", "Dispatch")
+    actor.call("click-button", "Confirm")
+    mp.until("the second Postbox to save its independent address", lambda:
+             packager.block_value(host, second, "AddressFilter") == '"Dispatch"')
+    host.command("/save-all flush")
+    host.restart()
+    first_data = packager.block_value(host, POS, "AddressFilter")
+    second_data = packager.block_value(host, second, "AddressFilter")
+    first_items = packager.block_value(host, POS, "Items")
+    second_items = packager.block_value(host, second, "Items")
+    assert first_data == '"Warehouse"' and second_data == '"Dispatch"', (first_data, second_data)
+    first_slots = packager.describe_slots(first_items, "Slot")
+    second_slots = packager.describe_slots(second_items, "Slot")
+    assert first_slots == f"17:{menu.PACKAGE}=1", first_slots
+    assert second_slots == "", second_slots
+    assert "open=false" in host.call("block", *POS)["state"]
+    assert "open=false" in host.call("block", *second)["state"]
+    actor.call("interact", *POS, "south")
+    mp.until("the filled Postbox to reopen after cold start", lambda:
+             menu.stack_item(actor, 317) == menu.PACKAGE)
+    actor.call("close")
+    mp.until("the Postbox to close after the persistence check", lambda:
+             "open=false" in host.call("block", *POS)["state"])
+    host.call("command", "/give @s minecraft:diamond_pickaxe")
+    host.call("command", "/gamemode survival")
+    actor.call("select", "minecraft:diamond_pickaxe")
+    for position in (second, POS):
+        actor.call("break", *position, "--timeout", 20)
+        mp.until(f"the Postbox at {position} to be removed", lambda p=position:
+                 host.call("block", *p)["block"] == "minecraft:air")
+    assert host.call("block", *POS)["block"] == "minecraft:air"
+    assert host.call("block", *second)["block"] == "minecraft:air"
+    drops = host.call("entities", 12, "minecraft:item")["entities"]
+    counts = {}
+    for entity in drops:
+        item = entity["item"]["item"]
+        counts[item] = counts.get(item, 0) + entity["item"]["count"]
+    assert counts.get("create:white_postbox", 0) == 1, counts
+    assert counts.get("create:blue_postbox", 0) == 1, counts
+    assert counts.get(menu.PACKAGE, 0) == 1, counts
+    print("Independent addresses and the addressed parcel survived cold reopen; removing both boxes dropped each block and its parcel.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for field in ("ctl", "client", "resources"):
@@ -190,6 +245,8 @@ def main():
         if args.screenshots:
             args.screenshots.mkdir(parents=True, exist_ok=True)
         interactive(host, actor, player, args.screenshots)
+        if not args.lan:
+            persistence(host, actor)
         place(host, actor, player)
     print(f"{mode}: standalone Postbox checks passed.")
 

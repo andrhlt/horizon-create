@@ -4887,6 +4887,27 @@ bindings = [
 ]
 
 [[injection]]
+id = "postbox_break_contents_capture"
+target = "horizon_client::game::block_breaking::Game<'_>::player_break_block"
+kind = "HEAD"
+helper = "postbox_break_contents_capture.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+]
+
+[[injection]]
+id = "postbox_break_contents_drop"
+target = "horizon_client::game::block_breaking::Game<'_>::player_break_block"
+kind = "RETURN"
+helper = "postbox_break_contents_drop.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "self" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+  { name = "result", ty = "Result<bool>", value = "$value" },
+]
+
+[[injection]]
 id = "ponder_mouse"
 target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_button_pressed_pre"
 kind = "HEAD"
