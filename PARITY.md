@@ -2228,9 +2228,54 @@ shaft preference, a crouched override, conflicting axes, and two shafts on
 one axis. Java captures are in `fixtures/creative-motor-placement-java.csv`
 from `tools/java-creative-motor-placement-trace.patch`.
 
+Java’s `CreativeMotorRenderer` draws one `SHAFT_HALF` partial on the motor’s
+`facing` side. It rotates about that axis with a position-dependent phase of
+0° or 22.5°. The [render replay](tools/test-creative-motor-render.py) samples
+all six facings in solo and the south-facing motor on both LAN clients. The
+replay places motors with +32 and −48 RPM settings and checks the rendered
+axis, half-shaft side, signed speed, phase and angle after each placement.
+It compares speed and axis to `fixtures/creative-motor-render-java.csv`
+([capture](tools/capture-creative-motor-java.py) with
+`tools/java-creative-motor-family-trace.patch`) and evaluates Java’s phase and
+angle rules at Horizon’s frame position and time. The independent LAN settings
+check verifies the server shaft response to the host and guest board actions.
+A [save/reopen replay](tools/test-creative-motor-reload.py) keeps `ScrollValue`
+and regenerates speed for two motors each connected to its own shaft at −24 RPM
+and one disconnected motor at +40 RPM.
+
+The Java probe also records
+`fixtures/creative-motor-competition-java.csv` for two motors on one shaft,
+including a sign change, source removal and re-add. On the final PR tree,
+build `native-9f42064-1dcba217c926` reports 107 of 144 samples differing.
+These are gameplay failures, not settling noise: in the equal-speed lane,
+Horizon starts with the opposite motor's −16 RPM source, gives the shaft and
+second motor the wrong sign, and removes the first motor by tick 4 while Java
+keeps all three blocks at +16 through tick 4. Flipping that motor at tick 5
+makes Java tear down all three blocks; Horizon instead reverses the surviving
+shaft and motor to +16. In the other lane, Java propagates the expected −16 RPM
+after the tick-5 reversal and retains the shaft and driven motor when the
+opposing motor is removed at tick 12. Horizon removes the opposing motor at
+tick 5, then reports zero shaft speed and loses the driven motor after tick 12.
+At re-add, the block/speed state still does not match Java. Thus the remaining
+gate is source selection and direction, conflict teardown, and network
+recovery; this trace has no stress/capacity field and cannot assess stress.
+
+The [kinetic source-transition check](tools/test-kinetic-network-sources.py)
+passes on the same final build, confirming the merged APP-1943 coverage but
+not the direct two-motor-on-one-shaft case. Six registered `creative-motor*`
+checks also pass on this build. A candidate startup-order change reduced this
+motor diagnostic to 87 differences on `native-9f42064-5c202877bda0` but still
+did not match Java, so that unverified change was not retained. Horizon samples
+are saved in `.local/creative-motor-competition-horizon.csv`. Keep this
+consequential gap linked to [APP-1943](https://linear.app/appstu/issue/APP-1943);
+the diagnostic is not registered and this gameplay gate remains open.
+
 ```sh
 python3 tools/test-creative-motor.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-creative-motor-placement.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-creative-motor-render.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-creative-motor-render.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --lan
+python3 tools/test-creative-motor-reload.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-multiplayer-creative-motor.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
 
