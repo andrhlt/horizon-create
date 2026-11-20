@@ -3695,6 +3695,21 @@ and frame attachment. The `--lan` replay checks a host placing the upper
 sail and a guest extending another edge, with the correct frame cost and
 result on both clients. Pixel and audio timing still require comparison.
 
+APP-1996's finite gameplay baseline passed all eight focused checks on
+2026-11-20: `windmill`, `windmill-crafting`, `windmill-lan`,
+`windmill-sails`, `sail-placement`, `sail-placement-lan`, `windmill-reopen`,
+and `windmill-facings`. The checks compared the existing 66-row Java
+assembly/load/reversal trace and 90-row six-facing trace, all 17 sail
+definitions, seven dye/shearing actions, eight placement actions, and the
+existing Java reload fixture. LAN checks verified host and guest actions
+converge on bearing direction, capacity, stress, placement and inventory.
+The run used `native-9f42064-6ce68a31b125` (Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, Minecraft 26.3) and pack
+SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+All eight outcomes are recorded in `.local/parity/` in the ticket worktree.
+These are scoped gameplay results; exact sail visuals/audio and broader
+layout/load permutations remain open under Full 1:1.
+
 ## Train Signal
 
 The [targeting GameTest](tools/java-train-signal-trace.patch) matches
