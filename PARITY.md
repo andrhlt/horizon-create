@@ -2416,7 +2416,7 @@ on the deposit tick at volume .125 and pitch 1.5. In LAN the guest moved
 the items and both clients heard one slide. Retrieval produced no
 second slide.
 
-The Depot baseline checks on `native-9f42064-558283db0c26` added
+The Depot baseline checks on `native-9f42064-d7e37b705c75` added
 [survival crafting, placement and loaded idle reopen](tools/test-depot-baseline.py):
 the player crafts and places the Depot, swaps complete ingot stacks, reopens
 the world, then retrieves the held stack with all counts conserved. Its
@@ -2434,13 +2434,13 @@ the pulling Funnel checks matched all 96 Java rows in both modes, comparator
 matched 17 ticks, and pressing matched 71.
 The pushing test checks the occupied ordinary Depot's rejection behavior;
 Weighted Ejector merge remains covered separately by its original Java trace.
-The worktree base commit is `c1255a02c54343567c3b5411cc66b119c7170f20`, with the
+The worktree base commit is `be02d33b1331352ed5a69cba28d93e6f04fafeb7`, with the
 pinned Horizon revision `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` and pack
 SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
 To reproduce the finite set on that build:
 
 ```sh
-python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-558283db0c26/horizon-ctl .local/patched-launcher/versions/native-9f42064-558283db0c26/horizon-client .local/patched-launcher/versions/native-9f42064-558283db0c26/.local/horizon-client/26.3 --jobs 2 \
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-d7e37b705c75/horizon-ctl .local/patched-launcher/versions/native-9f42064-d7e37b705c75/horizon-client .local/patched-launcher/versions/native-9f42064-d7e37b705c75/.local/horizon-client/26.3 --jobs 2 \
   --check depot-survival-reopen --check depot-pushing-custody \
   --check depot-first-click --check depot-first-click-lan \
   --check depot-pulling-funnel --check depot-pulling-funnel-lan \
@@ -2594,7 +2594,7 @@ placement and original Smart Observer belt-and-funnel replays passed.
 
 The [stationary Depot Funnel replay](tools/test-depot-pulling-funnel.py)
 matched [96 Java tick rows](fixtures/depot-pulling-funnel-java.csv) in solo
-and LAN on `native-9f42064-558283db0c26`. The open barrel accepted three ingots on tick 13.
+and LAN on `native-9f42064-d7e37b705c75`. The open barrel accepted three ingots on tick 13.
 The powered Funnel held its items through tick 18 and resumed on tick 19.
 The partly full barrel accepted one on tick 13 and the other two on tick
 21 after space cleared. The full barrel held its Depot output until space
