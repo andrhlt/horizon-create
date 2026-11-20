@@ -5508,6 +5508,19 @@ produced identical snapshots in two headless runs. The exact build
 also matches all 83 [original Redstone Link signal ticks](tools/test-redstone-link.py)
 and passes the live Clipboard, wrapping and brass-diode copy replays.
 
+APP-2032's bounded Redstone Link baseline reuses that trace for ordered
+frequencies, analog strengths, independent channel separation, mismatch and
+reconnection, source removal, and the downstream lamp. Its survival setup
+check verifies placement, receiver toggling, both frequency slots and sample
+retention. Existing LAN coverage verifies that a guest can configure a
+receiver and observe host power; the handheld-controller binding check covers
+the supported held-device path. The new `--persistence` mode saves and reopens
+the same world with the rig active and idle, checking the channel bindings and
+the sender/receiver output state. Run it with the normal
+`tools/test-redstone-link.py` client, control and resource arguments. Range
+edge cases, overlapping network combinations and the remaining facings remain
+outside this finite pass. Full 1:1 stays Open.
+
 The [Clipboard selection replay](tools/test-clipboard-editor.py)
 passes in solo and LAN on `native-9f42064-7a700098bbf4`. Double-click
 selects a word without its following space, and dragging selects text
