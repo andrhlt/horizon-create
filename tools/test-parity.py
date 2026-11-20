@@ -479,6 +479,7 @@ CHECKS = (
     ("controller-rail-wrench", "test-controller-rail-tools"),
     ("controller-rail-assembler", "test-controller-rail-tools", "--assembler"),
     ("sandpaper", "test-sandpaper"),
+    ("sandpaper-lan", "test-sandpaper-lan"),
     ("shearing", "test-shearing"),
     ("netherite-backtank", "test-netherite-backtank"),
     ("copper-diving-breath", "test-copper-diving-breath"),
