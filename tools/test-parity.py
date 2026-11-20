@@ -115,6 +115,7 @@ CHECKS = (
     ("clockwork-reopen", "test-clockwork-reopen"),
     ("clockwork-settings", "test-clockwork-settings"),
     ("chassis-range", "test-chassis-range"),
+    ("chassis-range-reopen", "test-chassis-range", "--persistence"),
     ("chassis-range-lan", "test-multiplayer-chassis-range"),
     ("chassis-preview", "test-chassis-preview", "--visual"),
     ("waterwheel-gameplay-axes", "test-waterwheel-gameplay", "--mode", "axes"),

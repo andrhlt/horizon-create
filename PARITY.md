@@ -4452,6 +4452,47 @@ texture. The atlas quad and cuboid edge submission follows the exposed
 cluster boundary measured in Java. Mixed-group preview transitions and
 pixel-by-pixel image comparison remain open.
 
+## APP-1995 Linear, Secondary and Radial Chassis
+
+This finite gameplay pass reused the pinned Java references at
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and the current Horizon source
+pin `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. Five Linear assemblies,
+six Secondary Linear assemblies (18 Java ticks), and six Radial assemblies
+(18 payload ticks plus a 27-tick quarter-turn) passed. The player checks
+covered linear placement and seven adhesive actions, four Secondary
+placements and five adhesive actions, Radial placement and 12 sticky-face
+actions, and the original chassis conversions. Range controls matched all
+12 Java samples, including clamp boundaries; the LAN guest changed a
+matching group setting while the neighboring variant retained its value.
+The existing preview replay matched 72 samples.
+
+The new [reopen replay](tools/test-chassis-range.py) also uses the mixed
+primary/secondary arrangement from
+[`secondary-linear-chassis-java.csv`](fixtures/secondary-linear-chassis-java.csv).
+It saves and reopens the idle assembly, verifies sticky membership and both
+range values, assembles the three-block payload, then saves and reopens while
+that payload is active and verifies the captured Java-relative positions.
+This is source-aligned gameplay persistence evidence, not a claim of exact
+Java active-reload timing.
+
+The selected bounded run passed 12 of 12 checks on the rebased combined
+build `native-9f42064-645e120d2506`. The client SHA-256 is
+`3e91d78b62415094ef4de108756ecde81c8e39ac4f814e03cc606644019b79c7`; the
+prepared Create pack SHA-256 is
+`3b914d86881a3d8eb906cdadfaa69981c6f0c9dcff4eaddfc3cf0560f400db49`.
+Reproduction used:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-645e120d2506/horizon-ctl .local/patched-launcher/versions/native-9f42064-645e120d2506/horizon-client .local/patched-launcher/versions/native-9f42064-645e120d2506/.local/horizon-client/26.3 --jobs 2 --check linear-chassis --check linear-chassis-player --check secondary-linear-chassis --check secondary-linear-chassis-player --check linear-chassis-conversions --check radial-chassis --check radial-chassis-player --check radial-chassis-spin --check chassis-range --check chassis-range-lan --check chassis-range-reopen --check chassis-preview
+```
+
+`git diff --check` and Python compilation passed. The first clean native build
+took 969 seconds; the post-rebase incremental combined build took 437 seconds.
+The focused gameplay batch passed after enabling the test harness's local
+control sockets. Additional mixed layouts, other controllers, non-default
+range configuration, and all-layout preview transitions remain follow-ups.
+Full 1:1 parity stays Open.
+
 ## Desk Bell
 
 The [pinned Java probe](tools/java-desk-bell.patch) records pre-press state,
