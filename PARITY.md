@@ -10769,81 +10769,22 @@ The following checks passed on `native-9f42064-d6dc2ad18d3f` (Horizon `9f42064c1
 
 The focused command was `python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 --check arrow-dispenser --check dispensers-dont-fight --check dispensers-refill --check creative-crate-dropper --check creative-crate-dropper-lan --check package-dropper-chute --check package-dropper-chute-lan`. The first three outputs are `.local/arrow_dispenser-horizon.csv`, `.local/dispensers_dont_fight-horizon.csv`, and `.local/dispensers_refill-horizon.csv`; individual logs are in `.local/parity/`.
 
-The Dropper LAN cases establish guest operation and convergence for those adjacent item-transfer paths. The mounted Gantry/bearing cases above were solo only. Mounted actor guest convergence and idle/active dispenser inventory save/reopen were not exercised in this pass and remain required baseline gates; host/guest timing equivalence and all other payload/mounting combinations also remain unverified. Keep this family Partial and the issue In Progress until the mounted guest and persistence cases pass. Full 1:1 remains Open.
+The Dropper LAN cases establish guest operation and convergence for those adjacent item-transfer paths. The mounted Gantry/bearing cases above were solo only. The follow-up mounted-actor gate below covers the remaining representative guest and persistence cases; host/guest timing equivalence and all other payload/mounting combinations remain unverified. Full 1:1 remains Open.
 
-The follow-up harness `tools/test-mounted-dispenser-gates.py` exercises a LAN
-guest beside a mounted arrow dispenser, explicit `/save-all` before idle and
-active reopen, and a representative mounted Dropper action. A fresh diagnostic
-run on the pinned `native-9f42064-d6dc2ad18d3f` runtime is preserved in
-`/private/tmp/app2008-current-gates.log`. Host arrow launch and item
-conservation through active reopen passed. The guest `entities` API cannot be
-used as an arrow oracle because Horizon documents that command as mobs, item
-drops and XP only; the fresh guest `looking-at` result also targeted the
-mechanical bearing, with no projectile target. The guest screenshot artifacts
-are `/private/tmp/app2008-guest-vanilla-arrow.png` and
-`/private/tmp/app2008-guest-mounted-arrow.png`.
+The follow-up harness `tools/test-mounted-dispenser-gates.py` now assembles a
+real Dropper fixture before the bearing actor is created, with a five-item
+cobblestone stack. On the pinned `native-9f42064-d6dc2ad18d3f` runtime, the
+mounted Dropper decremented and ejected one item, the LAN guest converged, and
+both idle and active `/save-all`/reopen checks conserved stack plus dropped-item
+counts. The mounted dispenser launched an arrow, conserved ammo and projectile
+count through idle and active reopen, and the rendered guest screenshot visibly
+contains the launched arrow. The `horizon-ctl entities` API is deliberately not
+used as a projectile oracle because it reports mobs, item drops and XP only;
+the guest screenshot is the replication assertion. Fresh artifacts are kept
+under `.local/app-2008-dispenser-fix/`, and the latest full run is recorded in
+`/private/tmp/app2008-mounted-full-no-diagnose.log`.
 
-The Dropper probe now assembles a real bearing payload, mutates its stored
-`MovedBlocks[0]` state to `minecraft:dropper`, installs a cobblestone stack,
-and clears the dispense latch. After 200 frozen ticks the stored stack still
-reads one, so the mounted Dropper action remains a concrete behavior blocker.
-The new checks are registered as `mounted-dispenser-gates` and
-`mounted-dispenser-dropper` in `tools/test-parity.py`; they are intentionally
-not claimed as passing until guest-visible output and Dropper decrement are
-fixed. Keep this family Partial and the issue In Progress.
-
-## APP-1966 Deployer player interactions
-
-The pinned Java rules are in `DeployerBlock.useItemOn`, `DeployerBlock.onWrenched`,
-`DeployerItemHandler`, and `DeployerFilterSlot`. A front-facing axial use swaps
-the player's active hand stack with the Deployer's fake-player hand; an empty
-hand retrieves the stored stack. The rear axial face passes through, while a
-Wrench on the facing side toggles USE/PUNCH and other Wrench faces rotate the
-block. Filter short interaction rejects Wrenches and Mechanical Arms, stores
-ordinary samples without consuming them, and consumes one Filter item when
-installing it.
-
-The reproduced exchange failure had the correct survival actor, main hand,
-three iron ingots, east-facing Deployer, east target face, and in-reach click.
-The hook trace showed `may_build=true`, then found a real `create:deployer`
-block entity with zero item slots. The item-on-block hook therefore returned
-unhandled. After initializing the one item slot, insertion passed, but retrieval
-still failed because empty hands do not call the item-on-block hook. Moving the
-exchange to the right-click hook fixed empty-hand retrieval. The right-click
-hook runs once per hand, so limiting this block exchange to the main hand
-prevents the subsequent empty offhand callback from immediately undoing an
-insertion. The click must be on the Deployer's facing side; the rear side is
-covered as a negative case.
-
-`tools/test-deployer-baseline.py` passed in solo and LAN. It verifies Wrench
-toggle without tool consumption, three-item insertion and retrieval, rear-face
-rejection, the 64-item stack boundary with all 65 items conserved across player
-and Deployer, filter-item consumption and return on replacement, ordinary
-sample conservation, and guest actions with host-observed block entity and
-inventory convergence. The North filter case aims at the active Deployer filter
-slot and places the actor within reach. The same script's `--persistence` case
-preserved idle mode/filter/held contents and resumed an active casing
-application after reopen, consuming exactly one alloy.
-
-The existing `tools/test-deployer-applications.py` passed its six in-world
-application lanes in solo and matched all 25 Java ticks. The tests ran on
-`native-9f42064-79b38369a117`, Horizon pin
-`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client SHA-256
-`ff8a6fef0b9430e493e97475cae7f5243706fffa36af86b6333bb13313d2aed7`, and
-Create pack SHA-256
-`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
-The control callback exposes the clicked side but not the exact hit vector; the
-test aims at the active North filter slot, while slot-edge hitbox boundaries
-remain unverified. Exact commands:
-
-```sh
-python3 tools/test-deployer-baseline.py "$ctl" "$client" "$resources" --pack "$pack"
-python3 tools/test-deployer-baseline.py "$ctl" "$client" "$resources" --pack "$pack" --lan
-python3 tools/test-deployer-baseline.py "$ctl" "$client" "$resources" --pack "$pack" --persistence
-python3 tools/test-deployer-applications.py "$ctl" "$client" "$resources" --pack "$pack"
-```
-
-The finite controls and persistence cases establish this gameplay baseline;
-they do not establish exhaustive Java parity for every hitbox edge, filter
-variant, recipe, contraption, animation, or packet timing. Full 1:1 remains
-Open.
+The checks are registered as `mounted-dispenser-gates` and
+`mounted-dispenser-dropper` in `tools/test-parity.py`. This is representative
+coverage, not exhaustive payload, mounting or packet-timing parity; keep the
+family Partial and Full 1:1 Open.
