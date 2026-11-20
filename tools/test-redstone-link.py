@@ -149,7 +149,7 @@ def persistence(args):
             f"/setblock {pos(SOURCE_A)} minecraft:redstone_block",
             "/save-all flush",
         ))
-        control.step_to(control.clock() + 2)
+        control.step_to(control.clock() + 1)
         active = sample(control)
         if active[1] != "true" or active[5] != "true":
             raise RuntimeError(f"Active Redstone Link rig did not power before save: {active}")
@@ -160,7 +160,7 @@ def persistence(args):
             raise RuntimeError(f"Active Redstone Link rig did not resume after reopen: {resumed}")
 
         control.command(f"/setblock {pos(SOURCE_A)} minecraft:air")
-        control.step_to(control.clock() + 2)
+        control.step_to(control.clock() + 1)
         idle = sample(control)
         if idle[1] != "false" or idle[5] != "false":
             raise RuntimeError(f"Redstone Link rig did not return to idle: {idle}")
