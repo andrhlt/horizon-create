@@ -490,6 +490,41 @@ every sampled player tick, including the grounded starting state.
 The table is the initial feature-family audit. Add individual Java actions
 and evidence as each family is inspected.
 
+## Hose Pulley baseline (APP-1989)
+
+The original Java GameTest `TestFluids.hosePulleyTransfer` uses a finite
+3×3×3 source of 27 water blocks and expects all 27 destination blocks filled,
+all 27 source blocks emptied, and the pulley tank empty. `tools/test-hose-pulley.py`
+compares 301 ticks, including both buffers and all 54 reservoir cells; the
+recorded run matched every Java sample. Idle save/reopen preserved the complete
+observable state and 27,000 mB. Active pump save/reopen retained 27,000 mB,
+resumed pumping, and matched the later Java trace state reached after restart.
+
+The pinned Java config defaults to a 10,000-block infinite-source threshold
+and `ALLOW_BY_TAG`; its generated `create:bottomless/allow` tag contains water
+and lava. `native/hose.rs` previously promoted only water. It now promotes both
+tagged vanilla fluids at the existing body limit. Isolated source bodies passed
+at 9,999 water blocks (finite), 10,000 water blocks (infinite), and 10,000 lava
+blocks (infinite). Powered lowering and raising passed, and active saves at both
+positions retained the pulley offset. In an integrated LAN world, a guest
+operated the pulley lever, the host received the action and started the pump,
+and the guest converged on the lever's resulting state. This checks guest
+interaction and state convergence, not Java packet timing or interpolation.
+
+The neighboring `fluid-pipe-gameplay` check also passed. The final checks used
+Horizon build `native-9f42064-52335bcc9361`, source baseline
+`47dcb5118e3a1b60dd4a80d02b6102eef68a9ba2`, and Create pack SHA-256
+`ff689b6512cec7eafee14305728047fa4aedaf1a8fccefb1ed963c57723c1d98`.
+Command: `python3 tools/test-parity.py <build horizon-ctl> <build horizon-client>
+<build .local/horizon-client/26.3> --jobs 1 --check 'hose-pulley' --check
+'fluid-pipe-gameplay'` (2/2 checks passed). Dynamic/nondefault
+`hosePulleyBlockThreshold` configuration, additional fluids/dimensions, and
+fluid effects remain outside this baseline. Early invalid fixtures and their
+diagnostics remain in `.local/parity/hose-pulley-bottomless-step-origin.log`,
+`.local/horizon-hose-lava-verify.log`, and `.local/horizon-hose-pulley-movement.log`;
+the final harness force-loads its threshold body and clears the movement column.
+Full 1:1 remains Open.
+
 ## Decorative stone cut from vanilla materials
 
 The [Java GameTest](tools/java-vanilla-stone-trace.patch) records
