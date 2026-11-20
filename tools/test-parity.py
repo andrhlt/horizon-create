@@ -554,6 +554,8 @@ CHECKS = (
     ("stacked-belt-press", "test-stacked-belt-press", "--sound"),
     ("stacked-belt-press-lan", "test-stacked-belt-press-lan", "--depot-slide"),
     ("ground-item-press", "test-ground-item-press", "--sound"),
+    ("press-lifecycle", "test-press-lifecycle"),
+    ("press-material-routes", "test-press-material-routes"),
     ("press-placement", "test-press-placement"),
     ("mixer-placement", "test-press-placement", "--mixer"),
     ("depot-first-click", "test-depot-first-click", "--slide"),
