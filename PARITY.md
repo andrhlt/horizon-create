@@ -7799,3 +7799,31 @@ regressions passed 13/13. The sequenced-pulley cross-regression passed 1/1,
 including its 56-tick trace. These results replace earlier APP-1949 build
 identifiers; broader combinations and the matrix's Full 1:1 column remain
 open.
+## APP-1943 kinetic source transitions — November 19, 2026
+
+The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+Source review of `RotationPropagator.propagateNewSource` confirms that incompatible
+nonzero conveyed speeds destroy the newly added position with drops. Horizon's
+kinetic source generation is shared with network traversal, and a conflicting
+new kinetic member is now removed; the surviving adjacent networks are then
+republished so their saved capacity and stress reflect the split immediately.
+
+`tools/test-kinetic-network-sources.py` covers two separated creative-motor line
+networks at +16 and -16 RPM, idle save/reopen, and insertion of a three-shaft
+connection whose final shaft must break for equal and weaker opposing sources.
+It also checks a stronger opposing source, matching +16 sources merging to
+capacity 524288, same-direction slower-source transitions, separation after
+removal, and an active merged save/reopen. The headless regression passed on
+freshly built Horizon `native-9f42064-03cb1f8496d1`. The existing
+small/large-waterwheel, loaded-stressometer, rotation-speed-controller-cascade,
+rotation-speed-controller-competing and rotation-speed-controller-LAN checks
+also passed on that exact build (6/6). Commands:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-ctl .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-client .local/horizon-client/26.3 --jobs 1 --check kinetic-network-sources
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-ctl .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-client .local/horizon-client/26.3 --jobs 1 --check small-waterwheel --check large-waterwheel --check loaded-stressometer --check rotation-speed-controller-cascade --check rotation-speed-controller-competing --check rotation-speed-controller-lan
+```
+
+These Horizon outcomes are integration regressions, not captured Java trace
+equivalence. Branch layouts, the exact-capacity transition, and LAN guest
+observation of this source-merge case remain untested. Full 1:1 remains Open.
