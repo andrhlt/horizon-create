@@ -1117,10 +1117,17 @@ to regenerate the Java reference.
 Polish Rose Quartz with Sand Paper or Red Sand Paper held in either
 hand. Holding use for 32 player ticks creates Polished Rose Quartz
 and spends one durability. Releasing early returns the quartz.
-The `test-sandpaper.py` fixture compares 80 active and terminal Java
-samples through both paths. `test-electronics-crafting.py` crafts nine
-original recipes, including Electron Tubes, Brass Tunnels, Nixie Tubes,
-Display Boards, Transmitters, and Display Links.
+Eligibility and output use the loaded `create:sandpaper_polishing` recipe,
+matching Java's recipe lookup and preserving the input if a saved polishing
+component no longer has a matching recipe. `test-sandpaper.py` compares 80
+active and terminal Java samples across normal paper completion, red paper
+completion, and early release. It also checks both paper variants in either
+hand, empty and invalid targets, last-quartz consumption, creative durability,
+and the eight-use break boundary. `test-sandpaper-lan.py` verifies guest use,
+host inventory convergence, and item counts and wear after disconnect/rejoin.
+`test-electronics-crafting.py` crafts both paper recipes and the existing
+electronics and machine recipes. Dropped-item targeting and exact particle,
+sound, and presentation parity remain open.
 
 ### Rope Pulley cargo
 

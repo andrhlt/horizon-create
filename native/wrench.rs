@@ -169,6 +169,31 @@ pub(super) fn pickup(game: &mut Game<'_>, pos: [i32; 3], block: &str) {
     }
 }
 
+fn wrench_belt(game: &mut Game<'_>, pos: [i32; 3]) -> bool {
+    let casing = game.native_block_property(pos, "casing");
+    if casing.as_deref() == Some("true") {
+        game.native_set_block_property_with(pos, "casing", "false", flags::UPDATE_ALL);
+        return true;
+    }
+    if game.native_block_property(pos, "part").as_deref() != Some("pulley") {
+        return false;
+    }
+    if !game.native_authoritative() {
+        return true;
+    }
+    if game.native_set_block_property_with(pos, "part", "middle", flags::UPDATE_ALL)
+        && !game.creative
+    {
+        if let Some(leftover) = game.give(ItemStack::new("create:shaft", 1)) {
+            game.pop_resource(pos, leftover);
+        }
+        if game.lan_acting.is_some() {
+            game.guest_inventory_resend = true;
+        }
+    }
+    true
+}
+
 pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> bool {
     if !game.may_build()
         || !game
@@ -178,6 +203,10 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> boo
         return false;
     }
     let block = game.native_block(pos);
+    if block == super::create_belt::BELT && wrench_belt(game, pos) {
+        game.swing_arm();
+        return true;
+    }
     if !game.native_sneaking() && super::create_steam_whistle::wrench(game, pos) { return true; }
     let ladder = super::create_metal_ladder::metal_ladder(&block);
     let supported = matches!(

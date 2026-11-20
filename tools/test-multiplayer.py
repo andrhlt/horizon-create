@@ -23,15 +23,15 @@ def until(description, test, seconds=15):
 
 
 def install_pack(home, pack=None):
-    (home / "horizon-mods").mkdir(parents=True)
+    (home / "horizon-mods").mkdir(parents=True, exist_ok=True)
     copy2(pack or ROOT / ".local/create.hmod", home / "horizon-mods/create.hmod")
     (home / "horizon-mods.txt").write_text("mod.create:true\n", encoding="utf-8")
 
 
 @contextmanager
-def dedicated(args, scratch, *, scenario="multiplayer"):
+def dedicated(args, scratch, *, scenario="multiplayer", overrides=None, pack=None):
     home = scratch / "server"
-    install_pack(home)
+    install_pack(home, pack)
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
@@ -47,7 +47,10 @@ def dedicated(args, scratch, *, scenario="multiplayer"):
         "simulation-distance": 4,
         "spawn-protection": 0,
     }
-    (home / "server.properties").write_text("".join(f"{k}={v}\n" for k, v in properties.items()))
+    properties.update(overrides or {})
+    (home / "server.properties").write_text(
+        "".join(f"{k}={v}\n" for k, v in properties.items() if v is not None)
+    )
     (home / "eula.txt").write_text("eula=true\n")
     logfile = ROOT / f".local/{scenario}-server.log"
     with logfile.open("w") as log:
