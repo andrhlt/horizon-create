@@ -5253,6 +5253,51 @@ changed. The existing 103-row fluid transfer fixture also passed.
 Ambient occlusion, contraption-mounted fittings and Copycat material
 connections remain open.
 
+### APP-1985 focused gameplay pass
+
+This pass retains the five Java casing/wrench/clone cases, the 103-row
+transport comparisons in solo and with an acting LAN guest, the 84 casing
+faces, and the 204 drain classifications above. The finite additional case
+list is powered Encased → basic → Glass → Encased conversion, full receiver
+and empty source limits, and representative idle and active save/reopen.
+Existing LAN replays cover representative guest casing and wrench edits;
+they assert host authority and eventual guest convergence, not packet timing.
+
+The pinned `EncasedPipeBlock.onWrenched`, `AxisPipeBlock.useItemOn` and
+`FluidPipeBlock.onWrenched` callbacks cache and restore flows around their
+block conversions. Glass accepts Copper Casing directly, restoring its two
+axis openings. `FluidTransportBehaviour.read`/`write` retain the transport
+interfaces. These rules are the source basis for the new bounded
+[lifecycle replay](tools/test-encased-fluid-pipe.py), which reuses the
+APP-1972 tank-content, conservation and tick-step helpers. It checks a
+128-RPM vertical line with an Encased segment and a Glass neighbor. The
+receiver initially holds 8,000 mB and the source 7,000 mB. A stalled/full
+reopen must preserve both tanks, pipe identities and openings. Clearing the
+receiver starts transport; each player conversion must retain the measured
+fluid immediately and then continue pumping. Active reopen must retain
+casing, openings and fluid and resume transfer. Once empty, the powered
+source must stay empty without increasing the receiver.
+
+The replay records phase, authoritative world tick, pipe ID, openings,
+waterlogging, source and receiver mB, and pump RPM in
+`.local/encased-fluid-pipe-lifecycle-horizon.csv`, including completed
+milestones before a failure. Its assertions use exact discrete state and
+fluid identity/amount conservation; continued-flow bounds do not establish
+exact Java transition or reload timing. The idle setup is powered but
+stalled against a full receiver. Integration of this new check is pending;
+no native behavior changes have been made in this pass.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 \
+  --jobs 2 --window-culling --check 'encased-fluid-pipe*' --check pump-startup-pressure \
+  --check copper-casing-ctm --check 'encased-pipe-drain-fitting*' \
+  --check fluid-pipe-lifecycle
+```
+
+Exact Java save/reload, additional network layouts and chunk boundaries,
+guest arrival timing, ambient occlusion, contraption-mounted fittings and
+Copycat material connections remain unverified. Full 1:1 remains Open.
+
 ## Deployer item applications
 
 On `native-9f42064-0e486313d59d`, the [in-world replay](tools/test-deployer-applications.py)

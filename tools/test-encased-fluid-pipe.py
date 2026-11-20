@@ -285,19 +285,114 @@ def transfer(args):
     print(f"Matched all {len(actual)} Java pressure/flow/tank rows, including both casing transitions.")
 
 
+def lifecycle(args):
+    # Reuse the APP-1972 world adapter and conservation checks. Import lazily:
+    # its player-interaction scenarios also reuse this module's helpers.
+    gameplay = import_module("test-fluid-pipe-gameplay")
+    pos = (10, 173, 20)
+    source, target = (10, 171, 20), (10, 175, 20)
+    glass = "create:glass_fluid_pipe"
+    water = "minecraft:water"
+    actual = []
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+
+    def record(host, phase, total):
+        amounts = gameplay.balances(host, 10, water, total)
+        speed = branched.reading(host.command("/data get block 10 172 20"), "Speed")
+        assert abs(speed) == 128, speed
+        block, faces, wet = current(host, pos)
+        actual.append((phase, host.clock(), block, faces, wet, *amounts, speed))
+        return amounts
+
+    try:
+        with fixture_world(args, "EncasedPipeLifecycle", pack=args.pack, env=ENV) as host:
+            host.commands((
+                "/fill 9 171 17 12 171 19 minecraft:stone",
+                "/setblock 10 171 20 create:fluid_tank",
+                "/setblock 10 172 20 create:mechanical_pump[facing=up]",
+                "/setblock 11 172 20 create:cogwheel[axis=y]",
+                "/setblock 11 171 20 create:creative_motor[facing=up]{ScrollValue:128}",
+                f"/setblock {coords(pos)} {BLOCK}[up=true,down=true]",
+                f"/setblock 10 174 20 {glass}[axis=y]",
+                "/setblock 10 175 20 create:fluid_tank",
+                "/gamemode survival @s",
+                "/tp @s 10.5 172 18.5",
+                f"/item replace entity @s hotbar.0 with {CASING} 5",
+                f"/item replace entity @s hotbar.1 with {WRENCH}",
+            ))
+            gameplay.fill(host, source, water, 7000)
+            gameplay.fill(host, target, water, 8000)
+            gameplay.advance(host, 22)
+            assert record(host, "full_target", 15000) == (7000, 8000)
+            saved = current(host, pos)
+            assert saved == (BLOCK, "110000", "-"), saved
+            host.restart()
+            assert current(host, pos) == saved
+            assert gameplay.block(host, (10, 174, 20), glass, axis="y")
+            assert record(host, "idle_reopen", 15000) == (7000, 8000)
+            gameplay.advance(host, 12)
+            assert record(host, "full_target_after_reopen", 15000) == (7000, 8000)
+
+            gameplay.fill(host, target, water, 0)
+            gameplay.advance(host, 20)
+            before = record(host, "pumping_encased", 7000)
+            assert 0 < before[1] < 7000, before
+            gameplay.move(host, host, "@s", 10.5, 172, 18.5)
+            # Side clicks on this vertical line exercise all three callbacks:
+            # encased wrench, basic side wrench, then glass copper casing.
+            for phase, item, expected in (
+                ("uncase", WRENCH, (PIPE, "110000", "false")),
+                ("glass", WRENCH, (glass, "y", "false")),
+                ("encase_glass", CASING, (BLOCK, "110000", "-")),
+            ):
+                use(host, pos, item)
+                assert current(host, pos) == expected, (phase, current(host, pos))
+                assert record(host, phase, 7000) == before
+                gameplay.advance(host, 12)
+                after = record(host, f"{phase}_continued", 7000)
+                assert before[1] < after[1] < 7000, (phase, before, after)
+                before = after
+            assert inventory(host, CASING) == 5
+            saved = current(host, pos)
+            host.restart()
+            assert current(host, pos) == saved
+            assert gameplay.block(host, (10, 174, 20), glass, axis="y")
+            after = record(host, "active_reopen", 7000)
+            assert after[1] >= before[1], (before, after)
+            gameplay.advance(host, 16)
+            continued = record(host, "active_reopen_continued", 7000)
+            assert after[1] < continued[1], (after, continued)
+            gameplay.advance(host, 150)
+            assert record(host, "empty_source", 7000) == (0, 7000)
+            gameplay.advance(host, 20)
+            assert record(host, "empty_source_stable", 7000) == (0, 7000)
+    finally:
+        with args.output.open("w", newline="") as stream:
+            writer = csv.writer(stream, lineterminator="\n")
+            writer.writerow(("phase", "tick", "id", "faces", "waterlogged", "source", "target", "rpm"))
+            writer.writerows(actual)
+    print("Encased/glass pumped transitions, full/empty limits, idle and active reopen passed; "
+          "fluid identity and amounts conserved throughout.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for arg in ("ctl", "client", "resources"):
         parser.add_argument(arg, type=lambda value: Path(value).resolve())
     parser.add_argument("--pack", type=Path)
-    parser.add_argument("--transfer", action="store_true")
+    scenario = parser.add_mutually_exclusive_group()
+    scenario.add_argument("--transfer", action="store_true")
+    scenario.add_argument("--lifecycle", action="store_true")
     parser.add_argument("--lan", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    if args.lifecycle and args.lan:
+        parser.error("--lifecycle reopens a solo world; use --lan with the state or transfer replay")
     if args.output is None:
         suffix = "-lan" if args.lan else ""
-        args.output = ROOT / f".local/encased-fluid-pipe-transfer{suffix}-horizon.csv"
-    (transfer if args.transfer else static_states)(args)
+        mode = "lifecycle" if args.lifecycle else "transfer"
+        args.output = ROOT / f".local/encased-fluid-pipe-{mode}{suffix}-horizon.csv"
+    (lifecycle if args.lifecycle else transfer if args.transfer else static_states)(args)
 
 
 if __name__ == "__main__":
