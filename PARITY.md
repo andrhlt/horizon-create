@@ -2031,6 +2031,38 @@ in headless solo and LAN on `34f0b58f5120`. Both roles bound a block with
 String and started both original 4,000-tick furnace budgets in the survival
 menus. Full fuel expiration and explosions remain open.
 
+APP-2019's bounded recipe pass extends the survival menu replay to cover the
+original cardboard recipes and shortage behavior: a plain Cardboard Block
+returns four Cardboard; three sheets expose no Block recipe result, and the
+fourth crafts one Block; a Cardboard Block without String still converts to
+four sheets, while adding String produces one Bound Block; a Bound Block also
+returns four Cardboard. Each successful craft consumes its inputs and leaves
+no remainder. This follows the pinned `CreateStandardRecipeGen` and
+`CreateItemApplicationRecipeGen` rules. Solo and LAN guest menu runs passed.
+
+The new `cardboard-production-reopen` check saves while the three 250 mB Pulp
+mixers and the Cardboard press are active, reopens the world, and verifies the
+eligible batches and press complete once; the 249 mB control stays idle. A
+second idle save/reopen retained the finished machine outputs and the X/Z axis
+states of both Cardboard block forms. The game advanced during client startup
+before the fixture could freeze it, so this proves operation and inventory
+survival across reopen, not exact Java timer restoration or reload tick parity.
+It reuses the existing Java trace cases; no new Java capture was needed.
+
+For this pass, the pinned Horizon revision built as
+`native-9f42064-f7d9ba41e662`; the installed `create.hmod` SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Ten existing placement, fire, production, Bound Cardboard, fuel and LAN checks
+passed on that build. The new menu cases and active/idle reopen case also
+passed. Reproduce with the exact build's `horizon-ctl`, `horizon-client` and
+prepared `26.3` resources using `tools/test-parity.py --jobs 2` and these
+checks: `cardboard-placement`, `cardboard-placement-lan`, `bound-cardboard`,
+`bound-cardboard-lan`, `bound-cardboard-menus`, `bound-cardboard-menus-lan`,
+`cardboard-fire`, `cardboard-fire-lan`, `cardboard-production`,
+`cardboard-production-lan`, and `cardboard-production-reopen`. Logs are in the
+worktree's `.local/parity/`. Full fuel expiration, explosions, lava spread,
+other Pulpifiable tag members and exact reload timing remain follow-ups.
+
 The four [original Cardboard armor recipes](fixtures/cardboard-armor-java.csv)
 matched shaped survival crafting, consumption, right-click equip slots and one
 point of defense per piece in solo and with an actual LAN guest. The pack

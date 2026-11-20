@@ -438,6 +438,7 @@ CHECKS = (
     ("cardboard-fire-lan", "test-cardboard-fire", "--lan"),
     ("cardboard-production", "test-cardboard-production"),
     ("cardboard-production-lan", "test-cardboard-production", "--lan"),
+    ("cardboard-production-reopen", "test-cardboard-production", "--reopen"),
     ("cardboard-armor", "test-cardboard-armor"),
     ("cardboard-armor-lan", "test-cardboard-armor", "--lan"),
     ("cardboard-armor-fuel", "test-cardboard-armor-fuel"),
