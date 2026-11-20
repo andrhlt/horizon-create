@@ -7224,6 +7224,19 @@ missed the start transition. On `native-9f42064-0908886fd3e5`, the
 and the original detached landing and copper recovery. The 56-tick
 [Sequenced Pulley replay](tools/test-sequenced-pulley.py) also passed.
 
+APP-1999 bounded acceptance ran on the combined latest-main build
+`native-9f42064-b47e135a9b67`
+(`create-worldshaper-screen.hmod`, SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`).
+`tools/test-parity.py` passed the original motion, detach and sequence
+checks plus blocked assembly, the upper zero-rope limit, idle and active
+save/reopen with cargo restoration, and a LAN host/guest ride on a moving
+glued payload (7/7). The independent bearing-player-collision regression
+also passed on this build. The rider check exposed missing previous-pose
+motion publication; Rope Pulley now publishes its per-tick payload delta
+for shared collision resolution. Full rope-height/configuration coverage,
+render interpolation and other interaction variants remain open.
+
 
 ## Fluid Valve opening and closing
 

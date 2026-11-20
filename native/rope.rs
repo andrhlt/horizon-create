@@ -317,6 +317,12 @@ pub(super) fn tick(
     let max = level_range(game, pos);
     let mut limit = float(&entity.nbt, "SequencedOffsetLimit");
     let mut load = payload(game, pos);
+    let previous_payload_y = load.as_ref().and_then(|load| {
+        game.others
+            .iter()
+            .find(|entity| entity.id == load.id)
+            .map(|entity| entity.position.components()[1])
+    });
     let mut depth = None;
     if changed && !running && rpm != 0.0 {
         let found = rope_length(game, pos, max);
@@ -404,7 +410,14 @@ pub(super) fn tick(
 
     if let Some(mut load) = load {
         move_payload(game, pos, &mut load, length);
+        let current_payload_y = f64::from(pos[1] - 1) - f64::from(length);
+        let motion = previous_payload_y.map_or(0.0, |previous| current_payload_y - previous);
+        entity
+            .nbt
+            .insert("DoorMotion".into(), Tag::Double(motion.to_bits()));
         save_payload(game, pos, load);
+    } else {
+        entity.nbt.remove(&"DoorMotion".into());
     }
     if let Some(limit) = limit {
         set_float(&mut entity.nbt, "SequencedOffsetLimit", limit);
