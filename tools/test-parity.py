@@ -439,6 +439,8 @@ CHECKS = (
     ("attribute-filter-color", "test-attribute-filter-color"),
     ("attribute-filter-color-lan", "test-attribute-filter-color", "--lan"),
     ("zinc-mining", "test-zinc-progression"),
+    ("zinc-fortune", "test-zinc-progression", "--fortune"),
+    ("zinc-mining-lan", "test-multiplayer-zinc"),
     ("zinc-heating", "test-zinc-progression", "--heating"),
     ("zinc-crafting", "test-machine-crafting", "--reference", "fixtures/zinc-crafting-java.csv"),
     ("stone-palettes", "test-stone-palettes"),
