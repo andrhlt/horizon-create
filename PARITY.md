@@ -213,12 +213,12 @@ and textured icons. Screenshots and widget IDs are archived in
 The [pinned Java tab inventory](tools/java-creative-tabs-inventory.patch)
 captured [203 Base and 377 Palettes display entries](fixtures/creative-tabs-java.csv).
 The prepared pack uses those display memberships and the Java Palettes
-order. The [headless replay](tools/test-create-creative-tabs.py) checked
+order. The [offscreen replay](tools/test-create-creative-tabs.py) checked
 both memberships, Palettes order, and both first live pages on
 `native-9f42064-89e551a852ca`. The 16-color seat search also passed.
 Base keeps the port’s existing relative order pending a Java client
-capture of its 3D-first sort. Search-only entries and attribution
-still need comparison.
+capture of its 3D-first sort. The APP-2095 replay below compares
+representative search-only entries and attribution.
 
 ## Inventory
 
@@ -7516,6 +7516,67 @@ and verified that Blaze Cake Base appears and Chromatic Compound is excluded.
 The existing tab replay passed the Base and Palettes display membership checks,
 Palettes ordering, and the first live page of each. Java client Base ordering
 and the remaining search interactions are open.
+
+## APP-2095 creative inventory baseline
+
+On the archived Horizon `native-9f42064-340cbe866fa7` client built from
+`adfa875` with the 0.2.67 launcher, the
+[tab replay](tools/test-create-creative-tabs.py) matched 203 Base and
+377 Palettes display entries, Java Palettes order, and both first live pages.
+The [search replay](tools/test-create-creative-search.py) matched all
+265 Base and 392 Palettes search entries in the pack. Live Search returned
+Blaze Cake Base and excluded Chromatic Compound. Both checks passed in
+25.93 seconds. The [colored seat search](tools/test-colored-seats.py) and
+[Ponder Back replay](tools/test-ponder-creative-back.py) also passed on
+the same client and pack.
+
+The [LAN replay](tools/test-create-creative-lan.py) passed in 60.95 seconds.
+A guest joined a local host, entered Creative, opened both Create tabs,
+and saw the same first 45 entries per tab as the pack. Closing and reopening
+the guest inventory retained the selected Building Blocks tab and its first
+page. Search returned Netherite Diving Boots, Ornate Iron Window and its
+pane, and Blaze Cake Base in three queries. Chromatic Compound, Incomplete
+Precision Mechanism, and Incomplete Track each returned an empty grid.
+The game state in scope is the selected tab during the current client
+session. These checks do not cover a cold process restart.
+
+Guest screenshots showed the Create and Create’s Building Blocks titles
+with their Cogwheel and Ornate Iron Window icons. Search rendered names
+and textured icons for the hovered boots, window, and Blaze Cake Base.
+The boots and window displayed their respective blue tab attribution.
+Blaze Cake Base is present in Search but lacks the blue Create line on
+this build. Pinned Java's `CreativeModeTab.contains` uses the tab's search
+membership, so its `SEARCH_TAB_ONLY` entries are credited. Horizon's
+tooltip lookup uses display membership and omits the label for this
+entry. The screenshot for the Palette tab also shows overlapping vanilla
+and Create tab hover labels. The selected panel title remains legible.
+The captures are in the worktree’s `.local/creative-lan-*.png`.
+
+Client SHA-256
+`39712c37f7f666a2d730506198523f0d0b42ef7b4a15c0ea9142a95b450224ea`.
+Matching content pack SHA-256
+`0dc4da44753fdf6dd94d1cdd8d26b82bc35446899a3ad1219a9990377e74b852`.
+The prepared Horizon 26.3 resources came from the
+`native-9f42064-6ce68a31b125` installation on the same upstream pin.
+The Java reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb` with NeoForge 21.1.219.
+The [capture patch](tools/java-creative-tabs-inventory.patch) SHA-256 is
+`b7efc29a0446decff4ffe4e2a66c1564843917812ed128a370396ba6d19dd8ee`.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 \
+  --check create-creative-tabs --check create-creative-search
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 \
+  --check create-creative-lan
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 \
+  --check create-creative-lan --check colored-seats-search --check ponder-creative-back
+```
+
+The first LAN fixture stopped on the host's empty chat reply after a
+targeted game-mode command. The replay now waits for the guest's reported
+game mode. An earlier sandboxed invocation reached client startup and
+could not bind its local control socket. The offscreen results above used
+isolated game directories and a local socket-enabled run.
 
 ## Tank bucket interaction
 

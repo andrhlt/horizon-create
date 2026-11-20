@@ -1554,6 +1554,7 @@ CHECKS = (
     ("colored-seats-search", "test-colored-seats", "--search"),
     ("create-creative-tabs", "test-create-creative-tabs"),
     ("create-creative-search", "test-create-creative-search"),
+    ("create-creative-lan", "test-create-creative-lan"),
     ("seat-player-fall", "test-seat-fall"),
     ("seat-player-fall-lan", "test-seat-fall", "--lan"),
     ("seat-item-fall", "test-seat-item-fall"),
