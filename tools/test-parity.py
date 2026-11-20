@@ -552,6 +552,8 @@ CHECKS = (
     ("roller-filling", "test-rollers", "roller_filling"),
     ("roller-paving-and-clearing", "test-rollers", "roller_paving_and_clearing"),
     ("vaults-protect-fuel", "test-vault-fuel"),
+    ("vault-groups", "test-vault-groups"),
+    ("vault-groups-lan", "test-vault-groups", "--lan"),
     ("crop-farming", "test-crop-farming"),
     ("contraption-controls", "test-contraption-controls"),
     ("elevator", "test-elevator", "--visual"),
