@@ -220,6 +220,7 @@ CHECKS = (
     ("gearbox-reopen", "test-gearbox-reopen"),
     ("gearbox-bearing-transform", "test-gearbox-bearing-transform"),
     ("bearing-player-collision", "test-bearing-player-collision"),
+    ("mechanical-bearing-gameplay", "test-mechanical-bearing-gameplay"),
     ("gearbox-piston", "test-gearbox-piston"),
     ("gearbox-piston-lan", "test-gearbox-piston", "--lan"),
     ("gearbox-mechanical-piston", "test-gearbox-mechanical-piston"),
