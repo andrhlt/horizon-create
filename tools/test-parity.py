@@ -317,6 +317,7 @@ CHECKS = (
     ("millstone-lan", "test-millstone-lan"),
     ("gear-trains", "test-shaft-and-cogwheel"),
     ("flywheel", "test-flywheel", "--visual"),
+    ("flywheel-reopen", "test-flywheel-reopen"),
     ("survival-crafting", "test-survival-crafting"),
     ("vanilla-recipe-reopen", "test-vanilla-recipe-reopen"),
     ("machine-crafting", "test-machine-crafting"),

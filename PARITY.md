@@ -1269,6 +1269,35 @@ table under `.local/flywheel-lan/`. Java screenshot comparison remains open.
 python3 tools/test-multiplayer-flywheel.py --java-source /path/to/java/create /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
 
+APP-1976 adds removal/reconnection and idle/active save/reopen of a powered
+Flywheel/shaft/cogwheel assembly. The packaged survival recipe is checked
+against Create's 3×3 brass-ingot and shaft pattern, and the player placement
+replay consumes four Flywheels in survival. Interactive crafting-table output
+was not exercised by this fixture and remains a follow-up. The Flywheel
+transmits axial rotation and does not generate power. The lifecycle check
+verifies that the powered source drives the shaft at +64 RPM while the adjacent
+cogwheel remains stopped, removal stops the assembly, and a reconnected -32 RPM
+source and its driven shaft survive active world reopen.
+
+```sh
+python3 tools/test-flywheel-reopen.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+```
+
+Verification used build `native-9f42064-d6dc2ad18d3f` and pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. The
+pinned Java checkout is `ac0c444d9828da3453ae8cc65338e8de063286fb`; capture
+patch `tools/java-flywheel-trace.patch` SHA-256 is
+`6ea13e7bed95335e68327439f72711447e44f6563da7644bae32ce7b40c31570`.
+References `fixtures/flywheel-java.csv` and
+`fixtures/flywheel-placement-java.csv` have SHA-256 values
+`c224b1482dc58c3bb88109db00f45eb9890dc35fae5a6962c1af8efd5bd7384c` and
+`246074d4db1610ce71543f1e5f960062978ce5742966b6829b650b942b928a8f`.
+Solo replay matched 96 Java ticks and four placements; LAN replay matched 96
+Java network/rotor samples with at least 99.94% host/guest rotor-mask overlap
+at 12 frozen checkpoints. Lifecycle replay passed idle +64 RPM, stopped, and
+reconnected -32 RPM before and after active reopen. Exact Java screenshot,
+packet arrival, interactive crafting and other assembly layouts remain open.
+
 ## Adjustable Chain Gearshift
 
 The 75-tick replay compares the original Java gearshift in both drive
