@@ -8601,6 +8601,40 @@ and mixing lookup regression fixtures also passed on this build. Other category
 entry points and full JEI presentation remain open.
 
 
+## APP-1959 Crushing Wheels and controller gameplay baseline
+
+On the rebased final build `native-9f42064-c76d4df0e346` with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`, the
+bounded APP-1959 cases passed against Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`:
+
+- `crushing-wheel-placement` selected the adjacent shaft axis, honored sneak
+  orientation override, rejected an invalid adjacent wheel without consuming
+  the held wheel, and formed a controller between aligned wheels.
+- `stone-crushing` matched 146 Java ticks through cobblestone-to-gravel and
+  gravel-to-sand/flint processing and transfer; the final chest held five sand
+  and one flint. `mechanical-crafter` matched all 144 Java ticks and produced
+  the crafted wheel pair at tick 143.
+- `crushing-wheel-rotation` measured same-sign wheel speeds `(128, 128)` as
+  invalid, opposing `(128, -128)` as valid at 2.56 speed, and reversed
+  `(-128, 128)` as valid facing north. A loaded 64-gravel input and its progress
+  remained still while power was stopped, then processing resumed after power
+  returned.
+- `crushing-wheel-blocked-output` held the guaranteed 64-sand output while a
+  Depot was occupied, then transferred it after the Depot was cleared without
+  losing or duplicating optional flint and clay-ball outputs.
+- `crushing-wheel-reopen` retained idle controller state and active input and
+  progress across reopen; active processing continued afterward.
+- `crushing-wheel-lan` had a host process 16 gravel while the guest observed the
+  active controller, then collected the host's 16-sand output from the shared
+  Depot.
+
+The repeatable command is listed in the [README's Crushing Wheels section](README.md#crushing-wheels-and-upward-chutes).
+This baseline does not establish exhaustive recipe, mob/entity crushing,
+particle/effect, pixel, Java reload, or packet-timing parity; Full 1:1 remains
+Open.
+
 The [Crushing Wheel lookup](tools/test-crushing-lookup.py) on
 `native-9f42064-90476b859cb6` used R and U and actual category-tab clicks in
 solo and LAN. It showed Cobblestone → Gravel in both Milling and Crushing,

@@ -723,7 +723,17 @@ from a Creative Crate onto the belt.
 
 ```sh
 python3 tools/test-stone-crushing.py /path/to/horizon-ctl /path/to/native/horizon-client /path/to/prepared/26.3
+python3 tools/test-crushing-wheel-placement.py /path/to/horizon-ctl /path/to/native/horizon-client /path/to/prepared/26.3
 python3 tools/test-funnel-placement.py /path/to/horizon-ctl /path/to/native/horizon-client /path/to/prepared/26.3
+```
+
+The [APP-1959 gameplay baseline](PARITY.md#app-1959-crushing-wheels-and-controller-gameplay-baseline)
+also checks equal/opposed/reversed wheel speeds, stopping and resuming loaded
+processing, full-Depot output retention and recovery, LAN guest collection, and
+idle/active save and reopen. Run the complete bounded set on one build with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 --check crushing-wheel-placement --check crushing-wheel-rotation --check crushing-wheel-blocked-output --check crushing-wheel-reopen --check crushing-wheel-lan --check stone-crushing --check mechanical-crafter
 ```
 
 ### Mechanical pump and open pipes
