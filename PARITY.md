@@ -3736,7 +3736,9 @@ payload save/reopen and host/guest riding checks are recorded above.
 The `crop-farming` replay matched all 72 Java samples from
 `fixtures/crop_farming-java.csv`. The trace checks the moving assembly, the
 field's wheat, carrot and potato states through harvesting and replanting, and
-the collected output item IDs. The `ploughing` replay matched all four original
+the collected output item IDs. Its additional moving-rig boundary check kept
+an age-0 carrot unchanged while a mature wheat crop was harvested and replanted
+to age 0. The `ploughing` replay matched all four original
 Java samples in `fixtures/ploughing-java.csv`, then passed full extension,
 sticky retraction and the added negative case where stone remains unchanged
 under the moving plough. The negative case follows the pinned
@@ -3752,8 +3754,8 @@ python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/
 ```
 
 This is a partial gameplay pass. The current references do not establish
-immature-crop rejection or exact item counts, and these runs do not cover guest
-collection or actor-specific idle and active save/reopen. Those consequential
+exact item counts, and these runs do not cover guest collection or actor-specific
+idle and active save/reopen. Those consequential
 multiplayer and persistence gates remain open for APP-2006; all-crop/loot and
 other tool interactions remain nonblocking broader follow-ups. Full 1:1 stays
 Open.
