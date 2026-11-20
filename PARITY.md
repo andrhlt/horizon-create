@@ -7814,13 +7814,13 @@ connection whose final shaft must break for equal and weaker opposing sources.
 It also checks a stronger opposing source, matching +16 sources merging to
 capacity 524288, same-direction slower-source transitions, separation after
 removal, and an active merged save/reopen. The headless regression passed on
-freshly built Horizon `native-9f42064-03cb1f8496d1`. The existing
+freshly built Horizon `native-9f42064-b2e225daec86` (focused source regression rerun after rebase). The existing
 small/large-waterwheel, loaded-stressometer, rotation-speed-controller-cascade,
 rotation-speed-controller-competing and rotation-speed-controller-LAN checks
 also passed on that exact build (6/6). Commands:
 
 ```sh
-python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-ctl .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-client .local/horizon-client/26.3 --jobs 1 --check kinetic-network-sources
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-ctl .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-client .local/horizon-client/26.3 --jobs 1 --check kinetic-network-sources
 python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-ctl .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-client .local/horizon-client/26.3 --jobs 1 --check small-waterwheel --check large-waterwheel --check loaded-stressometer --check rotation-speed-controller-cascade --check rotation-speed-controller-competing --check rotation-speed-controller-lan
 ```
 
@@ -7849,7 +7849,7 @@ stored theoretical ±8 RPM across the connected gear train and the effective
 speedometer response: it stays active below/at capacity, reads zero at 288 SU,
 and resumes after removing the load.
 
-On fresh build `native-9f42064-03cb1f8496d1`, the 105-tick existing Java trace
+On fresh build `native-9f42064-b2e225daec86`, the 105-tick existing Java trace
 and Goggles comparison passed, followed by the added boundary states:
 
 | Load | Java expected capacity/stress | Connected stored RPM | Effective speedometer | Result |
@@ -7865,7 +7865,7 @@ RPM, as in Java. The stressometer value was 0.875, 1.0 and 1.125 respectively,
 then returned to zero on recovery. Command:
 
 ```sh
-python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-ctl .local/patched-launcher/versions/native-9f42064-03cb1f8496d1/horizon-client .local/horizon-client/26.3 --jobs 1 --check loaded-stressometer
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-ctl .local/patched-launcher/versions/native-9f42064-b2e225daec86/horizon-client .local/horizon-client/26.3 --jobs 1 --check loaded-stressometer
 ```
 
 Branch layouts and direct LAN guest observation of this source merge remain
