@@ -1238,7 +1238,7 @@ boundaries remain open.
 On rebuilt `native-9f42064-370918737e07` (built with
 `sh tools/build-native.sh /Applications/Horizon.app/Contents/MacOS/horizon-launcher
 '/private/tmp/horizon-create-app1949-build'`), the sequenced-gearshift parity
-group passed all 10 checks using the `horizon-ctl` and `horizon-client` binaries
+group passed all 11 checks using the `horizon-ctl` and `horizon-client` binaries
 from that build: editor, render, LAN editing, comparator, stop, reload,
 gantry distance limit, orientation and Wrench. The reopened active sequencer
 matched Java's tick-6 state on its first resumed tick. On the same build, the sequenced pulley
@@ -1252,7 +1252,10 @@ the existing roller-filling fixture's live motor, gearbox, pinion and carriage.
 It verifies that a 1-block sequence at 128 RPM stops the downstream 32 RPM
 gantry at 0.25 blocks, following Java's relative distance context through the
 gearbox, then restores the carriage. This headless check passed on
-`native-9f42064-370918737e07`. Full 1:1 remains open.
+`native-9f42064-370918737e07`. The [sequenced piston replay](tools/test-sequenced-gearshift-piston.py)
+checks during-motion offset plus remaining distance, then verifies the piston
+settles at the 1-block endpoint after the sequence finishes. It also passed on
+that exact build. Full 1:1 remains open.
 
 When the original threshold-switch pulley finishes its rotation while the
 lever remains powered, the downstream pulley stops and the gearshift retains
