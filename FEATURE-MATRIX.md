@@ -189,7 +189,7 @@ the two measure different levels of evidence.
 
 | Feature | In game | Basic tested | Java comparison | Full 1:1 | Remaining work |
 | --- | --- | --- | --- | --- | --- |
-| Wrench | Yes | Pass | Tag, vanilla and Create controls, rotation, pickup and scoped sound checks | Open | Remaining targets and multiplayer interaction/visual cases |
+| Wrench | Yes | Pass | On `native-9f42064-558283db0c26` with pack SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`, the bounded pass reused 42 Java rotation/pickup actions and five tagged/rejected controls, added survival Wrench crafting, and passed 18 gearbox rotation/pickup cases plus 11 powered samples. Guest Wrench checks passed for gearbox rotation, shaft uncase and cogwheel output/uncase; save/reopen retained idle and active shaft configurations and operation | Open | Remaining target families, broad multiplayer interaction/visual cases and exact sound timing |
 | Engineer's Goggles | Yes | Pass | Craft, equip, and sampled speed, stress, analog and Frogport HUD output | Open | Remaining inspection targets, hover and appearance |
 | Clipboard | Yes | Pass | Held and placed editor, sharing, persistence and copy/paste for Redstone Links, Smart Chutes and Brass Funnels | Open | Remaining settings families and editing and presentation edges |
 | Cardboard, Pulp, Cardboard Block and Bound Cardboard | Yes | Pass | Production, placement, burning, menus and selected LAN cases | Open | Remaining sources, construction and persistence cases |
