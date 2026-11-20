@@ -311,6 +311,7 @@ CHECKS = (
     ("package-ejector-lan", "test-package-depot", "--ejector", "--lan"),
     ("package-belt", "test-package-belt"),
     ("package-belt-lan", "test-package-belt", "--lan"),
+    ("belt-connector-crafting", "test-survival-crafting", "--belt-connector"),
     ("package-funnel", "test-package-funnel"),
     ("package-funnel-lan", "test-package-funnel", "--lan"),
     ("package-stack", "test-package-stack"),
@@ -632,6 +633,9 @@ CHECKS = (
     ("casing-advancement-lan", "test-first-advancements", "--casing", "--multiplayer"),
     ("basin-compacting", "test-basin-compacting"),
     ("horizontal-belt", "test-horizontal-belt"),
+    ("belt-output-backpressure", "test-horizontal-belt", "--backpressure"),
+    ("horizontal-belt-lan-guest-placement", "test-horizontal-belt", "--lan"),
+    ("belt-reopen", "test-horizontal-belt", "--reopen"),
     ("andesite-tunnel", "test-andesite-tunnel"),
     *((f"brass-tunnel-{mode}", "test-brass-tunnel", "--mode", mode) for mode in (
         "filtering", "split", "round_robin", "prefer_nearest", "sync_input",
