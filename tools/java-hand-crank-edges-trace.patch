@@ -1,0 +1,319 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..ea2d4e4 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -2,8 +2,28 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ 
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
++import static com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock.AXIS_ALONG_FIRST_COORDINATE;
++import static com.simibubi.create.content.kinetics.simpleRelays.encased.EncasedCogwheelBlock.BOTTOM_SHAFT;
++import static com.simibubi.create.content.kinetics.simpleRelays.encased.EncasedCogwheelBlock.TOP_SHAFT;
++import static net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++import static net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++import static net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
++
++import java.util.List;
++
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.AllItems;
++import net.minecraft.core.Direction;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.entity.item.ItemEntity;
++import net.minecraft.world.item.context.BlockPlaceContext;
++import net.minecraft.world.level.GameType;
++import net.minecraft.world.phys.AABB;
++import net.minecraft.world.phys.BlockHitResult;
++
+ import com.simibubi.create.AllBlockEntityTypes;
+ import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.foundation.advancement.AllAdvancements;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+ import com.simibubi.create.content.schematics.SchematicItem;
+@@ -115,4 +135,285 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 32)
++	public static void handCrankEqualMotor(CreateGameTestHelper helper) {
++		handCrankMotorSpeed(helper, 32);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 32)
++	public static void handCrankSlowerMotor(CreateGameTestHelper helper) {
++		handCrankMotorSpeed(helper, 16);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixStopped(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "stopped", Direction.SOUTH, 0, -1, 0, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixBelow(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "below", Direction.SOUTH, 31, -1, 0, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixAbove(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "above", Direction.SOUTH, 33, -1, 0, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixOpposite(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "opposite", Direction.SOUTH, -32, -1, 0, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixChangeBefore(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "change_before", Direction.SOUTH, 16, 2, 64, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixSignBefore(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "sign_before", Direction.SOUTH, 16, 2, -16, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixWrench(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "wrench", Direction.SOUTH, 0, -1, 0, false, false, true);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixChangeDuring(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "change_during", Direction.SOUTH, 16, 7, 64, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixSignDuring(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "sign_during", Direction.SOUTH, 16, 7, -16, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixEast(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "east", Direction.EAST, 32, -1, 0, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixDown(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "down", Direction.DOWN, 32, -1, 0, true);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixEqual(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "equal", Direction.SOUTH, 32, -1, 0, false, true);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixFaster(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "faster", Direction.SOUTH, 64, -1, 0, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixNorth(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "north", Direction.NORTH, 32, -1, 0, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixWest(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "west", Direction.WEST, 32, -1, 0, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 34)
++	public static void handCrankMotorMatrixUp(CreateGameTestHelper helper) {
++		handCrankMotorMatrix(helper, "up", Direction.UP, 32, -1, 0, false);
++	}
++
++	private static void handCrankMotorMatrix(CreateGameTestHelper helper, String scenario,
++		Direction facing, int motorSpeed, int changeTick, int changedSpeed, boolean reverseFirst) {
++		handCrankMotorMatrix(helper, scenario, facing, motorSpeed, changeTick, changedSpeed,
++			reverseFirst, false);
++	}
++
++	private static void handCrankMotorMatrix(CreateGameTestHelper helper, String scenario,
++		Direction facing, int motorSpeed, int changeTick, int changedSpeed, boolean reverseFirst,
++		boolean repeatNormalAt9) {
++		handCrankMotorMatrix(helper, scenario, facing, motorSpeed, changeTick, changedSpeed,
++			reverseFirst, repeatNormalAt9, false);
++	}
++
++	private static void handCrankMotorMatrix(CreateGameTestHelper helper, String scenario,
++		Direction facing, int motorSpeed, int changeTick, int changedSpeed, boolean reverseFirst,
++		boolean repeatNormalAt9, boolean useWrench) {
++		var crank = new BlockPos(2, 2, 2);
++		var rear = crank.relative(facing.getOpposite());
++		var gaugePos = rear.relative(facing.getOpposite());
++		var motorPos = gaugePos.relative(facing.getOpposite());
++		var axis = facing.getAxis();
++		helper.setBlock(rear, AllBlocks.SHAFT.getDefaultState().setValue(AXIS, axis));
++		var gaugeFacing = axis == Direction.Axis.Y ? Direction.NORTH : Direction.UP;
++		boolean first = axis == Direction.Axis.X;
++		helper.setBlock(gaugePos, AllBlocks.STRESSOMETER.getDefaultState()
++			.setValue(FACING, gaugeFacing).setValue(AXIS_ALONG_FIRST_COORDINATE, first));
++		helper.setBlock(crank, AllBlocks.HAND_CRANK.getDefaultState().setValue(FACING, facing));
++		helper.setBlock(motorPos, AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(FACING, facing));
++		var motor = helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), motorPos);
++		motor.generatedSpeed.setValue(motorSpeed);
++		var player = helper.makeMockPlayer(GameType.SURVIVAL);
++		if (useWrench)
++			player.setItemInHand(InteractionHand.MAIN_HAND, AllItems.WRENCH.asStack());
++		var source = helper.getBlockEntity(AllBlockEntityTypes.HAND_CRANK.get(), crank);
++		var shaft = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), rear);
++		var gauge = helper.getBlockEntity(AllBlockEntityTypes.STRESSOMETER.get(), gaugePos);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			boolean mounted = AllBlocks.HAND_CRANK.has(helper.getBlockState(crank));
++			boolean motorMounted = AllBlocks.CREATIVE_MOTOR.has(helper.getBlockState(motorPos));
++			int drops = helper.getLevel().getEntitiesOfClass(ItemEntity.class,
++				new AABB(helper.absolutePos(crank)).inflate(2),
++				item -> item.getItem().is(AllBlocks.HAND_CRANK.asItem()))
++				.stream().mapToInt(item -> item.getItem().getCount()).sum();
++			int motorDrops = helper.getLevel().getEntitiesOfClass(ItemEntity.class,
++				new AABB(helper.absolutePos(motorPos)).inflate(2),
++				item -> item.getItem().is(AllBlocks.CREATIVE_MOTOR.asItem()))
++				.stream().mapToInt(item -> item.getItem().getCount()).sum();
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_HAND_CRANK_MATRIX %s,%d,%d,%.1f,%b,%d,%b,%.1f,%.1f,%.1f,%.1f,%.1f,%b,%d,%b,%d%n",
++				scenario, tick, motor.generatedSpeed.getValue(), motor.getGeneratedSpeed(), mounted,
++				mounted ? source.inUse : 0, mounted && source.backwards, mounted ? source.getSpeed() : 0,
++				shaft.getSpeed(), shaft.getTheoreticalSpeed(), gauge.getNetworkCapacity(),
++				gauge.getNetworkStress(), shaft.isOverStressed(), drops, motorMounted, motorDrops);
++			if (changeTick == tick)
++				motor.generatedSpeed.setValue(changedSpeed);
++			if (tick == 4 || tick == 9 || tick == 16) {
++				boolean backwards = tick == 4 ? reverseFirst
++					: tick == 9 ? !repeatNormalAt9 && !reverseFirst : true;
++				player.setShiftKeyDown(backwards);
++				helper.useBlock(crank, player);
++			}
++			if (tick < 28)
++				helper.fail("Waiting for the matrix crank to stop");
++		});
++	}
++
++	private static void handCrankMotorSpeed(CreateGameTestHelper helper, int motorSpeed) {
++		var crank = new BlockPos(2, 2, 2);
++		var rear = crank.north();
++		var motor = rear.north().north();
++		var gauge = rear.north();
++		helper.setBlock(rear, AllBlocks.SHAFT.getDefaultState().setValue(AXIS, Direction.Axis.Z));
++		helper.setBlock(gauge, AllBlocks.STRESSOMETER.getDefaultState()
++			.setValue(FACING, Direction.UP).setValue(AXIS_ALONG_FIRST_COORDINATE, false));
++		helper.setBlock(crank, AllBlocks.HAND_CRANK.getDefaultState().setValue(FACING, Direction.SOUTH));
++		helper.setBlock(motor, AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(FACING, Direction.SOUTH));
++		helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), motor).generatedSpeed.setValue(motorSpeed);
++		var player = helper.makeMockPlayer(GameType.SURVIVAL);
++		var source = helper.getBlockEntity(AllBlockEntityTypes.HAND_CRANK.get(), crank);
++		var shaft = helper.getBlockEntity(AllBlockEntityTypes.BRACKETED_KINETIC.get(), rear);
++		var stressometer = helper.getBlockEntity(AllBlockEntityTypes.STRESSOMETER.get(), gauge);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			boolean mounted = AllBlocks.HAND_CRANK.has(helper.getBlockState(crank));
++			int drops = helper.getLevel().getEntitiesOfClass(ItemEntity.class,
++				new AABB(helper.absolutePos(crank)).inflate(2),
++				item -> item.getItem().is(AllBlocks.HAND_CRANK.asItem())).size();
++			System.out.printf(java.util.Locale.ROOT,
++				"CREATE_HAND_CRANK_EDGE_MOTOR %d,%d,%b,%d,%.1f,%.1f,%.1f,%d%n",
++				motorSpeed, tick, mounted, mounted ? source.inUse : 0, mounted ? source.getSpeed() : 0,
++				shaft.getSpeed(), stressometer.getNetworkCapacity(), drops);
++			if (tick == 4 || tick == 9 || tick == 16) {
++				player.setShiftKeyDown(tick == 16);
++				helper.useBlock(crank, player);
++			}
++			if (tick < 28)
++				helper.fail("Waiting for the crank to stop");
++		});
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 46)
++	public static void handCrankGrip(CreateGameTestHelper helper) {
++		var crank = new BlockPos(2, 2, 2);
++		helper.setBlock(crank.north(), Blocks.STONE);
++		helper.setBlock(crank, AllBlocks.HAND_CRANK.getDefaultState().setValue(FACING, Direction.SOUTH));
++		var player = helper.makeMockPlayer(GameType.SURVIVAL);
++		var level = helper.getLevel();
++		var at = helper.absolutePos(crank);
++		var hit = new BlockHitResult(at.getCenter().relative(Direction.SOUTH, .5), Direction.SOUTH, at, false);
++		var source = helper.getBlockEntity(AllBlockEntityTypes.HAND_CRANK.get(), crank);
++		for (int index = 0; index < 3; index++) {
++			int sample = index;
++			int tick = 4 + 12 * index;
++			helper.runAtTickTime(tick, () -> {
++				var main = sample == 1 ? AllItems.EXTENDO_GRIP.asStack() : ItemStack.EMPTY;
++				var off = sample == 2 ? AllItems.EXTENDO_GRIP.asStack() : ItemStack.EMPTY;
++				player.setItemInHand(InteractionHand.MAIN_HAND, main);
++				player.setItemInHand(InteractionHand.OFF_HAND, off);
++				float before = player.getFoodData().getExhaustionLevel();
++				var result = level.getBlockState(at).useItemOn(main, level, player, InteractionHand.MAIN_HAND, hit);
++				helper.assertTrue(result.consumesAction(), "Crank did not consume the main-hand click");
++				System.out.printf(java.util.Locale.ROOT, "CREATE_HAND_CRANK_EDGE_GRIP %s,%d,%.1f,%.9f,%d,%d%n",
++					switch (sample) { case 1 -> "main"; case 2 -> "off"; default -> "empty"; },
++					source.inUse, source.getSpeed(), player.getFoodData().getExhaustionLevel() - before,
++					main.getDamageValue(), off.getDamageValue());
++				if (sample == 2)
++					helper.succeed();
++			});
++		}
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 12)
++	public static void handCrankShaftFaces(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var player = helper.makeMockPlayer(GameType.SURVIVAL);
++		var target = helper.absolutePos(new BlockPos(2, 4, 2));
++		var support = target.below();
++		level.setBlockAndUpdate(support, Blocks.STONE.defaultBlockState());
++		var hit = new BlockHitResult(support.getCenter().relative(Direction.UP, .5), Direction.UP, support, false);
++		var cased = AllBlocks.BRASS_ENCASED_COGWHEEL.getDefaultState().setValue(AXIS, Direction.Axis.X);
++		var gauge = AllBlocks.STRESSOMETER.getDefaultState().setValue(FACING, Direction.UP);
++		var names = List.of("encased_east_open", "encased_east_closed", "encased_west_open",
++			"encased_west_closed", "gauge_x", "gauge_z", "gauge_sneak", "axes_conflict");
++		var states = List.of(cased.setValue(BOTTOM_SHAFT, true), cased.setValue(TOP_SHAFT, true),
++			cased.setValue(TOP_SHAFT, true), cased.setValue(BOTTOM_SHAFT, true),
++			gauge.setValue(AXIS_ALONG_FIRST_COORDINATE, true), gauge.setValue(AXIS_ALONG_FIRST_COORDINATE, false),
++			gauge.setValue(AXIS_ALONG_FIRST_COORDINATE, true), cased.setValue(BOTTOM_SHAFT, true));
++		for (int i = 0; i < names.size(); i++) {
++			boolean west = i == 2 || i == 3;
++			level.setBlockAndUpdate(target, Blocks.AIR.defaultBlockState());
++			level.setBlockAndUpdate(target.relative(west ? Direction.EAST : Direction.WEST), Blocks.AIR.defaultBlockState());
++			level.setBlockAndUpdate(target.relative(west ? Direction.WEST : Direction.EAST), states.get(i));
++			level.setBlockAndUpdate(target.north(), i == 7
++				? AllBlocks.SHAFT.getDefaultState().setValue(AXIS, Direction.Axis.Z) : Blocks.AIR.defaultBlockState());
++			player.setShiftKeyDown(i == 6);
++			var stack = AllBlocks.HAND_CRANK.asStack();
++			player.setItemInHand(InteractionHand.MAIN_HAND, stack);
++			var context = new BlockPlaceContext(player, InteractionHand.MAIN_HAND, stack, hit);
++			var result = stack.useOn(context);
++			helper.assertTrue(result.consumesAction(), "Crank did not place in " + names.get(i));
++			var placed = level.getBlockState(target);
++			helper.assertTrue(AllBlocks.HAND_CRANK.has(placed), "Missing crank in " + names.get(i));
++			System.out.printf("CREATE_HAND_CRANK_EDGE_PLACEMENT %s,%s,%b%n",
++				names.get(i), placed.getValue(FACING), placed.getValue(WATERLOGGED));
++		}
++		helper.succeed();
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 8)
++	public static void handCrankAdvancement(CreateGameTestHelper helper) {
++		var crank = new BlockPos(2, 2, 2);
++		helper.setBlock(crank.north(), Blocks.STONE);
++		helper.setBlock(crank, AllBlocks.HAND_CRANK.getDefaultState().setValue(FACING, Direction.SOUTH));
++		var player = helper.makeMockPlayer(GameType.SURVIVAL);
++		player.getFoodData().setFoodLevel(0);
++		var level = helper.getLevel();
++		var at = helper.absolutePos(crank);
++		var hit = new BlockHitResult(at.getCenter().relative(Direction.SOUTH, .5), Direction.SOUTH, at, false);
++		boolean before = AllAdvancements.HAND_CRANK.isAlreadyAwardedTo(player);
++		var result = level.getBlockState(at).useItemOn(ItemStack.EMPTY, level, player,
++			InteractionHand.MAIN_HAND, hit);
++		boolean after = AllAdvancements.HAND_CRANK.isAlreadyAwardedTo(player);
++		System.out.printf("CREATE_HAND_CRANK_EDGE_ADVANCEMENT %d,%b,%b%n",
++			player.getFoodData().getFoodLevel(), before, after);
++		helper.assertTrue(player.getFoodData().getFoodLevel() == 0,
++			"Crank click did not start with an empty food bar");
++		helper.assertTrue(result.consumesAction(), "Crank did not consume the advancement click");
++		helper.succeed();
++	}
+ }

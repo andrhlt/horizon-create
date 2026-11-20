@@ -1,0 +1,14 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_test": "TestMisc.mixedTransmissionCallbacks",
+  "patch_sha256": "cdca06f0927bee11d6f8429eda05574796d7a5d0fb9f718fb13a40e3be416a46",
+  "trace_sha256": "c93839df2c06c8a542473373190d659f1df4785fcf44828457f00e9a0b231c3e",
+  "records": 60,
+  "gradle_elapsed_seconds": 43,
+  "tick_origin": "Java GameTest tick zero after setting the initial motor RPM.",
+  "layout": "An X-axis motor drives a Clutch and Gearshift in series with a shaft between and a shaft at the output. Rigs 0 and 1 have the Clutch upstream. Rigs 2 and 3 have the Gearshift upstream.",
+  "actions": "Two direct redstone placements on tick 3 and two removals on tick 6. Even rigs get the upstream action first. Phase 0 precedes the actions; phases 1 and 2 immediately follow each action on the same tick."
+}

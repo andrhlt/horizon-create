@@ -1,0 +1,177 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..218ffcf 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..4346be5 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,9 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.transmissionConsecutivePower")
++				|| test.testName().equals("TestMisc.gearshiftReverseTwoSources"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..0abb4d7 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -3,6 +3,7 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
+ import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllDataComponents;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+@@ -115,4 +116,136 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", batch = "consecutive_transmission", timeoutTicks = 18)
++	public static void transmissionConsecutivePower(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var powered = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++		var directions = new net.minecraft.core.Direction[] {
++			net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP, net.minecraft.core.Direction.SOUTH
++		};
++		var blocks = java.util.List.of(AllBlocks.CLUTCH.getDefaultState(), AllBlocks.GEARSHIFT.getDefaultState());
++		var rigs = new java.util.ArrayList<BlockPos>();
++		for (int kind = 0; kind < blocks.size(); kind++) {
++			for (int axisIndex = 0; axisIndex < directions.length; axisIndex++) {
++				var direction = directions[axisIndex];
++				var pos = new BlockPos(8 + axisIndex * 5, 5, 8 + kind * 5);
++				rigs.add(pos);
++				helper.setBlock(pos.relative(direction.getOpposite()), AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(facing, direction));
++				helper.setBlock(pos, blocks.get(kind).setValue(axis, direction.getAxis()));
++				helper.setBlock(pos.relative(direction), AllBlocks.SHAFT.getDefaultState().setValue(axis, direction.getAxis()));
++			}
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int rig = 0; rig < rigs.size(); rig++) {
++				var pos = rigs.get(rig);
++				var direction = directions[rig % directions.length];
++				var input = pos.relative(direction.getOpposite());
++				var output = pos.relative(direction);
++				var signal = pos.relative(direction.getAxis() == net.minecraft.core.Direction.Axis.X
++					? net.minecraft.core.Direction.NORTH : net.minecraft.core.Direction.EAST);
++				if (tick == 0)
++					helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), input).generatedSpeed.setValue(32);
++				for (int phase = 0; phase < 2; phase++) {
++					if (phase == 1) {
++						if (tick < 3 || tick > 6) continue;
++						helper.setBlock(signal, tick % 2 == 1 ? Blocks.REDSTONE_BLOCK.defaultBlockState() : Blocks.AIR.defaultBlockState());
++					}
++					var state = helper.getBlockState(pos);
++					System.out.printf(java.util.Locale.ROOT, "CREATE_TRANSMISSION_PULSE,%d,%s,%d,%d,%s,%.0f,%.0f%n",
++						rig / directions.length, direction.getAxis(), tick, phase, state.getValue(powered),
++						transitionSpeed(helper, pos), transitionSpeed(helper, output));
++				}
++			}
++			if (tick < 9) helper.fail("Waiting for six transmission pulse rigs");
++		});
++	}
++
++	@GameTest(template = "shearing", batch = "competing_gearshifts", timeoutTicks = 20)
++	public static void gearshiftReverseTwoSources(CreateGameTestHelper helper) {
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var powered = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++		var directions = new net.minecraft.core.Direction[] {
++			net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP, net.minecraft.core.Direction.SOUTH
++		};
++		var motor = AllBlocks.CREATIVE_MOTOR.getDefaultState();
++		var gearshift = AllBlocks.GEARSHIFT.getDefaultState();
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(helper.getLevel());
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		var level = helper.getLevel();
++		var rigs = new java.util.ArrayList<BlockPos>();
++		for (int lane = 0; lane < 4; lane++) {
++			for (int index = 0; index < directions.length; index++) {
++				var direction = directions[index];
++				var pos = new BlockPos(8 + index * 5, lane < 2 ? 5 : 9, 8 + lane % 2 * 5);
++				rigs.add(pos);
++				helper.setBlock(pos, Blocks.AIR.defaultBlockState());
++				var signal = pos.relative(direction.getAxis() == net.minecraft.core.Direction.Axis.X
++					? net.minecraft.core.Direction.NORTH : net.minecraft.core.Direction.EAST);
++				helper.setBlock(signal, lane < 2 ? Blocks.AIR.defaultBlockState() : Blocks.REDSTONE_BLOCK.defaultBlockState());
++				helper.setBlock(pos.relative(direction.getOpposite()), motor.setValue(facing, direction));
++				helper.setBlock(pos.relative(direction), motor.setValue(facing, direction.getOpposite()));
++			}
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int rig = 0; rig < rigs.size(); rig++) {
++				int lane = rig / directions.length;
++				var direction = directions[rig % directions.length];
++				var pos = rigs.get(rig);
++				var input = pos.relative(direction.getOpposite());
++				var output = pos.relative(direction);
++				var signal = pos.relative(direction.getAxis() == net.minecraft.core.Direction.Axis.X
++					? net.minecraft.core.Direction.NORTH : net.minecraft.core.Direction.EAST);
++				if (tick == 0) {
++					helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), input).generatedSpeed.setValue(32);
++					helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), output).generatedSpeed.setValue(lane % 2 == 0 ? -64 : 64);
++				}
++				if (tick == 4) {
++					if (lane < 2) {
++						helper.setBlock(pos, gearshift.setValue(axis, direction.getAxis()));
++						helper.setBlock(signal, Blocks.REDSTONE_BLOCK.defaultBlockState());
++					} else {
++						var support = helper.absolutePos(signal);
++						var face = direction.getAxis() == net.minecraft.core.Direction.Axis.X
++							? net.minecraft.core.Direction.SOUTH : net.minecraft.core.Direction.WEST;
++						var hit = new net.minecraft.world.phys.BlockHitResult(support.getCenter().relative(face, .5), face, support, false);
++						player.setItemInHand(hand, new ItemStack(gearshift.getBlock().asItem()));
++						var use = player.getItemInHand(hand).useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++						if (!use.consumesAction()
++							|| !helper.getBlockState(pos).equals(gearshift.setValue(axis, direction.getAxis()).setValue(powered, true)))
++							helper.fail("Powered hand placement failed on axis " + direction.getAxis());
++					}
++				}
++				var state = helper.getBlockState(pos);
++				var center = helper.absolutePos(pos);
++				if (lane >= 2) {
++					var kinetic = level.getBlockEntity(center);
++					if (kinetic instanceof com.simibubi.create.content.kinetics.base.DirectionalShaftHalvesBlockEntity drive) {
++						String sourceDirection = drive.hasSource() ? drive.getSourceFacing().getSerializedName() : "-";
++						System.out.printf(java.util.Locale.ROOT, "CREATE_GEARSHIFT_PLACEMENT_ENTITY,%d,%s,%d,true,%s,%s,%s,%s,%.0f,%.0f%n",
++							lane - 2, direction.getAxis(), tick, state.getValue(axis), sourceDirection, drive.hasNetwork(),
++							drive.needsSpeedUpdate(), drive.getTheoreticalSpeed(), drive.getSpeed());
++					} else {
++						System.out.printf("CREATE_GEARSHIFT_PLACEMENT_ENTITY,%d,%s,%d,false,-,-,false,false,0,0%n", lane - 2, direction.getAxis(), tick);
++					}
++				}
++				int drops = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
++					new net.minecraft.world.phys.AABB(center).inflate(1.0), item -> item.getItem().is(gearshift.getBlock().asItem())).size();
++				System.out.printf(java.util.Locale.ROOT, "CREATE_GEARSHIFT_TWO_SOURCES,%d,%s,%d,%s,%.0f,%.0f,%.0f,%d%n",
++					lane, direction.getAxis(), tick, state.isAir() ? "missing" : state.getValue(powered).toString(),
++					transitionSpeed(helper, input), transitionSpeed(helper, pos), transitionSpeed(helper, output), drops);
++			}
++			if (tick < 8) helper.fail("Waiting for all Gearshift reversals");
++		});
++	}
++
++	private static float transitionSpeed(CreateGameTestHelper helper, BlockPos pos) {
++		var entity = helper.getLevel().getBlockEntity(helper.absolutePos(pos));
++		return entity instanceof com.simibubi.create.content.kinetics.base.KineticBlockEntity kinetic
++			? kinetic.getTheoreticalSpeed() : 0;
++	}
+ }

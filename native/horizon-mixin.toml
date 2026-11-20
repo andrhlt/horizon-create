@@ -754,6 +754,15 @@ bindings = [
 ]
 
 [[injection]]
+id = "check_transmission_reconnections"
+target = "horizon_client::game::block_ticks::Game<'_>::tick_scheduled"
+kind = "HEAD"
+helper = "check_transmission_reconnections.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[injection]]
 id = "flush_clutch_signals"
 target = "horizon_client::game::Game<'_>::process_level_events"
 kind = "HEAD"

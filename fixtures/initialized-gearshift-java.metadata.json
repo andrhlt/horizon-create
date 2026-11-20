@@ -1,0 +1,13 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_test": "TestMisc.initializedGearshiftReversal",
+  "patch_sha256": "04ef936e9a0092c4e45283a9b83e38169dee93721b27a04b14db5d7c53cc3a8c",
+  "trace_sha256": "47ba365fd9d79dfb73349df638962e38596bc03f4559841f7b45aa2ffe6a7121",
+  "records": 90,
+  "gradle_elapsed_seconds": 17,
+  "layout": "Each X, Y and Z rig starts with a Gearshift powered or unpowered and a +32 RPM Creative Motor on the negative face. A compatible 64 RPM Creative Motor takes over from the positive face on tick 3.",
+  "actions": "Reverse the Gearshift on ticks 7 and 10. Phase 0 samples after the motor insertion and before the redstone change. Phase 1 samples immediately after the redstone change. Record Gearshift power, source facing, motor presence and theoretical RPM."
+}

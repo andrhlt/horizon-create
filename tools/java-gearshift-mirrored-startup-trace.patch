@@ -1,0 +1,121 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..05383cc 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -91,6 +91,7 @@ neoForge {
+ 
+         gameTestServer {
+             type = "gameTestServer"
++            gameDirectory = project.file("run/mirrored-pending-gearshift-final-" + System.getenv("CREATE_PENDING_GEARSHIFT_DROPS"))
+         }
+     }
+ }
+@@ -165,7 +166,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..c8e2901 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.pendingGearshiftReopen"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..f5034da 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -3,6 +3,7 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
+ import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllDataComponents;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+@@ -115,4 +116,73 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 72)
++	public static void pendingGearshiftReopen(CreateGameTestHelper helper) {
++		var mode = System.getenv("CREATE_PENDING_GEARSHIFT");
++		var level = helper.getLevel();
++		if ("off".equals(System.getenv("CREATE_PENDING_GEARSHIFT_DROPS"))) {
++			level.getGameRules().getRule(net.minecraft.world.level.GameRules.RULE_DOBLOCKDROPS)
++				.set(false, level.getServer());
++		}
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var powered = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++		var east = net.minecraft.core.Direction.WEST;
++		var motor = AllBlocks.CREATIVE_MOTOR.getDefaultState();
++		var clutch = AllBlocks.GEARSHIFT.getDefaultState().setValue(axis, east.getAxis());
++		var rigs = java.util.List.of(new BlockPos(-38, 101, -46), new BlockPos(-38, 101, -38));
++		level.setChunkForced(-3, -3, true);
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int lane = 0; lane < rigs.size(); lane++) {
++				var center = rigs.get(lane);
++				if (mode.equals("write")) {
++					if (tick == 0) {
++						for (int x = -2; x <= 3; x++)
++							for (int z = -1; z <= 1; z++)
++								level.setBlockAndUpdate(center.offset(x, -1, z), Blocks.STONE.defaultBlockState());
++						level.setBlockAndUpdate(center.above(), Blocks.AIR.defaultBlockState());
++						level.setBlockAndUpdate(center.west().above(), Blocks.AIR.defaultBlockState());
++						level.setBlockAndUpdate(center.west(), Blocks.AIR.defaultBlockState());
++						level.setBlockAndUpdate(center.west(2), Blocks.AIR.defaultBlockState());
++						if (lane == 1)
++							level.setBlockAndUpdate(center.above(), Blocks.REDSTONE_BLOCK.defaultBlockState());
++						level.setBlockAndUpdate(center, clutch.setValue(powered, lane == 1));
++						level.setBlockAndUpdate(center.east(), motor.setValue(facing, east));
++						var left = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(center.east());
++						left.generatedSpeed.setValue(32);
++					}
++					if (tick == 5) {
++						level.setBlockAndUpdate(center.west(), motor.setValue(facing, east.getOpposite()));
++						var right = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity) level.getBlockEntity(center.west());
++						right.generatedSpeed.setValue(lane == 0 ? -64 : 64);
++					}
++					if (tick == 8)
++						level.setBlockAndUpdate(center.above(), lane == 0 ? Blocks.REDSTONE_BLOCK.defaultBlockState() : Blocks.AIR.defaultBlockState());
++				}
++				var state = level.getBlockState(center);
++				String power = state.hasProperty(powered) ? state.getValue(powered).toString() : "missing";
++				int items = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
++					new net.minecraft.world.phys.AABB(center).inflate(2.0), item -> item.getItem().is(clutch.getBlock().asItem()))
++					.stream().mapToInt(item -> item.getItem().getCount()).sum();
++				boolean scheduled = level.getBlockTicks().hasScheduledTick(center, clutch.getBlock());
++				boolean leftPresent = level.getBlockState(center.east()).is(motor.getBlock());
++				boolean rightPresent = level.getBlockState(center.west()).is(motor.getBlock());
++				int motorDrops = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
++					new net.minecraft.world.phys.AABB(center).inflate(3.0), item -> item.getItem().is(motor.getBlock().asItem()))
++					.stream().mapToInt(item -> item.getItem().getCount()).sum();
++				System.out.printf(java.util.Locale.ROOT, "CREATE_PENDING_GEARSHIFT,%s,%d,%d,%d,%s,%.0f,%.0f,%.0f,%d,%s,%s,%s,%d%n",
++					mode, lane, tick, level.getGameTime(), power, pendingSpeed(level, center.east()), pendingSpeed(level, center),
++					pendingSpeed(level, center.west()), items, scheduled, leftPresent, rightPresent, motorDrops);
++			}
++			if (tick < (mode.equals("write") ? 8 : 48)) helper.fail("Waiting for pending Clutch schedules");
++		});
++	}
++
++	private static float pendingSpeed(ServerLevel level, BlockPos pos) {
++		var entity = level.getBlockEntity(pos);
++		return entity instanceof com.simibubi.create.content.kinetics.base.KineticBlockEntity kinetic
++			? kinetic.getTheoreticalSpeed() : 0;
++	}
+ }

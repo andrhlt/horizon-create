@@ -1,0 +1,13 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_test": "TestMisc.ordinaryTransmission",
+  "base_patch_sha256": "2d7ea7c8c9f5b57077c637a83a6e5e5f7883320f8d5f8e98e1eb379e670695fb",
+  "audio_patch_sha256": "73d9d79b0682d90b549888626707f2ae1c80570d32d7c6363edfc2310f29ae22",
+  "trace_sha256": "96f0c7b2752a166188a44fb1203c3dc01f0eee07e712b932fbe177c807cf4b81",
+  "records": 38,
+  "gradle_elapsed_seconds": 14,
+  "capture": "Apply tools/java-clutch-gearshift-trace.patch, then tools/java-transmission-wrench-audio-trace.patch. Observe the synchronous NeoForge sound events in all three axes and six faces and during both survival Wrench pickups. Empty sounds indicate a silent action. Each cue contains the ID, category, gain and randomly chosen pitch."
+}

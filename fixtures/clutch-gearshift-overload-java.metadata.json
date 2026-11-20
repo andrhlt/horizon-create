@@ -1,0 +1,13 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_test": "TestMisc.transmissionOverload",
+  "patch_sha256": "64395651bc4aef7ebb966a5e44b4e97d0803ad394d3dbd4ec5e17ccdc1be8a45",
+  "trace_sha256": "d8d7bff14f4e55424d6b28bd793cf7863c1f5f77b232937c96a6ea5dadfc5ebd",
+  "records": 34,
+  "gradle_elapsed_seconds": 18,
+  "layout": "Each X-axis transmission separates a Hand Crank from two Mechanical Presses. The crank can drive one press, while the load of two overloads it.",
+  "actions": "Start the crank on GameTest tick 2. Change redstone on ticks 4 and 7. Phase 0 samples before actions and phase 1 immediately after the relevant action. Java records theoretical RPM and effective RPM through the gate and first press."
+}

@@ -1,0 +1,37 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "patch_sha256": "606fd343952cc273e69fba1a20a2df0cfadf856458e7c09fce0c9a70cc0cd67a",
+  "gradle_elapsed_seconds": 75,
+  "capture_tick_origin": "GameTest tick zero after setting the initial Creative Motor speeds in each rig. The GameTests run in separate batches so the rigs cannot overlap.",
+  "consecutive_power": {
+    "fixture": "clutch-gearshift-consecutive-java.csv",
+    "records": 84,
+    "trace_sha256": "a06bc91c6269e86a5822fc8bf9c6e3f0cd95202ae04bfb1c6912f494b050f7fa",
+    "game_test": "TestMisc.transmissionConsecutivePower",
+    "phases": "Phase 0 samples before each power action. Phase 1 follows each adjacent redstone block placement or removal on ticks 3 through 6."
+  },
+  "gearshift_two_sources": {
+    "fixture": "gearshift-two-sources-java.csv",
+    "records": 54,
+    "trace_sha256": "34f8ab9a105c4efd7971af6c422f766cb9d38229af0a2013bc89099c538f1a28",
+    "game_test": "TestMisc.gearshiftReverseTwoSources",
+    "action": "On tick 4 place a Gearshift in an empty gap between the two independently running motors and immediately power it. Record the signed theoretical RPM and dropped Gearshift item count. Lane 0 motors rotate with the same sign before reversal and conflict at reconnection. Lane 1 motors counterrotate and join without breaking the Gearshift."
+  },
+  "gearshift_powered_placement": {
+    "fixture": "gearshift-powered-placement-java.csv",
+    "records": 54,
+    "trace_sha256": "34f8ab9a105c4efd7971af6c422f766cb9d38229af0a2013bc89099c538f1a28",
+    "game_test": "TestMisc.gearshiftReverseTwoSources",
+    "action": "Put the neighboring redstone block in place during setup. On tick 4 use a Gearshift item against that support while both drives are independent. The GameTest uses a NeoForge FakePlayer and the normal item use-on-block path.",
+    "block_entities": {
+      "fixture": "gearshift-powered-placement-entities-java.csv",
+      "records": 54,
+      "trace_sha256": "d1dd41b5bac7d92af994b2e98acf5eb00a8845d17cefce092e4d86db11e5031b"
+    }
+  },
+  "world": "Fresh disposable GameTest world followed by a second run reopening that same world. All 246 captured rows matched.",
+  "repeated_capture_elapsed_seconds": 53
+}
