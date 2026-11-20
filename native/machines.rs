@@ -68,6 +68,7 @@ use super::create_train_signal::{self, SIGNAL};
 use super::create_valve::{self, HANDLE_ENTITY, VALVE};
 
 const DEPLOYER: &str = "create:deployer";
+const SCHEMATIC_TABLE: &str = "create:schematic_table";
 
 pub(super) const DIRECTIONS: [[i32; 3]; 6] = [
     [1, 0, 0],
@@ -165,6 +166,7 @@ fn entity_id(block: &str) -> Option<&'static str> {
         GEARBOX => Some(GEARBOX),
         DEPLOYER => Some(DEPLOYER),
         CANNON => Some(CANNON),
+        SCHEMATIC_TABLE => Some(SCHEMATIC_TABLE),
         VALVE => Some(VALVE),
         CASED_COG | CASED_ANDESITE_COG => Some(CASED_COG_ENTITY),
         CASED_LARGE_COG | CASED_ANDESITE_LARGE_COG => Some(CASED_LARGE_COG_ENTITY),
@@ -279,6 +281,7 @@ pub(super) fn block_entity_ticks(block: &str, ticks: &mut bool) {
             super::create_chassis_range::ENTITY
                 | super::create_copycat::ENTITY
                 | super::create_item_hatch::HATCH
+                | SCHEMATIC_TABLE
         )
     }) || block == super::create_track::TRACK;
 }
@@ -298,6 +301,7 @@ pub(super) fn block_entity_container(block: &str, container: &mut Option<ModCont
         MILL => (10, (1..10).collect()),
         super::create_saw::SAW => (super::create_saw::SLOTS, Vec::new()),
         CANNON => (5, vec![1, 3]),
+        SCHEMATIC_TABLE => (2, vec![1]),
         CHUTE | PLAIN_CHUTE | DEPLOYER => (1, vec![0]),
         DEPOT | EJECTOR => (9, (0..9).collect()),
         name if name == FROGPORT || super::create_postbox::block(name) => {
@@ -318,7 +322,8 @@ pub(super) fn block_entity_container(block: &str, container: &mut Option<ModCont
     *container = Some(ModContainer {
         slots,
         faces: std::array::from_fn(|face| {
-            if block == super::create_item_drain::DRAIN && face < 2
+            if block == SCHEMATIC_TABLE
+                || block == super::create_item_drain::DRAIN && face < 2
                 || block == super::create_saw::SAW && face == Direction::Down as usize
             {
                 Vec::new()
@@ -328,6 +333,8 @@ pub(super) fn block_entity_container(block: &str, container: &mut Option<ModCont
         }),
         inputs: if block == FROGPORT || super::create_postbox::block(block) {
             (0..slots).collect()
+        } else if block == SCHEMATIC_TABLE {
+            vec![0]
         } else if block == BASIN {
             (0..9).collect()
         } else if block == CANNON {
@@ -338,6 +345,8 @@ pub(super) fn block_entity_container(block: &str, container: &mut Option<ModCont
         outputs,
         menu: if super::create_postbox::block(block) {
             Some(FROGPORT.to_owned())
+        } else if block == SCHEMATIC_TABLE {
+            Some(SCHEMATIC_TABLE.to_owned())
         } else {
             matches!(
                 block,
@@ -368,6 +377,9 @@ pub(super) fn container_accepts(
                 (slot, stack.item.as_ref()),
                 (0, create_schematicannon::SCHEMATIC) | (4, create_schematicannon::GUNPOWDER)
             );
+        }
+        SCHEMATIC_TABLE => {
+            *cancel |= !super::create_schematic_table::accepts(entity, slot, stack);
         }
         DEPOT | CONTROLLER | super::create_item_drain::DRAIN => {
             *cancel |= entity.items.iter().any(Option::is_some);

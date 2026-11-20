@@ -14,9 +14,18 @@ fn depot_click(
         *canceled = true;
         return;
     }
-    if !*canceled && crate::game::create_table_cloth::click(game, pos, face) { *canceled = true; return; }
-    if !*canceled && crate::game::create_placard::click(game, pos) { *canceled = true; return; }
-    if !*canceled && crate::game::create_steam_whistle::grow(game, pos) { *canceled = true; return; }
+    if !*canceled && crate::game::create_table_cloth::click(game, pos, face) {
+        *canceled = true;
+        return;
+    }
+    if !*canceled && crate::game::create_placard::click(game, pos) {
+        *canceled = true;
+        return;
+    }
+    if !*canceled && crate::game::create_steam_whistle::grow(game, pos) {
+        *canceled = true;
+        return;
+    }
     if !*canceled && crate::game::create_crafter::click_cover(game, pos, face) {
         *canceled = true;
         return;
@@ -73,6 +82,7 @@ fn depot_click(
         && (crate::game::create_station::open(game, pos)
             || crate::game::create_display_link::open(game, pos)
             || crate::game::create_chain_conveyor_packages::open_port(game, pos)
+            || crate::game::create_schematic_table::open(game, pos)
             || crate::game::create_brass_tunnel::click(game, pos, face))
     {
         *canceled = true;
