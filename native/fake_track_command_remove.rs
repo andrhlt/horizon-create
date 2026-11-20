@@ -14,7 +14,7 @@ fn fake_track_command_remove(
         return;
     }
     game.with_level(|_, level, ticks| {
-        crate::game::create_fake_track::remove_owner(
+        crate::game::create_track::remove_endpoint(
             level,
             ticks,
             horizon_core::position::BlockPos::new(pos[0], pos[1], pos[2]),

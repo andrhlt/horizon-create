@@ -5973,6 +5973,91 @@ Barrel. The Wand of Symmetry was present by tick 55 and the Potato
 Cannon by tick 65 in their respective Horizon setups. These are
 Horizon outcome checks. Item use and Java timing remain open.
 
+## Train Track and Railway Casing (APP-2045)
+
+The [Java removal trace](fixtures/track_removal-java.csv) exercises three
+curves from the [placement trace](fixtures/track_curve-java.csv). The
+pinned Create build at `ac0c444d9828da3453ae8cc65338e8de063286fb`
+ran one headless GameTest on Minecraft 1.21.1, NeoForge 21.1.219, and
+JDK 21. Each row samples the opposite endpoint and newly dropped tracks
+immediately after removal. The 23-segment survival curve returned
+12 curve tracks and one endpoint. Mining the secondary endpoint with
+block drops disabled and removing a 13-segment curve in creative mode
+both returned zero tracks. All three removed the reciprocal connection.
+The creative probe invokes Java's `playerWillDestroy` before removing
+the block. The run took 4m 15s including initial offline setup.
+
+Apply [the curve capture patch](tools/java-track-curve-trace.patch),
+then [the supplemental removal patch](tools/java-track-removal-trace.patch)
+in a disposable checkout of the pinned Java source and run
+`./gradlew --offline --no-daemon runGameTestServer`. The patch SHA-256s
+in application order are
+`93f00b668bc1fe82c0f0987a01db5b623d36d7a6ba6ade7238130fc77b2a0b86`
+and
+`e2234ef339a669804069b9ad705b3d2f790a209faad5575f0995cf616e47e16e`.
+
+The exact Horizon baseline at `e83bffc743a48041961aacc57de88281fa901217`
+built as `native-9f42064-8cc365d013ad` in 17m 6s with compatible
+launcher 0.2.67. With the updated content pack it still paid for the
+23-segment curve (32 tracks in inventory before placement and 15 after),
+then left the reciprocal endpoint active after survival mining and
+returned only one track. The same baseline with that pack applied one
+Sturdy Sheet to Brass Casing and recovered one Railway Casing with a
+pickaxe.
+
+On fixed build `native-9f42064-d0cdcece38f9` and a pack prepared from
+the same Java checkout with `python3 tools/prepare.py <java-checkout>`,
+the [offscreen lifecycle replay](tools/test-track-lifecycle.py) matched
+all three drop counts and immediate reciprocal cleanup. Replacing a
+curve endpoint with air by command returned the 12 curve tracks once.
+In the same run a survival player obtained and mined Railway Casing,
+then placed and recovered one straight track and one east-ascending
+track. After 24 ticks of player gravity the flat piece supported the
+player at 2/16 above the block base. The ascending piece had no player
+collision and the player landed on the supporting floor.
+
+The replay saved and reopened before and after the first curve removal.
+Both endpoints retained their original reciprocal offsets on the first
+reopen. The surviving endpoint remained flat with an empty connection
+list on the second reopen. Horizon retains the empty block entity to
+send a clearing update to clients. The render and path readers enumerate
+the connections, so the empty entity contributes no curve. The Java
+capture covered removal without a Java world reopen.
+
+The fixed Horizon build used engine revision
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` and mixins
+`5a64af938ec86b00d53d16a408aabc0038fb3e57` with native Create bundle
+`a7b5879abb38119f`. Build using `sh tools/build-native.sh <launcher> <launcher-data>`
+with the compatible 0.2.67 launcher and a private writable cache. The
+fixed rebuild took 4m 12s. The prepared `create.hmod` SHA-256 was
+`1d6c3b38fedbf8f4d0d69499e10a278093d756cf79a35ff44e180fd484b4b590`.
+
+An independent offscreen LAN guest placed one straight piece and the
+23-segment quarter-turn in survival. The host read reciprocal endpoint
+data, and the guest saw both endpoints and the 32-to-15 track cost.
+The fixture moved the host away from the guest's interaction position
+to keep players from intercepting the click. The run checks guest
+convergence.
+
+Final-build regressions matched 15 single placements, all seven line
+cases including the orthogonal crossing, all ten curve-placement cases
+including refusals, all 190 sequenced-crafting ticks, and 160 curved-train
+ticks with speed and four three-dimensional wheel positions. The
+Fake Track marker replay also passed. The offscreen curve capture
+showed both rails and the ties along the tested turn. An initial line
+test missed the span's first click. After the fixture waited for the
+server's selection before moving the player to the target, all seven
+line cases passed.
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --check 'track-lifecycle*'
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --check track-crafting --check track-placement --check track-line --check fake-track --check curved-train
+python3 tools/test-track-curve.py "$ctl" "$client" "$resources" --visual
+```
+
+The removal comparison breaks endpoints. Direct curve targeting,
+remaining branch layouts, track skins, and exact render parity remain open.
+
 ## Fake Track
 
 In the [curve fixture](tools/test-fake-track.py) on

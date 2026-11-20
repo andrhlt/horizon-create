@@ -1,0 +1,4 @@
+case,endpoint,block_drops,creative,curve_cost,recovered,other_has_entity
+0,primary,true,false,12,13,false
+1,secondary,false,false,12,0,false
+3,primary,true,true,7,0,false
