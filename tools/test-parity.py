@@ -640,6 +640,7 @@ CHECKS = (
     ("depot-pushing-custody", "test-depot-baseline", "--funnel"),
     ("depot-pulling-funnel", "test-depot-pulling-funnel"),
     ("depot-pulling-funnel-lan", "test-depot-pulling-funnel", "--lan"),
+    ("depot-pulling-funnel-active-reopen", "test-depot-pulling-funnel", "--reopen"),
     ("depot-drop-press", "test-depot-drop-press", "--sound"),
     ("weighted-ejector-lifecycle", "test-weighted-ejector-lifecycle"),
     ("weighted-ejector-empty-lan", "test-depot-ejector-launch", "--windup", "--multiplayer"),

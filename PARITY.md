@@ -3367,6 +3367,54 @@ first inward flap pose on the following game tick and each heard both
 sound layers once. The plain and outward Belt Funnel LAN controls passed
 again.
 
+### Andesite and Brass Funnels gameplay baseline (APP-1970)
+
+The bounded case list covers survival acquisition; placement/orientation;
+plain insertion and extraction; Belt Funnel insertion and extraction;
+Brass filter and amount settings; one exact stack-limited transfer;
+rejected/full-output backpressure; removal/reconnection; representative
+guest configuration and transfer; and idle and active save/reopen.
+
+`machine-crafting-java.csv` now includes both funnel tiers. The Andesite
+Funnel row follows the pinned generated recipe
+`data/create/recipe/crafting/logistics/andesite_funnel.json` (andesite alloy
+above dried kelp, output two). The Java trace patch includes that recipe for
+future capture. This environment has JDK 27 only, so that added row was
+source-derived rather than recaptured by the Java GameTest; the existing Brass
+Funnel trace remains from the Java GameTest. On the identified Horizon build,
+the survival crafting replay matched all 25 recipes, including both funnel
+outputs and their remaining inventory.
+
+The selected Horizon integration run passed 13/13 checks: stationary Funnel
+survival placement in solo and LAN; seven Java Wrench mode actions in LAN;
+all 30 support-transition observations in LAN and settings retention after
+reopen; plain Funnel collecting and extracting in LAN; Depot and Weighted
+Ejector routes in LAN; package routes in solo and LAN; Creative Crate Funnel
+insertion in LAN; and all 25 survival recipes. The LAN Clipboard Funnel replay
+matched six Java configuration snapshots, including exact and up-to counts.
+
+`depot-pulling-funnel-active-reopen` adds a source-aligned lifecycle case. A
+Brass pushing Funnel with an exact-two filter moves two of five iron ingots
+into a Depot. Active save/reopen preserves the remaining three, Depot contents,
+filter and amount mode. The occupied Depot blocks another transfer. Clearing
+it lets the Funnel move exactly two more; a powered idle save/reopen retains the
+one-item remainder and configuration. The check passed on the same build.
+
+Evidence identity: Java Create `ac0c444d9828da3453ae8cc65338e8de063286fb`,
+Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, native build
+`native-9f42064-6bdf8691aa42` (main-synchronized source `781c0ef`), and pack
+SHA-256 `a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+`native/funnel.rs`, `native/belt_funnel.rs`, and `native/funnel_flap.rs` are
+byte-identical between that build source and this ticket branch. The current
+source build attempt stopped before compilation because several Horizon patch
+hunks do not apply to the cached pinned engine source, including hunks in
+`horizon-world/src/level/place.rs`, `horizon-client/src/game/use_hand.rs`,
+`remote.rs`, and `dispenser.rs`. Therefore the gameplay findings are reviewable,
+but this ticket still needs the affected checks rerun on a successfully built
+current-source client before its baseline gate can be marked met. Full 1:1
+remains Open; other transfer/count combinations and cosmetic effects remain
+follow-ups.
+
 The [Ejector comparator replay](tools/test-depot-ejector-comparator.py)
 matched [all 62 Java ticks](fixtures/depot-ejector-comparator-java.csv)
 in solo and LAN on `e6e755d336c6`. The comparator and dust stepped through
