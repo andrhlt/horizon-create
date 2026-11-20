@@ -162,7 +162,7 @@ def verify_output(host, actor):
     print("The actor retrieved the first parcel with its order metadata, then the queued parcel began animating.")
 
 
-def verify_sources(host):
+def verify_sources(host, reopen=False):
     with (ROOT / "fixtures/stock-link-network-java.csv").open() as source:
         reference = {int(row["tick"]): row for row in csv.DictReader(source)}
     reserve = (7, 105, -15)
@@ -185,6 +185,23 @@ def verify_sources(host):
         ))
     host.step_to(host.clock() + 1)
 
+    if reopen:
+        # Save an idle but live network before any order changes its stock. The
+        # reopened Requester must still see the same two eligible inventories;
+        # the unrelated network remains excluded.
+        host.restart()
+        for pos, amount in ((STORAGE, 12), (reserve, 5), (other_network, 9)):
+            assert quantity(packager.block_value(host, pos, "Items")) == amount, (pos, amount)
+        for pos, frequency in ((LINK, FREQ), (reverse_link, FREQ),
+                               ((8, 106, -15), FREQ), ((8, 106, -18), "[I;0,91,0,27]")):
+            actual = "".join(packager.block_value(host, pos, "Freq").split())
+            assert actual == "".join(frequency.split()), (pos, actual, frequency)
+        configure(host, int(reference[4]["visible_iron"]) + 1)
+        pulse(host, True)
+        assert int(packager.block_value(host, REQUESTER, "Success").rstrip("b")) == 0
+        pulse(host, False)
+        print("Idle Stock Link networks, frequencies, inventory contents and eligibility survived host save/reopen.")
+
     def check_order(count, succeeds):
         configure(host, count)
         pulse(host, True)
@@ -205,7 +222,89 @@ def verify_sources(host):
     assert quantity(packager.block_value(host, STORAGE, "Items")) == int(reference[8]["stored_iron"])
     assert quantity(packager.block_value(host, reserve, "Items")) == 5
     assert quantity(packager.block_value(host, other_network, "Items")) == 9
-    print("The Requester refused orders above the Java stock totals and shipped six from the eligible Barrel.")
+
+    # Reconnect the removed second link to the same inventory. It must restore
+    # visibility without counting that Barrel twice.
+    animation = packager.number(packager.block_data(host, MACHINE), "AnimationTicks")
+    for _ in range(animation):
+        host.step_to(host.clock() + 1)
+    host.commands((
+        f"/setblock {xyz(reverse_link)} create:stock_link",
+        f"/data merge block {xyz(reverse_link)} {{Freq:{FREQ}}}",
+        f"/item replace block {xyz(STORAGE)} container.0 with {ITEM} 12",
+    ))
+    host.step_to(host.clock() + 1)
+    check_order(13, False)
+    if reopen:
+        host.restart()
+        assert quantity(packager.block_value(host, STORAGE, "Items")) == 12
+        actual_frequency = "".join(packager.block_value(host, reverse_link, "Freq").split())
+        assert actual_frequency == "".join(FREQ.split()), actual_frequency
+        configure(host, 13)
+        pulse(host, True)
+        assert int(packager.block_value(host, REQUESTER, "Success").rstrip("b")) == 0
+        pulse(host, False)
+        print("The reconnected, populated Stock Link network retained its single-inventory total after reopen.")
+    check_order(12, True)
+    assert quantity(packager.block_value(host, STORAGE, "Items")) == 0
+    print("The Requester refused orders above Java stock totals, shipped from the eligible Barrel, and restored a removed link without double-counting its inventory.")
+
+
+def verify_priority(host, actor):
+    with (ROOT / "fixtures/stock-link-priority-java.csv").open() as source:
+        row = next(csv.DictReader(source))
+    lower = (22, 105, -12)
+    lower_packager = (23, 105, -12)
+    lower_link = (23, 106, -12)
+    higher = (22, 105, -16)
+    higher_packager = (23, 105, -16)
+    higher_link = (23, 106, -16)
+    requester = (22, 105, -20)
+    pulse_at = (23, 105, -20)
+    frequency = "[I;901,2,3,4]"
+    host.commands((
+        f"/setblock {xyz(lower)} minecraft:barrel",
+        f"/item replace block {xyz(lower)} container.0 with {ITEM} 4",
+        f"/setblock {xyz(lower_packager)} create:packager[facing=east]",
+        f"/setblock {xyz(lower_link)} create:stock_link",
+        f"/data merge block {xyz(lower_link)} {{Freq:{frequency}}}",
+        "/setblock 23 107 -12 minecraft:target",
+        f"/setblock 23 107 -12 minecraft:target[power={row['lower_power']}]",
+        f"/setblock {xyz(higher)} minecraft:barrel",
+        f"/item replace block {xyz(higher)} container.0 with {ITEM} 9",
+        f"/setblock {xyz(higher_packager)} create:packager[facing=east]",
+        f"/setblock {xyz(higher_link)} create:stock_link",
+        f"/data merge block {xyz(higher_link)} {{Freq:{frequency}}}",
+        "/setblock 23 107 -16 minecraft:target",
+        f"/setblock 23 107 -16 minecraft:target[power={row['higher_power']}]",
+        f"/setblock {xyz(requester)} {BLOCK}",
+        f'/data merge block {xyz(requester)} {{Freq:{frequency},EncodedAddress:"Priority",AllowPartial:0b,EncodedRequest:{order(int(row["requested_iron"]))}}}',
+    ))
+    for _ in range(2):
+        host.step_to(host.clock() + 1)
+    actual_powers = tuple(int(packager.block_value(host, pos, "Power"))
+                          for pos in (lower_link, higher_link))
+    wanted_powers = (int(row["lower_power"]), int(row["higher_power"]))
+    assert actual_powers == wanted_powers, (actual_powers, wanted_powers)
+    host.command(f"/setblock {xyz(pulse_at)} minecraft:redstone_block")
+    for _ in range(2):
+        host.step_to(host.clock() + 1)
+    accepted = int(packager.block_value(host, requester, "Success").rstrip("b")) != 0
+    shipped = tuple(quantity(packager.block_value(host, pos, 'HeldBox.components."create:package_contents"'))
+                    for pos in (lower_packager, higher_packager))
+    remaining = tuple(quantity(packager.block_value(host, pos, "Items"))
+                      for pos in (lower, higher))
+    actual = (accepted, *actual_powers, sum(shipped), *shipped, *remaining)
+    expected = (row["accepted"] == "true", *wanted_powers, int(row["requested_iron"]),
+                int(row["shipped_from_lower_power"]), int(row["shipped_from_higher_power"]),
+                int(row["lower_inventory_remaining"]), int(row["higher_inventory_remaining"]))
+    assert actual == expected, (actual, expected)
+    if actor is not host:
+        host_state = host.call("block", *requester)["state"]
+        mp.until("the priority Requester state to reach the LAN guest", lambda:
+                 actor.call("block", *requester)["state"] == host_state)
+        assert "powered=true" in host_state
+    print(f"Stock Link priority matched Java: powers {actual_powers}, shipments {shipped}, remaining {remaining}.")
 
 
 def run(args):
@@ -230,7 +329,8 @@ def run(args):
             host.command(f"/tp {name} 9.5 105 -9.5")
         replay(host, actor, rows)
         verify_output(host, actor)
-        verify_sources(host)
+        verify_sources(host, reopen=actor is host)
+        verify_priority(host, actor)
     print(f"{mode} matched {len(rows)} Java Requester snapshots.")
 
 
