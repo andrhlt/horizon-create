@@ -602,6 +602,8 @@ CHECKS = (
     ("mechanical-piston-mode-ui", "test-mechanical-piston-mode-ui"),
     ("ploughing", "test-ploughing"),
     ("arrow-dispenser", "test-arrow-dispenser"),
+    ("mounted-dispenser-gates", "test-mounted-dispenser-gates"),
+    ("mounted-dispenser-dropper", "test-mounted-dispenser-gates", "--dropper-only"),
     ("dispensers-dont-fight", "test-gantry-dispensers", "dispensers_dont_fight"),
     ("dispensers-refill", "test-gantry-dispensers", "dispensers_refill"),
     ("gantry-lan-reload", "test-multiplayer-gantry", "--pack", str(ROOT / ".local/create.hmod")),

@@ -10771,13 +10771,23 @@ The focused command was `python3 tools/test-parity.py "$ctl" "$client" "$resourc
 
 The Dropper LAN cases establish guest operation and convergence for those adjacent item-transfer paths. The mounted Gantry/bearing cases above were solo only. Mounted actor guest convergence and idle/active dispenser inventory save/reopen were not exercised in this pass and remain required baseline gates; host/guest timing equivalence and all other payload/mounting combinations also remain unverified. Keep this family Partial and the issue In Progress until the mounted guest and persistence cases pass. Full 1:1 remains Open.
 
-The follow-up harness `tools/test-mounted-dispenser-gates.py` now exercises a LAN
+The follow-up harness `tools/test-mounted-dispenser-gates.py` exercises a LAN
 guest beside a mounted arrow dispenser, explicit `/save-all` before idle and
-active reopen, and a representative mounted Dropper action. On the pinned
-`native-9f42064-d6dc2ad18d3f` runtime, host arrow launch and item conservation
-through active reopen passed, but the guest never observed the launched arrow
-within the bounded 15-second replication window. The Dropper setup also needs
-to mutate the bearing's stored moved-block payload; replacing the stationary
-block after placement does not change the mounted actor. These are concrete
-remaining blockers, not claims of completion; the diagnostic command and raw
-runtime logs remain under `.local/`.
+active reopen, and a representative mounted Dropper action. A fresh diagnostic
+run on the pinned `native-9f42064-d6dc2ad18d3f` runtime is preserved in
+`/private/tmp/app2008-current-gates.log`. Host arrow launch and item
+conservation through active reopen passed. The guest `entities` API cannot be
+used as an arrow oracle because Horizon documents that command as mobs, item
+drops and XP only; the fresh guest `looking-at` result also targeted the
+mechanical bearing, with no projectile target. The guest screenshot artifacts
+are `/private/tmp/app2008-guest-vanilla-arrow.png` and
+`/private/tmp/app2008-guest-mounted-arrow.png`.
+
+The Dropper probe now assembles a real bearing payload, mutates its stored
+`MovedBlocks[0]` state to `minecraft:dropper`, installs a cobblestone stack,
+and clears the dispense latch. After 200 frozen ticks the stored stack still
+reads one, so the mounted Dropper action remains a concrete behavior blocker.
+The new checks are registered as `mounted-dispenser-gates` and
+`mounted-dispenser-dropper` in `tools/test-parity.py`; they are intentionally
+not claimed as passing until guest-visible output and Dropper decrement are
+fixed. Keep this family Partial and the issue In Progress.
