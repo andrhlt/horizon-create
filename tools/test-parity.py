@@ -277,6 +277,7 @@ CHECKS = (
     ("stockpile-switch-filter-lan", "test-stockpile-switch-filter", "--lan"),
     ("stockpile-switch-filter-render", "test-stockpile-switch-filter-render"),
     ("stockpile-switch-filter-render-lan", "test-stockpile-switch-filter-render", "--lan"),
+    ("stockpile-switch-lifecycle", "test-stockpile-switch-lifecycle"),
     ("observer-storage", "test-smart-observer"),
     ("observer-filtered-storage", "test-smart-observer", "--filtered"),
     ("observer-filter-poses", "test-smart-observer-filter", "--poses"),
@@ -373,6 +374,8 @@ CHECKS = (
     ("package-player-contact-lan", "test-package-player-contact", "--lan"),
     ("packager", "test-packager-redstone", "--visual"),
     ("packager-lan", "test-packager-redstone", "--visual", "--lan"),
+    ("packager-placement", "test-packager-placement"),
+    ("packager-lifecycle", "test-packager-lifecycle"),
     ("packager-crafting", "test-machine-crafting", "--reference", "fixtures/packager-crafting-java.csv"),
     ("stock-link-placement", "test-stock-link"),
     ("stock-link-placement-lan", "test-stock-link", "--lan"),
@@ -406,6 +409,7 @@ CHECKS = (
     ("turntable", "test-turntable"),
     ("turntable-player", "test-turntable-player"),
     ("turntable-player-lan", "test-turntable-player", "--lan"),
+    ("turntable-persistence", "test-turntable", "--persistence"),
     ("toolbox-storage", "test-toolbox-storage"),
     ("toolbox-portable", "test-toolbox-storage", "--portable"),
     ("toolbox-menu", "test-toolbox-menu"),
@@ -1664,6 +1668,10 @@ CHECKS = (
     ("train-passenger-count", "test-train-passenger-count"),
     ("multiplayer-elevator", "test-multiplayer-elevator"),
     ("chain-conveyor-idle-reopen", "test-chain-conveyor-idle-reopen"),
+    ("frogport-idle-reopen", "test-frogport-menu"),
+    ("frogport-inventory-lan", "test-frogport-menu", "--lan"),
+    ("frogport-settings-lan", "test-frogport-menu", "--settings", "--lan"),
+    ("frogport-active-reopen", "test-chain-conveyor-packages", "--pack", ".local/create.hmod", "--scenario", "straight", "--reopen-at", "27"),
 )
 
 
