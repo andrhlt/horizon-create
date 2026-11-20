@@ -3,6 +3,7 @@
 import argparse
 import csv
 from importlib import import_module
+import math
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -18,12 +19,12 @@ def wheel_fixture(large):
 
 def place_wheel(world, actor, target, x, y, large):
     name = "large_water_wheel" if large else "water_wheel"
-    state = "axis=z,extension=false" if large else "facing=north,waterlogged=false"
-    clear = (f"/fill {x-1} {y-1} -10 {x+1} {y+1} -10 minecraft:air"
-             if large else f"/setblock {x} {y} -10 minecraft:air")
+    state = "axis=z,extension=false" if large else "facing=south,waterlogged=false"
+    clear = (f"/fill {x-1} {y-1} -10 {x+1} {y+1} -9 minecraft:air"
+             if large else f"/fill {x} {y} -10 {x} {y} -9 minecraft:air")
     world.commands((
         f"/gamemode survival {target}",
-        f"/tp {target} {x+.5} {y+1} -8.5",
+        f"/tp {target} {x+.5} {y} -7.0",
         clear,
         f"/give {target} create:{name}",
     ))
@@ -31,7 +32,25 @@ def place_wheel(world, actor, target, x, y, large):
     multiplayer.until("the placer to hold a Water Wheel",
                       lambda: actor.call("inventory")["counts"].get(item) == 1)
     actor.call("select", item)
-    actor.call("interact", x, y, -11, "south")
+    # Aim at the south face; from floor height the ray passes above the
+    # upstream stressometer mounted in front of the wheel fixture.
+    actor.call("look-at", x + .5, y + .5, -10.999)
+    actor.call("wait", 2)
+    hit = actor.call("looking-at")
+    block = hit.get("block") or {}
+    if hit.get("kind") != "block" or block.get("pos") != [x, y, -11] or block.get("face") != "south":
+        raise RuntimeError(f"Water Wheel placement ray missed {(x, y, -11)} south face: {hit}")
+    player = actor.call("state")["player"]
+    held = (actor.call("inventory").get("held") or {}).get("item")
+    reach = math.dist(player["eye"], block["point"])
+    if player["sneaking"] or held != item or reach > 4.5:
+        raise RuntimeError(f"Invalid Water Wheel placement input: reach={reach:.2f}, held={held}, player={player}")
+    print(f"Water Wheel placement input: target={(x, y, -11)} face=south reach={reach:.2f} "
+          f"held={held} sneak={player['sneaking']} yaw={player['yaw']:.1f} pitch={player['pitch']:.1f}", flush=True)
+    actor.call("mouse", "right", "click")
+    actor.call("wait", 8)
+    print(f"Water Wheel placement result: {world.call('block', x, y, -10)}; "
+          f"inventory={actor.call('inventory')['counts']}", flush=True)
     multiplayer.until("the new Water Wheel to be placed on its original axis",
                       lambda: world.call("block", x, y, -10)["state"] == f"{item}[{state}]")
     multiplayer.until("the wheel item to be consumed",
@@ -83,22 +102,37 @@ def run_trip(world, actor, target, rows, structure, *, large=False, reopen=False
 
 def run_lava_trip(world, actor, target, rows, *, large):
     item = "create:large_water_wheel" if large else "create:water_wheel"
-    state = "axis=z,extension=false" if large else "facing=north,waterlogged=false"
+    state = "axis=z,extension=false" if large else "facing=south,waterlogged=false"
     lava_x = 8 if large else 7
     wall_x = lava_x + 1
     world.commands((
+        "/setblock 6 103 -7 minecraft:stone",
         "/setblock 6 104 -11 minecraft:stone",
         f"/setblock {wall_x} 104 -10 minecraft:stone",
         f"/setblock {wall_x} 105 -10 minecraft:stone",
         "/setblock 6 104 -9 minecraft:stone",
         f"/gamemode survival {target}",
-        f"/tp {target} 6.5 105 -8.5",
+        f"/tp {target} 6.5 104 -7.0",
         f"/give {target} {item}",
     ))
     multiplayer.until("the lava wheel placer to hold the wheel",
                       lambda: actor.call("inventory")["counts"].get(item) == 1)
     actor.call("select", item)
-    actor.call("interact", 6, 104, -11, "south")
+    actor.call("look-at", 6.5, 104.5, -10.999)
+    actor.call("wait", 2)
+    hit = actor.call("looking-at")
+    block = hit.get("block") or {}
+    if hit.get("kind") != "block" or block.get("pos") != [6, 104, -11] or block.get("face") != "south":
+        raise RuntimeError(f"Magma Wheel placement ray missed {(6, 104, -11)} south face: {hit}")
+    player = actor.call("state")["player"]
+    held = (actor.call("inventory").get("held") or {}).get("item")
+    reach = math.dist(player["eye"], block["point"])
+    if player["sneaking"] or held != item or reach > 4.5:
+        raise RuntimeError(f"Invalid Magma Wheel placement input: reach={reach:.2f}, held={held}, player={player}")
+    print(f"Magma Wheel placement input: target={(6, 104, -11)} face=south reach={reach:.2f} "
+          f"held={held} sneak={player['sneaking']}", flush=True)
+    actor.call("mouse", "right", "click")
+    actor.call("wait", 8)
     multiplayer.until("the lava-test wheel to be placed on its original axis",
                       lambda: world.call("block", 6, 104, -10)["state"] == f"{item}[{state}]")
     world.command("/setblock 6 104 -11 minecraft:air")
