@@ -3081,6 +3081,61 @@ The comparator replay matches those lid samples in solo and real LAN on
 `native-9f42064-830dc6e7a557`, including the immediate jump to an open lid on tick 39.
 Both renderer regressions passed again with the same pack.
 
+## Mechanical Arm gameplay baseline (APP-2014)
+
+The bounded Mechanical Arm pass reuses the pinned Create `ArmBlockEntity.java`
+and the existing Java traces. It keeps the broader target/type and presentation
+matrix open.
+
+The checked-in survival crafting trace includes the original Mechanical Arm
+recipe. A focused run of that one row matched its output and remainders.
+`arm-placement` configured a TAKE and DEPOSIT Depot with ordinary player input,
+placed the arm in survival, and transferred an iron ingot on tick 59. The
+`arm-brass-mixing` replay matched 248 Java ticks through arm custody, basin
+processing and the fixture's power transitions. `arm-loop` matched 101 Java
+ticks as two arms passed one diamond between Depots, with the item-count
+invariant checked on every row. `arm-burners` matched 75 Java ticks while one
+arm fed nine burner outputs.
+
+The registered `arm-backpressure` check leaves an empty input idle for 24
+ticks, fills all 27 slots of a barrel output, and confirms 32 ticks of blocked
+operation preserve the source item. It opens the output, applies redstone for
+32 ticks and confirms the arm stays stopped, then removes the signal and
+verifies exactly one item transfers within 64 ticks. The `arm-lan` check has a
+guest configure both endpoints and place the arm; the host observes the
+transfer, then the guest retrieves the output and the host observes the
+emptied Depot. This checks resulting state after guest convergence, not Java
+packet arrival timing.
+
+The `arm-persistence` check saves and reopens an idle configured arm, then
+reopens an active brass fixture at Java trace tick 32 while it holds zinc. The
+target list and held item remain present, and the arm resumes the transfer
+within 30 stepped ticks. This is a Horizon gameplay save/reopen check; it does
+not claim an exact Java reload comparison. The existing APP-1969 Depot
+prerequisite is Done ([PR 29](https://github.com/andrhlt/horizon-create/pull/29)),
+as is APP-1962 for Blaze Burner, fuels and blaze cakes
+([PR 25](https://github.com/andrhlt/horizon-create/pull/25)).
+
+All Horizon runs used `native-9f42064-340cbe866fa7` with pinned Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, Minecraft 26.3 and pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Client SHA-256 is
+`39712c37f7f666a2d730506198523f0d0b42ef7b4a15c0ea9142a95b450224ea`; control
+tool SHA-256 is
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`.
+The Java source was at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; its `ArmBlockEntity.java` SHA-256
+is `5d95cdcad9020f5af86a880daa2b7ec1103cfd4f8e417751cb448bdccaee6b57`.
+No new Java capture was needed. These checks did not establish every target,
+round-robin mode, output combination or exact arm path/animation; Full 1:1
+remains Open.
+
+```sh
+python3 tools/test-machine-crafting.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack .local/create.hmod --reference .local/arm-machine-crafting-java.csv
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 --check arm-placement --check arm-burners --check arm-loop --check arm-brass-mixing
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 --check arm-backpressure --check arm-lan --check arm-persistence
+```
+
 ## Mechanical Saw
 
 `tools/java-mechanical-saw-trace.patch` drives the original two saws with
