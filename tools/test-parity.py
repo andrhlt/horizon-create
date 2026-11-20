@@ -373,6 +373,8 @@ CHECKS = (
     ("package-player-contact-lan", "test-package-player-contact", "--lan"),
     ("packager", "test-packager-redstone", "--visual"),
     ("packager-lan", "test-packager-redstone", "--visual", "--lan"),
+    ("packager-placement", "test-packager-placement"),
+    ("packager-lifecycle", "test-packager-lifecycle"),
     ("packager-crafting", "test-machine-crafting", "--reference", "fixtures/packager-crafting-java.csv"),
     ("stock-link-placement", "test-stock-link"),
     ("stock-link-placement-lan", "test-stock-link", "--lan"),
