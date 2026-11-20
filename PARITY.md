@@ -321,6 +321,26 @@ name and custom data. The [Horizon replay](tools/test-crafting-reset.py)
 checks the authoritative inventory before crafting and after taking the
 result in survival.
 
+## Vanilla recipe save and reopen
+
+The `vanilla-recipe-reopen` check in [the parity runner](tools/test-parity.py)
+saves two White Wool stacks in separate hotbar slots, reopens the same world and
+confirms both persisted. It puts one wool in the player's 2×2 crafting grid
+and verifies the incomplete recipe has no result, then adds the second wool
+and crafts three White Carpet. This is a bounded gameplay persistence check
+for one ordinary vanilla crafting recipe; it does not establish full catalog,
+recipe-book unlock, stonecutting or cooking parity.
+
+The surrounding recipe evidence remains sampled: `survival-crafting` covers
+starter Create parts, `machine-crafting` compares 24 Java recipes including
+remainders, `cooking-materials --cooking-only` compares 609 Java samples for
+smelting bread, smoking bread and smelting Scoria, and
+`test-extra-material-recipes.py` has a campfire Dough-to-Bread case.
+`test-zinc-progression.py --heating` compares the
+existing smelting and blasting recipes. `vanilla-stone-palettes-lan` passed
+seven guest Stonecutter cases on retry; its first run transiently missed an
+output before the successful retry. Full catalog equivalence remains open.
+
 ## Zinc mining and processing
 
 The [original Java probe](tools/java-zinc-progression-trace.patch) records
