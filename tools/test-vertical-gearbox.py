@@ -199,7 +199,9 @@ def craft(args):
                 crafting.distribute(control,index,slots)
             crafting.craft(control,result,1)
             control.call('close')
-            assert not any(control.call('inventory')['counts'].get(item) for item,_ in ingredients)
+            contents=control.call('inventory')['counts']
+            leftovers={item: contents.get(item) for item,_ in ingredients if contents.get(item)}
+            assert not leftovers, (result, leftovers, contents)
     print('Both original shaped Gearbox recipes and both one-to-one conversions crafted in survival.')
 
 
