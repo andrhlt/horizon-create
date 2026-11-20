@@ -2135,6 +2135,12 @@ rebased onto `f9ee5a75d0efbe2c9e81b535c0d41a5e6f994481` and rebuilt as
 `native-9f42064-f11c2d5d72fd` in 4 minutes 8 seconds. The same 19 selected
 checks passed on this latest tree.
 
+`main` advanced once more while auto-merge was pending. On the current
+`576fe85f6aa470bc6f78b3f5682d7c5e8242c681` base, build
+`native-9f42064-5dce121d26bb` completed in 4 minutes 22 seconds and the same
+19 selected checks passed again, including both Smart Chute traces and
+cold-reopen cases.
+
 ```sh
 sh tools/build-native.sh /path/to/launcher-0.2.67 /path/to/private-launcher-data
 HORIZON_NO_AUDIO=1 HORIZON_NO_DISCORD=1 python3 tools/test-parity.py \
