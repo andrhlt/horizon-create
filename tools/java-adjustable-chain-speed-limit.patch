@@ -1,0 +1,112 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..218ffcf 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..bddb0d6 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.adjustableChainSpeedLimit"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..e958393 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -2,6 +2,13 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ 
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
++import com.simibubi.create.content.kinetics.chainDrive.ChainDriveBlock;
++import com.simibubi.create.content.kinetics.chainDrive.ChainGearshiftBlockEntity;
++import net.minecraft.core.Direction;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+ import com.simibubi.create.AllBlockEntityTypes;
+ import com.simibubi.create.AllDataComponents;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+@@ -115,4 +122,66 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 22)
++	public static void adjustableChainSpeedLimit(CreateGameTestHelper helper) {
++		for (int x : new int[] {12, 18}) {
++			var shift = new BlockPos(x, 3, 3);
++			var drive = shift.east();
++			var small = shift.below();
++			var large = small.west().north();
++			helper.setBlock(shift, AllBlocks.ADJUSTABLE_CHAIN_GEARSHIFT.getDefaultState()
++				.setValue(BlockStateProperties.AXIS, Direction.Axis.Y)
++				.setValue(ChainDriveBlock.CONNECTED_ALONG_FIRST_COORDINATE, true)
++				.setValue(ChainDriveBlock.PART, ChainDriveBlock.Part.START));
++			helper.setBlock(drive, AllBlocks.ENCASED_CHAIN_DRIVE.getDefaultState()
++				.setValue(BlockStateProperties.AXIS, Direction.Axis.Y)
++				.setValue(ChainDriveBlock.CONNECTED_ALONG_FIRST_COORDINATE, true)
++				.setValue(ChainDriveBlock.PART, ChainDriveBlock.Part.END));
++			helper.setBlock(small, AllBlocks.COGWHEEL.getDefaultState()
++				.setValue(BlockStateProperties.AXIS, Direction.Axis.Y));
++			helper.setBlock(large, AllBlocks.LARGE_COGWHEEL.getDefaultState()
++				.setValue(BlockStateProperties.AXIS, Direction.Axis.Y));
++			helper.setBlock(drive.below(), AllBlocks.SHAFT.getDefaultState()
++				.setValue(BlockStateProperties.AXIS, Direction.Axis.Y));
++			chainSpeedMotor(helper, large.below(), Direction.UP, x == 12 ? 64 : 96);
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int x : new int[] {12, 18}) {
++				var shift = new BlockPos(x, 3, 3);
++				var drive = shift.east();
++				var small = shift.below();
++				var large = small.west().north();
++				var shiftEntity = helper.getLevel().getBlockEntity(helper.absolutePos(shift));
++				System.out.printf(java.util.Locale.ROOT,
++					"CREATE_CHAIN_SPEED_LIMIT %d,%d,%b,%.1f,%.1f,%.1f,%.1f,%.1f%n",
++					tick, x == 12 ? 64 : 96, shiftEntity instanceof ChainGearshiftBlockEntity,
++					shiftEntity instanceof ChainGearshiftBlockEntity gearshift ? gearshift.getModifier() : 0f,
++					chainSpeed(helper, large), chainSpeed(helper, small),
++					chainSpeed(helper, shift), chainSpeed(helper, drive.below()));
++				if (tick == 3)
++					chainSpeedMotor(helper, drive.above(), Direction.DOWN, 32);
++				if (tick == 6)
++					helper.setBlock(shift.south(), Blocks.REDSTONE_BLOCK);
++				if (tick == 11)
++					helper.setBlock(large.below(), Blocks.AIR);
++				if (tick == 15)
++					helper.setBlock(shift.south(), Blocks.AIR);
++			}
++			if (tick < 19)
++				helper.fail("Waiting for the final chain speed sample");
++		});
++	}
++
++	private static void chainSpeedMotor(CreateGameTestHelper helper, BlockPos pos, Direction facing, int rpm) {
++		helper.setBlock(pos, AllBlocks.CREATIVE_MOTOR.getDefaultState()
++			.setValue(BlockStateProperties.FACING, facing));
++		helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), pos).generatedSpeed.setValue(rpm);
++	}
++
++	private static float chainSpeed(CreateGameTestHelper helper, BlockPos pos) {
++		var entity = helper.getLevel().getBlockEntity(helper.absolutePos(pos));
++		return entity instanceof KineticBlockEntity kinetic ? kinetic.getSpeed() : 0;
++	}
+ }
