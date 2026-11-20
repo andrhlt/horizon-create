@@ -802,7 +802,7 @@ The assembler regression retains six rail exchange actions and 18 departure
 samples from its existing Java fixtures.
 
 All eight selected checks passed serially on `native-9f42064-fb8446effe86`,
-built from the Controller Rail source at `5e631ab` with Horizon pin
+built from the Controller Rail source at `c9a9d9b` with Horizon pin
 `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` and the prepared Minecraft 26.3
 resources. The installed Create pack SHA-256 was
 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
@@ -5447,9 +5447,91 @@ LAN. The original survival recipe passed solo. On
 `native-9f42064-02594efd9424`, direct clicks matched Java ordinary
 filter set and clear, preserved the held sample's stack size, and kept
 the filter intact on Wrench use. Solo and LAN passes also repeated
-the seeded placement, deposit and close fixtures. The port uses
-Horizon sided insertion. Unusual inventory handlers, visuals and exact
+the seeded placement, deposit and close fixtures. Those historical runs used
+Horizon sided insertion; the APP-2017 pass below identified a consequential
+unsided-inventory mismatch. Unusual inventory handlers, visuals and exact
 sound playback remain open.
+
+### APP-2017 unsided insertion and lifecycle pass
+
+Pinned Java `ItemHatchBlock.useItemOn` queries `ItemHandler.BLOCK` with a
+`null` side. The [additional actual Java capture](tools/java-item-hatch-gameplay.patch)
+on Create `ac0c444d9828da3453ae8cc65338e8de063286fb` recorded
+`SUCCESS,0,9,minecraft:raw_iron,true`: a survival player holding nine Raw Iron
+items deposits all nine into Furnace input slot 0 through a horizontal Hatch,
+leaving the hand empty and opening the Hatch. The
+[one-row reference](fixtures/item-hatch-unsided-java.csv) and
+[capture metadata](fixtures/item-hatch-unsided-java.metadata.json) retain this
+observation. The same capture exactly reproduced the five original fixture
+CSVs (placement, eight deposits, timing, ordinary filter interactions and
+crafting) unchanged. The isolated headless Java capture completed successfully
+in 2m37s with JDK 21 and a private Gradle cache; the shared checkout/cache were
+not modified.
+
+The pre-fix Horizon replay on `native-9f42064-6ce68a31b125` reproduced a
+mismatch: all nine Raw Iron remained held, the Furnace stayed empty and the
+Hatch stayed closed. Client SHA-256:
+`bdbafe5289f2c05ef76009c17070e0320a7c606e042dd5202b142e0e6d123fc9`;
+control SHA-256:
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`;
+pack SHA-256:
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The build's recorded Horizon pin is
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. The failed command was:
+
+```sh
+python3 tools/test-item-hatch.py /Users/andrewholt/dev/horizon-create/.local/patched-launcher/versions/native-9f42064-6ce68a31b125/horizon-ctl /Users/andrewholt/dev/horizon-create/.local/patched-launcher/versions/native-9f42064-6ce68a31b125/horizon-client /Users/andrewholt/dev/horizon-create/.local/patched-launcher/versions/native-9f42064-6ce68a31b125/.local/horizon-client/26.3 --unsided-only
+```
+
+`item-hatch-boundaries` and `item-hatch-boundaries-lan` add actual-player
+transfers through all four horizontal attachments and the Java Furnace case.
+`item-hatch-lifecycle` adds idle and post-transfer save/reopen with a waterlogged
+Hatch, retained ordinary filter and Barrel contents, subsequent lid closure and
+another manual transfer. A Hatch's operation is instantaneous; its meaningful
+active save state is the ten-tick lid window after the transfer. Cold-launch
+ticks may finish that window before the harness freezes the reopened world,
+so this check establishes continued usability and retained state rather than
+exact Java reload timing.
+
+The narrow fix adds `native_insert_item_unsided` in the Horizon native item
+helpers and uses it only for Item Hatch deposits. It preserves destination
+item rules, stack limits, existing item merges, and remaining held items; all
+other native consumers keep their sided API.
+
+The final build `native-9f42064-2777747110f8` was built from APP-2017 base
+`c9a9d9b` and uses Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`.
+Its client SHA-256 is
+`272cd95c512901a2f2ff112c5ef6c202084192a2c98c6c6a319d6ef516cfe357`;
+`horizon-ctl` SHA-256 is
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`; the
+prepared pack SHA-256 is
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+The current-main rebuild completed in 13m59s. The seven-check batch passed **7/7** on base `c9a9d9b`:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-2777747110f8/horizon-ctl .local/patched-launcher/versions/native-9f42064-2777747110f8/horizon-client .local/patched-launcher/versions/native-9f42064-2777747110f8/.local/horizon-client/26.3 --jobs 2 --check 'item-hatch*'
+```
+
+This reran the four existing placement/deposit/filter checks in solo and LAN,
+including the original seven placements, eight deposits, ten-tick close and
+survival recipe. The new boundary checks transferred through all four
+horizontal attachment directions and deposited Raw Iron ×9 into Furnace
+input slot 0 in solo and with a LAN guest. The lifecycle check reopened an
+idle waterlogged Hatch with its paper filter and Barrel contents, reopened it
+after a transfer, observed the lid close within the ten-tick window, and
+completed another transfer without losing items. These checks establish
+continued gameplay and retained state; cold-launch ticks prevent a claim of
+exact Java reload timing. Logs are retained under `.local/parity/`.
+
+`python3 -m py_compile tools/test-item-hatch.py tools/test-parity.py`,
+`rustfmt --edition 2024 --check` on the patched `native_items.rs`, patch
+applicability against the pinned Horizon source, and `git diff --check` passed.
+The original pre-fix mismatch remains recorded at
+`.local/item-hatch-unsided-baseline.log`; an invalid block-item placement
+attempt remains labeled at
+`.local/item-hatch-unsided-baseline-invalid-block-item.log`. Broader specialized
+filter swaps, unusual inventory handlers, presentation and exact packet/audio
+timing remain follow-ups. Full 1:1 remains Open.
 
 ## Java runtime-generated processing recipes
 
