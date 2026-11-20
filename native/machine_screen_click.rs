@@ -15,5 +15,7 @@ fn machine_screen_click(
         *button = crate::game::create_brass_tunnel::screen_click(at);
     } else if block == crate::game::create_display_link::LINK && !right {
         *button = crate::game::create_display_link::screen_click(data, at);
+    } else if block == crate::game::create_schematic_table::BLOCK && !right {
+        *button = crate::game::create_schematic_table::screen_click(at);
     }
 }

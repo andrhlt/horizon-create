@@ -31,6 +31,8 @@ fn use_item_on(
         || crate::game::create_package_world::place(game, stack, pos, face)
         || crate::game::create_table_cloth::blocked(game, pos, face, stack)
         || crate::game::create_sail::use_item(game, pos, stack)
+        || crate::game::structure_blocks::create_schematic_capture::use_item(game, pos, stack)
+        || crate::game::create_schematic_table::open(game, pos)
         || crate::game::create_steam::use_item(game, pos, face, stack)
         || crate::game::create_shaft::encase(game, pos, stack)
         || crate::game::create_encased_fluid_pipe::encase(game, pos, stack)
