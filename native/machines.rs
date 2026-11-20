@@ -3239,7 +3239,22 @@ pub(super) fn check_transmission_reconnections(game: &mut Game<'_>) {
         if !finish_pending_transmission_reconnect(game, pos, now)
             && transmission_reconnects_into_opposing_drive(game, pos, now)
         {
-            game.native_machine_destroy_block(pos, None, false);
+            let fallback = match Kinetic::at(game, pos) {
+                Some(Kinetic::Clutch(..)) => Some(CLUTCH),
+                Some(Kinetic::Gearshift(..)) => Some(GEARSHIFT),
+                _ => None,
+            };
+            if let Some(mut drops) = game.native_machine_destroy_block(pos, None, true) {
+                if drops.is_empty()
+                    && game.ui.rules.bool("block_drops")
+                    && let Some(item) = fallback
+                {
+                    drops.push(ItemStack::new(item, 1));
+                }
+                for drop in drops {
+                    game.pop_resource(pos, drop);
+                }
+            }
         }
     }
 }
