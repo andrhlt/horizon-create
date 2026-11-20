@@ -10770,3 +10770,14 @@ The following checks passed on `native-9f42064-d6dc2ad18d3f` (Horizon `9f42064c1
 The focused command was `python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 --check arrow-dispenser --check dispensers-dont-fight --check dispensers-refill --check creative-crate-dropper --check creative-crate-dropper-lan --check package-dropper-chute --check package-dropper-chute-lan`. The first three outputs are `.local/arrow_dispenser-horizon.csv`, `.local/dispensers_dont_fight-horizon.csv`, and `.local/dispensers_refill-horizon.csv`; individual logs are in `.local/parity/`.
 
 The Dropper LAN cases establish guest operation and convergence for those adjacent item-transfer paths. The mounted Gantry/bearing cases above were solo only. Mounted actor guest convergence and idle/active dispenser inventory save/reopen were not exercised in this pass and remain required baseline gates; host/guest timing equivalence and all other payload/mounting combinations also remain unverified. Keep this family Partial and the issue In Progress until the mounted guest and persistence cases pass. Full 1:1 remains Open.
+
+The follow-up harness `tools/test-mounted-dispenser-gates.py` now exercises a LAN
+guest beside a mounted arrow dispenser, explicit `/save-all` before idle and
+active reopen, and a representative mounted Dropper action. On the pinned
+`native-9f42064-d6dc2ad18d3f` runtime, host arrow launch and item conservation
+through active reopen passed, but the guest never observed the launched arrow
+within the bounded 15-second replication window. The Dropper setup also needs
+to mutate the bearing's stored moved-block payload; replacing the stationary
+block after placement does not change the mounted actor. These are concrete
+remaining blockers, not claims of completion; the diagnostic command and raw
+runtime logs remain under `.local/`.
