@@ -5294,6 +5294,18 @@ python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/
   --check fluid-pipe-lifecycle
 ```
 
+The complete bounded APP-1985 suite passed after rebasing onto current `main`
+on `native-9f42064-b527cbe807b8`, built with launcher 0.2.67 and Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. Client SHA-256:
+`0c44ac860625ad3e87fe947dbdee71d43dfec29299ffa66b507e7fa0e4fb8a4e`; pack
+SHA-256: `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+`--check encased-fluid-pipe-lifecycle --check 'encased-fluid-pipe*'` passed
+5/5: idle/active reopen and pumped casing transitions, solo/LAN casing state,
+and all 103 Java transfer samples in both solo and LAN. Existing bounded
+pump startup, casing-face, and drain-fitting checks also passed on build
+`native-9f42064-d7e37b705c75` before the upstream mechanical-pump changes; the
+APP-1985 final rerun targeted the rebuilt current-main code.
+
 Exact Java save/reload, additional network layouts and chunk boundaries,
 guest arrival timing, ambient occlusion, contraption-mounted fittings and
 Copycat material connections remain unverified. Full 1:1 remains Open.
