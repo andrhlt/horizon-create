@@ -4923,6 +4923,44 @@ isolated and unrelated inventories. The Horizon Requester exercises the
 same stock thresholds and verifies the eligible Barrel's shipment.
 The direct stock-summary values and cache timing remain open.
 
+The Requester replay also saves and reopens the idle, populated network in
+solo before checking its Java-derived 18-item rejection threshold. It then
+removes and restores a second link to the same Barrel, confirming the restored
+link does not double-count that inventory. A second solo reopen preserves the
+reconnected link and its frequency; a subsequent accepted 12-item order empties
+the eligible Barrel. The [priority capture](fixtures/stock-link-priority-java.csv)
+proves one distinct-inventory source selection sample: with link powers 1 and
+7, Java shipped four requested ingots from the lower-power source and three
+from the higher-power source, leaving 0 and 6. The Horizon Requester replay
+compares that exact per-inventory split in solo and LAN. This is a sampled
+interaction, not a global ordering guarantee: Java randomly chooses among
+links sharing an inventory, and the network manager groups distinct
+inventories through a HashMap. The existing LAN replay compares Requester
+states and shipment results between host and guest. The host-only
+reopen/reconnect checks are not guest observations, and Java packet-arrival
+timing is not claimed.
+
+The priority sample used Java Create `ac0c444d9828da3453ae8cc65338e8de063286fb`
+(Create 6.0.10, Minecraft 1.21.1, NeoForge 21.1.219) on JDK 21.0.13.1. The
+[capture patch](tools/java-stock-link-priority.patch) SHA-256 is
+`06bbd5656bc85450469b0eb507bbedac34be581f4c182ec9db2a0d99bb770575`. Apply
+it to a disposable checkout of that pin with
+`git apply --unidiff-zero tools/java-stock-link-priority.patch`; the patch was
+checked against a clean checkout. The
+disposable GameTest passed 1/1 and recorded tick 30 in
+`.local/stock-priority-java-tick30.log`. Horizon build
+`native-9f42064-e0a9d28b20c7` and pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7` passed
+the solo and LAN Requester replays plus the six placement, Packager, and tuning
+checks on that same build. The Requester command was
+`python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-e0a9d28b20c7/horizon-ctl .local/patched-launcher/versions/native-9f42064-e0a9d28b20c7/horizon-client '/Users/andrewholt/Library/Application Support/horizon-launcher/versions/nightly-2026-11-13-9f42064/.local/horizon-client/26.3' --jobs 1 --check redstone-requester --check redstone-requester-lan`.
+The six neighboring checks were `stock-link-placement`,
+`stock-link-placement-lan`, `stock-link-packager`,
+`stock-link-packager-lan`, `stock-link-tuning`, and
+`stock-link-tuning-lan`. Build elapsed 19m37s, warmed Java capture 47s, and
+the final Requester pair about 2m; setup, coding, and debugging time were not
+measured separately. Detailed Horizon logs are under `.local/parity/`.
+
 ## Redstone Requester
 
 The [Requester replay](tools/test-redstone-requester.py) matches eight

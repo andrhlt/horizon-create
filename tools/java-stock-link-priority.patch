@@ -1,0 +1,73 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..1fec45d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -37 +37,3 @@ public class CreateGameTests {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestMisc.stockLinkPriority"))
++			.toList();
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..121d4c2 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -117,0 +118,59 @@ public class TestMisc {
++
++	@GameTest(template = "shearing", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void stockLinkPriority(CreateGameTestHelper helper) {
++		var level = helper.getLevel();
++		var a = helper.absolutePos(new BlockPos(3, 14, 2));
++		var b = a.south(4);
++		var frequency = new java.util.UUID(82, 15);
++		var iron = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_INGOT);
++		var linkType = com.simibubi.create.AllBlockEntityTypes.PACKAGER_LINK.get();
++		var machineA = a.east();
++		var machineB = b.east();
++		helper.runAtTickTime(2, () -> {
++			for (var pos : java.util.List.of(a, b))
++				level.setBlockAndUpdate(pos, net.minecraft.world.level.block.Blocks.BARREL.defaultBlockState());
++			((net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(a)).setItem(0, iron.copyWithCount(4));
++			((net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(b)).setItem(0, iron.copyWithCount(9));
++			var packager = com.simibubi.create.AllBlocks.PACKAGER.getDefaultState()
++				.setValue(net.minecraft.world.level.block.DirectionalBlock.FACING, net.minecraft.core.Direction.EAST);
++			var link = com.simibubi.create.AllBlocks.STOCK_LINK.getDefaultState();
++			level.setBlockAndUpdate(machineA, packager);
++			level.setBlockAndUpdate(machineB, packager);
++			level.setBlockAndUpdate(machineA.above(), link);
++			level.setBlockAndUpdate(machineB.above(), link);
++			level.getBlockEntity(machineA.above(), linkType).orElseThrow().behaviour.freqId = frequency;
++			level.getBlockEntity(machineB.above(), linkType).orElseThrow().behaviour.freqId = frequency;
++			var priorityA = machineA.above().north();
++			var priorityB = machineB.above().north();
++			level.setBlockAndUpdate(priorityA, net.minecraft.world.level.block.Blocks.TARGET.defaultBlockState()
++				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWER, 1));
++			level.setBlockAndUpdate(priorityB, net.minecraft.world.level.block.Blocks.TARGET.defaultBlockState()
++				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWER, 7));
++			level.getBlockEntity(machineA.above(), linkType).orElseThrow().behaviour.redstonePowerChanged(1);
++			level.getBlockEntity(machineB.above(), linkType).orElseThrow().behaviour.redstonePowerChanged(7);
++		});
++		helper.runAtTickTime(30, () -> {
++			var packagerA = (com.simibubi.create.content.logistics.packager.PackagerBlockEntity) level.getBlockEntity(machineA);
++			var packagerB = (com.simibubi.create.content.logistics.packager.PackagerBlockEntity) level.getBlockEntity(machineB);
++			int beforeA = packagerA.getAvailableItems().getCountOf(iron);
++			int beforeB = packagerB.getAvailableItems().getCountOf(iron);
++			if (beforeA != 4 || beforeB != 9)
++				helper.fail("Packager target inventories not ready: " + beforeA + "," + beforeB);
++			var order = com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts.simple(
++				java.util.List.of(new com.simibubi.create.content.logistics.BigItemStack(iron, 7)));
++			boolean accepted = com.simibubi.create.content.logistics.packagerLink.LogisticsManager.broadcastPackageRequest(
++				frequency,
++				com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour.RequestType.PLAYER,
++				order, null, "Priority");
++			var boxA = packagerA.heldBox;
++			var boxB = packagerB.heldBox;
++			int countA = boxA.isEmpty() ? 0 : com.simibubi.create.content.logistics.box.PackageItem.getContents(boxA).getStackInSlot(0).getCount();
++			int countB = boxB.isEmpty() ? 0 : com.simibubi.create.content.logistics.box.PackageItem.getContents(boxB).getStackInSlot(0).getCount();
++			int afterA = ((net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(a)).getItem(0).getCount();
++			int afterB = ((net.minecraft.world.level.block.entity.BarrelBlockEntity) level.getBlockEntity(b)).getItem(0).getCount();
++			System.out.printf("CREATE_STOCK_PRIORITY %b,%d,%d,%d,%d,%d,%d%n", accepted, 1, 7, countA, countB, afterA, afterB);
++			if (!accepted || countA + countB != 7 || beforeA + beforeB - afterA - afterB != 7)
++				helper.fail("Priority order did not ship seven requested items");
++			helper.succeed();
++		});
++	}
