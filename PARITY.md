@@ -802,7 +802,7 @@ The assembler regression retains six rail exchange actions and 18 departure
 samples from its existing Java fixtures.
 
 All eight selected checks passed serially on `native-9f42064-fb8446effe86`,
-built from the Controller Rail source at `c9a9d9b` with Horizon pin
+built from the Controller Rail source at `781c0ef` with Horizon pin
 `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` and the prepared Minecraft 26.3
 resources. The installed Create pack SHA-256 was
 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
@@ -5544,18 +5544,20 @@ helpers and uses it only for Item Hatch deposits. It preserves destination
 item rules, stack limits, existing item merges, and remaining held items; all
 other native consumers keep their sided API.
 
-The final build `native-9f42064-2777747110f8` was built from APP-2017 base
-`c9a9d9b` and uses Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`.
+The final build `native-9f42064-6bdf8691aa42` was built from APP-2017 base
+`781c0ef` and uses Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`.
 Its client SHA-256 is
-`272cd95c512901a2f2ff112c5ef6c202084192a2c98c6c6a319d6ef516cfe357`;
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`;
 `horizon-ctl` SHA-256 is
 `1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`; the
 prepared pack SHA-256 is
 `a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
-The current-main rebuild completed in 13m59s. The seven-check batch passed **7/7** on base `c9a9d9b`:
+The main-synchronized rebuild completed in 13m12s. An earlier rebased build
+`native-9f42064-2777747110f8` on `c9a9d9b` also passed all seven checks;
+its logs remain preserved in `.local/parity-app-2017-c9a9d9b/`. The seven-check batch passed **7/7** on base `781c0ef`:
 
 ```sh
-python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-2777747110f8/horizon-ctl .local/patched-launcher/versions/native-9f42064-2777747110f8/horizon-client .local/patched-launcher/versions/native-9f42064-2777747110f8/.local/horizon-client/26.3 --jobs 2 --check 'item-hatch*'
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-6bdf8691aa42/horizon-ctl .local/patched-launcher/versions/native-9f42064-6bdf8691aa42/horizon-client .local/patched-launcher/versions/native-9f42064-6bdf8691aa42/.local/horizon-client/26.3 --jobs 2 --check 'item-hatch*'
 ```
 
 This reran the four existing placement/deposit/filter checks in solo and LAN,
