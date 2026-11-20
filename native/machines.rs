@@ -997,7 +997,9 @@ fn network(game: &Game<'_>, start: [i32; 3], ticking: &ModBlockEntity) -> Networ
         // face. Evaluate each isolated side without counting the other load.
         let mut isolated = ticking.clone();
         let mut input = |side| {
-            isolated.nbt.insert("ClutchInputSide".into(), Tag::Int(side));
+            isolated
+                .nbt
+                .insert("ClutchInputSide".into(), Tag::Int(side));
             walk_network(game, start, (start, &isolated), true, |_, _| {})
         };
         if let Some(side @ (-1 | 1)) = int(&ticking.nbt, "ShaftInputSide") {
@@ -1052,7 +1054,11 @@ fn generated_source(
         Kinetic::Motor(facing) => {
             let detaching = matches!(entity.nbt.get(&"MotorSourceDetachTime".into()),
                 Some(Tag::Long(tick)) if *tick == game.world.game_time);
-            let speed = if detaching { 0.0 } else { motor_speed(facing, &entity.nbt) };
+            let speed = if detaching {
+                0.0
+            } else {
+                motor_speed(facing, &entity.nbt)
+            };
             (speed, 16384.0)
         }
         Kinetic::Handle(face) => create_valve::generator(game, pos, &entity.nbt, face),
@@ -3441,16 +3447,22 @@ fn transmission_reconnect_pending(entity: &ModBlockEntity, now: i64) -> bool {
 }
 
 fn finish_pending_transmission_reconnect(game: &mut Game<'_>, pos: [i32; 3], now: i64) -> bool {
-    let Some(entity) = mod_entity(game, pos).filter(|entity| transmission_reconnect_pending(entity, now)) else {
+    let Some(entity) =
+        mod_entity(game, pos).filter(|entity| transmission_reconnect_pending(entity, now))
+    else {
         return false;
     };
     // On disk load the kinetic data slots are empty. Java initializes the
     // branch motors from their saved sources before the queued callback.
-    let restored_motor = entity.data.is_empty()
+    let restored_motor = entity
+        .data
+        .is_empty()
         .then(|| restored_opposing_motor(game, pos, entity, now))
         .flatten();
     game.native_with_mod_block_entity(pos, |transmission| {
-        transmission.nbt.remove(&"TransmissionReconnectPending".into());
+        transmission
+            .nbt
+            .remove(&"TransmissionReconnectPending".into());
     });
     let Some(motor) = restored_motor else {
         return false;
@@ -3492,7 +3504,8 @@ fn restored_opposing_motor(
     {
         return None;
     }
-    let (conveyed, generated) = transmission_branch_speeds(game, pos, entity, transmission, input, now);
+    let (conveyed, generated) =
+        transmission_branch_speeds(game, pos, entity, transmission, input, now);
     // Java initializes an already-sourced Creative Motor only when its
     // configured speed exceeds its theoretical speed as a signed value.
     if matches!(transmission, Kinetic::Gearshift(..)) && generated <= conveyed {
@@ -3523,12 +3536,15 @@ fn transmission_reconnects_into_opposing_drive(game: &Game<'_>, pos: [i32; 3], n
             };
             (axis, source)
         }
-        Kinetic::Gearshift(axis, _) if !entity.nbt.contains_key(&"KineticsTick".into()) => (axis, -1),
+        Kinetic::Gearshift(axis, _) if !entity.nbt.contains_key(&"KineticsTick".into()) => {
+            (axis, -1)
+        }
         _ => return false,
     };
     let mut input = [0; 3];
     input[axis] = source;
-    let (conveyed, output) = transmission_branch_speeds(game, pos, entity, transmission, input, now);
+    let (conveyed, output) =
+        transmission_branch_speeds(game, pos, entity, transmission, input, now);
     opposing_branch_speeds(conveyed, output)
 }
 
@@ -3568,8 +3584,8 @@ fn transmission_branch_speed(
     side: [i32; 3],
 ) -> f32 {
     let neighbor = offset(ticking.0, side);
-    let Some(drive) = Kinetic::at(game, neighbor)
-        .filter(|block| transmission.ratio_to(*block, side).is_some())
+    let Some(drive) =
+        Kinetic::at(game, neighbor).filter(|block| transmission.ratio_to(*block, side).is_some())
     else {
         return 0.0;
     };
