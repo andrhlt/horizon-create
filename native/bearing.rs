@@ -957,6 +957,7 @@ pub(super) fn tick(
             entity.nbt.remove(&"AssembleNextTick".into());
             angle = 0.0;
         } else {
+            let mut actor_stalled = false;
             if was_running && rpm != 0.0 {
                 let previous = float(&entity.nbt, "ActorAngle").unwrap_or(0.0);
                 super::create_mounted_dispenser::rotate_actors(
@@ -970,6 +971,15 @@ pub(super) fn tick(
                     angle,
                 );
                 farm(game, &blocks, entity, anchor, axis, previous, angle);
+                actor_stalled = super::create_saw::move_actors(
+                    game,
+                    &mut blocks,
+                    entity,
+                    anchor,
+                    axis,
+                    previous,
+                    angle,
+                );
                 set_float(&mut entity.nbt, "ActorAngle", angle);
             }
             for block in &mut blocks {
@@ -991,15 +1001,16 @@ pub(super) fn tick(
                 }
                 angle = (angle + speed) % 360.0;
             }
-            let stalled = super::create_portable_interface::update_bearing(
-                game,
-                pos,
-                anchor,
-                &mut blocks,
-                axis,
-                physical_angle,
-                f64::from(angle).to_radians(),
-            );
+            let stalled = actor_stalled
+                || super::create_portable_interface::update_bearing(
+                    game,
+                    pos,
+                    anchor,
+                    &mut blocks,
+                    axis,
+                    physical_angle,
+                    f64::from(angle).to_radians(),
+                );
             entity
                 .nbt
                 .insert("Stalled".into(), Tag::Byte(i8::from(stalled)));

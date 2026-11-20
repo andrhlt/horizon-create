@@ -10597,3 +10597,91 @@ integration runs about 8 minutes across final-main reruns. The latest-main sync
 after those checks required no engine rebuild.
 No exhaustive contraption layouts, cosmetic timing or Java packet timing was
 claimed. Full 1:1 remains Open.
+
+
+## APP-2008 Dispensers, droppers and mounted actors
+
+The bounded comparison reused the pinned Create `ac0c444d9828da3453ae8cc65338e8de063286fb` references. The mounted dispenser implementation in this checkout is byte-identical to its source at `7f44b58c28df6a797c73e187dced78fe8575741e`; source review covered `MountedDispenseBehavior`, `DefaultMountedDispenseBehavior`, `DropperMovementBehaviour`, and `DispenserMovementBehaviour`. No consequential source mismatch appeared in the bounded cases, so no runtime edit was warranted.
+
+The following checks passed on `native-9f42064-d6dc2ad18d3f` (Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client SHA-256 `006bfe15a198b29d6af7633d353dcadaa07039121ae66c2081927299835a8811`) with the freshly prepared pinned pack (SHA-256 `ec0ee28f53e79af557cf6de5777d6f7c96497333be277d1aa005bbd606870e61`):
+
+| Case | Java comparison / outcome |
+| --- | --- |
+| Mounted arrow dispenser on a moving bearing | All 142 observations matched, including actor pose, ammo decrement, projectile count and launch direction across four successive launches. |
+| Two Gantry dispensers | All 68 samples matched for actor ordering and no duplicate/fighting effects. |
+| Refilled Gantry dispensers | All 68 samples matched for ammo refill from mounted cargo and subsequent firing. |
+| Dropper into Creative Crate, solo and LAN | Both 26-observation replays passed. |
+| Dropper into Chute, solo and LAN | Both registered cargo-transfer checks passed. |
+
+The focused command was `python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 --check arrow-dispenser --check dispensers-dont-fight --check dispensers-refill --check creative-crate-dropper --check creative-crate-dropper-lan --check package-dropper-chute --check package-dropper-chute-lan`. The first three outputs are `.local/arrow_dispenser-horizon.csv`, `.local/dispensers_dont_fight-horizon.csv`, and `.local/dispensers_refill-horizon.csv`; individual logs are in `.local/parity/`.
+
+The Dropper LAN cases establish guest operation and convergence for those adjacent item-transfer paths. The mounted Gantry/bearing cases above were solo only. The follow-up mounted-actor gate below covers the remaining representative guest and persistence cases; host/guest timing equivalence and all other payload/mounting combinations remain unverified. Full 1:1 remains Open.
+
+The follow-up harness `tools/test-mounted-dispenser-gates.py` now assembles a
+real Dropper fixture before the bearing actor is created, with a five-item
+cobblestone stack. On the pinned `native-9f42064-d6dc2ad18d3f` runtime, the
+mounted Dropper decremented and ejected one item, the LAN guest converged, and
+both idle and active `/save-all`/reopen checks conserved stack plus dropped-item
+counts. The mounted dispenser launched an arrow, conserved ammo and projectile
+count through idle and active reopen, and the rendered guest screenshot visibly
+contains the launched arrow. The `horizon-ctl entities` API is deliberately not
+used as a projectile oracle because it reports mobs, item drops and XP only;
+the guest screenshot is the replication assertion. Fresh artifacts are kept
+under `.local/app-2008-dispenser-fix/`, and the latest full run is recorded in
+`/private/tmp/app2008-mounted-full-no-diagnose.log`.
+
+The checks are registered as `mounted-dispenser-gates` and
+`mounted-dispenser-dropper` in `tools/test-parity.py`. This is representative
+coverage, not exhaustive payload, mounting or packet-timing parity; keep the
+family Partial and Full 1:1 Open.
+
+# APP-1981 Mechanical Saw gameplay baseline
+
+The bounded pass for APP-1981 keeps the existing generated Spruce Trapdoor
+trace and adds the gameplay cases that were missing from the matrix. It ran on
+Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, native build
+`native-9f42064-06476b4a74cb`, Create Java reference
+`ac0c444d9828da3453ae8cc65338e8de063286fb`, and pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+
+The focused batch passed 6/6:
+
+- `mechanical-saw`: the existing bamboo plank cut and horizontal log cut
+  matched all 96 sampled Java ticks, including the invalid Diamond pass-through.
+- `runtime-saw`: the generated Spruce Trapdoor cut matched all 96 Java ticks.
+- `mechanical-saw-placement`: placement and the filter configuration UI passed.
+- `electronics-crafting`: the survival Mechanical Saw recipe passed.
+- `mechanical-saw-output-recovery`: a full Depot held the saw's Bamboo Mosaic;
+  clearing the Depot delivered the buffered output without loss.
+- `mechanical-saw-tree-bearing`: an idle filter survived save/reopen; the
+  powered bearing-mounted saw then cut a representative three-log oak trunk,
+  survived active save/reopen, removed its attached leaves, and retained all
+  three logs in mounted storage.
+
+Run with the exact built client and prepared resources:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \
+  --check mechanical-saw --check runtime-saw \
+  --check mechanical-saw-placement --check electronics-crafting \
+  --check mechanical-saw-tree-bearing \
+  --check mechanical-saw-output-recovery
+```
+
+LAN guest item custody remains unverified. Two exploratory guest fixtures did
+not produce a confirmed saw pickup: one left the guest-dropped item at a stale
+pre-teleport spawn height, and the output-pickup case timed out without proving
+collection. Their diagnostics are preserved at
+`.local/parity/mechanical-saw-lan.log`; these are harness failures, not a
+confirmed product failure. The multiplayer gate remains open for a direct
+guest insertion/collection check. Broader tree species, other cutting outputs
+and exact moving-contraption tick timing remain follow-ups. Full 1:1 remains
+Open.
+
+The current-main rebase also exposed a compile blocker in the existing Postbox
+mixin (`anyhow::Result` is not available in the generated client); the branch
+uses `horizon_client::Result` so the combined client builds. The existing
+`postbox` regression check then failed after cold reopen because the expected
+parcel was absent from the dropped-item counts. Its log is
+`.local/parity/postbox.log`; this is outside APP-1981 and remains an explicit
+current-main follow-up rather than a saw result.
