@@ -4914,13 +4914,35 @@ The complete collision shape and exact animation remain open.
 ## Powered redstone latches
 
 The [pinned Java fixture](tools/java-create-latches.patch) records
-[41 ticks](fixtures/create-latches-java.csv) of Powered Latch and Powered
-Toggle Latch state, rear and side redstone inputs, and output read by
-adjacent dust. It includes short pulses, manual interactions and a
-sneaking interaction. The [physical Horizon replay](tools/test-create-latches.py)
-matched all 41 ticks in solo and with a guest operating both latches on
-`native-9f42064-e6e755d336c6`. Both survival recipes were exercised in
-solo. This replay covers the tested orientation and wire layout.
+[41 ticks](fixtures/create-latches-java.csv), ticks 0–40, of Powered Latch
+and Powered Toggle Latch state, rear and side inputs, and output read by
+adjacent dust. It covers short and held rear signals, a side signal, accepted
+manual toggles, rejection while rear and side power disagree, and sneaking.
+The [physical Horizon replay](tools/test-create-latches.py) matched every
+sample in solo and LAN on `native-9f42064-6bdf8691aa42`; the guest operated
+both latches and its observed state converged at every sample. Both survival
+recipes also passed in solo.
+
+The [persistence replay](tools/test-create-latches-persistence.py) checks
+idle saved outputs, active rear inputs on both latches, the Powered Latch's
+side input, and state retention across world restart. After reopening, it
+removes the rear input and then the remaining side input, confirming the
+Toggle Latch holds its output and the Powered Latch resets when both paths
+are off. These are instantaneous block states, so active persistence means
+retaining powered state and connections through restart and observing their
+subsequent reset transitions; no tile-entity contents apply. It passed on the
+same identified build. The registered checks are `redstone-latches`,
+`redstone-latches-lan`, and `redstone-latches-persistence`.
+
+Java source: Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+Capture patch SHA-256: `5ccdffe850690369dae4f659a23b4d4b4a8f732bf313813829d868fa8bc8e2c3`;
+trace SHA-256: `496e0d3ff609bd125b92fb466e081b12cea298ed0fc3cf04cd1b109b12c37c2c`.
+Horizon: `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client build
+`native-9f42064-6bdf8691aa42`, pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Run the three named checks with the documented `tools/test-parity.py`
+command. Exact visual presentation and other orientations/mixed layouts
+remain outside this bounded gameplay pass.
 
 ## Brass pulse diodes
 

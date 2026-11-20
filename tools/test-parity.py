@@ -1654,6 +1654,7 @@ CHECKS = (
     ("rose-quartz-lamp-lan", "test-rose-quartz-lamp", "--lan"),
     ("redstone-latches", "test-create-latches"),
     ("redstone-latches-lan", "test-create-latches", "--lan"),
+    ("redstone-latches-persistence", "test-create-latches-persistence"),
     ("desk-bell-pulse", "test-desk-bell"),
     ("desk-bell-pulse-lan", "test-desk-bell", "--lan"),
     ("desk-bell-placement", "test-desk-bell", "--placement"),
