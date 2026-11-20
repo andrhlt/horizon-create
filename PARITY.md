@@ -10216,3 +10216,56 @@ These representative cases establish the finite gameplay baseline. They do
 not claim exhaustive Java parity for every inventory, airflow, branch,
 mounted, visual, effect or packet-timing combination.
 
+## Redstone Contact gameplay baseline (APP-2000)
+
+The pinned Java `RedstoneContactBlock.hasValidContact` accepts either a
+Redstone Contact or an Elevator Contact when their facing values oppose.
+Before the fix, the old Horizon client powered the Redstone-to-Redstone pair
+and kept a mismatched pair off, but failed the Redstone-to-Elevator pair. The
+preserved reproduction is `.local/evidence/app-2000/pre-fix-redstone-contacts.log`.
+`native/contact.rs` now reads facing from both registered contact IDs for
+placement adjacency, neighbor updates and the scheduled contact tick.
+
+The finite baseline cases passed:
+
+- A player placed a contact against a support block; its facing matched the
+  pinned Java look-direction default. A matching pair, a nonmatching pair,
+  and a mixed Redstone/Elevator pair produced the expected static output.
+- Both connected states survived idle save/reopen. Removing each paired
+  contact deactivated the remaining Redstone Contact.
+- The original vertical Gantry trace matched all 111 samples, ticks 0–110,
+  for carriage height (tolerance `1e-6`), three powered states (exact), and
+  diamond-block height (exact). Trace origin is the first fixture sample.
+- An active Gantry/contact save at fixture tick 12 reopened and matched the
+  Java trace at tick 20 after server startup advanced the saved world.
+- On a dedicated server, host and guest agreed on matching, mismatched, mixed
+  pairs and deactivation. This confirms guest convergence, not packet-arrival
+  timing equivalence.
+
+The Java fixture is `fixtures/redstone_contacts-java.csv` from Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; the capture patch hash is
+`9746209a1df14aa1c3907c22d3e5f7c2529cb447b1608b943fc8bf44c6fa8419`.
+No Java recapture was needed. The final Horizon build is
+`native-9f42064-395b15d09945` on pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`; its client SHA-256 is
+`e7fce2430c800def29c42730261f9b79030c52bff3cf361522357956c3403145` and
+the pack SHA-256 is
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The solo trace output is `.local/redstone_contacts-horizon.csv` (112 rows
+including its header). The test log is `.local/parity/redstone-contacts.log`.
+
+Run the scoped checks with the pinned client and prepared 26.3 resources:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \
+  --check redstone-contacts --check redstone-contacts-lan
+```
+
+Both checks passed. `py_compile` for the two test scripts and runner, plus
+`git diff --check`, passed. Work time: setup/evidence reuse about 5 minutes;
+implementation and debugging about 25 minutes; private first build 533 seconds
+and incremental build 169 seconds; syntax/diff checks under a second; focused
+integration runs about 8 minutes across final-main reruns. The latest-main sync
+after those checks required no engine rebuild.
+No exhaustive contraption layouts, cosmetic timing or Java packet timing was
+claimed. Full 1:1 remains Open.

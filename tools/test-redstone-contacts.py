@@ -35,6 +35,58 @@ def run(args):
     with (ROOT / "fixtures/redstone_contacts-java.csv").open() as data:
         expected = tuple(csv.DictReader(data))
     with fixture_world(args, "Redstone-contacts", STRUCTURE, render=args.visual) as control:
+        # Java's hasValidContact accepts either contact block when the faces oppose.
+        # Keep these static cases away from the original moving Gantry fixture.
+        control.commands((
+            "/setblock 22 100 30 minecraft:stone",
+            "/item replace entity @s hotbar.0 with create:redstone_contact 1",
+            "/tp @s 25.5 100 30.5",
+        ))
+        control.call("wait", 3)
+        control.call("look-at", 22.5, 100.5, 30.5)
+        control.call("select", "create:redstone_contact")
+        control.call("interact", 22, 100, 30, "east")
+        placed = control.call("block", 23, 100, 30)["state"]
+        if not placed.startswith("create:redstone_contact[") or "facing=east" not in placed:
+            raise RuntimeError(f"Face placement did not use the Java look-direction default: {placed}")
+        static = (
+            ("30 100 30", "31 100 30", "create:redstone_contact[facing=east,powered=false]",
+             "create:redstone_contact[facing=west,powered=false]", True),
+            ("34 100 30", "35 100 30", "create:redstone_contact[facing=east,powered=false]",
+             "create:redstone_contact[facing=north,powered=false]", False),
+            ("38 100 30", "39 100 30", "create:redstone_contact[facing=east,powered=false]",
+             "create:elevator_contact[facing=west,powered=false,calling=false,powering=false]", True),
+        )
+        for left, right, left_state, right_state, _ in static:
+            control.command(f"/setblock {left} {left_state}")
+            control.command(f"/setblock {right} {right_state}")
+        checks = tuple(
+            control.commands(tuple(
+                f"/execute if block {left} create:redstone_contact[powered={str(powered).lower()}]"
+                for left, _, _, _, powered in static
+            ))
+        )
+        if any("Test passed" not in result for result in checks):
+            raise RuntimeError(f"Static Redstone Contact matching failed: {checks}")
+        control.command("/save-all flush")
+        control.restart()
+        checks = tuple(
+            control.commands(tuple(
+                f"/execute if block {left} create:redstone_contact[powered={str(powered).lower()}]"
+                for left, _, _, _, powered in static
+            ))
+        )
+        if any("Test passed" not in result for result in checks):
+            raise RuntimeError(f"Static contact pairs changed across idle save/reopen: {checks}")
+        control.command("/setblock 31 100 30 air")
+        control.command("/setblock 39 100 30 air")
+        control.step_to(control.clock() + 1)
+        checks = control.commands((
+            "/execute if block 30 100 30 create:redstone_contact[powered=false]",
+            "/execute if block 38 100 30 create:redstone_contact[powered=false]",
+        ))
+        if any("Test passed" not in result for result in checks):
+            raise RuntimeError(f"Static contacts failed to deactivate after separation: {checks}")
         control.commands((
             f"/place template create:{STRUCTURE.with_suffix('')} {' '.join(map(str, BASE))}",
             f"/setblock {pos((1, 2, 2))} minecraft:lever[face=floor,facing=west,powered=false]",
@@ -66,7 +118,29 @@ def run(args):
                     control.call("key", "f1", "tap")
             if differences:
                 raise RuntimeError("\n".join(differences[:8]))
-    print(f"Vertical Gantry travel, all three contacts, and the piston column matched Java for all {len(expected)} ticks.")
+    active_reopen_tick = 0
+    with fixture_world(args, "Redstone-contact-active-reopen", STRUCTURE) as control:
+        control.commands((
+            f"/place template create:{STRUCTURE.with_suffix('')} {' '.join(map(str, BASE))}",
+            f"/setblock {pos((1, 2, 2))} minecraft:lever[face=floor,facing=west,powered=false]",
+        ))
+        start = control.clock()
+        for tick in range(1, 13):
+            control.step_to(start + tick)
+        control.command("/save-all flush")
+        control.restart()
+        reopened_tick = control.clock() - start
+        active_reopen_tick = reopened_tick
+        row = next((row for row in expected if int(row["tick"]) == reopened_tick), None)
+        if row is None:
+            raise RuntimeError(f"Active reopen advanced outside the Java trace at tick {reopened_tick}.")
+        reopened = sample(control)
+        want = (float(row["height"]), *(row[key] for key in KEYS[1:4]), int(row["diamond_y"]))
+        if abs(reopened[0] - want[0]) > 1e-6 or reopened[1:] != want[1:]:
+            raise RuntimeError(f"Active Gantry/contact reopen at tick {reopened_tick}: {reopened} != {want}")
+        if reopened_tick <= 12:
+            raise RuntimeError("The active Gantry/contact setup did not resume after reopening.")
+    print(f"Static matching, idle reopen, separation and vertical Gantry travel passed; the original Java moving-contact trace and piston column matched all {len(expected)} ticks, and active save/reopen matched Java at trace tick {active_reopen_tick}.")
 
 
 if __name__ == "__main__":
