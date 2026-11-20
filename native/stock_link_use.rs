@@ -22,6 +22,7 @@ fn stock_link_use(game: &mut Game<'_>, hit: Option<&Hit>) -> std::ops::ControlFl
     }
     if hit.is_some_and(|hit| {
         crate::game::create_item_hatch::click(game, hit.pos, hit.point)
+            || crate::game::create_fluids::click_filter(game, hit)
             || crate::game::create_backtank::equip(game, hit.pos)
     }) {
         return std::ops::ControlFlow::Break(Ok(true));

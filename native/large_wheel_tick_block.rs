@@ -4,6 +4,7 @@ fn large_wheel_tick_block(
     pos: horizon_core::position::BlockPos,
     state: horizon_world::registry::BlockStateId,
 ) {
+    crate::game::create_fluids::tick_changed_pipe(level, pos, state);
     crate::game::create_large_wheel::tick_block(level, ticks, pos, state);
     crate::game::create_sequencer::tick_block(level, ticks, pos, state);
     crate::game::create_contact::tick(level, ticks, pos, state);
