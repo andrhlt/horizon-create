@@ -786,6 +786,61 @@ tick 1 and launches the minecart in the stored direction at 0.4 blocks
 per tick. The [Java GameTest patch](tools/java-controller-rail-tools.patch)
 recaptures the Wrench and Assembler traces.
 
+### APP-2044 finite gameplay baseline
+
+The [placement reference](fixtures/controller-rail-placement-java.csv) has 12
+Java rows across four headings, including straight, waterlogged and supported
+ascending placement. The `controller-rail` replay also rejects a south-side
+placement with no supporting block and confirms the rail stays in hand. The
+[signal reference](fixtures/controller-rail-power-java.csv) has 221 samples;
+the [gradient reference](fixtures/controller-rail-gradient-java.csv) has 490
+rail/comparator samples, including a two-tick comparator response. The
+[minecart reference](fixtures/controller-rail-motion-java.csv) checks 52
+samples for full/partial speed, zero-power centering and braking, with
+position and horizontal velocity within 0.000001 blocks or blocks per tick.
+The assembler regression retains six rail exchange actions and 18 departure
+samples from its existing Java fixtures.
+
+All eight selected checks passed serially on `native-9f42064-fb8446effe86`,
+built from the Controller Rail source at `5e631ab` with Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` and the prepared Minecraft 26.3
+resources. The installed Create pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+
+| Check | Result |
+| --- | --- |
+| `controller-rail` | Pass: 12 Java placements, rejected placement, 221 power samples |
+| `controller-rail-gradient` | Pass: 490 rail and comparator samples |
+| `controller-rail-motion` | Pass: 52 Java minecart samples |
+| `controller-rail-craft` | Pass: survival recipe crafts six rails and consumes all eight inputs |
+| `controller-rail-wrench` | Pass: 12 rotations and two dry/wet crouch-pickup cases |
+| `controller-rail-assembler` | Pass: six rail exchanges and 18 departure samples |
+| `controller-rail-persistence` | Pass: idle rail and powered rail state survive save/reopen; a moving cart remains on the powered line and advances after reopen |
+| `controller-rail-lan` | Pass: guest observes the host's powered rail state on a dedicated LAN server |
+
+The new rejection, persistence and LAN cases are Horizon behavior checks, not
+new Java timing captures. The existing Java fixtures remain the comparison
+evidence for power, direction and cart motion. The guest check establishes
+state convergence, not Java-equivalent packet arrival. During harness repair,
+the negative placement aim was moved away from an occluding fixture rail, and
+the Controller Rail pickup check stopped using a Wrench helper hard-coded to a
+different block position. No production Controller Rail mismatch was
+reproduced; this pass changes checks and evidence only.
+
+Reproduce the bounded final set with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check controller-rail --check controller-rail-gradient --check controller-rail-motion --check controller-rail-craft --check controller-rail-wrench --check controller-rail-assembler --check controller-rail-persistence --check controller-rail-lan
+```
+
+Time (approximate): setup and private runtime/cache provisioning 15 minutes;
+source review and fixture implementation/repair 25 minutes; Java recapture 0
+minutes (existing captures reused); native builds 20:32 for the first build,
+8:32 for the first rebased build and 5:01 for the final incremental build;
+static checks under one minute; final eight-check integration run about five
+minutes. Full 1:1 remains Open for remaining slopes, crossings and powered
+combinations.
+
 ## Copycat Panel and Step
 
 Horizon build `613a2d8c9600` matched 90 Java material and Wrench
