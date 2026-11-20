@@ -1,7 +1,7 @@
 # Independent feature-family workers
 
-Own the entire Linear issue's feature family through implementation, reference
-comparison, review, and integration. The issue's matrix row is the starting
+Deliver the Linear issue's finite gameplay pass through implementation, reference
+comparison, review, and integration under [the completion standard](COMPLETION-STANDARD.md). The issue's matrix row is the starting
 state; retain existing working code and evidence. Do not restart the port.
 
 ## Reference and efficient implementation
@@ -15,10 +15,9 @@ state; retain existing working code and evidence. Do not restart the port.
   algorithms, ordering, defaults and transitions directly into the existing Rust
   modules. Use a small pure production module only where it enables fast checks;
   avoid a framework or a parallel implementation solely for tests.
-- Enumerate the family's applicable paths: variants, placement/orientation,
-  settings, recipes/drops, interaction, redstone/kinetics, errors, rendering,
-  sounds, persistence and host/guest behavior. Compare this list to existing
-  fixtures; implement and verify uncovered behavior in batches.
+- Record a bounded case matrix for important gameplay paths and boundaries.
+  Reuse existing coverage, batch missing functional checks, and record cosmetic
+  and additional combinations as nonblocking follow-ups under the completion standard.
 - Reproduce a mismatch before changing existing behavior. Capture a real Java
   trace, including transitions and negative cases, then compare Horizon to it.
   Do not generate expected values from the Rust implementation. Confirm each
@@ -83,8 +82,8 @@ real Horizon checks on one identified build. Compare every sampled tick, with a
 stated tick origin, observable fields, tolerance (zero for exact discrete state)
 and source revision. Cover solo, LAN host and guest; distinguish authoritative
 server timing from guest eventual replication and interpolation. A wait for
-replication does not prove Java network arrival timing. Compare actual Java
-save/reload where claiming reload parity. Source-matched render parameters alone
+replication does not prove Java network arrival timing. Check representative idle/active Horizon save/reopen for gameplay completion.
+Compare actual Java save/reload where claiming exact reload parity. Source-matched render parameters alone
 do not prove identical pixels or sound timing.
 
 Preserve failed captures/results and label invalid fixtures rather than silently
@@ -97,10 +96,10 @@ Use a branch/worktree per ticket from a committed main baseline. Coordinate
 changes to shared native/machines.rs, native/horizon-mixin.toml, engine patches,
 preparation scripts, runner and matrix. Make narrow edits; do not reformat whole
 shared files. Push the branch and open a PR referencing the Linear issue.
-Update the family row and evidence notes in that PR. A passing representative
-fixture does not justify marking the whole family Full 1:1. If any applicable
-path is unimplemented or unverified, keep that gap explicit and do not close the
-issue as fully verified. Describe concrete environment blockers in Linear.
+Update the family row and evidence notes in that PR. Use the finite completion
+gates in COMPLETION-STANDARD.md. Keep Full 1:1 Open while exhaustive equivalence
+is unproven, but do not keep a gameplay ticket open solely for nonblocking
+cosmetic or untested follow-ups. Record consequential blockers and dependencies.
 
 The coordinator reviews/merges PRs, resolves overlapping changes and reruns the
 affected checks on the combined build before treating integration as complete.

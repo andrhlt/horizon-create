@@ -4,7 +4,9 @@ The first 10 feature families are assigned through standalone Todo issues in the
 [Blockmas project](https://linear.app/appstu/project/blockmas-02b108813887).
 Claim an issue before starting and read [the worker workflow](PARITY-WORKER.md).
 The [feature matrix](FEATURE-MATRIX.md) remains the evidence summary.
-These tickets track remaining full-family parity, not work already completed.
+These tickets deliver finite gameplay completion passes under
+[the completion standard](COMPLETION-STANDARD.md). Existing titles saying full
+parity do not require exhaustive equivalence before delivery.
 
 | Family | Linear issue |
 | --- | --- |
