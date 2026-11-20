@@ -313,22 +313,32 @@ the recipe's output order and resolves chance rolls when applying the recipe,
 not during repeated recipe lookups. This keeps lookup and tick validation from
 rerolling an output. Fluid outputs are unaffected.
 
-Source and focused helper checks cover interleaved guaranteed and probabilistic
-outputs and the count resulting from independent rolls. Runtime verification
-with a probabilistic mixer recipe, including host/guest and active save/reopen,
-remains open; existing deterministic mixing traces do not cover that case.
+The Rust helper test supplies three fixed rolls and checks the count and order
+of interleaved guaranteed and probabilistic outputs. The [runtime replay](tools/test-mixer-chance.py)
+loads a world datapack with one diamond input, 64 gold nugget rolls at 50% each
+and two guaranteed items. It closes the host while the mixer is running with
+at least 20 processing ticks left. On reopening, the same recipe still has its
+diamond and a positive countdown. After 80 more stepped ticks, the diamond is
+gone and the mixer is idle. The survival guest picks up the rolled stack from
+the depot and checks its exact count against the host. After an idle reopen,
+the depot still holds the iron nugget and the basin still holds the queued
+copper ingot. This checks output order, custody and persistence.
 
-The isolated build `native-9f42064-ffe4b00e329a` used the pinned 26.3 resources
-and `create.hmod` SHA-256
+The combined client `native-9f42064-12f8cd8053b7` produced 30 gold nuggets in
+the first completed replay. The game uses the level RNG, so the count varies
+between runs. The pinned 26.3 resources used `create.hmod` SHA-256
 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
-Its `horizon-client` SHA-256 is
-`07a4122cea6aca83ee27239677f8e8707fc600f6e117377fc189ba57ecb2c2e4`.
-The focused integration batch passed all 11 checks: `wheat-milling`,
-`milling-recipes`, `depot-pressing`, `pressing-category`, `basin-dry-alloy`,
-`basin-wet-materials`, `heated-fluid-food`, `water-filling-bottle`, `spouting`,
-`mixing-lookup` and `recipe-navigation`. These cover existing deterministic
-recipe behavior, basin routing, fluid processing, spouting and recipe sync;
-they do not exercise probabilistic output execution.
+The client SHA-256 is
+`0d8c15ef73ed7f31847b91f961a3ac9423887292b1275e8347aa7c54c270374c`.
+
+The earlier build `native-9f42064-ffe4b00e329a` passed 11 neighboring checks:
+`wheat-milling`, `milling-recipes`, `depot-pressing`, `pressing-category`,
+`basin-dry-alloy`, `basin-wet-materials`, `heated-fluid-food`,
+`water-filling-bottle`, `spouting`, `mixing-lookup` and `recipe-navigation`.
+These cover accepted and rejected inputs, basin routing, fluid processing,
+spouting and guest recipe/tag synchronization on reload. Run the same named
+checks and `mixer-chance` with `tools/test-parity.py` on the combined build.
+Exact RNG stream alignment with Java and guest packet timing remain unverified.
 
 The [Java crafting probe](tools/java-machine-crafting-trace.patch) resolves
 24 original recipe IDs through the game's recipe manager and records the
