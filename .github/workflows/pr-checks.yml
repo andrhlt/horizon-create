@@ -1,0 +1,39 @@
+name: PR checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quick-checks:
+    name: Quick checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Script and data syntax
+        run: python3 tools/check-source.py
+      - name: Clippy correctness (standalone Rust)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/create-ci-target
+        run: |
+          if [ "${{ github.event_name }}" = workflow_dispatch ] ||
+             git diff --name-only "$BASE_SHA" HEAD -- \
+               tools/tank-replay tools/tank-replay.rs \
+               native/tank_connectivity.rs native/tank_storage.rs \
+               .github/workflows/pr-checks.yml | grep -q .; then
+            cargo clippy --manifest-path tools/tank-replay/Cargo.toml \
+              --locked --all-targets -- -A warnings -D clippy::correctness
+          else
+            echo 'Standalone Rust inputs unchanged; Clippy skipped.'
+          fi
