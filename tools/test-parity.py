@@ -252,6 +252,8 @@ CHECKS = (
     ("rotation-speed-controller-clipboard", "test-rotation-speed-controller-clipboard"),
     ("rotation-speed-controller-clipboard-lan", "test-rotation-speed-controller-clipboard", "--lan"),
     ("rotation-speed-controller-loop-close", "test-rotation-speed-controller-loop-close"),
+    ("clipboard-lifecycle", "test-clipboard-lifecycle"),
+    ("clipboard-lifecycle-lan", "test-clipboard-lifecycle", "--lan"),
     ("waterwheel-materials", "test-waterwheel-materials"),
     ("depot-comparator", "test-depot-comparator"),
     ("item-drain", "test-item-drain", "--fluid-visual", "--plumbing"),
