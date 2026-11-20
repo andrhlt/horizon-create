@@ -2130,6 +2130,11 @@ passed on that exact build, including both new Smart Chute runs. An initial
 rerun inside the filesystem sandbox exited before gameplay because Horizon's
 local control socket was denied; the successful rerun had local socket access.
 
+While the PR waited for auto-merge, `main` advanced again. The branch was
+rebased onto `f9ee5a75d0efbe2c9e81b535c0d41a5e6f994481` and rebuilt as
+`native-9f42064-f11c2d5d72fd` in 4 minutes 8 seconds. The same 19 selected
+checks passed on this latest tree.
+
 ```sh
 sh tools/build-native.sh /path/to/launcher-0.2.67 /path/to/private-launcher-data
 HORIZON_NO_AUDIO=1 HORIZON_NO_DISCORD=1 python3 tools/test-parity.py \
