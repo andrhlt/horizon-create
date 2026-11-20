@@ -20,6 +20,13 @@ def coordinates(pos):
     return " ".join(map(str, pos))
 
 
+def property_value(state, key):
+    match = re.search(rf"\b{key}=([a-z]+)", state)
+    if match is None:
+        raise RuntimeError(f"Missing {key} in block state {state!r}.")
+    return match[1]
+
+
 def initial_build(radial):
     if radial:
         sticky = f"{RADIAL}[axis=y,sticky_east=true]"
@@ -186,9 +193,63 @@ def run(args):
     print(f"Linear and Radial Chassis range controls, six-tick holds, and captures matched all {len(actual)} Java ticks.")
 
 
+def persistence(args):
+    """Keep a configured mixed linear group through a world restart and move it."""
+    anchor = (8, 201, 42)
+    east = (9, 201, 42)
+    payload = (10, 201, 42)
+    members = (anchor, east)
+    bearing, motor = BEARING, MOTOR
+    with (ROOT / "fixtures/secondary-linear-chassis-java.csv").open() as file:
+        reference = next(row["payload"] for row in csv.DictReader(file)
+                         if row["scenario"] == "2" and row["tick"] == "1")
+    expected_payload = "|".join(sorted(
+        position for position, _ in (entry.split("=", 1) for entry in reference.split("|"))
+        if position.split(":")[2] == "0"
+    ))
+    with fixture_world(args, "chassis-range-reopen", render=True, pack=args.pack) as control:
+        control.commands((
+            "/tp @s 5.5 201 42.5 -90 24",
+            f"/setblock {coordinates(anchor)} {PRIMARY}[axis=x,sticky_top=true]",
+            f"/setblock {coordinates(east)} {SECONDARY}[axis=x,sticky_top=true]",
+            f"/setblock {coordinates(payload)} minecraft:bricks",
+            f"/setblock {coordinates(bearing)} create:mechanical_bearing[facing=up]",
+            f"/setblock {coordinates(motor)} create:creative_motor[facing=up]{{ScrollValue:0}}",
+            *(f"/data merge block {coordinates(member)} {{ScrollValue:2}}" for member in members),
+            "/gamemode survival",
+        ))
+        for _ in range(2):
+            control.step_to(control.clock() + 1)
+        control.restart()
+        observed = [control.call("block", *pos) for pos in (*members, payload)]
+        if [block["block"] for block in observed] != [PRIMARY, SECONDARY, "minecraft:bricks"]:
+            raise RuntimeError(f"Chassis assembly changed after reopen: {observed}.")
+        if (property_value(observed[0]["state"], "sticky_top") != "true"
+                or property_value(observed[1]["state"], "sticky_top") != "true"):
+            raise RuntimeError(f"Mixed chassis sticky faces changed after reopen: {observed[:2]}.")
+        ranges = values(control, *members)
+        if ranges != ["2"] * len(members):
+            raise RuntimeError(f"Chassis ranges changed after reopen: expected two 2s, got {ranges}.")
+        control.command(f"/data merge block {coordinates(motor)} {{ScrollValue:16}}")
+        control.step_to(control.clock() + 1)
+        actual_payload = captured(control, expected_payload)
+        if actual_payload != expected_payload:
+            raise RuntimeError(f"Reopened mixed chassis group captured {actual_payload}; Java {expected_payload}.")
+        control.restart()
+        actual_payload = captured(control, expected_payload)
+        if actual_payload != expected_payload:
+            raise RuntimeError(f"Active mixed chassis payload changed across restart: {actual_payload}.")
+    print("Mixed chassis membership and ranges survived idle restart; the active payload survived a second restart.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("ctl", "client", "resources"):
         parser.add_argument(name, type=lambda path: Path(path).resolve(strict=True))
     parser.add_argument("--pack", type=Path)
-    run(parser.parse_args())
+    parser.add_argument("--persistence", action="store_true")
+    args = parser.parse_args()
+    if args.persistence:
+        persistence(args)
+    else:
+        run(args)
