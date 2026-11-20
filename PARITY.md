@@ -2139,20 +2139,30 @@ and one disconnected motor at +40 RPM.
 
 The Java probe also records
 `fixtures/creative-motor-competition-java.csv` for two motors on one shaft,
-including a sign change, source removal and re-add. This direct layout remains
-different after the APP-1943 merge: on build `native-9f42064-c09cf86edbf1`,
-`tools/test-creative-motor-competition.py` reports 107 of 144 samples
-differing. Horizon removes the first motor during initialization, while Java
-retains the lane; Java later tears down the first case on the setting change.
+including a sign change, source removal and re-add. On the final PR tree,
+build `native-9f42064-1dcba217c926` reports 107 of 144 samples differing.
+These are gameplay failures, not settling noise: in the equal-speed lane,
+Horizon starts with the opposite motor's −16 RPM source, gives the shaft and
+second motor the wrong sign, and removes the first motor by tick 4 while Java
+keeps all three blocks at +16 through tick 4. Flipping that motor at tick 5
+makes Java tear down all three blocks; Horizon instead reverses the surviving
+shaft and motor to +16. In the other lane, Java propagates the expected −16 RPM
+after the tick-5 reversal and retains the shaft and driven motor when the
+opposing motor is removed at tick 12. Horizon removes the opposing motor at
+tick 5, then reports zero shaft speed and loses the driven motor after tick 12.
+At re-add, the block/speed state still does not match Java. Thus the remaining
+gate is source selection and direction, conflict teardown, and network
+recovery; this trace has no stress/capacity field and cannot assess stress.
+
 The [kinetic source-transition check](tools/test-kinetic-network-sources.py)
-passes on the same build, but it does not exercise two opposing motors placed
-on one existing shaft. A candidate startup-order change reduced this motor
-diagnostic to 87 differences on `native-9f42064-5c202877bda0` but still did
-not match Java, so that unverified change was not retained. The Horizon samples
+passes on the same final build, confirming the merged APP-1943 coverage but
+not the direct two-motor-on-one-shaft case. Six registered `creative-motor*`
+checks also pass on this build. A candidate startup-order change reduced this
+motor diagnostic to 87 differences on `native-9f42064-5c202877bda0` but still
+did not match Java, so that unverified change was not retained. Horizon samples
 are saved in `.local/creative-motor-competition-horizon.csv`. Keep this
-consequential source-order/flicker gap linked to
-[APP-1943](https://linear.app/appstu/issue/APP-1943); the diagnostic is not
-registered and this gameplay gate remains open.
+consequential gap linked to [APP-1943](https://linear.app/appstu/issue/APP-1943);
+the diagnostic is not registered and this gameplay gate remains open.
 
 ```sh
 python3 tools/test-creative-motor.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
