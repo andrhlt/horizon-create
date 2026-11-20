@@ -1647,6 +1647,7 @@ CHECKS = (
     ("colored-seats-lan", "test-colored-seats", "--lan"),
     ("colored-seats-crafting", "test-colored-seats", "--craft"),
     ("colored-seats-search", "test-colored-seats", "--search"),
+    ("seat-lifecycle", "test-seat-lifecycle"),
     ("create-creative-tabs", "test-create-creative-tabs"),
     ("create-creative-search", "test-create-creative-search"),
     ("create-creative-lan", "test-create-creative-lan"),
