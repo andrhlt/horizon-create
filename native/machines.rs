@@ -2051,6 +2051,48 @@ pub(super) fn collect_landed_items(
     }
 }
 
+fn collect_landed_basin_items(
+    game: &mut Game<'_>,
+    pos: [i32; 3],
+    inputs: &mut [Option<ItemStack>],
+) -> bool {
+    let (x, y, z) = (f64::from(pos[0]), f64::from(pos[1]), f64::from(pos[2]));
+    let mut changed = false;
+    let mut index = 0;
+    while index < game.dropped.len() {
+        let item = &game.dropped[index];
+        let point = item.position;
+        if item.on_ground
+            && (x..x + 1.0).contains(&point.x)
+            && (z..z + 1.0).contains(&point.z)
+            && (y..=y + 1.0 + 1e-6).contains(&point.y)
+        {
+            let limit = game.native_max_stack_size(&item.stack.item).unwrap_or(64);
+            let matching = inputs.iter().position(|slot| {
+                slot.as_ref().is_some_and(|stored| same_stack(stored, &item.stack))
+            });
+            let target = matching.or_else(|| inputs.iter().position(Option::is_none));
+            if let Some(target) = target {
+                let remaining = insert(
+                    std::slice::from_mut(&mut inputs[target]),
+                    &item.stack,
+                    limit,
+                );
+                if remaining != item.stack.count {
+                    changed = true;
+                }
+                if remaining == 0 {
+                    game.remove_dropped(index);
+                    continue;
+                }
+                game.dropped[index].stack.count = remaining;
+            }
+        }
+        index += 1;
+    }
+    changed
+}
+
 fn publish_network(entity: &mut ModBlockEntity, network: &Network) {
     publish_network_nbt(entity, network);
     if entity.data.len() < 3 {
@@ -3145,8 +3187,12 @@ pub(super) fn block_entity_tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut
             let (input, output) = items.split_at_mut(9);
             read_inventory(&mut entity.nbt, "InputItems", input);
             read_inventory(&mut entity.nbt, "OutputItems", output);
+            let inserted = collect_landed_basin_items(game, pos, input);
             entity.items = items;
             create_mixer::basin_tick(game, pos, entity);
+            if inserted {
+                game.native_block_entity_sync(pos);
+            }
         }
         CONTROLLER => create_crushing::tick(game, pos, entity),
         CRUSHING_WHEEL | "create:encased_shaft" => {
