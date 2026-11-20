@@ -604,7 +604,10 @@ pub(super) fn draw_screen(
             );
         }
     }
-    if data.first() == Some(&1) {
+    if rows == 0 {
+        let message = game.translate("create.display_link.no_target", "Not a Display Target");
+        centered(batch, &message, 112.0, 0xD3D3D3);
+    } else if data.first() == Some(&1) {
         centered(batch, "Active", 112.0, 0xC5F398);
     }
 }

@@ -4337,6 +4337,84 @@ polarity once on release. The 270-sample pulse LAN replay and nearby
 latch and valve controls passed on the same build. The animated indicator
 and diode click playback still need verification.
 
+## APP-2041 Display Link and Display Board
+
+The pinned Java Create revision `ac0c444d9828da3453ae8cc65338e8de063286fb`
+provides two existing references. The [Display Link fixture](fixtures/display_link-java.csv)
+samples ticks 0–145 for single and double chest counts, Nixie text, and
+redstone gating. The [depot fixture](fixtures/depot_display-java.csv)
+samples ticks 0–120 for both depot items, Board rows, and Board RPM.
+The capture patches are [Display Link](tools/java-display-link-trace.patch)
+and [depot display](tools/java-depot-display-trace.patch).
+
+The [lifecycle replay](tools/test-display-board-lifecycle.py) uses an
+offscreen integrated host and a survival LAN guest. The guest selects a
+powered Board, attaches a Link to a chest-facing Smart Observer, spends
+one Link, and selects the item-count source and second row. The host
+checks the resulting source, offset and row, and the guest framebuffer
+shows the count. Removing the Board hides the configuration controls.
+Restoring it allows the guest to publish 7 again with the same link.
+
+On the pinned Horizon comparison build `native-9f42064-6ce68a31b125`,
+the missing-target screen showed “Active”. Java’s `DisplayLinkScreen`
+uses `create.display_link.no_target` when the target is absent. The
+Horizon settings screen now uses the same translation in place of the
+active indicator while the target is absent.
+
+In the redstone-gated reopen, the saved connection and display of 7
+survive while the chest contains 11. Removing the redstone signal
+publishes 11. In the ungated reopen, the connection and 11 survive, and
+a stock change publishes 4 within 100 ticks.
+
+The baseline at port revision `198918987713b18a3cfa87c1ceddd7167f512419`
+built as `native-9f42064-f7d9ba41e662` in 19m 1s with launcher 0.2.67
+and Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. Its Create
+native bundle SHA-256 is
+`00ca576b17fc771b005a7af4ac7da74b7606f91cef4007c36b4ce2f9430f4496`.
+The prepared `create.hmod` SHA-256 is
+`79c140df790d6c578b79c3b027dfab4c825a8439355ed601b5d7cfebf9f47cb0`.
+
+The incremental candidate `native-9f42064-6a55687e3aae` built in 9m 58s.
+Its Create native bundle SHA-256 is
+`69924e9ecb722a34fa5b6daae5b1503357beb85724947911050f33241e844c6f`.
+The client SHA-256 is
+`5e78ea032b75c5344631f7678132c759538dfd334fededdce4295acebd410532`.
+Run the scoped checks with the candidate's binary and prepared 26.3
+resources, and the worktree's `.local/create.hmod`.
+
+```sh
+version=.local/patched-launcher/versions/native-9f42064-6a55687e3aae
+HORIZON_NO_AUDIO=1 python3 tools/test-parity.py "$version/horizon-ctl" \
+  "$version/horizon-client" "$version/.local/horizon-client/26.3" \
+  --jobs 1 --check display-board-lifecycle
+HORIZON_NO_AUDIO=1 python3 tools/test-parity.py "$version/horizon-ctl" \
+  "$version/horizon-client" "$version/.local/horizon-client/26.3" \
+  --jobs 2 --check display-link --check depot-display --check depot-display-settings
+HORIZON_NO_AUDIO=1 python3 tools/test-parity.py "$version/horizon-ctl" \
+  "$version/horizon-client" "$version/.local/horizon-client/26.3" \
+  --jobs 1 --check display-link-placement
+```
+
+The three existing comparison and depot settings checks passed in
+93.70s. Both traces matched every sample, and the survival depot settings
+published the item name to the second row of the powered Board.
+The Nixie placement check passed in 15.86s, selecting the Nixie,
+spending one Link and configuring the live count.
+
+The candidate lifecycle replay passed in 43.90s. The guest screenshots
+at `.local/display-board-guest-count.png` and
+`.local/display-board-guest-missing-target.png` show the second-row
+count and “Not a Display Target”, respectively. All 35 sampled cells
+of the guest digit match the installed bitmap font's `7` glyph. The
+sample compares the `7` and `?` font masks in
+`.local/app-2041-guest-glyph-verification.txt`. The seed menu comparison
+at `.local/app-2041-seed-guest-missing-target.png` shows the earlier
+“Active” label.
+
+The LAN check measures guest convergence and the reopen check exercises
+Horizon saves. Java network timing, Java reload parity, additional source
+and target combinations, and exact flap rendering remain open.
+
 ## Dyed Nixie Tubes
 
 The [Java dye trace](fixtures/nixie-dye-java.csv) and
