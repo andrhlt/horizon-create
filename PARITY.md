@@ -1905,6 +1905,15 @@ stone block each matched [18 Java slot transforms](fixtures/stockpile-switch-fil
 and submitted item geometry. When a guest selects a sample, both players see
 it on all three active faces of the tested wall-mounted switch.
 
+The bounded gameplay lifecycle check is `stockpile-switch-lifecycle`. It saves
+and reopens a barrel-backed item switch and a water-tank switch with configured
+thresholds, checking their stored contents and idle readings. It then crosses
+the item switch's upper threshold, saves while active, and confirms its powered
+output and sampled count after reopening. This is a Horizon save/reopen check;
+it does not claim Java reload parity. The check is registered in
+`tools/test-parity.py`; its run remains pending a provisioned pinned client and
+pack.
+
 ## Smart Observer filter
 
 The [72 original slot cases](fixtures/smart-observer-filter-poses-java.csv)
