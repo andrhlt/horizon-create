@@ -126,6 +126,45 @@ pub(super) fn inventory_tick(game: &mut Game<'_>, at: [i32; 3]) {
     game.native_update_output_neighbors(game.native_dimension(), at);
 }
 
+thread_local! {
+    static BREAK_CONTENTS: std::cell::RefCell<std::collections::HashMap<(String, [i32; 3]), Vec<Option<crate::items::ItemStack>>>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+pub(super) fn before_player_break(game: &Game<'_>, pos: [i32; 3]) {
+    if !game.native_authoritative() || !block(&game.native_block(pos)) {
+        return;
+    }
+    let key = (game.native_dimension().to_owned(), pos);
+    let contents = super::create_machines::mod_entity(game, pos)
+        .filter(|entity| entity.id == ENTITY)
+        .map(|entity| entity.items.clone())
+        .unwrap_or_default();
+    BREAK_CONTENTS.with_borrow_mut(|pending| {
+        pending.insert(key, contents);
+    });
+}
+
+pub(super) fn after_player_break(
+    game: &mut Game<'_>,
+    pos: [i32; 3],
+    result: anyhow::Result<bool>,
+) -> anyhow::Result<bool> {
+    if !game.native_authoritative() {
+        return result;
+    }
+    let key = (game.native_dimension().to_owned(), pos);
+    let contents = BREAK_CONTENTS.with_borrow_mut(|pending| pending.remove(&key));
+    if result.as_ref().is_ok_and(|broken| *broken)
+        && let Some(contents) = contents
+    {
+        game.with_level(|_, level, _| {
+            level.drop_lost_contents(horizon_core::position::BlockPos::new(pos[0], pos[1], pos[2]), contents);
+        });
+    }
+    result
+}
+
 // Java's Postbox targeting selection belongs to the player until a Postbox is placed.
 thread_local! {
     static STATION_TARGETS: std::cell::RefCell<std::collections::HashMap<([i32; 4], String), [i32; 3]>> =

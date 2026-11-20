@@ -5772,9 +5772,35 @@ parcel, keeps it across a menu reopen, and saves the address. The
 placement replay compares facing and waterlogging, and comparator
 values are sampled after settling.
 
-Train station attachment, train delivery, full world reload, the
-animated flag and remaining presentation checks are open. This work
-used isolated builds and muted offscreen menu replays.
+The APP-2029 follow-up replay used build `native-9f42064-6bdf8691aa42`
+(client SHA256 `703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`),
+pack SHA256 `a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`,
+and that evidence build's prepared 26.3 resources. The standalone replay
+passed in solo and LAN; the solo cold-reopen extension set `Warehouse` and
+`Dispatch` through each box's menu, retained the package in slot 17, and
+restored both boxes closed. A survival pickaxe break then exposed an item-loss
+defect: both Postbox blocks dropped, but their addressed package did not. The
+source fix captures package contents before the player-break callback and
+drops them only when that callback reports success. The rebuild has not
+completed: the available source cache failed on the advancement patch, and
+reusing its newer patched tree produced duplicate tree-fertilizer definitions.
+An initial compile also identified a mismatch between the checkout's Item
+Hatch hook and the cached Horizon source. The fix therefore remains unverified
+and removal is still an acceptance blocker. The existing offline buffer check
+in `tools/test-train-postbox-target.py` does not cover ordinary player break.
+
+Reproduce the baseline commands with the matching `horizon-ctl`, client and
+26.3 resources from the build above:
+
+```sh
+python3 tools/test-postbox.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 --pack /path/to/create.hmod
+python3 tools/test-postbox.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 --pack /path/to/create.hmod --lan
+python3 tools/test-postbox.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 --pack /path/to/create.hmod --craft
+```
+
+Train station attachment, train delivery, exact animated flag motion and
+remaining presentation checks stay open. This work used isolated worlds and
+muted offscreen menu replays.
 
 
 ## Nozzle placement and dropped-item airflow
