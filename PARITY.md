@@ -3656,6 +3656,60 @@ replay captures the original rotating head and break effects. Moving
 contraptions, cobblestone generator optimization, entity damage and
 exact sound or visual timing still need comparison.
 
+### APP-1983 bounded gameplay baseline
+
+On 2026-11-20, the stationary replay was rerun from the APP-1983 worktree
+against the pinned Java tick fixture. All 93 sampled ticks matched RPM, break
+progress, retry delay, target block and collected drops; this includes stone
+and dirt breaking, the bedrock control, power stop/resume and the neighboring-
+block retry. The existing placement replay also passed its two player cases:
+shaft-oriented placement and waterlogged source-water placement. Existing
+survival-crafting evidence records production of one Mechanical Drill from
+its original recipe. These results retain the scope of the stationary fixture
+and do not establish moving behavior.
+
+Runtime identity for the fresh replays: Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client build
+`native-9f42064-6bdf8691aa42` (client SHA-256
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`),
+pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`,
+and prepared Minecraft 26.3 resources from the same evidence directory.
+Commands were `python3 tools/test-mechanical-drill.py --visual ... --pack ...`
+and `python3 tools/test-mechanical-drill.py --configure ... --pack ...` with
+that build's `horizon-ctl`, `horizon-client`, and prepared resources. The
+initial sandboxed launch could not create its temporary control socket; the
+same isolated checks passed when rerun with local socket access.
+
+### APP-1983 mounted drilling
+
+Mounted straight-line drilling now uses the existing gantry and mechanical
+piston actor callbacks. It applies the pinned forward-motion gate and block
+eligibility checks, persists each actor's target and break progress, stalls
+movement during mining, puts drops into payload cargo before spawning
+leftovers, and clears break progress when motion ends. Linear contraptions may
+cross a blocked cell only when a forward-facing drill can mine that exact
+eligible target. Create tracks, non-breakable blocks, liquids, air and
+collision-free blocks remain obstructions.
+
+On 2026-11-20, final build `native-9f42064-581916b5f99f` (Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client SHA-256
+`cc8272cfcb393bc4e793c53d43bcf87014aa415cc032c2c7fa875af495631884`) passed
+all six selected regressions: stationary 93-tick drill trace, drill placement,
+mounted gantry LAN/save-reopen, existing gantry LAN/save-reopen,
+mechanical-piston actor regression, and ploughing. The mounted LAN scenario
+starts from an idle saved gantry, lets a guest power the drive and observe it
+move, then saves while the drill has a persistent active `BreakingPos`. After
+reopen the drill breaks stone, accounts for exactly one cobblestone/stone drop
+in cargo or the world, leaves bedrock unchanged, and stops the gantry. The
+stationary trace still matches all 93 Java samples; plough timing and piston
+actor regressions pass on the same final native build.
+
+These are representative bounded gameplay gates, not exhaustive 1:1 parity.
+Full 1:1 remains Open; other moving contraption types, wider block/drop
+combinations, cobblestone optimization and exact effects/presentation remain
+follow-ups.
+
 ```sh
 python3 tools/test-mechanical-drill.py --visual /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-mechanical-drill.py --configure /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3

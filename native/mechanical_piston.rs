@@ -92,10 +92,14 @@ fn has_clearance(
     blocks: &[Compound],
     piston: [i32; 3],
     sources: &[[i32; 3]],
+    motion: [i32; 3],
 ) -> bool {
     blocks.iter().all(|block| {
         let at = offset(anchor, relative(block));
-        at == piston || sources.contains(&at) || game.native_block_collision(at).is_empty()
+        at == piston
+            || sources.contains(&at)
+            || game.native_block_collision(at).is_empty()
+            || super::create_drill::allows_obstruction(game, blocks, anchor, at, motion)
     })
 }
 
@@ -187,7 +191,14 @@ fn assemble(
     ));
     let sources: Vec<_> = sources.into_iter().chain(extensions).collect();
     let next = position(start, normal, if speed > 0.0 { 1 } else { -1 });
-    if !has_clearance(game, next, &blocks, pos, &sources) {
+    if !has_clearance(
+        game,
+        next,
+        &blocks,
+        pos,
+        &sources,
+        normal.map(|step| step * if speed > 0.0 { 1 } else { -1 }),
+    ) {
         return None;
     }
     let air = game.native_default_state("minecraft:air")?;
@@ -362,7 +373,14 @@ pub(super) fn tick(
             },
         );
         let mut stopping = speed == 0.0 || next == 0.0 || next == range;
-        if !has_clearance(game, ahead, &blocks, pos, &[]) {
+        if !has_clearance(
+            game,
+            ahead,
+            &blocks,
+            pos,
+            &[],
+            normal.map(|step| step * if speed > 0.0 { 1 } else { -1 }),
+        ) {
             next = old.round();
             stopping = true;
         }
@@ -378,7 +396,20 @@ pub(super) fn tick(
         });
         let at =
             std::array::from_fn(|i| f64::from(anchor[i]) + f64::from(normal[i]) * f64::from(old));
+        let drill_at = std::array::from_fn(|i| {
+            f64::from(anchor[i]) + f64::from(normal[i]) * f64::from(next)
+        });
+        let drill_from = std::array::from_fn(|i| {
+            f64::from(anchor[i]) + f64::from(normal[i]) * f64::from(old)
+        });
         let motion = normal.map(|step| f64::from(step) * f64::from(next - old));
+        let drill_stalled = super::create_drill::translate(
+            game,
+            &mut blocks,
+            drill_from,
+            drill_at,
+            1.0 / 128.0,
+        );
         for block in &blocks {
             let Some(state) = compound(block, "BlockState") else {
                 continue;
@@ -393,7 +424,11 @@ pub(super) fn tick(
             }
         }
         set_float(&mut entity.nbt, "PreviousOffset", old);
-        set_float(&mut entity.nbt, "Offset", next);
+        if drill_stalled {
+            set_float(&mut entity.nbt, "Offset", old);
+        } else {
+            set_float(&mut entity.nbt, "Offset", next);
+        }
         if stopping {
             let target = position(anchor, normal, next.round() as i32);
             let initial = int(&entity.nbt, "CreatePistonInitialOffset").unwrap_or(0);
