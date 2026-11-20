@@ -6883,6 +6883,41 @@ in both modes, including compatible and perpendicular glass pipes,
 shafts, conflicting preferences, pump, Smart Fluid Pipe, Tank,
 Cauldron, water sources, and flowing water.
 
+APP-1986's bounded gameplay pass ran on `native-9f42064-fb8446effe86`
+with Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, the pinned Java
+source `ac0c444d9828da3453ae8cc65338e8de063286fb`, and the prepared Create
+pack (SHA-256 `af85c21d48dae13afa98251632b9c126c4410e617a734f229dbb28fa2467b553`).
+The [Fluid Valve line fixture](tools/test-fluid-valve-flow.py) moved water
+through a mechanically pumped line with a separately powered Fluid Valve.
+Its solo and LAN runs both verified powered opening, closed-flow rejection,
+reopening, reversal, and 7,000 mB conserved across the source tank, line and
+destination. On the solo run the tanks held 6,872/128 mB after opening and
+6,488/512 mB after closing; active flow resumed after save/reopen and retained
+the motor setting. A second idle, closed save/reopen retained both the closed
+state and destination amount. In the LAN run a guest changed the Creative
+Motor board to close and reopen the line, and the host observed the same
+resulting state and fluid movement. The [survival recipe check](tools/test-fluid-valve-flow.py)
+consumed an iron sheet and Fluid Pipe and produced one Fluid Valve.
+
+The registered flow, flow-LAN and recipe checks passed 3/3 on that build.
+The existing cycle, placement, placement-LAN, neighbor and neighbor-LAN
+checks also passed 5/5 on the same build, retaining the 19 Java cycle rows,
+24 placement cases and 26 neighbor cases. Commands:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check fluid-valve-flow --check fluid-valve-flow-lan --check fluid-valve-recipe
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check fluid-valve-cycle --check fluid-valve-placement --check fluid-valve-placement-lan --check fluid-valve-neighbors --check fluid-valve-neighbors-lan
+```
+
+The powered-flow fixture is a scoped state and conservation check, not a new
+Java-tick trace. Other fluids, port combinations and pointer rendering across
+orientations remain open in the Full 1:1 matrix.
+Effort log: Java recapture 0; pack preparation 24 s; runner/source review and
+fixture debugging about 25 min (motor direction, frozen-tick stepping and guest
+interaction corrections); private native builds took 9 min 50 s cold, 9 min 16 s
+after the first rebase, and 5 min 25 s on the latest main; Python syntax check
+under 1 s; the final eight focused integration checks took about 4 min.
+
 ## Copper Diving Helmet and Backtank breathing
 
 The [pinned Java GameTest](tools/java-copper-diving-breath.patch) submerged
