@@ -1,0 +1,137 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..218ffcf 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..892f799 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.chainDrivePlacement"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..5a111e9 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -2,6 +2,17 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ 
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.content.kinetics.chainDrive.ChainDriveBlock;
++import net.minecraft.core.Direction;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.entity.player.Player;
++import net.minecraft.world.item.context.UseOnContext;
++import net.minecraft.world.level.GameType;
++import net.minecraft.world.level.block.Block;
++import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++import net.minecraft.world.phys.BlockHitResult;
+ import com.simibubi.create.AllBlockEntityTypes;
+ import com.simibubi.create.AllDataComponents;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+@@ -115,4 +126,87 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing")
++	public static void chainDrivePlacement(CreateGameTestHelper helper) {
++		var player = helper.makeMockPlayer(GameType.CREATIVE);
++		var axes = Direction.Axis.values();
++		int index = 0;
++		for (var shaft : axes) {
++			for (var chain : axes) {
++				if (chain == shaft)
++					continue;
++				var center = new BlockPos(12 + index * 6, 4, 3);
++				var direction = Direction.fromAxisAndDirection(chain, Direction.AxisDirection.POSITIVE);
++				var left = center.relative(direction.getOpposite());
++				var right = center.relative(direction);
++				BlockPositionTrace trace = new BlockPositionTrace(shaft, chain, left, center, right);
++				Block endBlock = index % 2 == 0 ? AllBlocks.ENCASED_CHAIN_DRIVE.get() : AllBlocks.ADJUSTABLE_CHAIN_GEARSHIFT.get();
++				Block centerBlock = index % 2 == 0 ? AllBlocks.ADJUSTABLE_CHAIN_GEARSHIFT.get() : AllBlocks.ENCASED_CHAIN_DRIVE.get();
++				var alternate = java.util.Arrays.stream(axes).filter(axis -> axis != shaft && axis != chain)
++					.findFirst().orElseThrow();
++
++				placeChainDrive(helper, player, left, shaft, endBlock);
++				trace.sample(helper, "single");
++				placeChainDrive(helper, player, center, shaft, centerBlock);
++				trace.sample(helper, "pair");
++				placeChainDrive(helper, player, right, shaft, endBlock);
++				trace.sample(helper, "triple");
++				helper.setBlock(right, Blocks.AIR);
++				trace.sample(helper, "remove_end");
++				placeChainDrive(helper, player, right, alternate, endBlock);
++				trace.sample(helper, "different_shaft");
++				helper.setBlock(right, Blocks.AIR);
++				placeChainDrive(helper, player, right, chain, endBlock);
++				trace.sample(helper, "incompatible");
++				helper.setBlock(right, Blocks.AIR);
++				placeChainDrive(helper, player, right, shaft, endBlock);
++				trace.sample(helper, "restore_end");
++				helper.setBlock(center, Blocks.AIR);
++				trace.sample(helper, "split");
++				placeChainDrive(helper, player, center, shaft, centerBlock);
++				trace.sample(helper, "restore_middle");
++				index++;
++			}
++		}
++		helper.succeed();
++	}
++
++	private static void placeChainDrive(CreateGameTestHelper helper, Player player, BlockPos pos,
++		Direction.Axis shaft, Block block) {
++		var axis = BlockStateProperties.AXIS;
++		var toward = Direction.fromAxisAndDirection(shaft, Direction.AxisDirection.POSITIVE);
++		var support = pos.relative(toward);
++		helper.setBlock(support, AllBlocks.SHAFT.getDefaultState().setValue(axis, shaft));
++		var clicked = helper.absolutePos(support);
++		player.setPos(clicked.getX() - 2, clicked.getY(), clicked.getZ());
++		var face = toward.getOpposite();
++		var hit = new BlockHitResult(clicked.getCenter().relative(face, 0.5), face, clicked, false);
++		var hand = InteractionHand.MAIN_HAND;
++		var held = new ItemStack(block);
++		player.setItemInHand(hand, held);
++		held.useOn(new UseOnContext(player, hand, hit));
++		helper.assertBlockPresent(block, pos);
++		helper.setBlock(support, Blocks.AIR);
++	}
++
++	private record BlockPositionTrace(Direction.Axis shaft, Direction.Axis chain, BlockPos left,
++		BlockPos center, BlockPos right) {
++		void sample(CreateGameTestHelper helper, String phase) {
++			System.out.printf("CREATE_CHAIN_PLACEMENT %s,%s,%s,%s,%s,%s%n",
++				shaft, chain, phase, state(helper, left), state(helper, center), state(helper, right));
++		}
++
++		private static String state(CreateGameTestHelper helper, BlockPos pos) {
++			var state = helper.getBlockState(pos);
++			if (state.isAir())
++				return "air";
++			var gearshift = AllBlocks.ADJUSTABLE_CHAIN_GEARSHIFT.has(state);
++			var type = gearshift ? "gearshift" : "drive";
++			var powered = gearshift ? state.getValue(BlockStateProperties.POWERED).toString() : "-";
++			return String.format("%s:%s:%s:%s:%s", type, state.getValue(BlockStateProperties.AXIS),
++				state.getValue(ChainDriveBlock.CONNECTED_ALONG_FIRST_COORDINATE),
++				state.getValue(ChainDriveBlock.PART).getSerializedName(), powered);
++		}
++	}
+ }
