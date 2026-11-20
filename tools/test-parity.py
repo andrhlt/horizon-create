@@ -585,6 +585,8 @@ CHECKS = (
     ("mixer-placement", "test-press-placement", "--mixer"),
     ("depot-first-click", "test-depot-first-click", "--slide"),
     ("depot-first-click-lan", "test-depot-first-click", "--slide", "--multiplayer"),
+    ("depot-survival-reopen", "test-depot-baseline"),
+    ("depot-pushing-custody", "test-depot-baseline", "--funnel"),
     ("depot-pulling-funnel", "test-depot-pulling-funnel"),
     ("depot-pulling-funnel-lan", "test-depot-pulling-funnel", "--lan"),
     ("depot-drop-press", "test-depot-drop-press", "--sound"),

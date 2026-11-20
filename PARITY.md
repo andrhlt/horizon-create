@@ -2650,6 +2650,44 @@ on the deposit tick at volume .125 and pitch 1.5. In LAN the guest moved
 the items and both clients heard one slide. Retrieval produced no
 second slide.
 
+The Depot baseline checks on `native-9f42064-d7e37b705c75` added
+[survival crafting, placement and loaded idle reopen](tools/test-depot-baseline.py):
+the player crafts and places the Depot, swaps complete ingot stacks, reopens
+the world, then retrieves the held stack with all counts conserved. Its
+[pushing Funnel custody case](tools/test-depot-baseline.py) holds both a matching
+and a different incoming stack outside occupied Depots for 16 ticks, then
+transfers exactly one ingot after each Depot is cleared. The registered checks
+`depot-survival-reopen` and `depot-pushing-custody` passed with
+`depot-first-click`, `depot-first-click-lan`, `depot-pulling-funnel`,
+`depot-pulling-funnel-lan`, `depot-comparator`, `depot-pressing`,
+`press-lifecycle`, `weighted-ejector-belt-input-lan`, and
+`weighted-ejector-occupied-lan`. The press lifecycle check confirms empty and
+active save/reopen; the LAN first-click and pulling cases cover guest actions.
+The original first-click checks matched all three Java states solo and in LAN;
+the pulling Funnel checks matched all 96 Java rows in both modes, comparator
+matched 17 ticks, and pressing matched 71.
+The pushing test checks the occupied ordinary Depot's rejection behavior;
+Weighted Ejector merge remains covered separately by its original Java trace.
+The worktree base commit is `be02d33b1331352ed5a69cba28d93e6f04fafeb7`, with the
+pinned Horizon revision `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` and pack
+SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+To reproduce the finite set on that build:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-d7e37b705c75/horizon-ctl .local/patched-launcher/versions/native-9f42064-d7e37b705c75/horizon-client .local/patched-launcher/versions/native-9f42064-d7e37b705c75/.local/horizon-client/26.3 --jobs 2 \
+  --check depot-survival-reopen --check depot-pushing-custody \
+  --check depot-first-click --check depot-first-click-lan \
+  --check depot-pulling-funnel --check depot-pulling-funnel-lan \
+  --check depot-comparator --check depot-pressing --check press-lifecycle \
+  --check weighted-ejector-belt-input-lan --check weighted-ejector-occupied-lan
+```
+
+All eleven selected checks passed. Three initially failed because the isolated
+worktree lacked the copied structure fixtures at their expected path or the new
+script indexed chat output from a no-op game-mode command; both harness issues
+were corrected and those checks reran successfully. The updated runner includes
+the two new focused Depot checks. Full 1:1 remains Open.
+
 The [vertical Depot replay](tools/test-depot-drop-press.py) on build
 `beea127aa56c` matched all [41 original Java ticks](fixtures/depot-drop-press-java.csv).
 A loose ingot landed in the center of the Depot on tick 7, played the
@@ -2790,10 +2828,11 @@ placement and original Smart Observer belt-and-funnel replays passed.
 
 The [stationary Depot Funnel replay](tools/test-depot-pulling-funnel.py)
 matched [96 Java tick rows](fixtures/depot-pulling-funnel-java.csv) in solo
-and LAN on `693db180302a`. The open barrel accepted three ingots on tick 13.
+and LAN on `native-9f42064-d7e37b705c75`. The open barrel accepted three ingots on tick 13.
 The powered Funnel held its items through tick 18 and resumed on tick 19.
 The partly full barrel accepted one on tick 13 and the other two on tick
-21 after space cleared. The guest retrieved the eight remaining ingots
+21 after space cleared. The full barrel held its Depot output until space
+opened, then resumed delivery. The guest retrieved the eight remaining ingots
 from the barrels. Ejector Funnel, Depot placement and slide, and powered
 Press controls also passed.
 
