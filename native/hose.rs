@@ -21,6 +21,9 @@ const SEARCH_BATCH: usize = 1024;
 const BODY_LIMIT: usize = 10000;
 const WATER: &str = "minecraft:water";
 const LAVA: &str = "minecraft:lava";
+// Create's default BottomlessFluidMode is ALLOW_BY_TAG, whose pinned tag
+// contains both vanilla fluids.
+const BOTTOMLESS_FLUIDS: [&str; 2] = [WATER, LAVA];
 const UPDATE_FLUID: i32 = flags::UPDATE_CLIENTS | flags::UPDATE_KNOWN_SHAPE;
 
 pub(super) fn pipe_face(game: &Game<'_>, pos: [i32; 3]) -> Option<Direction> {
@@ -261,7 +264,7 @@ fn discover_fluid(game: &Game<'_>, queue: &mut Queue, fluid: &Fluid) -> bool {
         if source {
             queue.push(entry);
         }
-        if visited.len() >= BODY_LIMIT && fluid.id == WATER {
+        if visited.len() >= BODY_LIMIT && BOTTOMLESS_FLUIDS.contains(&fluid.id.as_str()) {
             return true;
         }
         for direction in Direction::ALL
