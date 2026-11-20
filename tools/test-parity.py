@@ -277,6 +277,7 @@ CHECKS = (
     ("stockpile-switch-filter-lan", "test-stockpile-switch-filter", "--lan"),
     ("stockpile-switch-filter-render", "test-stockpile-switch-filter-render"),
     ("stockpile-switch-filter-render-lan", "test-stockpile-switch-filter-render", "--lan"),
+    ("stockpile-switch-lifecycle", "test-stockpile-switch-lifecycle"),
     ("observer-storage", "test-smart-observer"),
     ("observer-filtered-storage", "test-smart-observer", "--filtered"),
     ("observer-filter-poses", "test-smart-observer-filter", "--poses"),
