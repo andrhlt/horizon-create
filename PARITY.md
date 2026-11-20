@@ -1086,6 +1086,10 @@ lands. A live guest operated the piston with its lever and both clients
 observed the Gearbox in its new position. The [Java GameTest patch](tools/java-gearbox-piston-trace.patch)
 records the piston and kinetic states.
 
+The [family comparison](GEARBOX-PARITY.md) records the mechanical piston
+endpoint replay, multi-Gearbox source handoff, Wrench transforms in solo and LAN,
+and save/reopen coverage.
+
 ## Stockpile Switch editor
 
 The editor uses Java’s original atlas and exposes both thresholds, the

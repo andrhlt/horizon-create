@@ -1,0 +1,15 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "create": "6.0.10",
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.219",
+  "java": "21.0.13.1",
+  "patch_sha256": "6ebd495c43cdb0c236c00d36885fc10fd2b6f43869eb218641bd0e0ccc388c8d",
+  "template_sha256": "ee7f068bf608653a052112aab8bfaab4370ea92af182bd87ba191e2a150c0cbc",
+  "trace_sha256": "75834ccf5f0dc80e5e451d6150f7d072810154f52d1aa6328fcd964b89ad2a45",
+  "records": 34,
+  "points_per_tick": 10,
+  "capture_seconds": 34.06,
+  "tick_origin": "GameTest tick 8 after rig setup. Actions run after sampling ticks 3, 9, 15, 21, and 27.",
+  "scope": "Direct Y-to-Z Gearbox connection, four outputs, two blocked casing shafts, compatible motors, source handoff, source loss, reversed source and second Gearbox removal/replacement."
+}
