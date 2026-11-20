@@ -1474,6 +1474,28 @@ during-motion offset plus remaining distance, then verifies the piston settles
 at the 1-block endpoint after the sequence finishes. It also passed on that
 exact build. Full 1:1 remains open.
 
+## Gantry gameplay baseline (APP-2002)
+
+The bounded baseline reuses the live roller-filling fixture and covers idle
+assembly rejection, an idle save/reopen, a survival LAN guest switching the
+drive lever, host and guest convergence on the powered state, carriage
+movement, and a moving save/reopen that resumes along the shaft. The reload
+case exposed that loaded gantry shafts have no kinetic ticker to rebuild their
+network after the saved kinetic cache is empty. `power_shafts` now refreshes
+those loaded shaft networks once, when their kinetic data is empty.
+
+The [LAN and reload check](tools/test-multiplayer-gantry.py) passed on build
+`native-9f42064-b9c58fb2733d` with pack SHA256
+`b0b0640e75dc76ad6ba61dc8a83c868cf98f1ed0c668fdc0b87acba5504b60`. The
+same build passed the selected regression batch 9/9: gantry LAN reload,
+sequenced gantry distance, dispenser source/neighbor behavior, roller filling
+and paving/clearing, redstone contacts, observer belt funnel, and contraption
+controls. This supplements the existing sequenced gantry check, which compares
+the 0.25-block limit with the pinned Java sequencer and gantry sources. The
+guest check verifies state convergence; it does not measure Java packet or
+interpolation timing. Additional loads, actors and layout transitions remain
+untested, and Full 1:1 remains open.
+
 When the original threshold-switch pulley finishes its rotation while the
 lever remains powered, the downstream pulley stops and the gearshift retains
 64 RPM. The [original fixture](fixtures/threshold_switch_pulley-java.csv)
@@ -4495,6 +4517,47 @@ Both screenshots exercise the world renderer with the original checker
 texture. The atlas quad and cuboid edge submission follows the exposed
 cluster boundary measured in Java. Mixed-group preview transitions and
 pixel-by-pixel image comparison remain open.
+
+## APP-1995 Linear, Secondary and Radial Chassis
+
+This finite gameplay pass reused the pinned Java references at
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and the current Horizon source
+pin `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. Five Linear assemblies,
+six Secondary Linear assemblies (18 Java ticks), and six Radial assemblies
+(18 payload ticks plus a 27-tick quarter-turn) passed. The player checks
+covered linear placement and seven adhesive actions, four Secondary
+placements and five adhesive actions, Radial placement and 12 sticky-face
+actions, and the original chassis conversions. Range controls matched all
+12 Java samples, including clamp boundaries; the LAN guest changed a
+matching group setting while the neighboring variant retained its value.
+The existing preview replay matched 72 samples.
+
+The new [reopen replay](tools/test-chassis-range.py) also uses the mixed
+primary/secondary arrangement from
+[`secondary-linear-chassis-java.csv`](fixtures/secondary-linear-chassis-java.csv).
+It saves and reopens the idle assembly, verifies sticky membership and both
+range values, assembles the three-block payload, then saves and reopens while
+that payload is active and verifies the captured Java-relative positions.
+This is source-aligned gameplay persistence evidence, not a claim of exact
+Java active-reload timing.
+
+The selected bounded run passed 12 of 12 checks on the rebased combined
+build `native-9f42064-645e120d2506`. The client SHA-256 is
+`3e91d78b62415094ef4de108756ecde81c8e39ac4f814e03cc606644019b79c7`; the
+prepared Create pack SHA-256 is
+`3b914d86881a3d8eb906cdadfaa69981c6f0c9dcff4eaddfc3cf0560f400db49`.
+Reproduction used:
+
+```sh
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-645e120d2506/horizon-ctl .local/patched-launcher/versions/native-9f42064-645e120d2506/horizon-client .local/patched-launcher/versions/native-9f42064-645e120d2506/.local/horizon-client/26.3 --jobs 2 --check linear-chassis --check linear-chassis-player --check secondary-linear-chassis --check secondary-linear-chassis-player --check linear-chassis-conversions --check radial-chassis --check radial-chassis-player --check radial-chassis-spin --check chassis-range --check chassis-range-lan --check chassis-range-reopen --check chassis-preview
+```
+
+`git diff --check` and Python compilation passed. The first clean native build
+took 969 seconds; the post-rebase incremental combined build took 437 seconds.
+The focused gameplay batch passed after enabling the test harness's local
+control sockets. Additional mixed layouts, other controllers, non-default
+range configuration, and all-layout preview transitions remain follow-ups.
+Full 1:1 parity stays Open.
 
 ## Desk Bell
 

@@ -78,6 +78,24 @@ pub(super) fn shaft_shape(game: &mut Game<'_>, at: [i32; 3]) {
 
 pub(super) fn power_shafts(game: &mut Game<'_>) {
     let ticking = game.block_ticking_area();
+    let unloaded_networks: Vec<_> = game
+        .world
+        .block_entity_tickers()
+        .iter()
+        .filter_map(|entry| {
+            let (x, y, z) = entry.0;
+            let pos = [x, y, z];
+            (ticking(x, z)
+                && game.native_block(pos) == SHAFT
+                && mod_entity(game, pos).is_some_and(|entity| entity.data.is_empty()))
+            .then_some(pos)
+        })
+        .collect();
+    for pos in unloaded_networks {
+        // Gantry shafts have no kinetic ticker. Rebuild their saved network on
+        // load so a running carriage can resume after a world reopen.
+        super::create_machines::refresh_connected_network(game, pos);
+    }
     let runs: Vec<_> = game
         .world
         .block_entity_tickers()
