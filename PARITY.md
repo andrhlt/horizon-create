@@ -321,6 +321,26 @@ name and custom data. The [Horizon replay](tools/test-crafting-reset.py)
 checks the authoritative inventory before crafting and after taking the
 result in survival.
 
+## Vanilla recipe save and reopen
+
+The `vanilla-recipe-reopen` check in [the parity runner](tools/test-parity.py)
+saves two White Wool stacks in separate hotbar slots, reopens the same world and
+confirms both persisted. It puts one wool in the player's 2×2 crafting grid
+and verifies the incomplete recipe has no result, then adds the second wool
+and crafts three White Carpet. This is a bounded gameplay persistence check
+for one ordinary vanilla crafting recipe; it does not establish full catalog,
+recipe-book unlock, stonecutting or cooking parity.
+
+The surrounding recipe evidence remains sampled: `survival-crafting` covers
+starter Create parts, `machine-crafting` compares 24 Java recipes including
+remainders, `cooking-materials --cooking-only` compares 609 Java samples for
+smelting bread, smoking bread and smelting Scoria, and
+`test-extra-material-recipes.py` has a campfire Dough-to-Bread case.
+`test-zinc-progression.py --heating` compares the
+existing smelting and blasting recipes. `vanilla-stone-palettes-lan` passed
+seven guest Stonecutter cases on retry; its first run transiently missed an
+output before the successful retry. Full catalog equivalence remains open.
+
 ## Zinc mining and processing
 
 The [original Java probe](tools/java-zinc-progression-trace.patch) records
@@ -335,8 +355,26 @@ for Horizon's built-in blast speed multiplier. The replay checks cook
 progress and the first output tick for all eight inputs.
 The [five original crafting traces](fixtures/zinc-crafting-java.csv)
 exercise both directions of Raw Zinc and Zinc Ingot storage and the
-Zinc Chain recipe. Fortune distribution, furnace experience payout,
-and grinding output still need gameplay checks.
+Zinc Chain recipe.
+
+The [Fortune check](tools/test-zinc-progression.py) runs twelve survival
+mining outcomes with Fortune III: six Zinc Ore and six Deepslate Zinc Ore.
+Each produced Raw Zinc within the pinned Java `ore_drops` bounds (1–4), and
+seven trials yielded a bonus. This is a representative case, not an exhaustive
+Fortune distribution. The [LAN persistence check](tools/test-multiplayer-zinc.py)
+mined and picked up one Raw Zinc as a survival guest. On build
+`native-9f42064-b2e225daec86`, the host and guest inventories agreed, and the
+inventory remained after the host world was reopened and the guest rejoined.
+The ore stayed mined. Furnace experience payout and grinding output remain
+follow-ups.
+
+The focused regression batch passed on build
+`native-9f42064-b2e225daec86` with pack SHA-256
+`6ac5f2d01e229ca8df2104fbe0ec105c7c5310da21f32d3db3b251f4fe81a4b4`:
+`python3 tools/test-parity.py BUILD/horizon-ctl BUILD/horizon-client BUILD/.local/horizon-client/26.3 --jobs 2 --check zinc-mining --check zinc-fortune --check zinc-mining-lan --check zinc-heating --check zinc-crafting --check crushed-materials-heating`.
+All six checks passed: 12 Java-referenced mining cases; 12 Fortune III trials;
+one LAN mine/pickup, host world reopen, and guest rejoin; eight Zinc cooking
+cases; five storage/chain recipes; and six crushed-material cooking cases.
 
 The [natural generation probe](tools/capture-java-zinc-worldgen.py)
 records ore coordinates across four chunks at seed 810102. Java with
@@ -4605,14 +4643,14 @@ encased. The Java probe stops after the block interaction returns
 `PASS_TO_DEFAULT_BLOCK_INTERACTION`, before the held casing can place next to
 the pipe and cause a shape update.
 
-The final runtime is `native-9f42064-67bca7338e12`, built using launcher
+The final runtime is `native-9f42064-14b1dcb81282`, built using launcher
 0.2.67 and the pinned Horizon revision
-`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. The clean isolated build took
-20 minutes 55 seconds. The client SHA-256 is
-`09cf090b28190b14bd01ab795fa0e495883c8d965163e6ba8517e2bb9e3ae3e9`.
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. The clean build after syncing
+current `main` took 148 seconds. The client SHA-256 is
+`efe122e6573776f9194188ffe7af2cb497003ef7c958764b68dffbc90fde9245`.
 The pack was prepared from the pinned Java checkout with `tools/prepare.py`.
 Its SHA-256 is
-`0affa267eaa1404441401e2d08f4c67890210a419e2d5eb6d27a78473b451eb8`.
+`6ca7517cee3017056b629d6649f837334c6d36bf5f1714a577b12bc813abe1cc`.
 The focused regression run passed all 14 selected checks on this runtime and
 pack, including solo and LAN pipe gameplay, collision, lifecycle, encased
 transfer, branch traffic, and dependent fluid regressions.
@@ -7947,3 +7985,37 @@ python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-b2e
 
 Branch layouts and direct LAN guest observation of this source merge remain
 follow-ups; Full 1:1 stays Open.
+
+
+### APP-2102 server configuration, permissions and persistence — November 19, 2026
+
+On the available Horizon client `native-9f42064-6ce68a31b125` (Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, mixins
+`5a64af938ec86b00d53d16a408aabc0038fb3e57`) with the content pack prepared
+from Create `ac0c444d9828da3453ae8cc65338e8de063286fb` (SHA-256
+`9a84fcfb00af7a5ffd52d1fe61a0ef853af78e197e557f192f5842cd8c383f0e`), the
+dedicated baseline check passed these bounded cases:
+
+- A generated `server.properties` retained the default `spawn-protection=16`;
+  setting `difficulty=hard` was observable from the connected operator.
+- The operator executed `/give`; the nonoperator's same command did not grant
+  an item. The server's `ops.json` retained the operator at permission level 4.
+- A guest received paper, disconnected, rejoined with the same identity, and
+  retained the item.
+- The existing LAN Hand Crank check passed guest reversal: shaft speed changed
+  from +32 to −32 RPM. Its idle and active save/reopen cases passed; the active
+  16 RPM motor and shaft resumed after reopening.
+
+Commands:
+
+```sh
+python3 tools/test-server-baseline.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack .local/create.hmod
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check hand-crank-lan --check hand-crank-persistence
+```
+
+The new dedicated check is registered as `server-baseline` in
+`tools/test-parity.py`. This scoped config case exercises Minecraft's
+`server.properties`; it does not establish Create `create-server.toml`
+loading/import, network synchronization or migration. The existing hand-crank
+restart check is a local world reopen, while the multiplayer check exercises a
+dedicated LAN world. Those broader cases and Full 1:1 remain open.

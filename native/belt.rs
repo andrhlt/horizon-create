@@ -123,6 +123,10 @@ pub(super) fn use_connector(game: &mut Game<'_>, pos: [i32; 3], stack: &ItemStac
     if stack.item.as_ref() != CONNECTOR {
         return false;
     }
+    if game.native_sneaking() {
+        select(game, None);
+        return true;
+    }
     let Some(axis) = shaft(game, pos) else {
         return false;
     };
@@ -170,8 +174,12 @@ pub(super) fn use_connector(game: &mut Game<'_>, pos: [i32; 3], stack: &ItemStac
     for i in 0..=length {
         let at = offset(first, normal.map(|n| n * i));
         let block = game.native_block(at);
+        let replaceable = game
+            .res
+            .behaviours()
+            .is_replaceable(game.world.block(at[0], at[1], at[2]));
         let is_shaft = shaft(game, at) == Some(axis);
-        if !is_shaft && !matches!(block.as_str(), "minecraft:air" | "minecraft:water") {
+        if !is_shaft && !replaceable {
             return true;
         }
         let part = if i == 0 {
