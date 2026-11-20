@@ -10781,3 +10781,58 @@ to mutate the bearing's stored moved-block payload; replacing the stationary
 block after placement does not change the mounted actor. These are concrete
 remaining blockers, not claims of completion; the diagnostic command and raw
 runtime logs remain under `.local/`.
+## APP-1966 Deployer player interactions
+
+The pinned Java rules are in `DeployerBlock.useItemOn`, `DeployerBlock.onWrenched`,
+`DeployerItemHandler`, and `DeployerFilterSlot`. A front-facing axial use swaps
+the player's active hand stack with the Deployer's fake-player hand; an empty
+hand retrieves the stored stack. The rear axial face passes through, while a
+Wrench on the facing side toggles USE/PUNCH and other Wrench faces rotate the
+block. Filter short interaction rejects Wrenches and Mechanical Arms, stores
+ordinary samples without consuming them, and consumes one Filter item when
+installing it.
+
+The reproduced exchange failure had the correct survival actor, main hand,
+three iron ingots, east-facing Deployer, east target face, and in-reach click.
+The hook trace showed `may_build=true`, then found a real `create:deployer`
+block entity with zero item slots. The item-on-block hook therefore returned
+unhandled. After initializing the one item slot, insertion passed, but retrieval
+still failed because empty hands do not call the item-on-block hook. Moving the
+exchange to the right-click hook fixed empty-hand retrieval. The right-click
+hook runs once per hand, so limiting this block exchange to the main hand
+prevents the subsequent empty offhand callback from immediately undoing an
+insertion. The click must be on the Deployer's facing side; the rear side is
+covered as a negative case.
+
+`tools/test-deployer-baseline.py` passed in solo and LAN. It verifies Wrench
+toggle without tool consumption, three-item insertion and retrieval, rear-face
+rejection, the 64-item stack boundary with all 65 items conserved across player
+and Deployer, filter-item consumption and return on replacement, ordinary
+sample conservation, and guest actions with host-observed block entity and
+inventory convergence. The North filter case aims at the active Deployer filter
+slot and places the actor within reach. The same script's `--persistence` case
+preserved idle mode/filter/held contents and resumed an active casing
+application after reopen, consuming exactly one alloy.
+
+The existing `tools/test-deployer-applications.py` passed its six in-world
+application lanes in solo and matched all 25 Java ticks. The tests ran on
+`native-9f42064-75d7cd9313ad`, Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client SHA-256
+`ff8a6fef0b9430e493e97475cae7f5243706fffa36af86b6333bb13313d2aed7`, and
+Create pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+The control callback exposes the clicked side but not the exact hit vector; the
+test aims at the active North filter slot, while slot-edge hitbox boundaries
+remain unverified. Exact commands:
+
+```sh
+python3 tools/test-deployer-baseline.py "$ctl" "$client" "$resources" --pack "$pack"
+python3 tools/test-deployer-baseline.py "$ctl" "$client" "$resources" --pack "$pack" --lan
+python3 tools/test-deployer-baseline.py "$ctl" "$client" "$resources" --pack "$pack" --persistence
+python3 tools/test-deployer-applications.py "$ctl" "$client" "$resources" --pack "$pack"
+```
+
+The finite controls and persistence cases establish this gameplay baseline;
+they do not establish exhaustive Java parity for every hitbox edge, filter
+variant, recipe, contraption, animation, or packet timing. Full 1:1 remains
+Open.
