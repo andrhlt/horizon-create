@@ -7908,3 +7908,37 @@ python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-b2e
 
 Branch layouts and direct LAN guest observation of this source merge remain
 follow-ups; Full 1:1 stays Open.
+
+
+### APP-2102 server configuration, permissions and persistence — November 19, 2026
+
+On the available Horizon client `native-9f42064-6ce68a31b125` (Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, mixins
+`5a64af938ec86b00d53d16a408aabc0038fb3e57`) with the content pack prepared
+from Create `ac0c444d9828da3453ae8cc65338e8de063286fb` (SHA-256
+`9a84fcfb00af7a5ffd52d1fe61a0ef853af78e197e557f192f5842cd8c383f0e`), the
+dedicated baseline check passed these bounded cases:
+
+- A generated `server.properties` retained the default `spawn-protection=16`;
+  setting `difficulty=hard` was observable from the connected operator.
+- The operator executed `/give`; the nonoperator's same command did not grant
+  an item. The server's `ops.json` retained the operator at permission level 4.
+- A guest received paper, disconnected, rejoined with the same identity, and
+  retained the item.
+- The existing LAN Hand Crank check passed guest reversal: shaft speed changed
+  from +32 to −32 RPM. Its idle and active save/reopen cases passed; the active
+  16 RPM motor and shaft resumed after reopening.
+
+Commands:
+
+```sh
+python3 tools/test-server-baseline.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack .local/create.hmod
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check hand-crank-lan --check hand-crank-persistence
+```
+
+The new dedicated check is registered as `server-baseline` in
+`tools/test-parity.py`. This scoped config case exercises Minecraft's
+`server.properties`; it does not establish Create `create-server.toml`
+loading/import, network synchronization or migration. The existing hand-crank
+restart check is a local world reopen, while the multiplayer check exercises a
+dedicated LAN world. Those broader cases and Full 1:1 remain open.

@@ -1512,6 +1512,7 @@ CHECKS = (
     ("fluid-observer", "test-fluid-observer"),
     ("spouting", "test-spouting"),
     ("multiplayer", "test-multiplayer"),
+    ("server-baseline", "test-server-baseline"),
     ("multiplayer-redstone-link", "test-multiplayer-redstone-link"),
     ("multiplayer-train", "test-multiplayer-train"),
     ("multiplayer-train-seats", "test-multiplayer-train-seats"),
