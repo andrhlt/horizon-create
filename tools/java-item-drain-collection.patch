@@ -1,0 +1,58 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..1b75712 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -37 +37,2 @@ public class CreateGameTests {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.itemDrainCollection")).toList();
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..de80a56 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -117,0 +118,45 @@ public class TestMisc {
++
++	@GameTest(template = "threshold_switch_pulley", timeoutTicks = 20)
++	public static void itemDrainCollection(CreateGameTestHelper helper) {
++		var world = helper.getLevel();
++		var pos = new BlockPos(8, 180, 23);
++		world.setChunkForced(0, 1, true);
++		world.setBlockAndUpdate(pos, com.simibubi.create.AllBlocks.ITEM_DRAIN.getDefaultState());
++		var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(world);
++		var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
++		player.getInventory().selected = 8;
++		var hit = new net.minecraft.world.phys.BlockHitResult(pos.getCenter(), net.minecraft.core.Direction.UP, pos, false);
++		var items = new net.minecraft.world.item.Item[] {
++			net.minecraft.world.item.Items.COBBLESTONE,
++			net.minecraft.world.item.Items.STICK,
++			net.minecraft.world.item.Items.STICK,
++			net.minecraft.world.item.Items.AIR,
++			net.minecraft.world.item.Items.AIR,
++		};
++		String[] names = {"block_pass", "stick_collect", "stick_repeat", "empty_collect", "empty_repeat"};
++		int[] cargo = {3, 0, 0, 0, 0};
++		int[] owned = {0, 3, 3, 3, 3};
++		for (int i = 0; i < names.length; i++) {
++			if (i == 0 || i == 3) {
++				player.getInventory().clearContent();
++				var input = world.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
++					pos, net.minecraft.core.Direction.WEST);
++				var remainder = input.insertItem(0, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_INGOT, 3), false);
++				helper.assertTrue(remainder.isEmpty(), "Fixture cargo insertion failed");
++			}
++			var stack = new net.minecraft.world.item.ItemStack(items[i]);
++			player.setItemInHand(hand, stack);
++			var result = world.getBlockState(pos).useItemOn(stack, world, player, hand, hit);
++			var entity = (com.simibubi.create.content.fluids.drain.ItemDrainBlockEntity) world.getBlockEntity(pos);
++			int held = entity.getHeldItemStack().getCount();
++			int inventory = player.getInventory().countItem(net.minecraft.world.item.Items.IRON_INGOT);
++			int tool = player.getItemInHand(hand).getCount();
++			System.out.printf("CREATE_DRAIN_COLLECTION %s,%s,%d,%d,%d%n", names[i], result, held, inventory, tool);
++			helper.assertTrue(held == cargo[i] && inventory == owned[i] && tool == (i < 3 ? 1 : 0), "Collection conservation failed: " + names[i]);
++			if (i == 0)
++				helper.assertTrue(result == net.minecraft.world.ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION, "Block item should pass through");
++			else
++				helper.assertTrue(result.consumesAction(), "Collection should consume interaction");
++		}
++		helper.succeed();
++	}
