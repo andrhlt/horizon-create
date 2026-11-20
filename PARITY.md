@@ -10816,7 +10816,7 @@ application after reopen, consuming exactly one alloy.
 
 The existing `tools/test-deployer-applications.py` passed its six in-world
 application lanes in solo and matched all 25 Java ticks. The tests ran on
-`native-9f42064-75d7cd9313ad`, Horizon pin
+`native-9f42064-79b38369a117`, Horizon pin
 `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client SHA-256
 `ff8a6fef0b9430e493e97475cae7f5243706fffa36af86b6333bb13313d2aed7`, and
 Create pack SHA-256
