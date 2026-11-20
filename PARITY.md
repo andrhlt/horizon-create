@@ -3037,6 +3037,52 @@ A loose ingot landed in the center of the Depot on tick 7, played the
 original plop at volume .25 and pitch 1.25, and became an iron sheet on
 tick 15. The earlier solo and LAN deposit and retrieval checks also passed.
 
+### APP-2012 Weighted Ejector gameplay baseline
+
+The receiving Depot baseline established player retrieval, occupied-inventory
+rejection and recovery, and custody through reopen. The Ejector pass uses that
+Depot on a four-block course.
+[APP-1969](https://linear.app/appstu/issue/APP-1969/create-gameplay-baseline-depot) ·
+[PR #29](https://github.com/andrhlt/horizon-create/pull/29)
+
+The reference is Create 6.0.10 at `ac0c444d9828da3453ae8cc65338e8de063286fb`
+(Minecraft 1.21.1, NeoForge 21.1.219). The native base is
+`e8b3918a44b7156a124244af531af911991927ad` on Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` (Minecraft 26.3). The pack SHA-256
+is `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Final native build: `native-9f42064-698ea7382493`. All nine targeted checks
+passed on this post-rebase build. The initial lifecycle result from the earlier
+build is retained under `.local/app-2012-sandbox-diagnostic/`.
+Source review covered the Java recipe and placement packet, `EjectorBlock`
+contact and signal handlers, and `EjectorBlockEntity` charge, launch, target,
+and save rules. The new lifecycle check complements the existing Java
+capture replays. [Lifecycle check](tools/test-weighted-ejector-lifecycle.py)
+
+| Case | Check and comparison |
+| --- | --- |
+| Survival acquisition and configuration | `weighted-ejector-lifecycle` crafts one Ejector from a gold sheet, Depot and Cogwheel, consumes it during ordinary placement, marks a target four blocks east, and sets the stack size to three. `weighted-ejector-target-lan` covers eight Java target cases and clearing the mark. `weighted-ejector-stack-size-lan` compares 46 Java ticks and a guest editing the threshold from three to two. |
+| Short transfer, empty or occupied Depot | `weighted-ejector-empty-lan` and `weighted-ejector-occupied-lan` compare 60 ticks each. The empty course launches at tick 14 and delivers on 34. The occupied course waits until the guest removes the blocker on 20, launches on 22, and delivers on 42. The guest retrieves exactly three ingots in each run. |
+| Obstructed trajectory and moving Belt input | `weighted-ejector-obstacle-lan` compares 42 Java ticks, including collision, physical stack release, and guest pickup. `weighted-ejector-belt-input-lan` compares 90 ticks of ingestion, merge and delivery. |
+| Standing player takeoff and landing | `weighted-ejector-player-lan-host` and `weighted-ejector-player-lan-guest` each compare 27 Java samples aligned to the initial descent. The actual actor lands on the raised course at takeoff +20, at relative position `(4.341349510, 3.0, 0.5)` with 20 health. Each position and velocity axis must differ by less than `2e-7`, and grounded and health fields must match exactly. Both clients hear the launch. |
+| Redstone inhibit, retrigger, and save/reopen | `weighted-ejector-lifecycle` checks 24 ticks of held cargo on each side of the idle reopen. It saves with three ingots at flight age six, then verifies the flight or completed Depot delivery after reopen, allowing the short course to finish during startup while requiring exact cargo conservation. After the Ejector recharges, the second batch stays held for another 24 powered ticks. Removing power delivers the second batch. All six ingots end in the player inventory, with no residual source, flight, destination, or loose cargo in a final 24-tick observation. Target direction, range, threshold, and power are checked after both reopens. These are Horizon gameplay save/reopen checks. |
+
+The strict flat-floor guest trace remains intermittent. On
+`native-9f42064-4a2ebff12602`, three of five repeats matched all 36 samples. In
+two, the guest received the authoritative landing health and velocity correction
+at takeoff +24, one tick earlier than the selected Java client trace. Position,
+grounded state and subsequent samples matched. A second Java client captured
+that correction at +26. Full 1:1 remains Open for packet arrival around contact,
+broader geometry and fluids, and remaining presentation cases.
+
+```sh
+HORIZON_NO_AUDIO=1 python3 tools/test-parity.py "$build/horizon-ctl" "$build/horizon-client" \
+  "$build/.local/horizon-client/26.3" --jobs 1 \
+  --check weighted-ejector-lifecycle --check weighted-ejector-target-lan \
+  --check weighted-ejector-stack-size-lan --check weighted-ejector-empty-lan \
+  --check weighted-ejector-occupied-lan --check weighted-ejector-obstacle-lan \
+  --check weighted-ejector-belt-input-lan --check 'weighted-ejector-player-lan-*'
+```
+
 The [Weighted Ejector Java probe](tools/java-depot-ejector-launch.patch)
 and [Horizon LAN replay](tools/test-depot-ejector-launch.py) matched the
 charge, lid motion, flight age and centered three-ingot delivery across
@@ -6224,8 +6270,39 @@ The [survival replay](tools/test-crafter-slot-cover.py) on
 crafted the original brass-nugget recipe, installed a cover on an
 empty crafter and recovered it by clicking with an empty hand. The
 preceding candidate crafted the same recipe but failed to install the
-cover. Covered-grid processing, drop, visual and LAN checks remain
-open.
+cover. The [APP-1965 gameplay baseline](#mechanical-crafters-app-1965)
+exercises a covered grid. Cover drops, rendering, and installing or
+removing a cover as a LAN guest remain open.
+
+## Mechanical Crafters (APP-1965)
+
+The Java reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`, Minecraft 1.21.1 and
+NeoForge 21.1.219. The Horizon checks used `native-9f42064-72dd88a3d19f`
+on Minecraft 26.3. The candidate was built from port base `1ff398eaac3e`
+and tested with `create.hmod` with SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 \
+  --jobs 3 --check mechanical-crafter --check 'crafter-*' --check mechanical-tools-crafting
+```
+
+| Check | Result |
+| --- | --- |
+| `mechanical-crafter` | The arm-fed grid matched all [144 Java samples](fixtures/crushing_wheel_crafting-java.csv) from ticks 0–143. Four sampled crafters matched speed, phase, countdown, held input, and transferred grid size. Two Crushing Wheels arrived on tick 143. |
+| `mechanical-tools-crafting` | The existing chute-fed Wand of Symmetry and Potato Cannon recipes reached their output barrels by Horizon ticks 55 and 65. |
+| `crafter-slot-cover` and `crafter-survival` | Survival crafting produced a Slot Cover and three Mechanical Crafters in their respective checks. The cover installed and came off with an empty hand. A placed crafter faced the player and its neighbor inherited the facing and pointed into it. A front wrench click cycled the arrow. A hand click fed one of two sticks, and an empty hand recovered it. |
+| `crafter-invalid-grid` | A Potato Cannon grid with a stick in place of Andesite Alloy produced no cannon and returned its seven ingredients. |
+| `crafter-process-reopen` | The missing cover kept the filled idle grid from starting for 25 stepped ticks. Reopening retained its arrow configuration and ingredients. Adding the cover started the craft. A second save captured an exporting leaf and accepting inlet with their ingredients in the grouped grid. After reopening, the full barrel held the result in the outlet's `INSERTING` phase. Freeing one barrel slot delivered exactly one Potato Cannon and every crafter returned to idle with empty input. |
+| `crafter-lan` | A survival guest changed the arrow and inserted one of two sticks. Host and guest agreed on the arrow, the host saw one stick in the crafter, and the guest retained one stick. |
+
+The new survival and recovery cases in [the gameplay fixture](tools/test-crafter-gameplay.py)
+use the pinned source rules for placement, input, cover completion, and ejection.
+Save/reopen was checked in Horizon and LAN evidence covers eventual state
+convergence. Java reload and packet timing, broader routing layouts, shared
+input connection controls, ordinary crafting recipes, active removal, and exact
+presentation remain open.
 
 ## Schematic and Quill
 
