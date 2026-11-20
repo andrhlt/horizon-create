@@ -71,7 +71,29 @@ def run(args):
     if actual != expected:
         diffs = [(want, got) for want, got in zip(expected, actual) if want != got]
         raise SystemExit(f"Ploughing differed (Java, Horizon): {diffs}")
-    print(f"Ploughing matched all {len(actual)} Java ticks. Full extension and sticky retraction passed.")
+    check_invalid_soil(args, expected[0][1])
+    print(f"Ploughing matched all {len(actual)} Java ticks. Full extension, sticky retraction, and invalid-soil boundary passed.")
+
+
+def check_invalid_soil(args, first_world_time):
+    with fixture_world(args, "ploughing_invalid_soil", TEMPLATE) as control:
+        control.command("/gamerule random_tick_speed 0")
+        while control.clock() % 20 != int(first_world_time):
+            control.step_to(control.clock() + 1)
+        control.commands((
+            "/place template create:gametest/contraptions/ploughing 25 96 -12",
+            "/setblock 28 98 -10 minecraft:lever[face=floor,facing=west,powered=false]",
+            "/setblock 29 97 -11 minecraft:stone",
+        ))
+        start = control.clock()
+        for tick in range(1, 9):
+            control.step_to(start + tick)
+        trace = sample(control, 8)
+        if not trace[2]:
+            raise RuntimeError("Invalid-soil fixture never assembled a moving plough")
+        result = control.command("/execute if block 29 97 -11 minecraft:stone")
+        if "Test passed" not in result:
+            raise RuntimeError(f"Plough changed invalid stone soil: {result}")
 
 
 if __name__ == "__main__":

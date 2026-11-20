@@ -3724,6 +3724,40 @@ and reports 2/2 checks passed. These representative cases do not establish full
 1:1 parity; other payload geometries, multi-axis collision, packet latency and
 unusual player poses remain open. Shared collision code is unchanged.
 
+## Harvester and Plough gameplay baseline (APP-2006)
+
+The bounded family checks currently pass on candidate build
+`native-9f42064-d6dc2ad18d3f`, using Create source
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The Mechanical Bearing prerequisite is complete under APP-1980; its active
+payload save/reopen and host/guest riding checks are recorded above.
+
+The `crop-farming` replay matched all 72 Java samples from
+`fixtures/crop_farming-java.csv`. The trace checks the moving assembly, the
+field's wheat, carrot and potato states through harvesting and replanting, and
+the collected output item IDs. The `ploughing` replay matched all four original
+Java samples in `fixtures/ploughing-java.csv`, then passed full extension,
+sticky retraction and the added negative case where stone remains unchanged
+under the moving plough. The negative case follows the pinned
+`PloughMovementBehaviour.visitNewPosition`/`canBreak` and vanilla hoe
+interaction behavior. The `contraption-controls` replay matched 105 Java
+samples in `fixtures/controls-java.csv`, including both Harvester and Plough
+actors, actor-disable controls, and bearing stop/restart.
+
+Commands, run with isolated headless worlds on the candidate build:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check crop-farming --check ploughing --check contraption-controls
+```
+
+This is a partial gameplay pass. The current references do not establish
+immature-crop rejection or exact item counts, and these runs do not cover guest
+collection or actor-specific idle and active save/reopen. Those consequential
+multiplayer and persistence gates remain open for APP-2006; all-crop/loot and
+other tool interactions remain nonblocking broader follow-ups. Full 1:1 stays
+Open.
+
 ## Windmill Bearing
 
 The pinned [Java GameTest](tools/java-windmill-trace.patch) covers a
