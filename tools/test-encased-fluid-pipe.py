@@ -138,7 +138,13 @@ def static_states(args):
             pos = (9 + 3 * index, 171, 21)
             x, y, z = pos
             initial = actions["wrong_casing"]
+            # The Java callback probe stops after PASS. A real Survival click
+            # next tries to place the held casing. Support the three-way state
+            # through that incidental neighbor update, then remove the arms
+            # while encased, before the reference uncasing action.
+            supports = ((x - 1, y, z), (x + 1, y, z), (x, y, z + 1)) if case == "junction" else ()
             host.commands((
+                *(f"/setblock {coords(side)} create:fluid_tank" for side in supports),
                 f"/setblock {coords(pos)} {encoded_state(initial)}",
                 f"/tp {player} {x + .5} {y} {z - 1.5}",
                 f"/item replace entity {player} hotbar.2 with create:andesite_casing",
@@ -158,6 +164,8 @@ def static_states(args):
             use(actor, pos, CASING)
             expect_state(host, pos, encased, actor)
             assert inventory(actor, CASING) == int(encased["held_count"]), case
+            if supports:
+                host.commands(f"/setblock {coords(side)} minecraft:air" for side in supports)
 
             if "add_north_pipe" in actions:
                 host.command(f"/setblock {x} {y} {z - 1} create:fluid_pipe[north=true,south=true]")

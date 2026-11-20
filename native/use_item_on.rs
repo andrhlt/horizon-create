@@ -47,7 +47,6 @@ fn use_item_on(
         || crate::game::create_cart_assembler_pickup::place_portable(game, pos, stack)
         || crate::game::create_mixer::use_item(game, pos, stack)
         || crate::game::create_fluid_tank::use_bucket(game, pos, stack)
-        || crate::game::create_fluids::set_filter(game, pos, stack)
         || crate::game::create_roller::set_filter(game, pos, stack)
         || crate::game::create_contraption_controls::filter(game, pos, stack)
         || crate::game::create_funnel::use_item(game, pos, face, stack)

@@ -17,7 +17,9 @@ fn gearbox_clone_item(
     if stack.is_none() && crate::game::create_backtank::block(block) {
         *stack = crate::game::create_backtank::packed(game, pos);
     }
-    if stack.is_none() && block == crate::game::create_encased_fluid_pipe::BLOCK {
+    if stack.is_none() && matches!(block,
+        crate::game::create_encased_fluid_pipe::BLOCK | crate::game::create_fluids::GLASS_PIPE
+    ) {
         *stack = Some(crate::items::ItemStack::new(crate::game::create_fluids::PIPE, 1));
     }
     if block == "create:gearbox" && stack.is_none()
