@@ -4485,6 +4485,39 @@ matched for distinct compartments. The same-compartment Java action
 throws during link removal. Horizon deliberately completes the
 pickup and returns both stacks.
 
+### APP-2083 Toolbox gameplay baseline — November 19, 2026
+
+The bounded replay batch passed 15/15 checks on the archived
+`2026-11-19-pre-mechanical-piston-b2405826c686` Horizon 26.3 client
+(client SHA-256
+`63d4babf8091fe41f7712bc92d85b7467beecc4721dc54e0dfc50da7a5c97887`)
+with the Create content pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The Horizon source pin is `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`;
+Java is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+The batch selected `toolbox-storage`, `toolbox-portable`, `toolbox-menu`,
+`toolbox-menu-lan`, `toolbox-deposit-lan`, `toolbox-confirm-lan`,
+`toolbox-link`, `toolbox-link-lan`, `toolbox-link-lan-reconnect`,
+`toolbox-pickup-linked-host`, `toolbox-pickup-linked-guest`,
+`toolbox-placed-dye`, `toolbox-crafting`, `toolbox-tagged-dye` and
+`toolbox-reopen`. It covers all 16 placed colors, representative and tagged
+survival dye crafts, storage and GUI actions, Java-referenced link/refill and
+range exit/reentry samples, reconnect, both LAN pickup directions, and player
+binding plus compartment state across a cold world reopen. The reopen check
+verified the player's saved link sidecar and filter, then refilled a 10-item
+hotbar stack to 32 while the compartment fell from 32 to 10. This establishes
+Horizon save/reopen behavior, not exact Java reload parity. The exact range
+threshold, unselected HUD markers, radial visuals, GUI preview, broader
+orientations and audible playback remain follow-ups.
+
+Command (with the archived client paths substituted):
+
+```sh
+python3 tools/test-parity.py BUILD/horizon-ctl BUILD/horizon-client BUILD/.local/horizon-client/26.3 --jobs 2 --check toolbox-storage --check toolbox-portable --check toolbox-menu --check toolbox-menu-lan --check toolbox-deposit-lan --check toolbox-confirm-lan --check toolbox-link --check toolbox-link-lan --check toolbox-link-lan-reconnect --check toolbox-pickup-linked-host --check toolbox-pickup-linked-guest --check toolbox-placed-dye --check toolbox-crafting --check toolbox-tagged-dye --check toolbox-reopen
+```
+
 
 ## Train Trapdoor and Framed Glass Trapdoor
 
