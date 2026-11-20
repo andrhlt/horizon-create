@@ -1,5 +1,5 @@
 use horizon_core::geometry::Direction;
-use horizon_world::level::{LevelAccess, PlacementContext, flags};
+use horizon_world::level::{LevelAccess, PlacementContext, PushReaction, flags};
 use horizon_world::nbt::{Compound, Tag};
 use horizon_world::registry::BlockStateId;
 
@@ -146,6 +146,12 @@ fn assemble(
             let at = position(start, normal, distance);
             if game.native_block_collision(at).is_empty() {
                 break;
+            }
+            if speed < 0.0 {
+                let state = game.world.block(at[0], at[1], at[2]);
+                if game.res.behaviours().facts(state).push == PushReaction::Push {
+                    break;
+                }
             }
             saved_block(game, at, start)?;
             seeds.push(at);

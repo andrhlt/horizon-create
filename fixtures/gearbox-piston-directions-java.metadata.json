@@ -1,0 +1,14 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "create": "6.0.10",
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.219",
+  "java": "21.0.13.1",
+  "patch_sha256": "dfb31510bd66b151caa6517ccf2af40bf6aa058f6b5a7060d0233195e9055dd5",
+  "trace_sha256": "bac04538721561c169375842b1335bf353ed88f7f3d59003adc216fbc3610bd7",
+  "template_sha256": "ee7f068bf608653a052112aab8bfaab4370ea92af182bd87ba191e2a150c0cbc",
+  "capture_seconds": 13.4,
+  "records": 48,
+  "tick_origin": "GameTest tick 2 after both rigs are set up and the motor is set. Reverse before sampling tick 10 after full endpoint placement.",
+  "scope": "One-pole, mode-0 sticky mechanical piston pushing a Y Gearbox west, and sticky piston moving a stone with a transverse X Gearbox attached by Super Glue upward and back."
+}

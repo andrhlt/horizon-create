@@ -10,9 +10,9 @@ fi
 launcher=$1
 data=$(CDPATH=""; cd -- "$2" && pwd)
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-# New launchers only accept SDK crates; this port still uses pinned source mixins.
+# New launchers use the optimized SDK profile; this port's source mixins need 0.2.67.
 # Keep the installed app intact and use the official compatible CLI separately.
-if ! "$launcher" native-build --help 2>&1 | grep -q 'horizon-mixin.toml'; then
+if ! "$launcher" native-build --help 2>&1 | grep -q 'possible values: performance, dev, release'; then
     echo "Installed launcher uses the newer SDK; selecting the pinned mixin launcher." >&2
     launcher=$(python3 "$root/tools/pinned-launcher.py")
 fi

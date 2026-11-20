@@ -9,6 +9,7 @@ use super::Game;
 use super::create_clockwork::{self, CLOCKWORK};
 use super::create_cogwheel::encased_size;
 use super::create_fluids::name;
+use super::create_machines::{self, GEARBOX};
 use super::create_portable_interface::{FLUID as FLUID_PORT, ITEM as ITEM_PORT};
 
 const WRENCH: &str = "create:wrench";
@@ -92,7 +93,7 @@ pub(super) fn change_pose(game: &mut Game<'_>, pos: [i32; 3], face: Direction, b
             return super::create_shaft::remove_from_girder(game, pos);
         }
         _ if encased_size(block).is_some() => return change_cased_cog(game, pos, face),
-        "create:shaft" | "create:cogwheel" | "create:gearbox" | "create:clutch"
+        "create:shaft" | "create:cogwheel" | GEARBOX | "create:clutch"
         | "create:gearshift" => {
             let Some(prior) = game.native_block_property(pos, "axis") else {
                 return false;
@@ -115,6 +116,9 @@ pub(super) fn change_pose(game: &mut Game<'_>, pos: [i32; 3], face: Direction, b
         _ => return false,
     };
     let (key, value, prior) = update;
+    if block == GEARBOX {
+        return prior != value && create_machines::wrench_gearbox(game, pos, value);
+    }
     let turned =
         prior != value && game.native_set_block_property_with(pos, key, value, flags::UPDATE_ALL);
     if block == CLOCKWORK {

@@ -1,0 +1,376 @@
+[
+  {
+    "case": "north_wall",
+    "face": "north",
+    "player": "south",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": true,
+    "neighbors": [],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "x"
+    },
+    "unsupported": {
+      "block": "create:gearbox",
+      "axis": "x"
+    }
+  },
+  {
+    "case": "south_wall",
+    "face": "south",
+    "player": "north",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "x"
+    }
+  },
+  {
+    "case": "east_wall",
+    "face": "east",
+    "player": "west",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "z"
+    }
+  },
+  {
+    "case": "west_wall",
+    "face": "west",
+    "player": "east",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "z"
+    }
+  },
+  {
+    "case": "floor",
+    "face": "up",
+    "player": "west",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": true,
+    "neighbors": [],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "z"
+    },
+    "unsupported": {
+      "block": "create:gearbox",
+      "axis": "z"
+    }
+  },
+  {
+    "case": "ceiling",
+    "face": "down",
+    "player": "east",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": true,
+    "neighbors": [],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "z"
+    },
+    "unsupported": {
+      "block": "create:gearbox",
+      "axis": "z"
+    }
+  },
+  {
+    "case": "regular_near_shaft",
+    "face": "north",
+    "player": "south",
+    "target": "air",
+    "support": "stone",
+    "item": "create:gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [
+      "east:shaft:x"
+    ],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "y"
+    }
+  },
+  {
+    "case": "x_neighbor",
+    "face": "north",
+    "player": "south",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [
+      "east:shaft:x"
+    ],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "z"
+    }
+  },
+  {
+    "case": "z_neighbor",
+    "face": "east",
+    "player": "west",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [
+      "north:shaft:z"
+    ],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "x"
+    }
+  },
+  {
+    "case": "opposite_x_neighbors",
+    "face": "north",
+    "player": "south",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [
+      "east:shaft:x",
+      "west:shaft:x"
+    ],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "z"
+    }
+  },
+  {
+    "case": "axis_conflict",
+    "face": "north",
+    "player": "south",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [
+      "east:shaft:x",
+      "north:shaft:z"
+    ],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "x"
+    }
+  },
+  {
+    "case": "sneaking_z_neighbor",
+    "face": "east",
+    "player": "west",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": true,
+    "remove_support": false,
+    "neighbors": [
+      "north:shaft:z"
+    ],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "x"
+    }
+  },
+  {
+    "case": "blocked_and_vertical_shafts",
+    "face": "north",
+    "player": "south",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [
+      "east:shaft:z",
+      "up:shaft:y"
+    ],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "x"
+    }
+  },
+  {
+    "case": "powered_x_clutch",
+    "face": "north",
+    "player": "south",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [
+      "east:powered_clutch:x"
+    ],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "z"
+    }
+  },
+  {
+    "case": "unpowered_z_clutch",
+    "face": "east",
+    "player": "west",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [
+      "north:clutch:z"
+    ],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "x"
+    }
+  },
+  {
+    "case": "wrong_axis_clutch",
+    "face": "east",
+    "player": "west",
+    "target": "air",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [
+      "north:clutch:x"
+    ],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "z"
+    }
+  },
+  {
+    "case": "clicked_x_shaft",
+    "face": "east",
+    "player": "south",
+    "target": "air",
+    "support": "shaft_x",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "z"
+    }
+  },
+  {
+    "case": "replace_clicked_grass",
+    "face": "up",
+    "player": "west",
+    "target": "grass",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "z"
+    }
+  },
+  {
+    "case": "replace_target_water",
+    "face": "up",
+    "player": "west",
+    "target": "water",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [],
+    "placed": true,
+    "remaining": 0,
+    "landed": {
+      "block": "create:gearbox",
+      "axis": "z"
+    }
+  },
+  {
+    "case": "blocked_target_fence",
+    "face": "up",
+    "player": "west",
+    "target": "fence",
+    "support": "stone",
+    "item": "create:vertical_gearbox",
+    "sneaking": false,
+    "remove_support": false,
+    "neighbors": [],
+    "placed": false,
+    "remaining": 1,
+    "landed": {
+      "block": "minecraft:oak_fence"
+    }
+  }
+]

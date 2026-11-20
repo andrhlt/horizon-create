@@ -4,6 +4,7 @@ use std::sync::{Mutex, OnceLock};
 use horizon_core::geometry::Direction;
 use horizon_core::position::BlockPos;
 use horizon_core::random::RandomSource;
+use horizon_world::level::flags;
 use horizon_world::nbt::{Compound, JavaString, Tag};
 
 use crate::containers::{BlockEntity, ModBlockEntity, ModContainer};
@@ -52,6 +53,9 @@ const BRASS_SHAFT: &str = "create:brass_encased_shaft";
 const CHAIN_DRIVE: &str = "create:encased_chain_drive";
 const BEARING: &str = "create:mechanical_bearing";
 pub(super) const GEARBOX: &str = "create:gearbox";
+const GEARBOX_MOVED_TICK: &str = "PistonPlacedTick";
+const GEARBOX_WRENCH_TICK: &str = "WrenchDetachedTick";
+const GEARBOX_ATTACH_TICKS: [&str; 2] = [GEARBOX_MOVED_TICK, GEARBOX_WRENCH_TICK];
 use super::create_chain_gearshift::{self, ADJUSTABLE as CHAIN_GEARSHIFT};
 use super::create_clockwork::{self, CLOCKWORK};
 use super::create_cogwheel::{
@@ -72,6 +76,18 @@ pub(super) const DIRECTIONS: [[i32; 3]; 6] = [
     [0, -1, 0],
     [0, 0, 1],
     [0, 0, -1],
+];
+
+// Create walks added kinetic networks in Direction.values() order. Gearbox
+// joins can see an existing source and a local motor at the same speed, so
+// retain that ordering without changing source selection for other machines.
+const GEARBOX_DIRECTIONS: [[i32; 3]; 6] = [
+    [0, -1, 0],
+    [0, 1, 0],
+    [0, 0, -1],
+    [0, 0, 1],
+    [-1, 0, 0],
+    [1, 0, 0],
 ];
 
 pub(super) fn offset(pos: [i32; 3], delta: [i32; 3]) -> [i32; 3] {
@@ -688,7 +704,12 @@ impl Kinetic {
             [0, 1, -1],
             [0, 1, 1],
         ];
-        DIRECTIONS.into_iter().chain(
+        let directions = if matches!(self, Self::Gearbox(_)) {
+            &GEARBOX_DIRECTIONS[..]
+        } else {
+            &DIRECTIONS[..]
+        };
+        directions.iter().copied().chain(
             (self.gear().is_some() || matches!(self, Self::Belt(..)))
                 .then_some(DIAGONALS)
                 .into_iter()
@@ -812,6 +833,38 @@ fn gearbox_input_direction(side: [i32; 3]) -> i32 {
         .iter()
         .position(|face| face.normal() == side)
         .map_or(-1, |index| index as i32)
+}
+
+fn conflicting_gearbox_join(game: &Game<'_>, pos: [i32; 3], state: &Network) -> bool {
+    let Some(Kinetic::Gearbox(box_axis)) = Kinetic::at(game, pos) else {
+        return false;
+    };
+    let gearbox = Kinetic::Gearbox(box_axis);
+    let linked_gearbox = GEARBOX_DIRECTIONS.iter().any(|&delta| {
+        let other_pos = offset(pos, delta);
+        Kinetic::at(game, other_pos).is_some_and(|other| {
+            matches!(other, Kinetic::Gearbox(_)) && gearbox.ratio_to(other, delta).is_some()
+        })
+    });
+    if !linked_gearbox || state.rpm == 0.0 {
+        return false;
+    }
+
+    GEARBOX_DIRECTIONS.iter().any(|&delta| {
+        let other_pos = offset(pos, delta);
+        let Some(Kinetic::Motor(facing)) = Kinetic::at(game, other_pos) else {
+            return false;
+        };
+        if gearbox.ratio_to(Kinetic::Motor(facing), delta).is_none() {
+            return false;
+        }
+        let Some(motor) = mod_entity(game, other_pos) else {
+            return false;
+        };
+        let incoming =
+            motor_speed(facing, &motor.nbt) / gearbox_multiplier(state.source_side, delta);
+        incoming != 0.0 && incoming.signum() != state.rpm.signum()
+    })
 }
 
 pub(super) fn valve_rear_link(game: &Game<'_>, pos: [i32; 3], face: Direction) -> bool {
@@ -999,6 +1052,7 @@ fn walk_network(
     let Some(block) = Kinetic::at(game, start) else {
         return Network::default();
     };
+    let gearbox_start = matches!(block, Kinetic::Gearbox(_));
     let mut pending = VecDeque::from([(start, block, 1.0, [0; 3], [0; 3], None, false)]);
     let mut visited = HashSet::from([start]);
     let mut network = Network::default();
@@ -1022,8 +1076,10 @@ fn walk_network(
         }
         if matches!(block, Kinetic::Gearbox(_))
             && data.is_some_and(|entity| {
-                matches!(entity.nbt.get(&"PistonPlacedTick".into()), Some(Tag::Long(tick))
-                if *tick == game.world.game_time)
+                GEARBOX_ATTACH_TICKS.into_iter().any(|key| {
+                    matches!(entity.nbt.get(&JavaString::from(key)), Some(Tag::Long(tick))
+                        if *tick == game.world.game_time)
+                })
             })
         {
             continue;
@@ -1120,11 +1176,18 @@ fn walk_network(
             .filter(|_| matches!(block, Kinetic::Conveyor))
             .into_iter()
             .flat_map(|entity| super::create_chain_conveyor_connect::links(&entity.nbt));
-        for (delta, chain_link) in block
+        let mut neighbors = block
             .neighbors()
             .map(|delta| (delta, false))
             .chain(chain_connections.map(|delta| (delta, true)))
-        {
+            .collect::<Vec<_>>();
+        if gearbox_start {
+            // Create resolves a new Gearbox against the existing network
+            // before considering a tied source attached directly to the new
+            // block. A depth-first walk preserves that source precedence.
+            neighbors.reverse();
+        }
+        for (delta, chain_link) in neighbors {
             if clutch_source.is_some_and(|side| delta.into_iter().sum::<i32>() != side) {
                 continue;
             }
@@ -1186,7 +1249,7 @@ fn walk_network(
                     }
                     _ => sequence,
                 };
-                pending.push_back((
+                let next = (
                     other,
                     neighbor,
                     ratio * direction_ratio / edge,
@@ -1194,7 +1257,12 @@ fn walk_network(
                     if pos == start { delta } else { first_step },
                     next_sequence,
                     clutch_reconnected,
-                ));
+                );
+                if gearbox_start {
+                    pending.push_front(next);
+                } else {
+                    pending.push_back(next);
+                }
             }
         }
     }
@@ -1738,6 +1806,15 @@ fn publish_network(entity: &mut ModBlockEntity, network: &Network) {
     entity.data[2] = network.stress.to_bits() as i32;
 }
 
+pub(super) fn reset_moved_gearbox(entity: &mut ModBlockEntity, tick: i64) {
+    // Java clears the saved kinetics on a moved block before it can attach again.
+    publish_network(entity, &Network::default());
+    entity.nbt.remove(&"KineticsTick".into());
+    entity
+        .nbt
+        .insert(GEARBOX_MOVED_TICK.into(), Tag::Long(tick));
+}
+
 fn publish_network_nbt(entity: &mut ModBlockEntity, network: &Network) {
     if entity.id == VALVE && saved_speed(&entity.nbt) != network.speed() {
         create_valve::retarget(entity, network.speed());
@@ -1839,6 +1916,23 @@ pub(super) fn reading(entity: &ModBlockEntity, index: usize) -> f32 {
 pub(super) fn refresh_connected_network(game: &mut Game<'_>, pos: [i32; 3]) {
     let members = kinetic_members(game, pos);
     publish_kinetic_members(game, members, publish_network);
+}
+
+pub(super) fn wrench_gearbox(game: &mut Game<'_>, pos: [i32; 3], axis: &str) -> bool {
+    let members = kinetic_members(game, pos);
+    if !game.native_set_block_property_with(pos, "axis", axis, flags::UPDATE_ALL) {
+        return false;
+    }
+
+    // Java detaches the old network during Wrench use and attaches on the next tick.
+    let tick = game.world.game_time;
+    game.native_with_mod_block_entity(pos, |entity| {
+        entity
+            .nbt
+            .insert(GEARBOX_WRENCH_TICK.into(), Tag::Long(tick));
+    });
+    publish_kinetic_members(game, members, publish_network);
+    true
 }
 
 fn kinetic_members(game: &Game<'_>, pos: [i32; 3]) -> Vec<[i32; 3]> {
@@ -2875,13 +2969,28 @@ pub(super) fn block_entity_tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut
         super::create_station::STATION => super::create_station::tick(game, pos, entity),
         CHUTE | PLAIN_CHUTE => tick_chute(game, pos, entity),
         CLUTCH | GEARSHIFT | GEARBOX => {
-            if entity.id == GEARBOX
-                && matches!(entity.nbt.get(&"PistonPlacedTick".into()),
-                Some(Tag::Long(tick)) if *tick != game.world.game_time)
-            {
-                entity.nbt.remove(&"PistonPlacedTick".into());
+            if entity.id == GEARBOX {
+                for key in GEARBOX_ATTACH_TICKS.map(JavaString::from) {
+                    if matches!(entity.nbt.get(&key), Some(Tag::Long(tick)) if *tick != game.world.game_time)
+                    {
+                        entity.nbt.remove(&key);
+                    }
+                }
             }
             let state = network(game, pos, entity);
+            if entity.id == GEARBOX
+                && !entity.nbt.contains_key(&"KineticsTick".into())
+                && conflicting_gearbox_join(game, pos, &state)
+            {
+                // Create rejects an incompatible network join at the newly
+                // attached kinetic block. Do this only on the Gearbox's first
+                // kinetic tick so an established neighboring network survives.
+                game.native_machine_destroy_block(pos, None, true);
+                for delta in GEARBOX_DIRECTIONS {
+                    refresh_connected_network(game, offset(pos, delta));
+                }
+                return;
+            }
             let input_changed = if entity.id == GEARBOX {
                 int(&entity.nbt, "ShaftInputDirection").unwrap_or(-1)
                     != gearbox_input_direction(state.source_side)

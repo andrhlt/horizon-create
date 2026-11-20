@@ -1,0 +1,221 @@
+[
+  {
+    "phase": "before_save",
+    "points": {
+      "powered": {
+        "block": "create:gearbox",
+        "rpm": -32.0,
+        "axis": "x",
+        "source": "down"
+      },
+      "powered_north": {
+        "block": "create:shaft",
+        "rpm": 32.0
+      },
+      "powered_up": {
+        "block": "create:shaft",
+        "rpm": 32.0
+      },
+      "below_motor": {
+        "block": "create:creative_motor",
+        "rpm": -32.0
+      },
+      "south_motor": {
+        "block": "minecraft:air"
+      },
+      "stopped": {
+        "block": "create:gearbox",
+        "rpm": 0.0,
+        "axis": "z",
+        "source": "none"
+      },
+      "stopped_south": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "stopped_east": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "blocked_motor": {
+        "block": "create:creative_motor",
+        "rpm": 32.0
+      }
+    }
+  },
+  {
+    "phase": "after_load",
+    "points": {
+      "powered": {
+        "block": "create:gearbox",
+        "rpm": -32.0,
+        "axis": "x",
+        "source": "down"
+      },
+      "powered_north": {
+        "block": "create:shaft",
+        "rpm": 32.0
+      },
+      "powered_up": {
+        "block": "create:shaft",
+        "rpm": 32.0
+      },
+      "below_motor": {
+        "block": "create:creative_motor",
+        "rpm": -32.0
+      },
+      "south_motor": {
+        "block": "minecraft:air"
+      },
+      "stopped": {
+        "block": "create:gearbox",
+        "rpm": 0.0,
+        "axis": "z",
+        "source": "none"
+      },
+      "stopped_south": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "stopped_east": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "blocked_motor": {
+        "block": "create:creative_motor",
+        "rpm": 32.0
+      }
+    }
+  },
+  {
+    "phase": "settled",
+    "points": {
+      "powered": {
+        "block": "create:gearbox",
+        "rpm": -32.0,
+        "axis": "x",
+        "source": "down"
+      },
+      "powered_north": {
+        "block": "create:shaft",
+        "rpm": 32.0
+      },
+      "powered_up": {
+        "block": "create:shaft",
+        "rpm": 32.0
+      },
+      "below_motor": {
+        "block": "create:creative_motor",
+        "rpm": -32.0
+      },
+      "south_motor": {
+        "block": "minecraft:air"
+      },
+      "stopped": {
+        "block": "create:gearbox",
+        "rpm": 0.0,
+        "axis": "z",
+        "source": "none"
+      },
+      "stopped_south": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "stopped_east": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "blocked_motor": {
+        "block": "create:creative_motor",
+        "rpm": 32.0
+      }
+    }
+  },
+  {
+    "phase": "source_removed",
+    "points": {
+      "powered": {
+        "block": "create:gearbox",
+        "rpm": 0.0,
+        "axis": "x",
+        "source": "none"
+      },
+      "powered_north": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "powered_up": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "below_motor": {
+        "block": "minecraft:air"
+      },
+      "south_motor": {
+        "block": "minecraft:air"
+      },
+      "stopped": {
+        "block": "create:gearbox",
+        "rpm": 0.0,
+        "axis": "z",
+        "source": "none"
+      },
+      "stopped_south": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "stopped_east": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "blocked_motor": {
+        "block": "create:creative_motor",
+        "rpm": 32.0
+      }
+    }
+  },
+  {
+    "phase": "source_replaced",
+    "points": {
+      "powered": {
+        "block": "create:gearbox",
+        "rpm": 24.0,
+        "axis": "x",
+        "source": "south"
+      },
+      "powered_north": {
+        "block": "create:shaft",
+        "rpm": -24.0
+      },
+      "powered_up": {
+        "block": "create:shaft",
+        "rpm": -24.0
+      },
+      "below_motor": {
+        "block": "minecraft:air"
+      },
+      "south_motor": {
+        "block": "create:creative_motor",
+        "rpm": 24.0
+      },
+      "stopped": {
+        "block": "create:gearbox",
+        "rpm": 0.0,
+        "axis": "z",
+        "source": "none"
+      },
+      "stopped_south": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "stopped_east": {
+        "block": "create:shaft",
+        "rpm": 0.0
+      },
+      "blocked_motor": {
+        "block": "create:creative_motor",
+        "rpm": 32.0
+      }
+    }
+  }
+]
