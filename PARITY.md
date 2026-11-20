@@ -7416,6 +7416,32 @@ Quill selection through its original UI remain open. The muted LAN replay
 on the same candidate confirmed that a real guest could open the imported
 chest and see its original title, `capture chest`.
 
+APP-2092 adds a bounded player-facing Quill path: two main-hand clicks select
+inclusive corners, sneaking cancels, an anvil name is sanitized (or defaults
+to `schematic`), duplicate names receive a suffix, and the export is saved in
+the authoritative world's generated template directory. The exported
+Schematic item retains the template ID and enters the existing placement
+flow. Quill exports turn Structure Void cells into explicit air while
+omitting ordinary air. The Table now has a persistent input/output container
+and a Load Template action for an existing, registered Schematic item. The
+focused offscreen host replay in `tools/test-schematic-capture.py` passed on
+`native-9f42064-1811f947e145` with `--java` and the pinned 26.3 resources. It
+covers malformed and oversized selections, unsafe and duplicate names, Quill
+retention, Structure Void clearing, named block-entity data, world reopen,
+rejected Table insertion, template loading, and Table input/output save and
+reopen. The Java fixture placed every block and property and preserved its
+named chest.
+
+A separate `--lan` attempt did not reach guest assertions: the guest loaded
+resources, disconnected before the host logged a join, and `joined_client`
+timed out after 45 seconds. The earlier Java chest guest-open evidence remains
+valid; this pass claims no new guest Table or Quill action. The Table load
+action operates on a template-backed Schematic item already in the world. The
+local `.nbt` file picker and Java's chunked upload, the editable placement
+preview and separate edit controls, and the original Java prompt screen
+remain open. The checks are registered under `schematic-capture` and
+`schematic-java-import-lan` in `tools/test-parity.py`.
+
 
 ## Creative Crate Chute delivery
 

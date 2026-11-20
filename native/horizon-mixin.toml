@@ -1851,6 +1851,18 @@ bindings = [
   { name = "pitch", ty = "f32", value = "*pitch" },
 ]
 
+[[injection]]
+id = "schematic_table_menu_slot_rules"
+target = "horizon_client::native_client_hooks::menu_slot_rules"
+kind = "HEAD"
+helper = "schematic_table_menu_slot_rules.rs"
+bindings = [
+  { name = "menu", ty = "&str", value = "menu" },
+  { name = "slot", ty = "usize", value = "slot" },
+  { name = "stack", ty = "&crate::items::ItemStack", value = "stack" },
+  { name = "may_place", ty = "&mut bool", value = "&mut *may_place" },
+]
+
 [[module]]
 id = "hand_crank"
 file = "crates/horizon-client/src/game.rs"
@@ -4517,6 +4529,24 @@ id = "schematic_capture"
 file = "crates/horizon-client/src/game/structure_blocks.rs"
 name = "create_schematic_capture"
 source = "schematic_capture.rs"
+
+[[module]]
+id = "schematic_table"
+file = "crates/horizon-client/src/game.rs"
+name = "create_schematic_table"
+source = "schematic_table.rs"
+
+[[injection]]
+id = "schematic_capture_voids"
+target = "horizon_client::game::structure_blocks::Game<'_>::template_from_world"
+kind = "RETURN"
+helper = "schematic_capture_voids.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "origin", ty = "[i32; 3]", value = "origin" },
+  { name = "size", ty = "[i32; 3]", value = "size" },
+  { name = "template", ty = "Tag", value = "$value" },
+]
 
 [[injection]]
 id = "schematic_capture_control"
