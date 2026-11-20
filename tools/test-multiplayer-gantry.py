@@ -65,6 +65,10 @@ def run(args, scratch):
     lx, ly, lz = LEVER
     with fixture_world(args, "Gantry-LAN-reload", TEMPLATE, render=True, pack=args.pack) as host:
         host.command(f"/place template create:{TEMPLATE.with_suffix('')} {x} {y} {z}")
+        if args.drill:
+            # Replace the leading roller with a west-facing drill. The moving
+            # carriage travels west; obstacles are added once the guest starts it.
+            host.command(f"/setblock {x + 5} {y + 4} {z + 2} create:mechanical_drill[facing=west]")
         host.command(f"/setblock {lx} {ly} {lz} minecraft:lever[face=wall,facing=north,powered=true]")
         host.command(f"/tp @s {x + 8.5} {y + 3} {z - 2.5}")
         advance(host, 4)
@@ -105,10 +109,24 @@ def run(args, scratch):
             host_offset = read_offset(host)
             if host_offset is None or host_offset <= 0:
                 raise RuntimeError(f"Guest-powered gantry did not start moving: {host_offset}")
+            if args.drill:
+                host.command(f"/setblock {x + 4} {y + 4} {z + 2} minecraft:stone")
+                host.command(f"/setblock {x + 3} {y + 4} {z + 2} minecraft:bedrock")
             multiplayer.until("the guest to observe the moving gantry", lambda:
                 "powered=false" in guest.call("block", lx, ly, lz)["state"]
                 and guest.call("block", x + 6, y + 5, z + 2)["block"] == "minecraft:air"
             )
+
+            if args.drill:
+                for _ in range(80):
+                    actor_data = host.command(f"/data get entity {GANTRY} CreateGantry.Blocks")
+                    if "BreakingPos" in actor_data:
+                        break
+                    advance(host, 1)
+                else:
+                    raise RuntimeError(f"Mounted drill did not begin breaking: offset={read_offset(host)}, "
+                                       f"target={host.call('block', x + 4, y + 4, z + 2)}, "
+                                       f"actor={host.command(f'/data get entity {GANTRY} CreateGantry')}")
 
         saved_offset = read_offset(host)
         if saved_offset is None:
@@ -119,6 +137,42 @@ def run(args, scratch):
             raise RuntimeError(f"Moving gantry save lost progress: {saved_offset} -> {restored_offset}")
         advance(host, 3)
         resumed_offset = read_offset(host)
+        if args.drill:
+            if host.call("block", x + 4, y + 4, z + 2)["block"] != "minecraft:air":
+                for _ in range(100):
+                    if host.call("block", x + 4, y + 4, z + 2)["block"] == "minecraft:air":
+                        break
+                    advance(host, 1)
+                else:
+                    raise RuntimeError(f"Saved drill did not finish: offset={read_offset(host)}, "
+                                       f"stone={host.call('block', x + 4, y + 4, z + 2)}, "
+                                       f"actor={host.command(f'/data get entity {GANTRY} CreateGantry')}")
+            # Bedrock is not breakable; the contraption must stop there and
+            # retain exactly one stone drop in its payload or as a world item.
+            for _ in range(200):
+                if read_offset(host) is None:
+                    break
+                advance(host, 1)
+            if read_offset(host) is not None:
+                raise RuntimeError("Gantry kept moving against the unbreakable bedrock obstruction")
+            if host.call("block", x + 3, y + 4, z + 2)["block"] != "minecraft:bedrock":
+                raise RuntimeError("Mounted drill changed the bedrock obstruction")
+            world_blocks = host.call("blocks", x, y, z, x + 12, y + 8, z + 8)["blocks"]
+            barrels = [(bx, by, bz) for bx, by, bz, state in world_blocks
+                       if "barrel" in state]
+            barrel_items = " ".join(host.command(f"/data get block {bx} {by} {bz} Items")
+                                    for bx, by, bz in barrels)
+            drops = host.call("entities", 16, "minecraft:item")["entities"]
+            stone_count = (barrel_items.count("minecraft:stone")
+                           + barrel_items.count("minecraft:cobblestone")
+                           + sum(1 for item in drops
+                                 if "minecraft:stone" in str(item)
+                                 or "minecraft:cobblestone" in str(item)))
+            if stone_count != 1:
+                raise RuntimeError(f"Expected exactly one conserved stone drop, found {stone_count}: "
+                                   f"{barrel_items}; {drops}")
+            print("Mounted gantry drill broke stone, conserved its drop, ignored bedrock, and stopped after save/reopen.")
+            return
         if resumed_offset is None or max(restored_offset, resumed_offset) <= saved_offset:
             raise RuntimeError(f"Moving gantry did not resume after reopen: {saved_offset} -> "
                                f"{restored_offset} -> {resumed_offset}; "
@@ -132,5 +186,7 @@ if __name__ == "__main__":
     for name in ("ctl", "client", "resources"):
         parser.add_argument(name, type=lambda value: Path(value).resolve(strict=True))
     parser.add_argument("--pack", type=Path)
+    parser.add_argument("--drill", action="store_true",
+                        help="test a mounted drill, its drop, obstruction, and active save/reopen")
     with TemporaryDirectory(prefix="hc-gantry-lan-") as scratch:
         run(parser.parse_args(), Path(scratch))

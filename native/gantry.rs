@@ -134,11 +134,19 @@ pub(super) fn power_shafts(game: &mut Game<'_>) {
     }
 }
 
-fn space_for(game: &Game<'_>, anchor: [i32; 3], blocks: &[Compound], moving: &[[i32; 3]]) -> bool {
+fn space_for(
+    game: &Game<'_>,
+    anchor: [i32; 3],
+    blocks: &[Compound],
+    moving: &[[i32; 3]],
+    motion: [i32; 3],
+) -> bool {
     blocks.iter().all(|saved| {
         let at = offset(anchor, relative(saved));
         let state = game.world.block(at[0], at[1], at[2]);
-        moving.contains(&at) || game.res.behaviours().is_replaceable(state)
+        moving.contains(&at)
+            || game.res.behaviours().is_replaceable(state)
+            || super::create_drill::allows_obstruction(game, blocks, anchor, at, motion)
     })
 }
 
@@ -158,7 +166,7 @@ fn assemble(game: &mut Game<'_>, origin: [i32; 3]) {
         .iter()
         .map(|block| offset(origin, relative(block)))
         .collect();
-    if blocks.is_empty() || !space_for(game, next, &blocks, &source) {
+    if blocks.is_empty() || !space_for(game, next, &blocks, &source, direction.normal()) {
         return;
     }
     let dimension = game.native_dimension();
@@ -266,7 +274,15 @@ fn move_one(game: &mut Game<'_>, id: u32, mut data: Compound) {
         let crossing = change != 0.0
             && (grid_offset * axis_sign < candidate * axis_sign)
                 != (change * axis_sign < 0.0);
-        if (allowed || !crossing) && space_for(game, next_block, &blocks, &[]) {
+        if (allowed || !crossing)
+            && space_for(
+                game,
+                next_block,
+                &blocks,
+                &[],
+                axis.map(|step| step * if change > 0.0 { 1 } else { -1 }),
+            )
+        {
             next = candidate;
             stop = false;
             if let Some(limit) = sequence_limit {
@@ -280,6 +296,8 @@ fn move_one(game: &mut Game<'_>, id: u32, mut data: Compound) {
     }
     let contact_origin =
         std::array::from_fn(|i| f64::from(origin[i]) + f64::from(axis[i]) * distance);
+    let planned_origin =
+        std::array::from_fn(|i| f64::from(origin[i]) + f64::from(axis[i]) * next);
     super::create_contact::moving(game, &blocks, contact_origin, &mut data, age > 2 && !stop);
     let previous = number(&data, "PreviousOffset");
     let previous_origin =
@@ -290,7 +308,28 @@ fn move_one(game: &mut Game<'_>, id: u32, mut data: Compound) {
         previous_origin,
         contact_origin,
     );
-    if !stop && super::create_roller::tick(game, &mut blocks, previous_origin, contact_origin, id) {
+    let drill_stalled = if stop {
+        // StopMoving cancels BlockBreakingMovementBehaviour progress before
+        // the actor is restored to the world.
+        super::create_drill::translate(
+            game,
+            &mut blocks,
+            contact_origin,
+            contact_origin,
+            1.0,
+        );
+        false
+    } else {
+        super::create_drill::translate(
+            game,
+            &mut blocks,
+            contact_origin,
+            planned_origin,
+            1.0,
+        )
+    };
+    if !stop && (drill_stalled
+        || super::create_roller::tick(game, &mut blocks, previous_origin, contact_origin, id)) {
         next = distance;
     }
     if stop && restore(game, current, &blocks, 1, 0.0) {
