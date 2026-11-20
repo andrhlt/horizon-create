@@ -1235,27 +1235,30 @@ pinned Java BlockEntity read/write fields and links the active checkpoint to
 the existing Java GameTest trace. Other instruction types and persistence
 boundaries remain open.
 
-On rebuilt `native-9f42064-370918737e07` (built with
+On rebased `origin/main` (`1f2f317`),
 `sh tools/build-native.sh /Applications/Horizon.app/Contents/MacOS/horizon-launcher
-'/private/tmp/horizon-create-app1949-build'`), the sequenced-gearshift parity
-group passed all 11 checks using the `horizon-ctl` and `horizon-client` binaries
-from that build: editor, render, LAN editing, comparator, stop, reload,
-gantry distance limit, orientation and Wrench. The reopened active sequencer
-matched Java's tick-6 state on its first resumed tick. On the same build, the sequenced pulley
-consumer trace passed, as did 13 affected piston, gantry, roller and bearing
-regressions (including piston modes, moving actors and reload, both mounted
-dispenser cases, both roller tracks, and the 105-tick contraption-controls
-trace). Checks that did not need rendering used the headless client.
+'/private/tmp/horizon-create-app1949-build'` produced build
+`native-9f42064-f1e8907217b7`. The sequenced-gearshift parity group passed all
+11 checks using that build's `horizon-ctl` and `horizon-client` binaries:
+editor, render, LAN editing, comparator, stop, reload, gantry distance limit,
+orientation and Wrench. The reopened active sequencer
+matched Java's tick-6 state on its first resumed tick. On the same build, the
+sequenced pulley consumer trace passed, as did 13 affected piston, gantry,
+roller and bearing regressions (including piston modes, moving actors and
+reload, both mounted dispenser cases, both roller tracks, and the 105-tick
+contraption-controls trace). Checks that did not need rendering used the
+headless client.
 
 The [sequenced gantry replay](tools/test-sequenced-gearshift-gantry.py) uses
 the existing roller-filling fixture's live motor, gearbox, pinion and carriage.
 It verifies that a 1-block sequence at 128 RPM stops the downstream 32 RPM
 gantry at 0.25 blocks, following Java's relative distance context through the
 gearbox, then restores the carriage. This headless check passed on
-`native-9f42064-370918737e07`. The [sequenced piston replay](tools/test-sequenced-gearshift-piston.py)
-checks during-motion offset plus remaining distance, then verifies the piston
-settles at the 1-block endpoint after the sequence finishes. It also passed on
-that exact build. Full 1:1 remains open.
+`native-9f42064-f1e8907217b7`. The
+[sequenced piston replay](tools/test-sequenced-gearshift-piston.py) checks
+during-motion offset plus remaining distance, then verifies the piston settles
+at the 1-block endpoint after the sequence finishes. It also passed on that
+exact build. Full 1:1 remains open.
 
 When the original threshold-switch pulley finishes its rotation while the
 lever remains powered, the downstream pulley stops and the gearshift retains
