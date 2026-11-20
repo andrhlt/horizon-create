@@ -2935,14 +2935,25 @@ a block, with both circuits synchronized and both inventories intact.
 
 The fixtures use the original base, handle and indicator models and block
 texture. The visual run captures the low and raised handle in Horizon.
-Wall and ceiling power, restart timing, visual tick timing, audio playback,
-ambient particles, and Wrench behavior still need comparison.
+The [save/reopen replay](tools/test-analog-lever.py) raises the lever to State 7,
+saves after the 15-tick debounce has settled, reopens the same world, and checks
+State 7, ChangeTimer 0, and both connected redstone wires before lowering it and
+checking State 6 and both outputs. This is source-aligned gameplay persistence
+evidence; it does not claim Java restart-timing parity. Wall and ceiling power,
+visual tick timing, audio playback, and ambient particles remain follow-ups. The
+pinned Java Analog Lever is not `IWrenchable`; Horizon likewise leaves a
+Wrench-held interaction unchanged, so Wrench behavior is source-aligned and no
+separate gameplay fix is required.
+
+The isolated replay passed on `native-9f42064-d6dc2ad18d3f` with pack
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
 
 ```sh
 python3 tools/test-analog-lever.py --visual /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-analog-lever.py --removal --destroy /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-analog-lever.py --removal /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-analog-lever.py --craft /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-analog-lever.py --reopen /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-multiplayer-analog-lever.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
 
