@@ -677,6 +677,7 @@ CHECKS = (
     ("casing-advancement", "test-first-advancements", "--casing"),
     ("casing-advancement-lan", "test-first-advancements", "--casing", "--multiplayer"),
     ("basin-compacting", "test-basin-compacting"),
+    ("basin-lifecycle", "test-basin-lifecycle"),
     ("horizontal-belt", "test-horizontal-belt"),
     ("belt-output-backpressure", "test-horizontal-belt", "--backpressure"),
     ("horizontal-belt-lan-guest-placement", "test-horizontal-belt", "--lan"),

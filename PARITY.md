@@ -5512,6 +5512,43 @@ need gameplay coverage.
 
 ## Basin materials and cooking
 
+### Basin compacting lifecycle check
+
+`basin-lifecycle` adds a bounded multiplayer and persistence check alongside
+the four original compacting traces. A LAN guest drops nine Iron Ingots into
+the Basin; the check verifies the actual guest action reached the input
+inventory, preserves idle input across reopen, starts compacting, stops motor
+speed mid-cycle, reopens the active world, resumes, and sends the Iron Block
+through a horizontal Basin output into a chest for guest collection. This is a
+source-aligned gameplay check, not an exact Java reload or packet-timing
+comparison. The guest extracts from the routed chest because a Basin has no
+player inventory screen; the output still originates in the Basin recipe.
+
+The translated Java paths are `BasinBlock.updateEntityAfterFallOn` (dropped
+item insertion), `BasinInventory.insertItem` (unique item slots),
+`BasinRecipe.apply` (ingredient/output simulation and consumption),
+`MechanicalPressBlockEntity.tryProcessInBasin`, `PressingBehaviour.tick`
+(mid-cycle processing and zero-speed pause), and `BasinBlockEntity` read/write
+and spout routing. The check is registered as `basin-lifecycle` in
+`tools/test-parity.py`. It passed on `native-9f42064-3916961b0c42`. The case
+is Horizon gameplay evidence, not an exact Java reload or packet-timing
+comparison.
+
+The same build passed the scoped Java replays:
+
+- `basin-compacting`: four rigs, 132 sampled rows.
+- `brass-mixing`: the heated brass route matched all 186 Java ticks; a
+  separate 186-tick no-heat run retained its ingredients and produced no brass.
+- `basin-dry-alloy`: iron and zinc alloy paths, 106 samples.
+- `basin-wet-materials`: dough, three Mud inputs and grass rejection, 265 samples.
+
+Reproduce them with the actual check names in `tools/test-parity.py`, for
+example:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 --check basin-compacting --check brass-mixing --check basin-dry-alloy --check basin-wet-materials --check basin-lifecycle
+```
+
 The [material recipe replay](tools/test-material-recipes.py) on
 `native-9f42064-488a066f200f` with `create-material-recipes-v2.hmod`
 matched 265 samples across Dough, Mud from Dirt, Coarse Dirt and Rooted
