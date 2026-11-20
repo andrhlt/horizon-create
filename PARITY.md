@@ -3415,6 +3415,34 @@ current-source client before its baseline gate can be marked met. Full 1:1
 remains Open; other transfer/count combinations and cosmetic effects remain
 follow-ups.
 
+Commands for the passing integration evidence (runtime arguments point to the
+identified build and its prepared 26.3 resources):
+
+```sh
+CTL=/Users/andrewholt/dev/horizon-create/.local/app-2017-evidence/native-9f42064-6bdf8691aa42/horizon-ctl
+CLIENT=/Users/andrewholt/dev/horizon-create/.local/app-2017-evidence/native-9f42064-6bdf8691aa42/horizon-client
+RESOURCES=/Users/andrewholt/dev/horizon-create/.local/app-2017-evidence/native-9f42064-6bdf8691aa42/.local/horizon-client/26.3
+PACK=/Users/andrewholt/dev/horizon-create/.local/app-2017-evidence/create.hmod
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 2 \
+  --check machine-crafting \
+  --check stationary-funnel-placement \
+  --check stationary-funnel-placement-lan \
+  --check funnel-wrench-modes-lan \
+  --check funnel-neighbor-lan \
+  --check funnel-neighbor-reopen \
+  --check plain-funnel-collect-flap-lan \
+  --check plain-funnel-extract-flap-lan \
+  --check depot-pulling-funnel-lan \
+  --check package-funnel \
+  --check package-funnel-lan \
+  --check creative-crate-funnel-insert-lan \
+  --check weighted-ejector-funnel-lan
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1 \
+  --check depot-pulling-funnel-active-reopen
+python3 tools/test-clipboard-copy.py "$CTL" "$CLIENT" "$RESOURCES" \
+  --funnel --lan --pack "$PACK"
+```
+
 The [Ejector comparator replay](tools/test-depot-ejector-comparator.py)
 matched [all 62 Java ticks](fixtures/depot-ejector-comparator-java.csv)
 in solo and LAN on `e6e755d336c6`. The comparator and dust stepped through
