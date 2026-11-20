@@ -86,9 +86,15 @@ def verify(args):
             control.step_to(start + tick)
             for row in sample(control, tick):
                 actual[row[:3]] = row[3:]
-        differences = [
-            (key, expected.get(key), actual[key]) for key in sorted(actual) if expected.get(key) != actual[key]
-        ]
+    output = ROOT / ".local/creative-motor-competition-horizon.csv"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("w", newline="") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(("tick", "case", "offset", "present", "speed"))
+        writer.writerows((*key, *actual[key]) for key in sorted(actual))
+    differences = [
+        (key, expected.get(key), actual[key]) for key in sorted(actual) if expected.get(key) != actual[key]
+    ]
     if differences:
         raise RuntimeError(
             f"{len(differences)} of {len(expected)} competing-motor samples differ from Java. "

@@ -2122,29 +2122,37 @@ shaft preference, a crouched override, conflicting axes, and two shafts on
 one axis. Java captures are in `fixtures/creative-motor-placement-java.csv`
 from `tools/java-creative-motor-placement-trace.patch`.
 
-The original renderer and a world reload are covered too. Java’s
-`CreativeMotorRenderer` draws one `SHAFT_HALF` partial on the motor’s `facing`
-side, rotating about that axis with the 22.5° position phase. A [render
-replay](tools/test-creative-motor-render.py) matches Java’s rotation axis,
-half-shaft side, RPM, phase and angle for all six facings at +32 and −48 RPM in
-solo and for a LAN host and guest, from
-`fixtures/creative-motor-render-java.csv`
+Java’s `CreativeMotorRenderer` draws one `SHAFT_HALF` partial on the motor’s
+`facing` side. It rotates about that axis with a position-dependent phase of
+0° or 22.5°. The [render replay](tools/test-creative-motor-render.py) samples
+all six facings in solo and the south-facing motor on both LAN clients. The
+replay places motors with +32 and −48 RPM settings and checks the rendered
+axis, half-shaft side, signed speed, phase and angle after each placement.
+It compares speed and axis to `fixtures/creative-motor-render-java.csv`
 ([capture](tools/capture-creative-motor-java.py) with
-`tools/java-creative-motor-family-trace.patch`). A [save/reopen
-replay](tools/test-creative-motor-reload.py) keeps `ScrollValue` and regenerates
-the driven speed for two connected motors and one disconnected idle motor after
-the world is saved and reopened.
+`tools/java-creative-motor-family-trace.patch`) and evaluates Java’s phase and
+angle rules at Horizon’s frame position and time. The independent LAN settings
+check verifies the server shaft response to the host and guest board actions.
+A [save/reopen replay](tools/test-creative-motor-reload.py) keeps `ScrollValue`
+and regenerates speed for two motors each connected to its own shaft at −24 RPM
+and one disconnected motor at +40 RPM.
 
-Java’s core `RotationPropagator` still owns what happens when two motors share
-one network. The same Java probe records
-`fixtures/creative-motor-competition-java.csv`: an opposing equal pair settles
-at the first motor’s speed, and a mid-network sign flip tears the lane down.
-`tools/test-creative-motor-competition.py` currently reports 75 of 144 samples
-differing, because Horizon picks a different winning generator for the shared
-network. That source-overpower and flicker rule belongs to the wider kinetic
-family and remains open here
-([APP-1943](https://linear.app/appstu/issue/APP-1943)); the check is a
-diagnostic and is not registered until it matches.
+The Java probe also records
+`fixtures/creative-motor-competition-java.csv` for two motors on one shaft,
+including a sign change, source removal and re-add. This direct layout remains
+different after the APP-1943 merge: on build `native-9f42064-c09cf86edbf1`,
+`tools/test-creative-motor-competition.py` reports 107 of 144 samples
+differing. Horizon removes the first motor during initialization, while Java
+retains the lane; Java later tears down the first case on the setting change.
+The [kinetic source-transition check](tools/test-kinetic-network-sources.py)
+passes on the same build, but it does not exercise two opposing motors placed
+on one existing shaft. A candidate startup-order change reduced this motor
+diagnostic to 87 differences on `native-9f42064-5c202877bda0` but still did
+not match Java, so that unverified change was not retained. The Horizon samples
+are saved in `.local/creative-motor-competition-horizon.csv`. Keep this
+consequential source-order/flicker gap linked to
+[APP-1943](https://linear.app/appstu/issue/APP-1943); the diagnostic is not
+registered and this gameplay gate remains open.
 
 ```sh
 python3 tools/test-creative-motor.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
