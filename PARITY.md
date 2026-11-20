@@ -335,8 +335,26 @@ for Horizon's built-in blast speed multiplier. The replay checks cook
 progress and the first output tick for all eight inputs.
 The [five original crafting traces](fixtures/zinc-crafting-java.csv)
 exercise both directions of Raw Zinc and Zinc Ingot storage and the
-Zinc Chain recipe. Fortune distribution, furnace experience payout,
-and grinding output still need gameplay checks.
+Zinc Chain recipe.
+
+The [Fortune check](tools/test-zinc-progression.py) runs twelve survival
+mining outcomes with Fortune III: six Zinc Ore and six Deepslate Zinc Ore.
+Each produced Raw Zinc within the pinned Java `ore_drops` bounds (1–4), and
+seven trials yielded a bonus. This is a representative case, not an exhaustive
+Fortune distribution. The [LAN persistence check](tools/test-multiplayer-zinc.py)
+mined and picked up one Raw Zinc as a survival guest. On build
+`native-9f42064-b2e225daec86`, the host and guest inventories agreed, and the
+inventory remained after the host world was reopened and the guest rejoined.
+The ore stayed mined. Furnace experience payout and grinding output remain
+follow-ups.
+
+The focused regression batch passed on build
+`native-9f42064-b2e225daec86` with pack SHA-256
+`6ac5f2d01e229ca8df2104fbe0ec105c7c5310da21f32d3db3b251f4fe81a4b4`:
+`python3 tools/test-parity.py BUILD/horizon-ctl BUILD/horizon-client BUILD/.local/horizon-client/26.3 --jobs 2 --check zinc-mining --check zinc-fortune --check zinc-mining-lan --check zinc-heating --check zinc-crafting --check crushed-materials-heating`.
+All six checks passed: 12 Java-referenced mining cases; 12 Fortune III trials;
+one LAN mine/pickup, host world reopen, and guest rejoin; eight Zinc cooking
+cases; five storage/chain recipes; and six crushed-material cooking cases.
 
 The [natural generation probe](tools/capture-java-zinc-worldgen.py)
 records ore coordinates across four chunks at seed 810102. Java with

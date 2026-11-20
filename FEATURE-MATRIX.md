@@ -164,7 +164,7 @@ the two measure different levels of evidence.
 
 | Feature | In game | Basic tested | Java comparison | Full 1:1 | Remaining work |
 | --- | --- | --- | --- | --- | --- |
-| Zinc Ore, deeper Zinc Ore, raw/zinc blocks and Zinc processing | Yes | Pass | Mining, furnace/blast timing, zinc storage recipes, and seeded ore generation | Open | Fortune distribution, experience payout, further seeds and downstream processing |
+| Zinc Ore, deeper Zinc Ore, raw/zinc blocks and Zinc processing | Yes | Pass | Java-matched mining drops, Fortune III bounds, furnace/blast timing, zinc storage recipes, seeded ore generation, and LAN guest mining/pickup with inventory retained across host reopen and guest rejoin | Open | Exhaustive Fortune distribution, experience payout, further seeds and downstream processing |
 | Create stone world generation and Striated Ore | Yes | Pass | Recorded ore volumes, layered variants and save/reopen on selected seeds | Open | Additional seeds, generator/load order and runtime setting |
 | Decorative stone palettes | Yes | Pass | Registry/default states, survival cuts, pillars, slab merging, walls, and mining. [Furnace Scoria](fixtures/cooking-materials-timing-java.csv) matched 203 headless samples with output at tick 200. [Seven reverse Stonecutter recipes](tools/test-palettes-reverse-cutting.py) passed in survival | Open | Remaining recipes, connections, models and environmental interactions |
 | Rose Quartz and Polished Rose Quartz palettes | Yes | Pass | Recipes, walls and placement, sandpaper and redstone lamp behavior | Open | Remaining palette interactions and appearance |
