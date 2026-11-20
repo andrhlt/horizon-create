@@ -9723,9 +9723,11 @@ and the pack SHA-256 was
 Both `observer-lifecycle` and `observer-lifecycle-lan` matched all four Java
 samples and passed their cold-reopen checks in 78 seconds together. The LAN
 guest restored its view of both observers and lamps after reconnecting. The
-full ten-check batch passed again after rebasing onto
-`5e631abb6cc7fa01d3f31fa8573e5a985edb2e0a`, including the intervening
-bearing collision and Display Link changes.
+full ten-check batch passed on a rebuilt candidate after rebasing onto
+`036972379bc9b35b3fc371ae6755abcbb79f3f9f` (Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`). The rebuilt client
+`native-9f42064-9669a74fb4bf` has SHA-256
+`f504c88fadca21613d4e9a13436ee8686872791287e74c7d49e581637b05a9be`.
 
 The same candidate passed all eight selected regressions.
 
