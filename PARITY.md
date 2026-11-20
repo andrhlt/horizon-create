@@ -2221,6 +2221,25 @@ python3 tools/test-analog-lever.py --craft /path/to/horizon-ctl /path/to/horizon
 python3 tools/test-multiplayer-analog-lever.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
 
+## Survival progression baseline (APP-2094)
+
+The bounded progression path passed on the isolated build
+`native-9f42064-b2e225daec86`, built from Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, with the pack prepared from the
+pinned Create checkout. All 12 focused checks passed: the six-recipe survival
+craft replay includes Andesite Alloy; brass Basin mixing matched 186 Java
+ticks; and brass Depot pressing matched 71 Java ticks and four impact cues.
+
+Advancement checks matched the original 14-tick Alloy and casing traces in solo
+and LAN. The placer alone earned casing progress. Small Water Wheel score and
+ownership matched 32 Java ticks in solo, LAN, and after reopening the placed
+wheel; a LAN guest could earn the award while the host remained a bystander.
+Press ownership matched 33 Java ticks in both LAN role directions, with only
+the placer earning the award. The first advancement check also retained earned
+progress after a solo reopen. This covers the recorded host/guest ownership
+cases and representative persistence; other advancement criteria, rewards and
+progression combinations remain follow-ups. Full 1:1 remains Open.
+
 ## First Create advancements
 
 The [Java advancement probe](tools/java-first-advancements-trace.patch)
