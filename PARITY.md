@@ -3572,6 +3572,39 @@ Rope Pulley detach case, and Java bearing quarter-turn Gearbox restoration check
 also passed on that build. Full 1:1 remains open for other payload shapes,
 multi-axis collision, packet latency and unusual player poses.
 
+## Mechanical Bearing gameplay baseline (APP-1980)
+
+The registered [bounded gameplay check](tools/test-mechanical-bearing-gameplay.py)
+(`mechanical-bearing-gameplay`) covers survival placement, empty-hand start
+and stop, bedrock-obstructed assembly, positive-to-negative RPM reversal,
+automatic stop placement for modes 0/1/2 at near and away angles, and an idle
+bearing's `ScrollValue` across save/reopen. These cases follow the pinned
+`MechanicalBearingBlock.useItemOn`, `MechanicalBearingBlockEntity.tick` and
+`BearingContraption.assemble` behavior at Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb` ([block](https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/content/contraptions/bearing/MechanicalBearingBlock.java),
+[block entity](https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/content/contraptions/bearing/MechanicalBearingBlockEntity.java),
+[contraption](https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/content/contraptions/bearing/BearingContraption.java)).
+Both focused checks passed on build `native-9f42064-645e120d2506`, using
+Create source `ac0c444d9828da3453ae8cc65338e8de063286fb` and pack SHA-256
+`3c687913a0bba61bf6de08200887cc5b735b005a11f48ad6d495f1bd6a852379`:
+
+```sh
+TMPDIR=/private/tmp python3 tools/test-parity.py \
+  .local/patched-launcher/versions/native-9f42064-645e120d2506/horizon-ctl \
+  .local/patched-launcher/versions/native-9f42064-645e120d2506/horizon-client \
+  .local/patched-launcher/versions/native-9f42064-645e120d2506/.local/horizon-client/26.3 \
+  --jobs 1 --check mechanical-bearing-gameplay --check bearing-player-collision
+```
+
+`mechanical-bearing-gameplay` passed survival placement/item consumption,
+assembly and empty-hand disassembly, obstructed assembly, reversal, the bounded
+mode stop cases, and idle setting save/reopen. `bearing-player-collision` passed
+active glued cargo save/reopen and disassembly, plus host and LAN guest riding
+the rotating payload while remaining grounded. The run used isolated worlds
+and reports 2/2 checks passed. These representative cases do not establish full
+1:1 parity; other payload geometries, multi-axis collision, packet latency and
+unusual player poses remain open. Shared collision code is unchanged.
+
 ## Windmill Bearing
 
 The pinned [Java GameTest](tools/java-windmill-trace.patch) covers a
