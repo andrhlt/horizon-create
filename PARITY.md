@@ -5111,6 +5111,42 @@ these reference fixtures.
   a paired landing door. Check that both leaves open and close in both
   clients.
 
+## Elevator bounded gameplay baseline (APP-2001)
+
+The Rope Pulley and Redstone Contact prerequisites are Done in APP-1999 and
+APP-2000. The bounded two-floor baseline passed on 2026-11-20 using
+`native-9f42064-395b15d09945` and the `create.hmod` pack with SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. The
+build uses Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0a` and was produced
+from commit `5cd93bb`; the current main commit is `a167267`. The post-build
+main changes do not modify elevator, rope or contact modules. Java comparisons
+reuse the pinned Create 6.0.10 traces at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+| Bounded case | Result |
+| --- | --- |
+| Original two-pulley cabin, Redstone trip and return | `elevator`: all 67 Java ticks matched. |
+| Active and idle save/reopen, retained cargo and return/disassembly | `elevator-reload`: reopened at trip tick 42; all 66 return ticks matched Java; cabin and seat disassembled, and the cow remained at the upper landing after idle reopen. |
+| Two named floors, guest floor selection, door modes/interlock, indicator and sound | `elevator-service`: 101 Java ticks, 85 indicator samples on both clients, and 66 standing-player positions matched. |
+| Host and guest board the elevator seats and dismount in survival | `elevator-grounded`: both players boarded, rode to the upper landing, shift-dismounted and remained grounded. |
+| Standing host and guest ride to both endpoints and dismount | `elevator-standing`: both players remained unmounted and supported for all 134 travel ticks, then jumped and landed independently. |
+| Walking on the moving cabin and crossing paired doors | `elevator-walkthrough`: both players walked while rising, stopped at closed doors, and crossed after the paired doors opened; both clients observed the door states. |
+| Host/guest selected-floor trip and shared state | `multiplayer-elevator`: all 92 Java ticks matched for both clients, including names, lamps, cabin position and seated riders. Guest state was checked after convergence. |
+
+Run these checks together with the exact build's `horizon-ctl`,
+`horizon-client` and prepared `26.3` resources using
+`python3 tools/test-parity.py <build>/horizon-ctl <build>/horizon-client <build>/.local/horizon-client/26.3 --jobs 2 --check elevator --check elevator-reload --check elevator-service --check elevator-grounded --check elevator-standing --check elevator-walkthrough --check multiplayer-elevator`.
+All seven passed. Raw logs and sampled Horizon CSVs are retained under
+`.local/app-2001-evidence/` in the development environment.
+
+The two registered contacts bound this pass's travel range; upward and
+downward trips both settled at their selected endpoints. Closed landing doors
+blocked player exit until the guest opened them. APP-1999 independently checks
+the shared Rope Pulley blocked-assembly and zero-rope upper-limit behavior.
+The checks establish this baseline for the two-floor configuration, not every
+height or layout. Full 1:1 remains open for additional layouts, camera and
+interpolation timing, delayed updates and remaining edge interactions.
+
 ## Copper roofs
 
 The port loads all 48 original copper shingle and tile blocks, including
