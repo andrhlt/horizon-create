@@ -32,6 +32,11 @@ const PISTON_OPTIONS: [(&str, &str, [f32; 2]); 3] = [
     ("create.contraptions.movement_mode.move_place_returned", "Place only in Starting Position", [160.0, 16.0]),
     ("create.contraptions.movement_mode.move_never_place", "Place only when Anchor Destroyed", [176.0, 16.0]),
 ];
+const ROLLER_OPTIONS: [(&str, &str, [f32; 2]); 3] = [
+    ("", "Tunnel Pave", [144.0, 64.0]),
+    ("", "Straight Fill", [160.0, 64.0]),
+    ("", "Wide Fill", [176.0, 64.0]),
+];
 const SPRITES: &str = "create:gui/value_settings";
 
 #[derive(Clone, Copy)]
@@ -39,6 +44,7 @@ pub(super) enum IconBoard {
     Windmill,
     Clockwork,
     Piston,
+    Roller,
 }
 
 impl IconBoard {
@@ -47,6 +53,7 @@ impl IconBoard {
             Self::Windmill => &WINDMILL_OPTIONS,
             Self::Clockwork => &CLOCKWORK_OPTIONS,
             Self::Piston => &PISTON_OPTIONS,
+            Self::Roller => &ROLLER_OPTIONS,
         }
     }
 
@@ -57,7 +64,7 @@ impl IconBoard {
     fn position(self, [left, top, width, height]: [f32; 4]) -> [f32; 2] {
         let [x, y] = match self {
             Self::Windmill => [(width / 2.0).floor() - 13.0, (height / 2.0).floor() - 5.0],
-            Self::Clockwork | Self::Piston => [
+            Self::Clockwork | Self::Piston | Self::Roller => [
                 ((width - 37.0) / 2.0).floor(),
                 ((height - 11.0) / 2.0).floor(),
             ],
@@ -90,6 +97,10 @@ impl IconBoard {
             Self::Windmill => (TITLE.to_owned(), TIP.to_owned()),
             Self::Piston => (
                 game.translate("create.contraptions.movement_mode", "Movement Mode"),
+                Text::translate_with_fallback("create.gui.value_settings.release_to_confirm", "Release %1$s to Confirm", &[keybinds::display_name(game.settings.keys.get("key.use"))]).plain(),
+            ),
+            Self::Roller => (
+                "Rolling Mode".to_owned(),
                 Text::translate_with_fallback("create.gui.value_settings.release_to_confirm", "Release %1$s to Confirm", &[keybinds::display_name(game.settings.keys.get("key.use"))]).plain(),
             ),
             Self::Clockwork => (

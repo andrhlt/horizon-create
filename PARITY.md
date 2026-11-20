@@ -10436,3 +10436,46 @@ integration runs about 8 minutes across final-main reruns. The latest-main sync
 after those checks required no engine rebuild.
 No exhaustive contraption layouts, cosmetic timing or Java packet timing was
 claimed. Full 1:1 remains Open.
+
+## APP-2007 Mechanical Roller gameplay baseline
+
+The finite checks completed on the pinned Create reference
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`:
+
+- Existing Java comparisons `roller_filling` and `roller_paving_and_clearing`
+  passed on the candidate client. Together they compare 146 captured ticks for
+  fill, paving and clearing behavior, including the recorded material cases.
+- `roller-mode-ui` selected Tunnel Pave, Straight Fill and Wide Fill as host;
+  a LAN guest selected Wide Fill and the host observed the server value. The
+  selected mode persisted through `/save-all flush` and fixture restart. This
+  proves guest convergence and idle mode persistence, not packet-arrival timing
+  parity.
+- Gantry Shaft/Carriage is already Done; its existing integrated regressions
+  include the Roller. APP-2007's candidate build is
+  `native-9f42064-6d0b66c8daae`; client SHA-256
+  `306122ffe91cf76f28248cc74a63da75acace3e15d2b407ed90d30867621a79b`; prepared
+  Create pack SHA-256
+  `921c10ce6a435a3c4e7d45a6651001e1b77bd321cf621d896b348a471c701bbe`.
+  Cursor fix `16af87f` is included in the client.
+- Exact scoped command:
+
+  ```sh
+  python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \\
+    --check roller-filling --check roller-paving-and-clearing \\
+    --check roller-mode-ui
+  ```
+
+The new `native/roller.rs` work adds the mode setter, Roller placement redirect,
+full-block filter validation, and the Java slab-to-double-block filter state.
+`native/speed_controller_controls.rs` exposes the three mode choices through the
+existing Roller value board. `tools/test-roller-mode-ui.py` is the LAN/mode and
+idle-reopen check registered by the parity runner.
+
+This pass is partial. The current checks do not establish survival acquisition
+and mounting, invalid-filter rejection, exact consumed-material boundaries,
+active moving save/reopen, or actor transport. Those bounded gates remain open;
+we do not claim the whole APP-2007 baseline complete. The placement redirect
+and filter boundary code still need integration coverage before calling those
+paths verified. Additional terrain patterns, drum visuals, animation and exact
+network timing remain follow-ups; Full 1:1 stays Open.

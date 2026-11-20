@@ -145,11 +145,11 @@ pub(super) fn before_player_break(game: &Game<'_>, pos: [i32; 3]) {
     });
 }
 
-pub(super) fn after_player_break(
+pub(super) fn after_player_break<E: std::fmt::Debug>(
     game: &mut Game<'_>,
     pos: [i32; 3],
-    result: anyhow::Result<bool>,
-) -> anyhow::Result<bool> {
+    result: Result<bool, E>,
+) -> Result<bool, E> {
     if !game.native_authoritative() {
         return result;
     }

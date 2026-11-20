@@ -603,6 +603,7 @@ CHECKS = (
     ("mounted-drill-gantry-lan-reload", "test-multiplayer-gantry", "--drill", "--pack", str(ROOT / ".local/create.hmod")),
     ("roller-filling", "test-rollers", "roller_filling"),
     ("roller-paving-and-clearing", "test-rollers", "roller_paving_and_clearing"),
+    ("roller-mode-ui", "test-roller-mode-ui"),
     ("vaults-protect-fuel", "test-vault-fuel"),
     ("vault-groups", "test-vault-groups"),
     ("vault-groups-lan", "test-vault-groups", "--lan"),
