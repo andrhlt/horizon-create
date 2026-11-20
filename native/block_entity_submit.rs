@@ -52,6 +52,10 @@ fn block_entity_submit(
     } else if block == crate::game::create_item_drain::DRAIN {
         crate::game::create_item_drain::render(game, pos, entity, draw);
     } else if matches!(block,
+        crate::game::create_fluid_tank::TANK | crate::game::create_fluid_tank::CREATIVE
+    ) {
+        crate::game::create_tank_visual::render(game, pos, entity, draw);
+    } else if matches!(block,
         crate::game::create_threshold_switch::THRESHOLD_SWITCH | crate::game::create_smart_observer::OBSERVER
     ) {
         crate::game::create_threshold_switch::render_filter(game, pos, state, entity, draw);

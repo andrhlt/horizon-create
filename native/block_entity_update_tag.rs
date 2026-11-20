@@ -2,6 +2,16 @@ fn block_entity_update_tag(
     entity: &crate::containers::ModBlockEntity,
     tag: &mut Option<horizon_world::nbt::Compound>,
 ) {
+    if matches!(
+        entity.id.as_str(),
+        crate::game::create_fluid_tank::TANK | crate::game::create_fluid_tank::CREATIVE
+    ) {
+        // Tank fluid and controller dimensions drive the client-side tank
+        // renderer. Keep the update tag in step with the authoritative entity
+        // so both chunk loads and later fill/drain changes reach clients.
+        tag.get_or_insert_with(Default::default)
+            .extend(entity.nbt.clone());
+    }
     if entity.id == crate::game::create_sticker::STICKER { tag.get_or_insert_with(Default::default); }
     if crate::game::create_elevator_doors::sliding(&entity.id) {
         crate::game::create_elevator_doors::world_door_update(entity, tag);
