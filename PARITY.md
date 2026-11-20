@@ -4874,6 +4874,21 @@ The live comparison checks the hanging arm angles and roster
 transitions. Full player travel and frame-by-frame rendered pose
 parity remain open.
 
+### APP-2027 bounded gameplay baseline
+
+The bounded issue pass ran against Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, final rebased build `native-9f42064-fb8446effe86`, using prepared 26.3 resources and pack SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. The pinned Create reference is `ac0c444d9828da3453ae8cc65338e8de063286fb`. Reused capture patch SHA-256 values: base trace `c86a2ccaab8161037024f301ab34776c6e90668b7c76026fbbafcbab0033bb11`, branch `b7e83ad6e1b6ccade01d78f7b35adb926effbc74178e9ae6cb568f57d3ccc5e3`, blocked barrel `1e634db3945305ae1b005cafedfadbed7df2163ff4b23834f7ff84e1b66153a9`, restart `7c7fab944a25ccfac9ed48e64ddf9d308b758dde4799a6b8bf6f32269208c671`.
+
+- `tools/test-chain-conveyor-kinetics.py`: straight and rising Java traces matched one-sided and reciprocal connections, 128 RPM, reversal to -128 RPM, power loss, 16/128 RPM restart, and disconnection. The survival LAN interaction refused one chain, then consumed three of sixteen for the reciprocal connection; the guest observed both endpoints at 128 RPM.
+- `tools/test-chain-conveyor-branch.py --lan`: matched 70 Java world ticks and 57 package states with host and guest loading addressed packages onto separate branches.
+- `tools/test-chain-conveyor-adjacent.py --blocked --visual --lan`: matched 18 Java ticks; a full barrel blocked export at tick 37, then accepted cargo at tick 48. The guest saw the warning appear and clear.
+- `tools/test-chain-conveyor-rider.py --lan --dismount sneak`: a guest boarded a moving span, traveled, and dismounted by sneaking.
+- `tools/test-chain-conveyor-idle-reopen.py`: reciprocal links survived idle save/reopen with no cargo; adding a motor after reopening restarted both endpoints at 128 RPM.
+- `tools/test-chain-conveyor-packages.py --scenario straight --reopen-at 27`: matched 80 world ticks and 100 package states through an in-flight save/reopen. `tools/test-chain-conveyor-restart.py` also matched the straight and rising/reversal saved states and 15 post-restart Java package states apiece. The rising restart comparison begins at Java tick 0 because Horizon must tick once to publish the changed motor RPM; the Java tick -1 sample is pre-tick.
+
+These cases cover the gameplay baseline only. Full Java player travel, latency, complex route permutations, pixel-level presentation and animation timing remain open follow-ups.
+
+Elapsed time: no new Java capture; environment provisioning and diagnosis about 15 minutes; restart-fixture repair and evidence updates about 25 minutes; initial isolated build 18m 08s, rebased incremental builds 7m 53s and 3m 20s; production-logic replay 1.5s; headless integration runs about 15 minutes across the builds. The wall-clock estimates exclude wait time between work sessions.
+
 ### Frogport inventory
 
 Right-click opens the 18 package slots with the original Frogport

@@ -1627,6 +1627,7 @@ CHECKS = (
     ("desk-bell-wet-placement-lan", "test-desk-bell", "--wet-placement", "--lan"),
     ("train-passenger-count", "test-train-passenger-count"),
     ("multiplayer-elevator", "test-multiplayer-elevator"),
+    ("chain-conveyor-idle-reopen", "test-chain-conveyor-idle-reopen"),
 )
 
 
