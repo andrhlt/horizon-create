@@ -5272,6 +5272,24 @@ observed comparator wire strengths of 1, 2 and 0 across the three
 states. The same build observed passive boiler heat from both flame
 states and its loss after extinguishing. Presentation remains open.
 
+On `native-9f42064-b0213de77789`, the Blaze Burner survival replay passed
+normal fuel and Blaze Cake, refuel threshold and overflow, rejected fuel,
+expiry, lava-bucket remainder, and idle/active save-reopen. Acquisition mode
+captured a Blaze with an empty burner and placed the resulting burner. The LAN
+fueling replay passed with a survival guest consuming coal into a cold burner;
+the host observed 1,600 fuel ticks and kindled heat, and the guest observed the
+kindled state. The first fixture placed host and guest at the same coordinates,
+so the guest targeted the host entity instead of the burner. Separating the
+players corrected the fixture; no multiplayer production-code change was
+needed. These replays are registered as `blaze-burner`,
+`blaze-burner-acquisition`, and `blaze-burner-lan` in
+`tools/test-parity.py`. The earlier [heated-fluid replay](tools/test-fluid-food.py)
+matches three Basin recipes over 86 ticks; its first four samples keep all
+three burners smouldering and each mixer idle before fuel is applied,
+providing the insufficient-heat control. Source review also corrected
+creative capture to preserve the empty burner, matching
+`BlazeBurnerBlockItem.giveBurnerItemTo` at the pinned Java revision.
+
 ## Minecart Contraption items
 
 The [survival replay](tools/test-minecart-contraption-items.py) on

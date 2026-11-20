@@ -1112,6 +1112,8 @@ CHECKS = (
     ("steam-engine", "test-steam-engine"),
     ("steam-placement", "test-steam-placement"),
     ("blaze-burner", "test-blaze-burner"),
+    ("blaze-burner-acquisition", "test-blaze-burner", "--acquisition"),
+    ("blaze-burner-lan", "test-multiplayer-blaze-burner"),
     ("arm-brass-mixing", "test-arm-brass-mixing"),
     ("spout-crafting", "test-spout-crafting"),
     ("arm-placement", "test-arm-placement"),
