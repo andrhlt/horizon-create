@@ -2445,21 +2445,21 @@ adds the signed Clipboard actions above:
   guest large-cog placement and guest Clipboard copy/paste. Resulting host state
   matches; settings/clipboard delivery checks do not claim Java packet-arrival
   or interpolation timing.
-* On the freshly rebuilt `native-9f42064-e442e57aa9ac` (Horizon source
+* The powered four-gearbox/controller loop-close replay matches the saved Java
+  outcome: the newly inserted gearbox loses its block entity by tick 8 and is
+  air by tick 9, while the original network retains +24 RPM.
+* On the fresh combined build `native-9f42064-5a0a0aaed520` (Horizon source
   `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, prepared pack SHA-256
   `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`), the
-  bounded controller suite and selected neighbor regressions passed 19/19.
-  The compatible-launcher rebuild took 54 seconds (incremental); the test run
-  used this build's `horizon-client` and resource directory. Test outputs are
-  retained in `.local/parity/`.
+  bounded controller suite, APP-1943 source-conflict check and selected neighbor
+  regressions passed 21/21. This build includes the APP-1943 merge and the
+  shared Wrench changes from main through `716e57e`; checks used this build's
+  `horizon-client` and resource directory. The compatible-launcher rebuild took
+  8m00s (incremental). Test outputs are retained in `.local/parity/`.
 
-One consequential shared-network mismatch remains and is tracked as a blocking
-dependency on [APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and):
-in a closed four-gearbox/controller loop, Java breaks the incompatible
-controller/gearbox chain while Horizon can keep the loop and publish conflicting
-speeds. The controller-specific fixes and bounded checks in this branch are
-ready for a clearly labelled partial PR; this mismatch prevents claiming the
-gameplay baseline or marking APP-1951 complete.
+The formerly blocking shared-network mismatch from
+[APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and)
+is resolved and checked on the combined build. Full 1:1 parity remains open.
 
 Nonblocking follow-ups are exact bracket-transition timing, Flywheel
 instancing, overload tint/particles, cosmetic feedback-sound timing, other
