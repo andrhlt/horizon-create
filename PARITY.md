@@ -4574,6 +4574,64 @@ changes the host's saved mode twice with the same board. Board screenshots
 are captured for visual inspection. Pixel-by-pixel comparison and hover
 sound timing remain open.
 
+## APP-1997 Clockwork gameplay baseline
+
+The finite acceptance set reuses the pinned Java evidence for survival
+crafting; both-hand power and mode behavior; the 256 RPM settling limit;
+ordinary stop, mining and wrench rotation; obstruction drops; settings; active
+reopen; and host/guest audio. It adds an idle persistence case to
+`tools/test-clockwork-reopen.py`: set mode 1 while stopped, save and restart,
+then verify mode 1 remains, `Running` is not set and no hand displays exist.
+The fixture restores mode 0 before its existing Java active-reopen comparison.
+This idle check is source-aligned; it does not claim Java reload parity.
+
+Pinned inputs: Create `ac0c444d9828da3453ae8cc65338e8de063286fb`, Minecraft
+1.21.1 / NeoForge 21.1.219. The isolated Horizon client is
+`native-9f42064-bb1452aaac4d` from source commit
+`e8b3918a44b7156a124244af531af911991927ad`, an ancestor of this ticket's
+`origin/main` base `1da56f2a0e33936df8e007e3c188e09fd20057e0`. Clockwork's
+native behavior modules are unchanged at the ticket base. Prepared resources
+were `.local/horizon-client/26.3`; the Create pack SHA-256 was
+`cb9a737fce8e9f26c0b0f4f0a8fc2af332959c39f1d4cb3ca06f9a3583e28fcc`.
+
+The reviewed Java paths at that pin were
+`src/main/java/com/simibubi/create/content/contraptions/bearing/ClockworkBearingBlock.java`,
+`ClockworkBearingBlockEntity.java`, and `ClockworkContraption.java` in the same
+directory. They define empty-hand assembly/disassembly, wrench stop behavior,
+ordered hand collection, mode targets and ticking, and contraption attachment.
+The exact binaries and resources used were under
+`/Users/andrewholt/dev/horizon-create/.worktrees/app-2047-bogeys-train-assembly/.local/`:
+`patched-launcher/versions/native-9f42064-bb1452aaac4d/horizon-ctl`, the
+matching `horizon-client`, and `horizon-client/26.3`.
+
+On that client, the command
+`HORIZON_NO_AUDIO=1 HORIZON_CREATE_TEST_AUDIO=1 python3 tools/test-parity.py /Users/andrewholt/dev/horizon-create/.worktrees/app-2047-bogeys-train-assembly/.local/patched-launcher/versions/native-9f42064-bb1452aaac4d/horizon-ctl /Users/andrewholt/dev/horizon-create/.worktrees/app-2047-bogeys-train-assembly/.local/patched-launcher/versions/native-9f42064-bb1452aaac4d/horizon-client /Users/andrewholt/dev/horizon-create/.worktrees/app-2047-bogeys-train-assembly/.local/horizon-client/26.3 --jobs 1 --check 'clockwork-*'`
+passed 8/8 checks in about three minutes. Results: 46 powered/mode samples;
+82 settling samples; 27 removal samples; 27 obstruction samples; original
+survival recipe; English/German settings and two guest mode changes; all six
+Java audio cues on both host and guest; active Java reopen plus idle mode
+persistence. The muted audio variables are required for software playback
+capture. Exact remaining time/layout combinations, visual pixel parity and
+hover sound timing remain open.
+
+The seven Java capture/probe patch SHA-256 values are:
+
+| Capture | SHA-256 |
+| --- | --- |
+| `java-clockwork-bearing-trace.patch` | `3f5fa866bc87c2364e4b6b03a851a5aa2e81e71a0fa5cf6031b830e18f6258e8` |
+| `java-clockwork-settling-trace.patch` | `8770ec599ae0c35171a27ee10ddca02c7592289d6a961307649768bb2a2b7f29` |
+| `java-clockwork-removal-trace.patch` | `779dcd1c0261c697326ce105e07af7b9286c64aaa5ed1246363aa458f4b103f0` |
+| `java-clockwork-obstruction-trace.patch` | `93755509ce7870dc5b0859b9b154f405bbc0cf192be7229082ac8abb66d211fb` |
+| `java-clockwork-reopen-trace.patch` | `86a852e517d332df427782a15690296b19224ee69cf7a04a41c12599a8c92f12` |
+| `java-clockwork-audio-trace.patch` | `262c054a02fa5ed25a16cdac6a4bc545195ff62ab49ed22a17c92563f9735d29` |
+| `java-clockwork-settings-client-probe.patch` | `32ea337571e31c4d304dd64fa986b2b90414afe1c283eb5fd26a4562af435b0e` |
+
+An earlier audio collection attempt on build `native-9f42064-6a3da367a9bb`
+timed out waiting for playback events, including a retry with muted software
+audio enabled. The later identified client passed the same host/guest trace;
+the earlier failure is retained in the local run notes and is not counted as
+a product audio regression.
+
 ## Chassis range controls
 
 The [Java client probe](tools/java-chassis-range-client-probe.patch) opens
