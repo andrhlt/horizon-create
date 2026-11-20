@@ -8364,6 +8364,34 @@ two tanks holding 4,000 and 5,000 mB formed a three-block group. All three
 positions reported capacity 24,000 mB and contents 9,000 mB, with the transferred
 storage cleared. Both bucket replays and the split replay passed on this build.
 
+## APP-1987 tank fluid rendering and client synchronization
+
+The [render fixture](tools/test-tank-render.py) exercises real bucket fills and
+a drain, then reads both authoritative block data and the client block-entity
+render trace. On `native-9f42064-5079f533f884`, it rendered a 3,000/8,000 mB
+ordinary tank, a full 8,000 mB creative lava tank, and a 16,000/32,000 mB joined
+2x2 tank. It observed both sides of the live 4,000→3,000 mB change, repeated
+the final state after a cold world reopen, and verified the same fluid meshes on
+a joining LAN guest. Offscreen host and guest screenshots show the rendered
+water and lava in their windows.
+
+The initial empty screenshot was traced to an actual replication omission, not
+missing render dispatch. Server block data held fluid after writes, but clients
+received an empty `TankContent` compound because tank update tags omitted the
+entity NBT and fluid writes did not mark the controller updated. The tank update
+tag now carries the controller and fluid fields, and fluid writes notify the
+block entity update path. The fixture now uses bucket interactions, so it
+asserts the real synchronization path as well as geometry.
+
+The grouped tank/fluid regressions passed 37/38 checks; the only failure was
+the offline production-core runner missing locked `serde_json` from its isolated
+Cargo cache. After fetching that exact locked dependency,
+`python3 tools/test-parity.py ... --check tank-script-core` passed separately,
+for 38/38 affected checks overall. The same runs passed LAN bucket and
+encased-pipe transfer, the active fluid-pipe lifecycle, and the mechanical-pump
+LAN case. Full 1:1 visual parity remains open for interpolation, particles,
+client lighting, and exact Java pixels.
+
 ## Intermediate survival crafts
 
 Six [Java-captured recipes](fixtures/intermediate-crafting-java.csv) matched the

@@ -685,6 +685,12 @@ file = "crates/horizon-client/src/game.rs"
 name = "create_fluid_tank"
 source = "fluid_tank.rs"
 
+[[module]]
+id = "tank_visual"
+file = "crates/horizon-client/src/game.rs"
+name = "create_tank_visual"
+source = "tank_visual.rs"
+
 
 [[module]]
 id = "mixer"

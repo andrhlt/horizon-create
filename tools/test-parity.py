@@ -1526,6 +1526,7 @@ CHECKS = (
     ("fluid-threshold", "test-fluid-threshold"),
     ("tank-bucket", "test-tank-bucket"),
     ("tank-bucket-lan", "test-tank-bucket-lan"),
+    ("tank-render", "test-tank-render"),
     ("tank-split", "test-tank-split"),
     ("tank-merge", "test-tank-merge"),
     ("tank-mixed", "test-tank-mixed"),
