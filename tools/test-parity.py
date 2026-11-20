@@ -149,6 +149,7 @@ CHECKS = (
     ("sequenced-gearshift-comparator", "test-sequenced-gearshift-comparator"),
     ("sequenced-gearshift-stop-lan", "test-sequenced-gearshift-comparator", "--lan"),
     ("sequenced-gearshift-reload", "test-sequenced-gearshift-reload"),
+    ("sequenced-gearshift-gantry", "test-sequenced-gearshift-gantry"),
     ("sequenced-gearshift-orientation", "test-sequenced-gearshift-orientation"),
     ("sequenced-gearshift-wrench-lan", "test-sequenced-gearshift-orientation", "--lan"),
     ("sequenced-gearshift-render", "test-sequenced-gearshift-render"),

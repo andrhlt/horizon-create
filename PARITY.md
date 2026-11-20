@@ -1238,20 +1238,21 @@ boundaries remain open.
 On rebuilt `native-9f42064-370918737e07` (built with
 `sh tools/build-native.sh /Applications/Horizon.app/Contents/MacOS/horizon-launcher
 '/private/tmp/horizon-create-app1949-build'`), the sequenced-gearshift parity
-group passed all 9 checks using the `horizon-ctl` and `horizon-client` binaries
+group passed all 10 checks using the `horizon-ctl` and `horizon-client` binaries
 from that build: editor, render, LAN editing, comparator, stop, reload,
-orientation and Wrench. The reopened active sequencer matched Java's tick-6
-state on its first resumed tick. On the same build, the sequenced pulley
+gantry distance limit, orientation and Wrench. The reopened active sequencer
+matched Java's tick-6 state on its first resumed tick. On the same build, the sequenced pulley
 consumer trace passed, as did 13 affected piston, gantry, roller and bearing
 regressions (including piston modes, moving actors and reload, both mounted
 dispenser cases, both roller tracks, and the 105-tick contraption-controls
 trace). Checks that did not need rendering used the headless client.
 
-The gantry distance-limit integration still lacks a valid repeatable setup:
-the attempted headless rig did not assemble a gantry, so it is not counted as
-coverage. The existing gantry and roller checks above cover their affected
-regressions, while the sequenced pulley and bearing traces cover downstream
-sequence timing. Full 1:1 remains open.
+The [sequenced gantry replay](tools/test-sequenced-gearshift-gantry.py) uses
+the existing roller-filling fixture's live motor, gearbox, pinion and carriage.
+It verifies that a 1-block sequence at 128 RPM stops the downstream 32 RPM
+gantry at 0.25 blocks, following Java's relative distance context through the
+gearbox, then restores the carriage. This headless check passed on
+`native-9f42064-370918737e07`. Full 1:1 remains open.
 
 When the original threshold-switch pulley finishes its rotation while the
 lever remains powered, the downstream pulley stops and the gearshift retains
