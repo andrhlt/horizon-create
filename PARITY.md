@@ -2195,6 +2195,59 @@ settings box opens the board on the sixth client tick, and releasing it
 confirms the selected value. A three-tick press stays in the world and a
 left-click on the board leaves the setting pending.
 
+The overload replay uses an 8 RPM water wheel supplying 256 SU through a
+gearbox and controller. One fan on the cog side applies 254, 256 or 258 SU
+at targets 127, 128 and 129 RPM. The fan runs at equality and stalls at
+258 SU. The replay recovers first at +128 and then at −127 after another
+overload at −129. Java records the fan's effective RPM directly. The Horizon
+replay computes it from the fan's saved speed, capacity and stress, and
+independently samples the speedometer target, which drops to zero during
+overload. Build
+`native-9f42064-4ce381fec622` matched all 17 samples after the 70-tick
+water-wheel warmup. Horizon sets the target with the server NBT command.
+The tested pack SHA-256 is
+`d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`.
+[Java trace](fixtures/rotation-speed-controller-overload-java.csv)
+
+Apply the overload patch to the pinned Java checkout and run
+`./gradlew --offline runGameTestServer` with Java 21. Extract the CSV fields
+after `CREATE_CONTROLLER_OVERLOAD `. The patch SHA-256 is
+`f5fd02e889371390358e0766d782927bb0369297f7c5c2c797a21f7dc8efd6d8`.
+[Capture patch](tools/java-rotation-speed-controller-overload.patch)
+
+The boundary replay compares both drive directions on ticks 1–23 after
+setup. The negative row's zero column selects −1 RPM. The board also sets
+−73, −256, +256 and +23 RPM. A true zero target after ticks 9 and 18 stops
+the regulated side while the input stays at 24 RPM. Java invokes
+`SpeedControllerPeripheral.setTargetSpeed(0)`. The Horizon replay injects
+`ScrollValue:0` with the server's `/data merge block` command. The comparison
+covers the resulting settings and all seven speeds at four decimal places.
+[Java trace](fixtures/rotation-speed-controller-boundaries-java.csv) ·
+[Capture patch](tools/java-rotation-speed-controller-boundaries.patch)
+
+Apply the boundary patch to Create 6.0.10 at `ac0c444d9828da3453ae8cc65338e8de063286fb`
+and run `./gradlew --offline runGameTestServer` on Java 21. Extract the CSV
+fields after `CREATE_SPEED_CONTROLLER_BOUNDS `. The patch SHA-256 is
+`142a5e1dcb914680c5d953b5d4ad0a996aeb5c53435e509376af19ec9e4348ee`.
+Existing build `native-9f42064-711c7991bebd` matched all 23 ticks with
+prepared pack SHA-256 `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`.
+
+A cold reopen replay saves four powered rigs at signed targets −73 and +83,
+plus a zero target in each drive direction. A fresh Java server process
+loads the same world. The trace records the target and five block RPM
+readings before save, at the first loaded pre-tick, and for six more ticks.
+Horizon closes and relaunches its world process and takes the first sample
+before stepping the reopened world. Build `native-9f42064-711c7991bebd`
+matched all 32 rows using prepared pack SHA-256
+`d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`.
+[Java trace](fixtures/rotation-speed-controller-reopen-java.csv)
+
+Apply the reopen patch to the pinned Create 6.0.10 checkout. With Java 21,
+run `python3 tools/capture-java-rotation-speed-controller-reopen.py /path/to/checkout --output /path/to/empty-capture-dir --offline`.
+The patch SHA-256 is
+`14af0eca9f174c4e1f475ddf576dd16f3c180acdc03b6ac7f548d6dea912845d`.
+[Capture patch](tools/java-rotation-speed-controller-reopen.patch)
+
 The 40-tick cascade replay loads two regulators with fans in all three
 sections. It compares six rotational speeds and both controllers’ stress and
 capacity while changing signed settings, removing the first motor, then
@@ -2219,17 +2272,198 @@ shaft. A live host sets 64 RPM, and a guest reverses the server output to
 −32 RPM, then attaches a large cog to a second controller and spends one item.
 The original recipe passes the survival crafting fixture.
 
+An integrated hidden Java host and guest also opened the survival settings
+board and sent real `ValueSettingsPacket` edits through the LAN server. At
+frozen world tick 283 the host's +64 and guest's −32 edits were both accepted
+by the server and appeared on both clients' controller block entities at that
+tick. This verifies authority and replication for those edits. The frozen
+world reports effective RPM zero, so this capture does not establish the
+unfrozen shaft or rendered replication delay; LAN timing remains open.
+
+The survival Wrench replay starts with 24 RPM through a bare controller
+set to −73. A top click rotates the axis to X and stops the downstream
+shaft. The side click leaves the axis at X, and a bottom click restores the
+Z axis and 24 RPM. The setting survives both turns. Sneak-clicking picks up
+one controller and stops its former output shaft. The original motor
+keeps running. Baseline `native-9f42064-711c7991bebd` differed in six rows.
+Candidate `native-9f42064-4ce381fec622` matched all eleven samples from
+ticks 1–11 using the same prepared pack.
+[Java trace](fixtures/rotation-speed-controller-wrench-java.csv)
+
+Apply the Wrench patch to the pinned Java checkout and run
+`./gradlew --offline runGameTestServer`, then extract the fields after
+`CREATE_CONTROLLER_WRENCH `. The patch SHA-256 is
+`0d9c40a415a15cf22afcef6a832446f0d9b83da33d60a269cfd1d4aa0f82dcae`.
+[Capture patch](tools/java-rotation-speed-controller-wrench.patch)
+
+The render replay checks the X and Z controller shafts at +16 and −16 RPM.
+Both clients submit shaft and bracket geometry in an enclosed fixture with
+distinct block light at the controller and cog. The hidden Java client uses
+the fallback renderer with Flywheel disabled. The six stages cover an empty
+top, vertical large cogs, Brass and Andesite Encased Large Cogwheels, bare
+horizontal cogs, their removal, and reinstallation. Each stage contributes
+two actual frame submissions per axis after the Java bracket has settled.
+
+The comparison measures emitted vertex counts and light exactly. Local
+bounds have a tolerance of 0.0001 blocks and shaft angles have a tolerance
+of 0.003 degrees. Shaft bounds use the pose before spin, and angle
+comparisons align the clients' reported render times and fractions.
+Baseline `native-9f42064-c717808ff817` used block light 12 from the controller
+for all eight bracket submissions. Java used light 13 from the cog cell.
+Build `native-9f42064-2ffe2a07cde0` matched all 24 submissions using prepared
+pack SHA-256 `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`.
+[Java trace](fixtures/rotation-speed-controller-render-java.csv)
+
+Apply the render patch to the pinned Create checkout, then use Java 21 and
+run `python3 tools/capture-java-rotation-speed-controller-render.py /path/to/checkout --output /path/to/empty-capture-dir --offline`.
+The patch SHA-256 is
+`0006d6ed092875363bb9376f300202b02e7f7fd2524ac50fdb1df49ddd5fc2b9`.
+[Capture patch](tools/java-rotation-speed-controller-render.patch)
+
+Six more rigs check survival placement under Brass and Andesite Encased Large
+Cogwheels, both regulation directions, and isolation for parallel, vertical
+and small cogs. The shaft-driven andesite rig has both casing shaft ends
+closed. A pre-oriented brass rig tests transmission independently of
+placement. Java removes each 24 RPM motor after tick 4 and reinstalls it at
+32 RPM after tick 8. Horizon compares all 72 rows from ticks 1–12, measuring
+controller, cog and output shaft RPM to four decimal places, controller axis
+and remaining item count. Tick 0 records the Java setup state.
+[Java trace](fixtures/rotation-speed-controller-encased-java.csv) ·
+[Capture patch](tools/java-rotation-speed-controller-placement.patch)
+
+The encased capture uses Create 6.0.10 at `ac0c444d9828da3453ae8cc65338e8de063286fb`
+with Java 21. Apply the capture patch in a disposable checkout and run
+`./gradlew --offline runGameTestServer`, then extract the comma-separated
+fields after `CREATE_SPEED_CONTROLLER_ENCASED,`. The patch SHA-256 is
+`63dfba533978470a8864971de85229f1300e18aac6bd8a039f9d82ac847540ce`.
+Baseline `native-9f42064-a5156e57df79` differed in 32 rows.
+Build `native-9f42064-3bf392fcd9c8` matched all 72 rows with prepared
+pack SHA-256 `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`.
+
+Four additional rigs use the controller's settings board to check which block
+breaks at the default kinetic limit. A shaft-driven large cog turns a small
+cog at 256 RPM with a setting of ±128. At ±129 the large cog breaks before the
+next sample, leaving the controller, small cog and motor in place. After
+setting ±48, replacing the large cog restores both gear speeds. All blocks
+survive the same edits with the motor missing or driving from the large-cog
+side. The replay compares exact block presence and setting plus RPM to four
+decimal places from ticks 1–18. Tick 0 records the Java setup state.
+[Java trace](fixtures/rotation-speed-controller-break-java.csv) ·
+[Capture patch](tools/java-rotation-speed-controller-break.patch)
+
+Apply the break-order patch to the pinned Java checkout and run the same
+GameTest command, then extract the fields after
+`CREATE_SPEED_CONTROLLER_BREAK `. The patch SHA-256 is
+`5728675450d454a0fad2a505b331105c16412e97288d8dc0ec24faa1d91d1bd4`.
+Baseline `native-9f42064-3bf392fcd9c8` differed in 12 rows.
+Build `native-9f42064-711c7991bebd` matched all 72 rows using the same
+prepared pack and passed all 13 selected regressions.
+
 ```sh
 python3 tools/test-rotation-speed-controller.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-rotation-speed-controller.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --loaded
+python3 tools/test-rotation-speed-controller-overload.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --boundaries
+python3 tools/test-rotation-speed-controller-reopen.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-rotation-speed-controller-cascade.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-rotation-speed-controller-competing.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-rotation-speed-controller-placement.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-encased.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-break.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-wrench.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-render.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-multiplayer-rotation-speed-controller.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-multiplayer-rotation-speed-controller-timing.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-clipboard.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+python3 tools/test-rotation-speed-controller-clipboard.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --lan
 ```
 
-Competing cascades, loop conflicts, and the decision about which existing
-block breaks when a setting changes remain outside these fixtures.
+A diagnostic four-gearbox bypass confirmed a loop conflict at initial motor
+attachment. The Java loop at a +24 RPM target breaks the controller and
+first gearbox. The Horizon baseline keeps the loop in place and publishes
+different gear speeds. In Java, the loop with a −24 RPM target runs until a
+setting edit to −48 breaks the controller, large cog and first gearbox.
+Installing the missing gearbox while the +24 RPM loop is already powered
+breaks the newly placed gearbox in Java by the next sample. Horizon keeps
+the gearbox and reverses the large cog from +24 to −24 RPM.
+
+The [LAN replay](tools/test-multiplayer-rotation-speed-controller.py)
+checks host and guest settings, shaft RPM after a server step, and guest
+cog placement. The [timing replay](tools/test-multiplayer-rotation-speed-controller-timing.py)
+uses the real settings screen on an offscreen host and guest. It freezes the
+world between packet acceptance and the next server tick. Java 6.0.10's
+settings callback immediately updates theoretical output RPM to +64 for the
+host and −32 for the guest. The host and guest block entities both receive
+each setting on that tick. Effective kinetic RPM is zero while Java is frozen.
+The four [captured Java observations](fixtures/rotation-speed-controller-lan-timing-java.csv)
+cover both actors and both recipients.
+
+The Horizon settings callback now refreshes every connected kinetic member
+after the target changes, matching Java's remove-and-reattach path. The
+headless client cannot expose the controller settings screen to the test
+driver, so the two-client settings interaction uses offscreen rendering. In
+the fresh build after cherry-picking `16af87f`, the Horizon timing replay
+matched Java: host +64 and guest −32 were visible on the output shaft at
+acceptance, before another server step. The targeted parity selection passed
+17/17 checks, including the LAN timing replay.
+
+The Java reference uses a disposable offline-profile setup and explicit IPv4
+loopback binding. On the pinned Create checkout, apply the render patch first
+and then the LAN timing patch; run
+`python3 tools/capture-java-rotation-speed-controller-lan.py /path/to/checkout /path/to/empty-capture-dir`
+with Java 21. The LAN patch SHA-256 is
+`830572544d2ac0733dcac1770da2d0cf02a6f603c81562add49ef78fd84a1427`.
+[Capture patch](tools/java-rotation-speed-controller-lan-timing.patch)
+
+The [Clipboard replay](tools/test-rotation-speed-controller-clipboard.py)
+copies the controller's signed setting using Create's `Speed` key and
+`Row`/`Value` payload, then pastes −64 and +96 RPM into a second controller.
+Solo and LAN guest replays check that Clipboard interactions leave the
+simulation tick unchanged. The LAN host is headless; only the interacting
+client renders offscreen.
+
+### APP-1951 bounded gameplay pass
+
+The finite matrix for this delivery retains the existing Java comparisons and
+adds the signed Clipboard actions above:
+
+* Six survival placement cases cover both controller axes, blocked-top fallback,
+  large-cog placement and shaft-preferred orientation. Encased cog checks cover
+  horizontal valid layouts and parallel, vertical and small-cog controls.
+* Settings checks cover −256, −73, −1, zero, +23, +83, +128, +256 and the
+  overload boundary at ±129, plus positive/negative reversal and passthrough.
+  The 23-tick boundary fixture compares seven connected speeds per sample.
+* The 40-tick loaded cascade changes both controller targets, removes the first
+  source and powers from the opposite end. The 24-tick competing-motor fixture
+  covers a stronger same-direction source and an opposing source that breaks.
+  Both compare connected speed/sign; the cascade also compares stress/capacity.
+* Persistence saves four connected rigs: active −73 and +83 RPM outputs, plus
+  zero-target outputs in both drive directions while their inputs remain active.
+  It samples the saved state, the first reopened tick and six resumed ticks;
+  all 32 Java rows matched.
+* LAN coverage includes a host setting +64 RPM, a guest editing it to −32 RPM,
+  guest large-cog placement and guest Clipboard copy/paste. Resulting host state
+  matches; settings/clipboard delivery checks do not claim Java packet-arrival
+  or interpolation timing.
+* The powered four-gearbox/controller loop-close replay matches the saved Java
+  outcome: the newly inserted gearbox loses its block entity by tick 8 and is
+  air by tick 9, while the original network retains +24 RPM.
+* On the fresh combined build `native-9f42064-5a0a0aaed520` (Horizon source
+  `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, prepared pack SHA-256
+  `d6361c9f73eee47726e1b26463b463670e7be1e6b5e42a47019a14318d37c7df`), the
+  bounded controller suite, APP-1943 source-conflict check and selected neighbor
+  regressions passed 21/21. This build includes the APP-1943 merge and the
+  shared Wrench changes from main through `716e57e`; checks used this build's
+  `horizon-client` and resource directory. The compatible-launcher rebuild
+  took 8m00s (incremental). Test outputs are retained in `.local/parity/`.
+
+The formerly blocking shared-network mismatch from
+[APP-1943](https://linear.app/appstu/issue/APP-1943/create-full-parity-kinetic-network-propagation-speed-stress-and)
+is resolved and checked on the combined build. Full 1:1 parity remains open.
+
+Nonblocking follow-ups are exact bracket-transition timing, Flywheel
+instancing, overload tint/particles, cosmetic feedback-sound timing, other
+Clipboard settings families and unfrozen LAN frame-arrival timing.
 
 ## Analog Lever
 
