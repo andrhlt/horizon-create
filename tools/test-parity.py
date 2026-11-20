@@ -248,6 +248,7 @@ CHECKS = (
     ("depot-comparator", "test-depot-comparator"),
     ("item-drain", "test-item-drain", "--fluid-visual", "--plumbing"),
     ("item-drain-lan", "test-multiplayer-item-drain"),
+    ("item-drain-gameplay", "test-item-drain-gameplay"),
     ("threshold-switch", "test-threshold-switch"),
     ("stockpile-switch-editor", "test-stockpile-switch-editor"),
     ("stockpile-switch-editor-lan", "test-stockpile-switch-editor", "--lan"),
