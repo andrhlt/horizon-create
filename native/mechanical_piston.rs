@@ -153,7 +153,14 @@ fn assemble(
                     break;
                 }
             }
-            saved_block(game, at, start)?;
+            if saved_block(game, at, start).is_none() {
+                // Java PistonContraption.addToInitialFrontier leaves an immovable
+                // pull target in place while retracting the piston apparatus.
+                if speed < 0.0 {
+                    break;
+                }
+                return None;
+            }
             seeds.push(at);
         }
     }

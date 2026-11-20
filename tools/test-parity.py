@@ -581,6 +581,8 @@ CHECKS = (
     ("mechanical-piston-mode-2", "test-mechanical-piston-sticker", "--mode", "2"),
     ("mechanical-piston-normal", "test-mechanical-piston-sticker", "--extra", "normal"),
     ("mechanical-piston-blocked", "test-mechanical-piston-sticker", "--extra", "blocked"),
+    ("mechanical-piston-immovable-retraction", "test-mechanical-piston-immovable-retraction"),
+    ("mechanical-piston-boundaries", "test-mechanical-piston-boundaries"),
     ("mechanical-piston-actors", "test-mechanical-piston-sticker", "--extra", "actors"),
     ("mechanical-piston-lan", "test-mechanical-piston-sticker", "--mode", "1", "--lan"),
     ("mechanical-piston-actors-lan", "test-mechanical-piston-sticker", "--extra", "actors", "--lan"),
