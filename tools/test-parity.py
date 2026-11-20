@@ -60,6 +60,7 @@ CHECKS = (
     ("mechanical-saw", "test-mechanical-saw", "--visual"),
     ("mechanical-saw-tree-bearing", "test-mechanical-saw-tree"),
     ("mechanical-saw-output-recovery", "test-mechanical-saw-recovery"),
+    ("mechanical-saw-lan", "test-multiplayer-mechanical-saw"),
     ("runtime-saw", "test-mechanical-saw", "--runtime"),
     ("runtime-washing", "test-fan-depot", "--runtime-washing"),
     ("copper-backtank-charging", "test-copper-backtank"),

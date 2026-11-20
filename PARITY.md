@@ -10644,7 +10644,7 @@ Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, native build
 `ac0c444d9828da3453ae8cc65338e8de063286fb`, and pack SHA-256
 `a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
 
-The focused batch passed 6/6:
+The focused seven-check batch passed 7/7 on this build:
 
 - `mechanical-saw`: the existing bamboo plank cut and horizontal log cut
   matched all 96 sampled Java ticks, including the invalid Diamond pass-through.
@@ -10657,6 +10657,9 @@ The focused batch passed 6/6:
   powered bearing-mounted saw then cut a representative three-log oak trunk,
   survived active save/reopen, removed its attached leaves, and retained all
   three logs in mounted storage.
+- `mechanical-saw-lan`: with the host tick loop running, the guest collected
+  the actual filtered Bamboo Mosaic output from the powered saw; the host
+  observed no duplicated Bamboo Planks.
 
 Run with the exact built client and prepared resources:
 
@@ -10665,18 +10668,15 @@ python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \
   --check mechanical-saw --check runtime-saw \
   --check mechanical-saw-placement --check electronics-crafting \
   --check mechanical-saw-tree-bearing \
-  --check mechanical-saw-output-recovery
+  --check mechanical-saw-output-recovery --check mechanical-saw-lan
 ```
 
-LAN guest item custody remains unverified. Two exploratory guest fixtures did
-not produce a confirmed saw pickup: one left the guest-dropped item at a stale
-pre-teleport spawn height, and the output-pickup case timed out without proving
-collection. Their diagnostics are preserved at
-`.local/parity/mechanical-saw-lan.log`; these are harness failures, not a
-confirmed product failure. The multiplayer gate remains open for a direct
-guest insertion/collection check. Broader tree species, other cutting outputs
-and exact moving-contraption tick timing remain follow-ups. Full 1:1 remains
-Open.
+Two earlier exploratory guest fixtures did not establish transfer: one left a
+guest-dropped item at a stale pre-teleport spawn height, and another had the
+guest close enough to pick up the input before the saw. Their diagnostics are
+preserved in `.local/parity/mechanical-saw-lan.log`; the final fixture avoids
+both setup errors and passes. Broader tree species, other cutting outputs and
+exact moving-contraption tick timing remain follow-ups. Full 1:1 remains Open.
 
 The current-main rebase also exposed a compile blocker in the existing Postbox
 mixin (`anyhow::Result` is not available in the generated client); the branch
