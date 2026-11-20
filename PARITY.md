@@ -171,14 +171,20 @@ covers guest feed/collection and idle/partway reopen. These neighboring gates
 apply to the same authoritative basin inventory and Spout transfer paths; they
 do not claim packet-timing parity for a guest-triggered potion brew.
 
-The existing checked 394-tick run is recorded in `.local/parity/potion-brewing.log`;
-its detailed Horizon samples are in `.local/potion_brewing-horizon.csv`. A fresh
-replay from this ticket worktree could not open because the sandbox denied
-Horizon’s local control socket. As a result, the current worktree has not
-produced fresh final-build evidence for the potion-specific no-heat control or
-LAN/reopen combination. Keep this baseline partial until those cases pass on
-the integrated build. Remaining potion variants, splash/lingering handling and
-exhaustive fluid component combinations stay follow-ups.
+The replay was rerun from the isolated ticket worktree on client build
+`native-9f42064-6bdf8691aa42` with pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`; all 394
+Java rows matched exactly. Horizon output is in the worktree's
+`.local/potion_brewing-horizon.csv`, and the runner log is
+`.local/horizon-potion-brewing.log`. The no-heat rule is source-aligned in both
+Java (`PotionMixingRecipes.createRecipe` requires `HEATED`) and Horizon
+(`native/mixer.rs::recipe` blocks heat-required recipes and `brew` requires
+heat), but a potion-specific negative-control replay is still needed. The
+neighboring basin and Spout lifecycle checks do not replace the requested
+potion-path guest/reopen check. Keep this baseline partial until those cases
+and affected checks pass on the integrated build. Remaining potion variants,
+splash/lingering handling and exhaustive fluid component combinations stay
+follow-ups.
 
 Reproduce the Java trace comparison with:
 
