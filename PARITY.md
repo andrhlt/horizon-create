@@ -3367,6 +3367,82 @@ first inward flap pose on the following game tick and each heard both
 sound layers once. The plain and outward Belt Funnel LAN controls passed
 again.
 
+### Andesite and Brass Funnels gameplay baseline (APP-1970)
+
+The bounded case list covers survival acquisition; placement/orientation;
+plain insertion and extraction; Belt Funnel insertion and extraction;
+Brass filter and amount settings; one exact stack-limited transfer;
+rejected/full-output backpressure; removal/reconnection; representative
+guest configuration and transfer; and idle and active save/reopen.
+
+`machine-crafting-java.csv` now includes both funnel tiers. The Andesite
+Funnel row follows the pinned generated recipe
+`data/create/recipe/crafting/logistics/andesite_funnel.json` (andesite alloy
+above dried kelp, output two). The Java trace patch includes that recipe for
+future capture. This environment has JDK 27 only, so that added row was
+source-derived rather than recaptured by the Java GameTest; the existing Brass
+Funnel trace remains from the Java GameTest. On the identified Horizon build,
+the survival crafting replay matched all 25 recipes, including both funnel
+outputs and their remaining inventory.
+
+The selected Horizon integration run passed 13/13 checks: stationary Funnel
+survival placement in solo and LAN; seven Java Wrench mode actions in LAN;
+all 30 support-transition observations in LAN and settings retention after
+reopen; plain Funnel collecting and extracting in LAN; Depot and Weighted
+Ejector routes in LAN; package routes in solo and LAN; Creative Crate Funnel
+insertion in LAN; and all 25 survival recipes. The LAN Clipboard Funnel replay
+matched six Java configuration snapshots, including exact and up-to counts.
+
+`depot-pulling-funnel-active-reopen` adds a source-aligned lifecycle case. A
+Brass pushing Funnel with an exact-two filter moves two of five iron ingots
+into a Depot. Active save/reopen preserves the remaining three, Depot contents,
+filter and amount mode. The occupied Depot blocks another transfer. Clearing
+it lets the Funnel move exactly two more; a powered idle save/reopen retains the
+one-item remainder and configuration. The check passed on the same build.
+
+Evidence identity: Java Create `ac0c444d9828da3453ae8cc65338e8de063286fb`,
+Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, native build
+`native-9f42064-6bdf8691aa42` (main-synchronized source `781c0ef`), and pack
+SHA-256 `a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+`native/funnel.rs`, `native/belt_funnel.rs`, and `native/funnel_flap.rs` are
+byte-identical between that build source and this ticket branch. The current
+source build attempt stopped before compilation because several Horizon patch
+hunks do not apply to the cached pinned engine source, including hunks in
+`horizon-world/src/level/place.rs`, `horizon-client/src/game/use_hand.rs`,
+`remote.rs`, and `dispenser.rs`. Therefore the gameplay findings are reviewable,
+but this ticket still needs the affected checks rerun on a successfully built
+current-source client before its baseline gate can be marked met. Full 1:1
+remains Open; other transfer/count combinations and cosmetic effects remain
+follow-ups.
+
+Commands for the passing integration evidence (runtime arguments point to the
+identified build and its prepared 26.3 resources):
+
+```sh
+CTL=/Users/andrewholt/dev/horizon-create/.local/app-2017-evidence/native-9f42064-6bdf8691aa42/horizon-ctl
+CLIENT=/Users/andrewholt/dev/horizon-create/.local/app-2017-evidence/native-9f42064-6bdf8691aa42/horizon-client
+RESOURCES=/Users/andrewholt/dev/horizon-create/.local/app-2017-evidence/native-9f42064-6bdf8691aa42/.local/horizon-client/26.3
+PACK=/Users/andrewholt/dev/horizon-create/.local/app-2017-evidence/create.hmod
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 2 \
+  --check machine-crafting \
+  --check stationary-funnel-placement \
+  --check stationary-funnel-placement-lan \
+  --check funnel-wrench-modes-lan \
+  --check funnel-neighbor-lan \
+  --check funnel-neighbor-reopen \
+  --check plain-funnel-collect-flap-lan \
+  --check plain-funnel-extract-flap-lan \
+  --check depot-pulling-funnel-lan \
+  --check package-funnel \
+  --check package-funnel-lan \
+  --check creative-crate-funnel-insert-lan \
+  --check weighted-ejector-funnel-lan
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1 \
+  --check depot-pulling-funnel-active-reopen
+python3 tools/test-clipboard-copy.py "$CTL" "$CLIENT" "$RESOURCES" \
+  --funnel --lan --pack "$PACK"
+```
+
 The [Ejector comparator replay](tools/test-depot-ejector-comparator.py)
 matched [all 62 Java ticks](fixtures/depot-ejector-comparator-java.csv)
 in solo and LAN on `e6e755d336c6`. The comparator and dust stepped through
@@ -4573,6 +4649,64 @@ open and preserves the previously saved value. A survival LAN guest
 changes the host's saved mode twice with the same board. Board screenshots
 are captured for visual inspection. Pixel-by-pixel comparison and hover
 sound timing remain open.
+
+## APP-1997 Clockwork gameplay baseline
+
+The finite acceptance set reuses the pinned Java evidence for survival
+crafting; both-hand power and mode behavior; the 256 RPM settling limit;
+ordinary stop, mining and wrench rotation; obstruction drops; settings; active
+reopen; and host/guest audio. It adds an idle persistence case to
+`tools/test-clockwork-reopen.py`: set mode 1 while stopped, save and restart,
+then verify mode 1 remains, `Running` is not set and no hand displays exist.
+The fixture restores mode 0 before its existing Java active-reopen comparison.
+This idle check is source-aligned; it does not claim Java reload parity.
+
+Pinned inputs: Create `ac0c444d9828da3453ae8cc65338e8de063286fb`, Minecraft
+1.21.1 / NeoForge 21.1.219. The isolated Horizon client is
+`native-9f42064-bb1452aaac4d` from source commit
+`e8b3918a44b7156a124244af531af911991927ad`, an ancestor of this ticket's
+`origin/main` base `1da56f2a0e33936df8e007e3c188e09fd20057e0`. Clockwork's
+native behavior modules are unchanged at the ticket base. Prepared resources
+were `.local/horizon-client/26.3`; the Create pack SHA-256 was
+`cb9a737fce8e9f26c0b0f4f0a8fc2af332959c39f1d4cb3ca06f9a3583e28fcc`.
+
+The reviewed Java paths at that pin were
+`src/main/java/com/simibubi/create/content/contraptions/bearing/ClockworkBearingBlock.java`,
+`ClockworkBearingBlockEntity.java`, and `ClockworkContraption.java` in the same
+directory. They define empty-hand assembly/disassembly, wrench stop behavior,
+ordered hand collection, mode targets and ticking, and contraption attachment.
+The exact binaries and resources used were under
+`/Users/andrewholt/dev/horizon-create/.worktrees/app-2047-bogeys-train-assembly/.local/`:
+`patched-launcher/versions/native-9f42064-bb1452aaac4d/horizon-ctl`, the
+matching `horizon-client`, and `horizon-client/26.3`.
+
+On that client, the command
+`HORIZON_NO_AUDIO=1 HORIZON_CREATE_TEST_AUDIO=1 python3 tools/test-parity.py /Users/andrewholt/dev/horizon-create/.worktrees/app-2047-bogeys-train-assembly/.local/patched-launcher/versions/native-9f42064-bb1452aaac4d/horizon-ctl /Users/andrewholt/dev/horizon-create/.worktrees/app-2047-bogeys-train-assembly/.local/patched-launcher/versions/native-9f42064-bb1452aaac4d/horizon-client /Users/andrewholt/dev/horizon-create/.worktrees/app-2047-bogeys-train-assembly/.local/horizon-client/26.3 --jobs 1 --check 'clockwork-*'`
+passed 8/8 checks in about three minutes. Results: 46 powered/mode samples;
+82 settling samples; 27 removal samples; 27 obstruction samples; original
+survival recipe; English/German settings and two guest mode changes; all six
+Java audio cues on both host and guest; active Java reopen plus idle mode
+persistence. The muted audio variables are required for software playback
+capture. Exact remaining time/layout combinations, visual pixel parity and
+hover sound timing remain open.
+
+The seven Java capture/probe patch SHA-256 values are:
+
+| Capture | SHA-256 |
+| --- | --- |
+| `java-clockwork-bearing-trace.patch` | `3f5fa866bc87c2364e4b6b03a851a5aa2e81e71a0fa5cf6031b830e18f6258e8` |
+| `java-clockwork-settling-trace.patch` | `8770ec599ae0c35171a27ee10ddca02c7592289d6a961307649768bb2a2b7f29` |
+| `java-clockwork-removal-trace.patch` | `779dcd1c0261c697326ce105e07af7b9286c64aaa5ed1246363aa458f4b103f0` |
+| `java-clockwork-obstruction-trace.patch` | `93755509ce7870dc5b0859b9b154f405bbc0cf192be7229082ac8abb66d211fb` |
+| `java-clockwork-reopen-trace.patch` | `86a852e517d332df427782a15690296b19224ee69cf7a04a41c12599a8c92f12` |
+| `java-clockwork-audio-trace.patch` | `262c054a02fa5ed25a16cdac6a4bc545195ff62ab49ed22a17c92563f9735d29` |
+| `java-clockwork-settings-client-probe.patch` | `32ea337571e31c4d304dd64fa986b2b90414afe1c283eb5fd26a4562af435b0e` |
+
+An earlier audio collection attempt on build `native-9f42064-6a3da367a9bb`
+timed out waiting for playback events, including a retry with muted software
+audio enabled. The later identified client passed the same host/guest trace;
+the earlier failure is retained in the local run notes and is not counted as
+a product audio regression.
 
 ## Chassis range controls
 
@@ -10077,3 +10211,50 @@ python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 2 \
 
 Full 1:1 remains Open, including broader target and filter combinations and
 Java-equivalent packet timing.
+# APP-1971 Chute and Smart Chute gameplay baseline
+
+The finite APP-1971 baseline covers survival acquisition, representative
+vertical transfer, Smart Chute controls, backpressure, persistence, and LAN
+guest interaction. Full 1:1 remains Open for airflow, branch and mounted
+layouts and exact Java save/network timing.
+
+`tools/test-chute-crafting.py` verifies the pinned survival recipes: four
+Chutes from iron sheets and an iron ingot, then one Smart Chute from a brass
+sheet, Chute and Electron Tube. `tools/test-creative-crate-chute.py` matches 13
+Java cargo ticks for ordinary downward and upward delivery in solo and LAN.
+`tools/test-item-filter-chute.py` matches all 20 Java Smart Chute snapshots at
+tick 16 in solo and LAN; the lifecycle cases exercise filter edits, rejected
+input, powered stop/resume, and cold reopen with idle and in-flight cargo.
+`tools/test-clipboard-copy.py --chute` checks exact Clipboard transfer for
+filter, amount and mode settings, including List Filter installation and the
+filter-only case, in solo and LAN. The upward full-Chest capacity cases match
+all 19 Java samples in both modes and verify delivery resumes when capacity
+opens.
+
+The focused batch passed 11/11 registered checks on the fresh client built
+from port commit `1da56f2a0e33936df8e007e3c188e09fd20057e0` and pinned Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. Client SHA-256:
+`322cad6d76f2c9c3f9d9f18ab68252035d39e0457ad50c3c4f8a161839ac9ebf`; pack
+SHA-256: `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Checks: `chute-survival-crafting`, `item-filter-chute`,
+`item-filter-chute-lan`, `smart-chute-clipboard`,
+`smart-chute-clipboard-lan`, `creative-crate-chute`,
+`creative-crate-chute-lan`, `creative-crate-chute-upward`,
+`creative-crate-chute-upward-lan`, `upward-chute-capacity`, and
+`upward-chute-capacity-lan`. Runs used isolated fixture worlds; LAN cases
+included a guest. The exact focused command is:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 2 \
+  --check chute-survival-crafting --check item-filter-chute \
+  --check item-filter-chute-lan --check smart-chute-clipboard \
+  --check smart-chute-clipboard-lan --check creative-crate-chute \
+  --check creative-crate-chute-lan --check creative-crate-chute-upward \
+  --check creative-crate-chute-upward-lan --check upward-chute-capacity \
+  --check upward-chute-capacity-lan
+```
+
+These representative cases establish the finite gameplay baseline. They do
+not claim exhaustive Java parity for every inventory, airflow, branch,
+mounted, visual, effect or packet-timing combination.
+

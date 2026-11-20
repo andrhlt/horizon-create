@@ -61,6 +61,76 @@ def tick(host, tick):
         yield [str(rig), str(tick), str(contents(depot)), str(contents(barrel)), powered[1]]
 
 
+def active_reopen(host):
+    z = 10
+    host.commands((
+        f"/fill 2 103 {z-2} 12 103 {z+2} minecraft:smooth_stone",
+        f"/fill 2 104 {z-2} 12 111 {z+2} minecraft:air",
+        f"/setblock 5 104 {z} create:depot",
+        f"/setblock 6 105 {z} minecraft:barrel",
+        f"/setblock 5 105 {z} create:brass_belt_funnel[facing=west,shape=pushing]",
+        f'/data merge block 5 105 {z} {{Filter:{{id:"{IRON}",count:1}},FilterAmount:2,UpTo:0b}}',
+        f'/data merge block 6 105 {z} {{Items:[{{Slot:0b,id:"{IRON}",count:5}}]}}',
+    ))
+
+    def counts():
+        source, depot = host.commands((
+            f"/data get block 6 105 {z} Items",
+            f"/data get block 5 104 {z} Items",
+        ))
+        return contents(source), contents(depot)
+
+    def settings():
+        filter_data, amount, up_to = host.commands((
+            f"/data get block 5 105 {z} Filter",
+            f"/data get block 5 105 {z} FilterAmount",
+            f"/data get block 5 105 {z} UpTo",
+        ))
+        assert IRON in filter_data and amount.endswith("2") and up_to.endswith("0b"), (
+            filter_data, amount, up_to,
+        )
+
+    host.step_to(host.clock() + 1)
+    assert counts() == (3, 2), f"Exact-two transfer did not conserve the five-item source: {counts()}"
+    settings()
+    host.call("save")
+    host.restart()
+    assert counts() == (3, 2), f"Active save/reopen changed Funnel custody: {counts()}"
+    settings()
+
+    start = host.clock()
+    for tick in range(1, 31):
+        host.step_to(start + tick)
+        if host.command(f"/data get block 5 105 {z} TransferCooldown").endswith("0"):
+            break
+    assert counts() == (3, 2), f"Occupied Depot should apply backpressure after reopen: {counts()}"
+    settings()
+
+    host.command(f"/data merge block 5 104 {z} {{Items:[]}}")
+    start = host.clock()
+    for tick in range(1, 12):
+        host.step_to(start + tick)
+        if counts() == (1, 2):
+            break
+    assert counts() == (1, 2), f"Exact-count transfer did not resume after output cleared: {counts()}"
+    settings()
+    host.command(f"/setblock 5 106 {z} minecraft:redstone_block")
+    host.step_to(host.clock() + 1)
+    host.call("save")
+    host.restart()
+    assert counts() == (1, 2), f"Idle save/reopen changed Funnel custody: {counts()}"
+    assert "powered=true" in host.call("block", 5, 105, z)["state"]
+    settings()
+    host.command(f"/setblock 5 106 {z} minecraft:air")
+    start = host.clock()
+    for tick in range(1, 12):
+        host.step_to(start + tick)
+        if "powered=false" in host.call("block", 5, 105, z)["state"]:
+            break
+    assert counts() == (1, 2), f"One-item remainder was lost after resuming: {counts()}"
+    print("Active and idle save/reopen retained the exact-two filter, backpressure, and transfer custody.")
+
+
 def main():
     parser = ArgumentParser(description=__doc__)
     for name in ("ctl", "client", "resources"):
@@ -69,6 +139,7 @@ def main():
     parser.add_argument("--reference", type=Path, default=ROOT / "fixtures/depot-pulling-funnel-java.csv")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--lan", action="store_true")
+    parser.add_argument("--reopen", action="store_true")
     args = parser.parse_args()
     with args.reference.open() as source:
         rows = csv.reader(source)
@@ -117,6 +188,8 @@ def main():
                 host.step_to(host.clock() + 1)
                 mp.until("guest collects the barrel output", lambda: mp.count(guest, IRON) == (8 if index == 3 else 3 * index))
                 guest.call("close")
+        if args.reopen:
+            active_reopen(host)
     print(f"Matched {len(actual)} Java tick rows across three Funnel rigs.")
 
 
