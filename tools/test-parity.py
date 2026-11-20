@@ -136,6 +136,8 @@ CHECKS = (
     ("goggles-gauges", "test-goggles-gauges"),
     ("wrench", "test-wrench"),
     ("wrench-tagged", "test-wrench", "--tagged"),
+    ("wrench-crafting", "test-wrench", "--craft"),
+    ("wrench-pickup-probe", "test-wrench-pickup-probe"),
     ("hand-crank", "test-hand-crank"),
     ("hand-crank-competing-motor", "test-hand-crank-motor"),
     ("hand-crank-lan", "test-multiplayer-hand-crank"),
