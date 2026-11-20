@@ -303,6 +303,7 @@ CHECKS = (
     ("analog-lever-destruction", "test-analog-lever", "--removal", "--destroy"),
     ("analog-lever-replacement", "test-analog-lever", "--removal"),
     ("analog-lever-crafting", "test-analog-lever", "--craft"),
+    ("analog-lever-reopen", "test-analog-lever", "--reopen"),
     ("analog-lever-lan", "test-multiplayer-analog-lever"),
     ("redstone-link-settings", "test-redstone-link", "--configure"),
     ("display-link", "test-display-link"),
