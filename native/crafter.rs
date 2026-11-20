@@ -1,7 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use horizon_core::{geometry::Direction, position::BlockPos};
-use horizon_world::nbt::{Compound, Tag};
+use horizon_world::{
+    level::flags,
+    nbt::{Compound, Tag},
+};
 
 use crate::containers::{BlockEntity, ModBlockEntity};
 use crate::items::ItemStack;
@@ -13,6 +16,7 @@ use super::create_machines::{DIRECTIONS, ingredient_matches, int, mod_entity, of
 
 pub(super) const CRAFTER: &str = "create:mechanical_crafter";
 const SLOT_COVER: &str = "create:crafter_slot_cover";
+const WRENCH: &str = "create:wrench";
 type Pos = [i32; 3];
 type Grid = BTreeMap<(i32, i32), Option<ItemStack>>;
 
@@ -223,41 +227,92 @@ fn targets(game: &Game<'_>, pos: Pos) -> Vec<Pos> {
     targets
 }
 
-pub(super) fn click_cover(game: &mut Game<'_>, pos: Pos, face: Pos) -> bool {
-    if (!game.native_authoritative() && game.lan_acting.is_none())
-        || direction(game, pos).map(Direction::normal) != Some(face)
+pub(super) fn click(game: &mut Game<'_>, pos: Pos, face: Pos) -> bool {
+    let Some(front) = direction(game, pos) else {
+        return false;
+    };
+    if !game.may_build()
+        || (!game.native_authoritative() && game.lan_acting.is_none())
+        || front.normal() != face
     {
         return false;
     }
-    let held = game.held().map(|stack| stack.item.as_ref());
-    if held.is_some_and(|item| item != SLOT_COVER)
+    let held = game.held().cloned();
+    if held
+        .as_ref()
+        .is_some_and(|stack| stack.item.as_ref() == "create:mechanical_arm")
+    {
+        return false;
+    }
+    if held
+        .as_ref()
+        .is_some_and(|stack| stack.item.as_ref() == WRENCH)
+    {
+        if game.native_sneaking() {
+            return false;
+        }
+        let next = match game.native_block_property(pos, "pointing").as_deref() {
+            Some("up") => "left",
+            Some("left") => "down",
+            Some("down") => "right",
+            Some("right") => "up",
+            _ => return false,
+        };
+        game.native_set_block_property_with(pos, "pointing", next, flags::UPDATE_ALL);
+        game.swing_arm();
+        return true;
+    }
+    if game.native_sneaking()
         || (held.is_none() && game.hand != horizon_client::first_person::Hand::Main)
     {
         return false;
     }
-    let installing = held.is_some();
-    let changed = game.native_with_mod_block_entity(pos, |entity| {
-        if entity.id != CRAFTER
-            || Phase::read(entity) != Phase::Idle
-            || entity.items.first().is_some_and(Option::is_some)
-            || (int(&entity.nbt, "Cover") == Some(1)) == installing
-        {
+
+    let Some(entity) = mod_entity(game, pos) else {
+        return false;
+    };
+    if Phase::read(entity) != Phase::Idle {
+        if let Some(positions) = chain(game, pos, front) {
+            for at in positions {
+                eject_at(game, at, front);
+            }
+        }
+    } else {
+        let covered = int(&entity.nbt, "Cover") == Some(1);
+        let item = entity.items.first().and_then(Option::as_ref);
+        let installing = held
+            .as_ref()
+            .is_some_and(|stack| stack.item.as_ref() == SLOT_COVER);
+        if installing || (held.is_none() && covered) {
+            if covered == installing || item.is_some() {
+                return false;
+            }
+            game.native_with_mod_block_entity(pos, |entity| {
+                entity
+                    .nbt
+                    .insert("Cover".into(), Tag::Byte(i8::from(installing)));
+            });
+            if !game.creative {
+                if installing {
+                    game.consume_held();
+                } else {
+                    game.give_or_drop(ItemStack::new(SLOT_COVER, 1));
+                }
+            }
+        } else if let Some(stack) = held {
+            let count = stack.count;
+            let remainder = insert(game, pos, stack);
+            if remainder.as_ref().map_or(0, |stack| stack.count) != count {
+                *game.held_mut() = remainder;
+            }
+        } else if let Some(item) = item.cloned() {
+            game.native_with_mod_block_entity(pos, |entity| entity.items[0] = None);
+            game.give_or_drop(item);
+        } else {
             return false;
         }
-        entity.nbt.insert("Cover".into(), Tag::Byte(i8::from(installing)));
-        true
-    });
-    if changed != Some(true) {
-        return false;
+        game.native_block_entity_sync(pos);
     }
-    if !game.creative {
-        if installing {
-            game.consume_held();
-        } else {
-            game.give_or_drop(ItemStack::new(SLOT_COVER, 1));
-        }
-    }
-    game.native_block_entity_sync(pos);
     game.guest_inventory_resend |= game.lan_acting.is_some();
     game.swing_arm();
     true
@@ -267,10 +322,15 @@ pub(super) fn drop_cover(level: &mut super::GameLevel<'_>, pos: BlockPos, side_e
     if !side_effects || !level.native_authoritative {
         return;
     }
-    if level.world.block_entities.get(&(pos.x, pos.y, pos.z)).is_some_and(|entity| {
-        matches!(entity, BlockEntity::Mod(entity)
+    if level
+        .world
+        .block_entities
+        .get(&(pos.x, pos.y, pos.z))
+        .is_some_and(|entity| {
+            matches!(entity, BlockEntity::Mod(entity)
             if entity.id == CRAFTER && int(&entity.nbt, "Cover") == Some(1))
-    }) {
+        })
+    {
         level.drop_lost_contents(pos, vec![Some(ItemStack::new(SLOT_COVER, 1))]);
     }
 }
@@ -279,7 +339,7 @@ pub(super) fn available(entity: &ModBlockEntity) -> bool {
     entity.id == CRAFTER
         && Phase::read(entity) == Phase::Idle
         && int(&entity.nbt, "Cover").unwrap_or(0) == 0
-        && entity.items.first().is_some_and(Option::is_none)
+        && entity.items.first().is_none_or(Option::is_none)
 }
 
 pub(super) fn room(game: &Game<'_>, pos: Pos) -> u32 {
@@ -289,28 +349,41 @@ pub(super) fn room(game: &Game<'_>, pos: Pos) -> u32 {
         .count() as u32
 }
 
-fn begin(game: &mut Game<'_>, pos: Pos) {
-    let Some(front) = direction(game, pos) else {
-        return;
-    };
-    if !mod_entity(game, pos).is_some_and(|entity| reading(entity, 0) != 0.0) {
-        return;
+fn ready_to_begin(
+    game: &Game<'_>,
+    pos: Pos,
+    front: Direction,
+    local: &ModBlockEntity,
+    powered_start: bool,
+) -> Option<Vec<Pos>> {
+    let positions = chain(game, pos, front)?;
+    let mut has_item = false;
+    for &at in &positions {
+        let entity = if at == pos {
+            local
+        } else {
+            mod_entity(game, at)?
+        };
+        let filled = entity.items.first().is_some_and(Option::is_some);
+        if Phase::read(entity) != Phase::Idle
+            || (!powered_start && !filled && int(&entity.nbt, "Cover") != Some(1))
+        {
+            return None;
+        }
+        has_item |= filled;
     }
-    let Some(positions) = chain(game, pos, front) else {
-        return;
-    };
-    if !positions.iter().all(|&at| {
-        mod_entity(game, at).is_some_and(|entity| {
-            Phase::read(entity) == Phase::Idle
-                && (int(&entity.nbt, "Cover") == Some(1)
-                    || entity.items.first().is_some_and(Option::is_some))
-        })
-    }) {
-        return;
-    }
+    has_item.then_some(positions)
+}
+
+fn begin(
+    game: &mut Game<'_>,
+    positions: Vec<Pos>,
+    front: Direction,
+    mut local: Option<(Pos, &mut ModBlockEntity)>,
+) {
     for at in positions {
         let leaf = preceding(game, at, front).is_empty();
-        game.native_with_mod_block_entity(at, |entity| {
+        let start = |entity: &mut ModBlockEntity| {
             let item = entity.items.first_mut().and_then(Option::take);
             save(entity, &Grid::from([((0, 0), item)]));
             if leaf {
@@ -318,13 +391,18 @@ fn begin(game: &mut Game<'_>, pos: Pos) {
             } else {
                 Phase::Accepting.set(entity, 0);
             }
-        });
+        };
+        if let Some((_, entity)) = local.as_mut().filter(|(pos, _)| *pos == at) {
+            start(entity);
+        } else {
+            game.native_with_mod_block_entity(at, start);
+        }
         game.native_block_entity_sync(at);
     }
 }
 
 pub(super) fn insert(game: &mut Game<'_>, pos: Pos, mut stack: ItemStack) -> Option<ItemStack> {
-    let mut received = false;
+    let mut received = Vec::new();
     for at in targets(game, pos) {
         if stack.count == 0 {
             break;
@@ -332,6 +410,9 @@ pub(super) fn insert(game: &mut Game<'_>, pos: Pos, mut stack: ItemStack) -> Opt
         if game.native_with_mod_block_entity(at, |entity| {
             if !available(entity) {
                 return false;
+            }
+            if entity.items.is_empty() {
+                entity.items.push(None);
             }
             entity.items[0] = Some(ItemStack {
                 count: 1,
@@ -341,12 +422,17 @@ pub(super) fn insert(game: &mut Game<'_>, pos: Pos, mut stack: ItemStack) -> Opt
         }) == Some(true)
         {
             stack.count -= 1;
-            received = true;
+            received.push(at);
             game.native_block_entity_sync(at);
         }
     }
-    if received {
-        begin(game, pos);
+    for at in received {
+        if let (Some(front), Some(entity)) = (direction(game, at), mod_entity(game, at))
+            && reading(entity, 0) != 0.0
+            && let Some(positions) = ready_to_begin(game, at, front, entity, false)
+        {
+            begin(game, positions, front, None);
+        }
     }
     (stack.count != 0).then_some(stack)
 }
@@ -434,26 +520,36 @@ fn spread(game: &mut Game<'_>, pos: Pos, front: Direction, entity: &mut ModBlock
     game.native_block_entity_sync(target);
 }
 
-fn finish(game: &mut Game<'_>, pos: Pos, front: Direction, entity: &mut ModBlockEntity) {
-    let stacks = grid(entity);
-    let fallback = pos.map(|v| f64::from(v) + 0.5);
-    for (_, stack) in stacks {
-        if let Some(stack) = stack {
-            game.add_item_entity(stack, fallback, None, 10);
-        }
-    }
-    let Some(chain) = chain(game, pos, front) else {
-        return;
-    };
-    for at in chain.into_iter().filter(|&at| at != pos) {
-        game.native_with_mod_block_entity(at, |node| {
-            Phase::Idle.set(node, 0);
-            save(node, &Grid::new());
-        });
-        game.native_block_entity_sync(at);
-    }
+fn take_contents(entity: &mut ModBlockEntity) -> Vec<ItemStack> {
+    let mut stacks: Vec<_> = grid(entity).into_values().flatten().collect();
+    stacks.extend(entity.items.first_mut().and_then(Option::take));
     Phase::Idle.set(entity, 0);
     save(entity, &Grid::new());
+    stacks
+}
+
+fn eject(game: &mut Game<'_>, pos: Pos, front: Direction, stacks: Vec<ItemStack>) {
+    let normal = front.normal();
+    let drop_at = std::array::from_fn(|i| f64::from(pos[i]) + 0.5 + 0.75 * f64::from(normal[i]));
+    for stack in stacks {
+        game.add_item_entity(stack, drop_at, None, 10);
+    }
+}
+
+fn eject_at(game: &mut Game<'_>, pos: Pos, front: Direction) {
+    if let Some(stacks) = game.native_with_mod_block_entity(pos, take_contents) {
+        eject(game, pos, front, stacks);
+        game.native_block_entity_sync(pos);
+    }
+}
+
+fn finish(game: &mut Game<'_>, pos: Pos, front: Direction, entity: &mut ModBlockEntity) {
+    if let Some(positions) = chain(game, pos, front) {
+        for at in positions.into_iter().filter(|&at| at != pos) {
+            eject_at(game, at, front);
+        }
+    }
+    eject(game, pos, front, take_contents(entity));
 }
 
 fn output(game: &mut Game<'_>, pos: Pos, front: Direction, entity: &mut ModBlockEntity) {
@@ -492,18 +588,46 @@ fn output(game: &mut Game<'_>, pos: Pos, front: Direction, entity: &mut ModBlock
     } else {
         Phase::Inserting.set(entity, 0);
     }
+    game.native_block_entity_sync(pos);
 }
 
 pub(super) fn tick(game: &mut Game<'_>, pos: Pos, entity: &mut ModBlockEntity, rpm: f32) {
     if int(&entity.nbt, "CountDown").is_none() {
         Phase::Idle.set(entity, 0);
     }
-    let phase = Phase::read(entity);
     let Some(front) = direction(game, pos) else {
         return;
     };
+    let phase = Phase::read(entity);
+    if phase == Phase::Accepting {
+        return;
+    }
+    let powered = game.native_neighbor_signal(game.native_dimension(), pos) != 0;
+    let was_powered = int(&entity.nbt, "WasPowered").unwrap_or(1) != 0;
+    if powered != was_powered {
+        entity
+            .nbt
+            .insert("WasPowered".into(), Tag::Byte(i8::from(powered)));
+    }
+    let powered_start = powered && !was_powered;
+    if phase == Phase::Idle && rpm != 0.0 {
+        let lazy_start =
+            game.world.game_time % 20 == 0 && entity.items.first().is_some_and(Option::is_some);
+        if (powered_start || lazy_start)
+            && let Some(positions) = ready_to_begin(game, pos, front, entity, powered_start)
+        {
+            begin(game, positions, front, Some((pos, entity)));
+        }
+        return;
+    }
     if phase == Phase::Inserting {
-        output(game, pos, front, entity);
+        if game.world.game_time % 20 == 0
+            || pointing(game, pos, front).is_some_and(|(direction, _)| {
+                super::create_belt::feed_point(game, offset(pos, direction.normal())).is_some()
+            })
+        {
+            output(game, pos, front, entity);
+        }
     }
     if !matches!(
         phase,
