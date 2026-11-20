@@ -2123,6 +2123,13 @@ a headless host and an offscreen guest after offscreen-host control timeouts.
 The host only issues commands in that test. The guest still applies the
 selected filter through player input.
 
+After rebasing onto `origin/main` at `f62a9b97ebe14c4320f5e0ac84583ff43e835edd`,
+the current tree rebuilt as `native-9f42064-92c206b2a1f2` in 10 minutes 52
+seconds using the private launcher cache. The same 19 selected checks all
+passed on that exact build, including both new Smart Chute runs. An initial
+rerun inside the filesystem sandbox exited before gameplay because Horizon's
+local control socket was denied; the successful rerun had local socket access.
+
 ```sh
 sh tools/build-native.sh /path/to/launcher-0.2.67 /path/to/private-launcher-data
 HORIZON_NO_AUDIO=1 HORIZON_NO_DISCORD=1 python3 tools/test-parity.py \
