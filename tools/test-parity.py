@@ -409,6 +409,7 @@ CHECKS = (
     ("turntable", "test-turntable"),
     ("turntable-player", "test-turntable-player"),
     ("turntable-player-lan", "test-turntable-player", "--lan"),
+    ("turntable-persistence", "test-turntable", "--persistence"),
     ("toolbox-storage", "test-toolbox-storage"),
     ("toolbox-portable", "test-toolbox-storage", "--portable"),
     ("toolbox-menu", "test-toolbox-menu"),

@@ -6107,6 +6107,22 @@ bit for bit. Eight edge probes matched clamping, rejection and the
 applied velocity. The pig's body and head angles, guest interpolation,
 and visual presentation remain open.
 
+The finite APP-1977 gameplay pass reran crafting/placement, all 17 Java pig
+samples, and the LAN player case on `native-9f42064-6ce68a31b125`; all passed.
+The LAN host and guest each matched 494 camera frames and observed three
+powered edge pushes. The prepared Java 26.3 resource directory was
+`nightly-2026-11-13-9f42064/.local/horizon-client/26.3`, and the imported pack
+SHA-256 was `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The new [idle/active persistence case](tools/test-turntable.py) saved an idle
+Turntable and vertical shaft, then saved an active motor, Turntable and pig;
+after reopen, the blocks/connection and speed remained, pig contact resumed
+after landing, and a dropped iron ingot retained its count of one. This is
+source-aligned Horizon persistence evidence, not a Java reload comparison.
+Reproduce with the `turntable-crafting-and-placement`, `turntable`,
+`turntable-player-lan`, and `turntable-persistence` checks in
+`tools/test-parity.py`. Dropped-item yaw presentation and exact guest mob
+interpolation remain follow-ups; no broader visual parity is claimed.
+
 ## Toolbox crafting, placement and storage
 
 The headless storage replay on `native-9f42064-70205eb8ade6` matched
