@@ -22,12 +22,12 @@ GUEST = "CrankGuest"
 
 
 def verify(args, scratch):
-    with fixture_world(args, "HandCrankLAN", render=True) as host:
+    with fixture_world(args, "HandCrankLAN") as host:
         crank.setup(host)
         network = host.call("lan", "open", "0", "commands", "force")
         address = f"127.0.0.1:{network['port']}"
         with multiplayer.joined_client(
-            args, scratch, address, GUEST, render=True, scenario="multiplayer-hand-crank",
+            args, scratch, address, GUEST, scenario="multiplayer-hand-crank",
         ) as guest:
             multiplayer.until(
                 "the independent guest to be placed",

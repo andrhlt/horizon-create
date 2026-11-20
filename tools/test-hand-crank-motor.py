@@ -18,7 +18,7 @@ def verify(args):
     with (ROOT / "fixtures/hand-crank-motor-java.csv").open() as reference:
         expected = list(csv.DictReader(reference))
     env = {"CREATE_HAND_CRANK_TRACE": ",".join(map(str, crank.CRANK))}
-    with fixture_world(args, "HandCrankMotor", env=env, render=True) as control:
+    with fixture_world(args, "HandCrankMotor", env=env) as control:
         crank.setup(control)
         control.commands((
             "/setblock 6 101 -13 create:creative_motor[facing=south]",

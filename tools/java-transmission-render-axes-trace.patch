@@ -1,0 +1,110 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..5520bca 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -91,6 +91,7 @@ neoForge {
+ 
+         gameTestServer {
+             type = "gameTestServer"
++            gameDirectory = project.file("run/transmission-render-axes-tests")
+         }
+     }
+ }
+@@ -165,7 +166,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..edeaa80 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.transmissionRenderAxes"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..2c58bb0 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,70 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 20)
++	public static void transmissionRenderAxes(CreateGameTestHelper helper) {
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var powered = net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
++		var level = helper.getLevel();
++		var axes = new net.minecraft.core.Direction[] {
++			net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP, net.minecraft.core.Direction.SOUTH
++		};
++		var blocks = java.util.List.of(com.simibubi.create.AllBlocks.CLUTCH.getDefaultState(),
++			com.simibubi.create.AllBlocks.GEARSHIFT.getDefaultState());
++		record Rig(int kind, net.minecraft.core.Direction positive, net.minecraft.core.Direction input,
++			BlockPos pos, BlockPos signal) {}
++		var rigs = new java.util.ArrayList<Rig>();
++		for (int kind = 0; kind < blocks.size(); kind++) {
++			for (int axisIndex = 0; axisIndex < axes.length; axisIndex++) {
++				var positive = axes[axisIndex];
++				for (int side = 0; side < 2; side++) {
++					var input = side == 0 ? positive.getOpposite() : positive;
++					var pos = new BlockPos(8 + 6 * axisIndex, 4 + 10 * kind + 5 * side, 8 + kind);
++					var signal = axisIndex == 1 ? pos.west() : pos.above();
++					rigs.add(new Rig(kind, positive, input, pos, signal));
++					helper.setBlock(signal, Blocks.AIR.defaultBlockState());
++					helper.setBlock(pos.relative(input), com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState()
++						.setValue(facing, input.getOpposite()));
++					helper.setBlock(pos, blocks.get(kind).setValue(axis, positive.getAxis()));
++					helper.setBlock(pos.relative(input.getOpposite()), com.simibubi.create.AllBlocks.SHAFT.getDefaultState()
++						.setValue(axis, positive.getAxis()));
++				}
++			}
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (Rig rig : rigs) {
++				if (tick == 0)
++					helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), rig.pos().relative(rig.input()))
++						.generatedSpeed.setValue(32);
++				if (tick != 3 && tick != 4 && tick != 5 && tick != 7 && tick != 8)
++					continue;
++				for (int phase = 0; phase < 2; phase++) {
++					if (phase == 1) {
++						if (tick == 4 || tick == 7)
++							helper.setBlock(rig.signal(), (tick == 4 ? Blocks.REDSTONE_BLOCK : Blocks.AIR).defaultBlockState());
++						else continue;
++					}
++					var pos = helper.absolutePos(rig.pos());
++					var gate = (com.simibubi.create.content.kinetics.transmission.SplitShaftBlockEntity) level.getBlockEntity(pos);
++					var boxAxis = rig.positive().getAxis();
++					int sum = (boxAxis == net.minecraft.core.Direction.Axis.X ? 0 : pos.getX())
++						+ (boxAxis == net.minecraft.core.Direction.Axis.Y ? 0 : pos.getY())
++						+ (boxAxis == net.minecraft.core.Direction.Axis.Z ? 0 : pos.getZ());
++					float offset = sum % 2 == 0 ? 22.5f : 0f;
++					float negative = gate.getSpeed() * gate.getRotationSpeedModifier(rig.positive().getOpposite());
++					float positive = gate.getSpeed() * gate.getRotationSpeedModifier(rig.positive());
++					float time = level.getGameTime() + .5f;
++					System.out.printf(java.util.Locale.ROOT, "CREATE_TRANSMISSION_RENDER_AXES,%d,%s,%s,%d,%d,%s,%s,%.1f,%.4f,%.4f,%.6f,%.6f%n",
++						rig.kind(), boxAxis, rig.input(), tick, phase, gate.getBlockState().getValue(powered), gate.getSourceFacing(),
++						offset, negative, positive, (time * negative * 3f / 10f) % 360 + offset,
++						(time * positive * 3f / 10f) % 360 + offset);
++				}
++			}
++			if (tick < 8) helper.fail("Waiting for the second shaft transition");
++		});
++	}
++
+ }

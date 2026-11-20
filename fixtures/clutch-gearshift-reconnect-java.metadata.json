@@ -1,0 +1,24 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_test": "TestMisc.clutchGearshiftReconnect",
+  "patch_sha256": "152e816e279e436506ddcb8df43853404a080d2bd8717f93e92e0d5ef154f9cb",
+  "trace_sha256": "57cf94b3e084622bba3ce721b0315624f8c4e95270acc9b4a7a318722dd3f2ca",
+  "records": 26,
+  "gradle_elapsed_seconds": 22,
+  "tick_origin": "GameTest tick 0 after the left motor is set to 32 RPM. Samples follow actions on each test tick.",
+  "lanes": {
+    "0": "unpowered Gearshift opposing the Clutch input",
+    "1": "powered Gearshift making the competing inputs compatible"
+  },
+  "rpm": "Signed theoretical RPM, zero when the block entity is absent. Values in these lanes are integral.",
+  "drops": "Number of Clutch item entities within one block of the Clutch bounds.",
+  "gearshift_drop_capture": {
+    "fixture": "clutch-gearshift-drop-java.csv",
+    "trace_sha256": "f426f949144a1e08cfe5ede5b6d7186299a0b48607161e958b96d6d5ce187c0e",
+    "records": 2,
+    "sample": "After the final trace sample, destroy the two remaining Gearshifts in place with drops enabled."
+  }
+}

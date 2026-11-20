@@ -1,0 +1,13 @@
+{
+  "create_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "minecraft_version": "1.21.1",
+  "neoforge_version": "21.1.219",
+  "game_test": "TestMisc.pendingClutchReopen",
+  "patch_sha256": "c323699662ec6b2999a84a0179b07d2bd67bcf5c4f138f5f8393f43a1e39beb7",
+  "trace_sha256": "9b07d45fa314abe1595ad5d3bdda831d25eb6868df553acd682a4657a65437e6",
+  "records": 116,
+  "capture": "Run ./gradlew --offline --no-daemon runGameTestServer with CREATE_PENDING_CLUTCH_DROPS=on and CREATE_PENDING_CLUTCH=write, then launch a new process with CREATE_PENDING_CLUTCH=read in the same disposable world.",
+  "layout": "Mirror the original X-axis fixture by swapping the motor positions and facings. The first and second branch fields retain their logical order.",
+  "sampling": "Run the on setting in distinct write and read Java processes. The headless native command harness samples the saved state and the first two exact simulation ticks."
+}
