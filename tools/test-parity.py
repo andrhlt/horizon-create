@@ -1667,6 +1667,10 @@ CHECKS = (
     ("train-passenger-count", "test-train-passenger-count"),
     ("multiplayer-elevator", "test-multiplayer-elevator"),
     ("chain-conveyor-idle-reopen", "test-chain-conveyor-idle-reopen"),
+    ("frogport-idle-reopen", "test-frogport-menu"),
+    ("frogport-inventory-lan", "test-frogport-menu", "--lan"),
+    ("frogport-settings-lan", "test-frogport-menu", "--settings", "--lan"),
+    ("frogport-active-reopen", "test-chain-conveyor-packages", "--pack", ".local/create.hmod", "--scenario", "straight", "--reopen-at", "27"),
 )
 
 
