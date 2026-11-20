@@ -297,6 +297,7 @@ CHECKS = (
     ("observer-chutes", "test-chute-observer"),
     ("observer-belt-funnel", "test-observer-belt-funnel"),
     ("redstone-contacts", "test-redstone-contacts"),
+    ("redstone-contacts-lan", "test-multiplayer-redstone-contact"),
     ("redstone-link", "test-redstone-link"),
     ("analog-lever", "test-analog-lever", "--visual"),
     ("analog-lever-destruction", "test-analog-lever", "--removal", "--destroy"),
