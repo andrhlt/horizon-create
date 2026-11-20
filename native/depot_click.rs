@@ -26,7 +26,7 @@ fn depot_click(
         *canceled = true;
         return;
     }
-    if !*canceled && crate::game::create_crafter::click_cover(game, pos, face) {
+    if !*canceled && crate::game::create_crafter::click(game, pos, face) {
         *canceled = true;
         return;
     }
