@@ -22,6 +22,18 @@ jobs:
           fetch-depth: 0
       - name: Script and data syntax
         run: python3 tools/check-source.py
+      - name: Fast Rust tests
+        run: |
+          test_dir=$(mktemp -d)
+          trap 'rm -r "$test_dir"' EXIT
+          for suite in \
+            test-frogport-open-math \
+            test-frogport-anticipation-math \
+            test-toolbox-animation-math \
+            test-elevator-contact-motion; do
+            rustc --edition=2024 --test "tools/$suite.rs" -o "$test_dir/$suite"
+            "$test_dir/$suite"
+          done
       - name: Clippy correctness (standalone Rust)
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
