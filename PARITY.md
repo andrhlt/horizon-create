@@ -2275,6 +2275,24 @@ falling onto stone and being pressed into separate sheets. The [Horizon replay](
 on build `5d18ba4dd0d3` matched ground contact at tick 7, the first scan at
 tick 15, and sheet conversion and both original impact sounds at ticks 24,
 43, and 62. The 132-sample Basin and moving-belt regressions also passed.
+The ticket baseline extends that replay with a non-recipe cobblestone spawned
+ahead of the valid ingot stack; the Press leaves it untouched and still matches
+all 81 Java samples. On build `native-9f42064-b02beacd07a9`, the updated
+[Pressing category check](tools/test-pressing-category.py) passed iron, gold and
+copper sheet recipe routes and host-to-guest recipe/tag synchronization. A
+separate [material route check](tools/test-press-material-routes.py) processed
+one gold ingot into a golden sheet and one copper ingot into a copper sheet.
+The combined Depot, Brass, stacked-belt, LAN collection, ground-item, category,
+material route, placement, and vertical drop checks all passed on this build.
+
+The [Press lifecycle check](tools/test-press-lifecycle.py) filled the Depot's
+eight output slots with 512 cobblestone and processed two iron ingots. One sheet
+remained in the Depot and one was dropped into the world; both inputs were
+accounted for with no duplicate output and all cobblestone retained. The same
+check reopened an idle powered Press and an active Press with two ingots. The
+active machine retained its input/progress and finished both cycles after
+reopen. This is a gameplay save/reopen check; it does not claim Java reload
+timing equivalence.
 
 The [Java Press ownership fixture](tools/java-press-advancement.patch)
 captures [33 ticks](fixtures/press-advancement-java.csv) from ordinary
