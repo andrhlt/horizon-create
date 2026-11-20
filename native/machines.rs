@@ -1,4 +1,4 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Mutex, OnceLock};
 
 use horizon_core::geometry::Direction;
@@ -844,21 +844,40 @@ fn conflicting_gearbox_join(game: &Game<'_>, pos: [i32; 3], state: &Network) -> 
         return false;
     }
 
-    GEARBOX_DIRECTIONS.iter().any(|&delta| {
-        let other_pos = offset(pos, delta);
-        let Some(Kinetic::Motor(facing)) = Kinetic::at(game, other_pos) else {
-            return false;
+    let Some(entity) = mod_entity(game, pos) else {
+        return false;
+    };
+    let mut retained_direction_conflict = false;
+    let (_, inconsistent_loop) =
+        walk_network_checking_loops(game, pos, (pos, entity), true, |member, ratio| {
+            if member == pos || ratio == 0.0 {
+                return;
+            }
+            let retained = mod_entity(game, member)
+                .and_then(|entity| float(&entity.nbt, "Speed"))
+                .unwrap_or(0.0);
+            let projected = state.rpm / ratio;
+            if retained != 0.0 && projected != 0.0 && retained.signum() != projected.signum() {
+                retained_direction_conflict = true;
+            }
+        });
+    if inconsistent_loop || retained_direction_conflict {
+        return true;
+    }
+    let mut directions = HashSet::new();
+    walk_network(game, pos, (pos, entity), true, |member, ratio| {
+        let (Some(block), Some(member_entity)) =
+            (Kinetic::at(game, member), mod_entity(game, member))
+        else {
+            return;
         };
-        if gearbox.ratio_to(Kinetic::Motor(facing), delta).is_none() {
-            return false;
+        let generated = generated_source(game, member, block, member_entity).0;
+        let network_speed = generated * ratio;
+        if network_speed != 0.0 {
+            directions.insert(network_speed.is_sign_positive());
         }
-        let Some(motor) = mod_entity(game, other_pos) else {
-            return false;
-        };
-        let incoming =
-            motor_speed(facing, &motor.nbt) / gearbox_multiplier(state.source_side, delta);
-        incoming != 0.0 && incoming.signum() != state.rpm.signum()
-    })
+    });
+    directions.len() > 1
 }
 
 pub(super) fn valve_rear_link(game: &Game<'_>, pos: [i32; 3], face: Direction) -> bool {
@@ -1116,6 +1135,36 @@ fn walk_network(
     start: [i32; 3],
     ticking: TickingKinetic<'_>,
     controller_links: bool,
+    visit: impl FnMut([i32; 3], f32),
+) -> Network {
+    walk_network_inner(game, start, ticking, controller_links, None, visit)
+}
+
+fn walk_network_checking_loops(
+    game: &Game<'_>,
+    start: [i32; 3],
+    ticking: TickingKinetic<'_>,
+    controller_links: bool,
+    visit: impl FnMut([i32; 3], f32),
+) -> (Network, bool) {
+    let mut inconsistent_loop = false;
+    let network = walk_network_inner(
+        game,
+        start,
+        ticking,
+        controller_links,
+        Some(&mut inconsistent_loop),
+        visit,
+    );
+    (network, inconsistent_loop)
+}
+
+fn walk_network_inner(
+    game: &Game<'_>,
+    start: [i32; 3],
+    ticking: TickingKinetic<'_>,
+    controller_links: bool,
+    mut inconsistent_loop: Option<&mut bool>,
     mut visit: impl FnMut([i32; 3], f32),
 ) -> Network {
     let Some(block) = Kinetic::at(game, start) else {
@@ -1124,6 +1173,7 @@ fn walk_network(
     let gearbox_start = matches!(block, Kinetic::Gearbox(_));
     let mut pending = VecDeque::from([(start, block, 1.0, [0; 3], [0; 3], None, false)]);
     let mut visited = HashSet::from([start]);
+    let mut ratios = HashMap::from([(start, 1.0)]);
     let mut network = Network::default();
     let mut impact_per_rpm = 0.0;
     let mut new_impact_per_rpm = 0.0;
@@ -1237,7 +1287,7 @@ fn walk_network(
                 continue;
             }
             let other = offset(pos, delta);
-            if visited.contains(&other) {
+            if visited.contains(&other) && inconsistent_loop.is_none() {
                 continue;
             }
             if let Some(neighbor) = Kinetic::at(game, other) {
@@ -1285,7 +1335,15 @@ fn walk_network(
                 if direction_ratio == 0.0 || detaching {
                     continue;
                 }
+                let next_ratio = ratio * direction_ratio / edge;
+                if let Some(existing_ratio) = ratios.get(&other).copied() {
+                    if let Some(inconsistent_loop) = inconsistent_loop.as_deref_mut() {
+                        *inconsistent_loop |= (next_ratio - existing_ratio).abs() > 1e-5;
+                    }
+                    continue;
+                }
                 visited.insert(other);
+                ratios.insert(other, next_ratio);
                 let next_sequence = match block {
                     Kinetic::Sequencer(axis, _, input, motion)
                         if entered[axis] != input && delta[axis] == input =>
@@ -1297,7 +1355,7 @@ fn walk_network(
                 let next = (
                     other,
                     neighbor,
-                    ratio * direction_ratio / edge,
+                    next_ratio,
                     delta.map(|n| -n),
                     if pos == start { delta } else { first_step },
                     next_sequence,

@@ -233,6 +233,7 @@ CHECKS = (
     ("rotation-speed-controller-lan-timing", "test-multiplayer-rotation-speed-controller-timing"),
     ("rotation-speed-controller-clipboard", "test-rotation-speed-controller-clipboard"),
     ("rotation-speed-controller-clipboard-lan", "test-rotation-speed-controller-clipboard", "--lan"),
+    ("rotation-speed-controller-loop-close", "test-rotation-speed-controller-loop-close"),
     ("waterwheel-materials", "test-waterwheel-materials"),
     ("depot-comparator", "test-depot-comparator"),
     ("item-drain", "test-item-drain", "--fluid-visual", "--plumbing"),
