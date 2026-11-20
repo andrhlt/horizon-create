@@ -1,0 +1,7 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "patch_sha256": "a78a3c64161617849b1c4d2c243185e802696462d15b68fb12541f36d1ba0a2e",
+  "csv_sha256": "ea0b67016507276f50ca0d94dfd48f1b9ba6167d85b340af99e4f00391ce43c1",
+  "records": 144,
+  "scope": "Isolated pinned Java creativeMotorCompetition GameTest; both lanes, ticks 0\u201323, samples before actions at ticks 5, 12 and 18"
+}

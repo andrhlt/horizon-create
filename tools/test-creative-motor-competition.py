@@ -36,9 +36,10 @@ def setup(control):
             f"/setblock {base} {Y} {Z} create:creative_motor[facing=east]",
             f"/setblock {base + 1} {Y} {Z} create:shaft[axis=x]",
             f"/setblock {base + 2} {Y} {Z} create:creative_motor[facing=west]",
-            f"/data merge block {base} {Y} {Z} {{ScrollValue:16}}",
-            f"/data merge block {base + 2} {Y} {Z} {{ScrollValue:{16 if case == 0 else -16}}}",
         ))
+        # Java's setValue(16) skips the callback for a freshly placed motor.
+        if case == 1:
+            commands.append(f"/data merge block {base + 2} {Y} {Z} {{ScrollValue:-16}}")
     control.commands(commands)
 
 
@@ -59,7 +60,7 @@ def sample(control, tick):
 
 
 def verify(args):
-    with (ROOT / "fixtures/creative-motor-competition-java.csv").open() as stream:
+    with (ROOT / "fixtures/creative-motor-competition-isolated-java.csv").open() as stream:
         expected = {
             (int(row["tick"]), int(row["case"]), int(row["offset"])): (int(row["present"]), float(row["speed"]))
             for row in csv.DictReader(stream)
@@ -68,30 +69,31 @@ def verify(args):
         setup(control)
         start = control.clock()
         actual = {}
-        for tick in range(1, TICKS + 1):
+        for tick in range(TICKS):
+            if tick > 0:
+                control.step_to(start + tick)
+            for row in sample(control, tick):
+                actual[row[:3]] = row[3:]
+            # The Java GameTest samples each lane before acting on that lane.
             if tick == 5:
-                control.commands(
-                    f"/data merge block {BASES[case] + 2} {Y} {Z} {{ScrollValue:{-16 if case == 0 else 16}}}"
-                    for case in range(len(BASES))
-                )
+                for case, base in enumerate(BASES):
+                    if actual[tick, case, 2][0]:
+                        setting = -16 if case == 0 else 16
+                        control.command(f"/data merge block {base + 2} {Y} {Z} {{ScrollValue:{setting}}}")
             if tick == 12:
                 control.commands(f"/setblock {BASES[case]} {Y} {Z} minecraft:air" for case in range(len(BASES)))
             if tick == 18:
                 control.commands(
                     f"/setblock {BASES[case]} {Y} {Z} create:creative_motor[facing=east]" for case in range(len(BASES))
                 )
-                control.commands(
-                    f"/data merge block {BASES[case]} {Y} {Z} {{ScrollValue:16}}" for case in range(len(BASES))
-                )
-            control.step_to(start + tick)
-            for row in sample(control, tick):
-                actual[row[:3]] = row[3:]
-    output = ROOT / ".local/creative-motor-competition-horizon.csv"
+    output = args.output
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="") as stream:
         writer = csv.writer(stream)
         writer.writerow(("tick", "case", "offset", "present", "speed"))
         writer.writerows((*key, *actual[key]) for key in sorted(actual))
+    if actual.keys() != expected.keys():
+        raise RuntimeError(f"Competition trace keys differ: {actual.keys() ^ expected.keys()}.")
     differences = [
         (key, expected.get(key), actual[key]) for key in sorted(actual) if expected.get(key) != actual[key]
     ]
@@ -108,6 +110,7 @@ def main():
     for name in ("ctl", "client", "resources"):
         parser.add_argument(name, type=lambda value: Path(value).resolve())
     parser.add_argument("--pack", type=Path)
+    parser.add_argument("--output", type=Path, default=ROOT / ".local/creative-motor-competition-horizon.csv")
     verify(parser.parse_args())
 
 

@@ -927,6 +927,24 @@ struct Network {
     source_side: [i32; 3],
     clutch_reconnected: bool,
     sequence: Option<create_sequencer::Motion>,
+    motor_source: Option<[i32; 3]>,
+    source_conflict: bool,
+}
+
+struct KineticDrive {
+    speed: f32,
+    capacity: f32,
+    first_step: [i32; 3],
+    clutch_reconnected: bool,
+    sequence: Option<create_sequencer::Motion>,
+    motor: Option<MotorDrive>,
+}
+
+#[derive(Clone, Copy)]
+struct MotorDrive {
+    pos: [i32; 3],
+    driver: Option<[i32; 3]>,
+    initialized: bool,
 }
 
 impl Network {
@@ -1097,23 +1115,16 @@ fn resolve_kinetic_conflict(game: &mut Game<'_>, pos: [i32; 3]) -> bool {
     let Some(entity) = mod_entity(game, pos).cloned() else {
         return false;
     };
-    let mut directions = HashSet::new();
-    walk_network(game, pos, (pos, &entity), true, |member, ratio| {
-        let (Some(member_block), Some(member_entity)) =
-            (Kinetic::at(game, member), mod_entity(game, member))
-        else {
-            return;
-        };
-        let generated = generated_source(game, member, member_block, member_entity).0;
-        let network_speed = generated * ratio;
-        if network_speed != 0.0 {
-            directions.insert(network_speed.is_sign_positive());
-        }
-    });
-    if directions.len() < 2 {
+    if !walk_network(game, pos, (pos, &entity), true, |_, _| {}).source_conflict {
         return false;
     }
-    game.native_machine_destroy_block(pos, None, true);
+    break_kinetic_conflict(game, pos);
+    true
+}
+
+fn break_kinetic_conflict(game: &mut Game<'_>, pos: [i32; 3]) {
+    let collect = !matches!(Kinetic::at(game, pos), Some(Kinetic::Motor(_)));
+    game.native_machine_destroy_block(pos, None, collect);
     for direction in [
         Direction::Down,
         Direction::Up,
@@ -1127,7 +1138,47 @@ fn resolve_kinetic_conflict(game: &mut Game<'_>, pos: [i32; 3]) -> bool {
             refresh_connected_network(game, neighbor);
         }
     }
-    true
+}
+
+fn assign_kinetic_drive(network: &mut Network, sources: &[KineticDrive]) {
+    let initialized_motor = sources
+        .iter()
+        .any(|source| source.motor.is_some_and(|motor| motor.initialized));
+    let mut signs = [false; 2];
+    for source in sources {
+        if let Some(motor) = source.motor {
+            if initialized_motor && !motor.initialized {
+                continue;
+            }
+            if let Some(driver) = motor.driver.and_then(|driver| {
+                sources.iter().find(|source| {
+                    source.motor.is_some_and(|motor| {
+                        motor.pos == driver && (!initialized_motor || motor.initialized)
+                    })
+                })
+            }) {
+                // An overpowered motor takes the driving network's speed, even
+                // when its unchanged setting points in the opposite direction.
+                if source.speed.signum() != driver.speed.signum() {
+                    continue;
+                }
+                if source.speed.abs() <= driver.speed.abs() {
+                    network.capacity += source.capacity;
+                    continue;
+                }
+            }
+        }
+        signs[usize::from(source.speed.is_sign_positive())] = true;
+        network.capacity += source.capacity;
+        if source.speed.abs() > network.rpm.abs() {
+            network.rpm = source.speed;
+            network.source_side = source.first_step;
+            network.clutch_reconnected = source.clutch_reconnected;
+            network.sequence = source.sequence;
+            network.motor_source = source.motor.map(|motor| motor.pos);
+        }
+    }
+    network.source_conflict = signs[0] && signs[1];
 }
 
 fn walk_network(
@@ -1175,6 +1226,7 @@ fn walk_network_inner(
     let mut visited = HashSet::from([start]);
     let mut ratios = HashMap::from([(start, 1.0)]);
     let mut network = Network::default();
+    let mut sources = Vec::new();
     let mut impact_per_rpm = 0.0;
     let mut new_impact_per_rpm = 0.0;
     while let Some((pos, block, ratio, entered, first_step, sequence, mut clutch_reconnected)) =
@@ -1212,13 +1264,20 @@ fn walk_network_inner(
             }
             let (generated, capacity_per_rpm) = generated_source(game, pos, block, entity);
             let supplied = generated * ratio;
-            if supplied.abs() > network.rpm.abs() {
-                network.rpm = supplied;
-                network.source_side = first_step;
-                network.clutch_reconnected = clutch_reconnected;
-                network.sequence = sequence;
+            if supplied != 0.0 {
+                sources.push(KineticDrive {
+                    speed: supplied,
+                    capacity: generated.abs() * capacity_per_rpm,
+                    first_step,
+                    clutch_reconnected,
+                    sequence,
+                    motor: matches!(block, Kinetic::Motor(_)).then(|| MotorDrive {
+                        pos,
+                        driver: motor_driver(entity, pos),
+                        initialized: motor_initialized_speed(entity).is_some(),
+                    }),
+                });
             }
-            network.capacity += generated.abs() * capacity_per_rpm;
             if matches!(
                 block,
                 Kinetic::Mill
@@ -1369,6 +1428,7 @@ fn walk_network_inner(
             }
         }
     }
+    assign_kinetic_drive(&mut network, &sources);
     network.stress = impact_per_rpm * network.rpm.abs();
     network.new_load = new_impact_per_rpm * network.rpm.abs();
     network
@@ -1471,7 +1531,17 @@ fn motor_facing(facing: &str) -> Option<[i32; 3]> {
         .map(|side| side.normal())
 }
 
-const SEEN_MOTOR_SPEED: usize = 3;
+fn motor_initialized_speed(entity: &ModBlockEntity) -> Option<f32> {
+    float(&entity.nbt, "MotorGeneratedSpeed")
+}
+
+fn motor_driver(entity: &ModBlockEntity, pos: [i32; 3]) -> Option<[i32; 3]> {
+    let Tag::IntArray(source) = entity.nbt.get(&"MotorSource".into())? else {
+        return None;
+    };
+    let source: [i32; 3] = source.as_slice().try_into().ok()?;
+    (source != pos).then_some(source)
+}
 
 pub(super) fn resolve_motor_changes(game: &mut Game<'_>) {
     if !game.native_authoritative() {
@@ -1514,7 +1584,7 @@ pub(super) fn resolve_motor_changes(game: &mut Game<'_>) {
                 return None;
             };
             let speed = motor_speed(facing, &entity.nbt);
-            (speed != reading(entity, SEEN_MOTOR_SPEED)).then_some((pos, speed))
+            (Some(speed) != motor_initialized_speed(entity)).then_some((pos, speed))
         })
         .collect();
 
@@ -1524,21 +1594,34 @@ pub(super) fn resolve_motor_changes(game: &mut Game<'_>) {
         finish_pending_transmission_reconnect(game, pos, now);
     }
     for (pos, speed) in changes {
-        resolve_motor_speed(game, pos, speed);
+        resolve_motor_speed(game, pos, speed, false);
     }
 }
 
-fn resolve_motor_speed(game: &mut Game<'_>, pos: [i32; 3], speed: f32) {
+fn resolve_motor_speed(game: &mut Game<'_>, pos: [i32; 3], speed: f32, sync: bool) {
     let Some(entity) = mod_entity(game, pos) else {
         return;
     };
     let previous_speed = float(&entity.nbt, "Speed").unwrap_or(0.0);
-    if previous_speed != 0.0
-        && speed != 0.0
-        && previous_speed.signum() != speed.signum()
-        && previous_speed.abs() >= speed.abs()
-        && motor_network_has_active_crank(game, pos, entity)
-    {
+    let initializing = motor_initialized_speed(entity).is_none();
+    let previous_driver = motor_driver(entity, pos);
+    let mut still_driven = false;
+    let mut competing_motors = false;
+    let prior = walk_network(game, pos, (pos, entity), true, |member, _| {
+        still_driven |= Some(member) == previous_driver;
+        competing_motors |=
+            member != pos && matches!(Kinetic::at(game, member), Some(Kinetic::Motor(_)));
+    });
+    // CreativeMotorBlockEntity.initialize compares signed speeds when a
+    // neighboring source has already propagated into this motor.
+    let keep_initial_drive = initializing && still_driven && speed <= previous_speed;
+    let under_power = previous_speed != 0.0 && speed != 0.0 && previous_speed.abs() >= speed.abs();
+    let reversing = previous_speed.signum() != speed.signum() && under_power;
+    if reversing && still_driven && !keep_initial_drive {
+        break_kinetic_conflict(game, pos);
+        return;
+    }
+    if reversing && motor_network_has_active_crank(game, pos, entity) {
         game.native_machine_destroy_block(pos, None, false);
         return;
     }
@@ -1546,15 +1629,32 @@ fn resolve_motor_speed(game: &mut Game<'_>, pos: [i32; 3], speed: f32) {
         game.native_machine_destroy_block(pos, None, false);
         return;
     }
-    if speed != 0.0 && resolve_kinetic_conflict(game, pos) {
+    let inherit = prior.motor_source.filter(|&source| {
+        initializing
+            && !still_driven
+            && source != pos
+            && prior.rpm.signum() == speed.signum()
+            && prior.rpm.abs() >= speed.abs()
+            && mod_entity(game, source)
+                .and_then(motor_initialized_speed)
+                .is_some()
+    });
+    game.native_with_mod_block_entity(pos, |entity| {
+        set_float(&mut entity.nbt, "MotorGeneratedSpeed", speed);
+        if let Some(source) = inherit {
+            entity
+                .nbt
+                .insert("MotorSource".into(), Tag::IntArray(source.to_vec()));
+        } else if !still_driven || speed.abs() > previous_speed.abs() {
+            entity.nbt.remove(&"MotorSource".into());
+        }
+    });
+    if speed != 0.0 && !keep_initial_drive && resolve_kinetic_conflict(game, pos) {
         return;
     }
-    game.native_with_mod_block_entity(pos, |entity| {
-        if entity.data.len() <= SEEN_MOTOR_SPEED {
-            entity.data.resize(SEEN_MOTOR_SPEED + 1, 0);
-        }
-        entity.data[SEEN_MOTOR_SPEED] = speed.to_bits() as i32;
-    });
+    if sync || competing_motors {
+        refresh_connected_network(game, pos);
+    }
 }
 
 fn motor_network_has_active_crank(game: &Game<'_>, pos: [i32; 3], entity: &ModBlockEntity) -> bool {
@@ -1586,9 +1686,8 @@ pub(super) fn motor_setting_changed(game: &mut Game<'_>, pos: [i32; 3]) {
         return;
     };
     let speed = motor_speed(facing, &entity.nbt);
-    if speed != reading(entity, SEEN_MOTOR_SPEED) {
-        resolve_motor_speed(game, pos, speed);
-        refresh_connected_network(game, pos);
+    if Some(speed) != motor_initialized_speed(entity) {
+        resolve_motor_speed(game, pos, speed, true);
     }
 }
 
@@ -1964,6 +2063,20 @@ fn publish_network_nbt(entity: &mut ModBlockEntity, network: &Network) {
         create_valve::retarget(entity, network.speed());
     }
     set_float(&mut entity.nbt, "Speed", network.rpm);
+    // A source may tick before the newly placed bridge checks the conflict.
+    // Keep both sources independent until that bridge has been resolved.
+    if entity.id == "create:motor" && !network.source_conflict {
+        if let Some(source) = network
+            .motor_source
+            .filter(|_| network.source_side != [0; 3])
+        {
+            entity
+                .nbt
+                .insert("MotorSource".into(), Tag::IntArray(source.to_vec()));
+        } else {
+            entity.nbt.remove(&"MotorSource".into());
+        }
+    }
     if matches!(entity.id.as_str(), CLUTCH | GEARSHIFT) {
         let input = network.source_side.into_iter().sum::<i32>();
         entity.nbt.insert("ShaftInputSide".into(), Tag::Int(input));
