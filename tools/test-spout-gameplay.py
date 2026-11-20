@@ -118,10 +118,10 @@ def add_water_spout(control, amount=250):
     )
 
 
-def add_bottle_to_belt(control, *, position_value=0.5, segment=0):
+def add_bottle_to_belt(control, *, position_value=0.5, segment=0, item=INPUT):
     control.command(
         f'/data merge block {START} {{Inventory:{{PositiveOrder:1b,Items:['
-        f'{{Item:{{id:"{INPUT}",count:1}},PrevPos:{position_value}f,Pos:{position_value}f,'
+        f'{{Item:{{id:"{item}",count:1}},PrevPos:{position_value}f,Pos:{position_value}f,'
         f'Angle:180,PrevOffset:0.0f,Offset:0.0f,InSegment:{segment},InDirection:1}}]}}}}'
     )
 
@@ -258,30 +258,33 @@ def run_boundaries(args):
                 break
         else:
             raise RuntimeError(f"Restarted belt did not fill the held bottle: {spout}; {belt_data(control)}")
-        # Let the route settle so a successful fill cannot be mistaken for a
-        # stuck or duplicated belt item. The sole output may now be in the
-        # Depot rather than on the belt.
-        for _ in range(12):
+        # Let the route carry the filled potion all the way to the Depot so a
+        # successful fill cannot be mistaken for a stuck or duplicated item.
+        for _ in range(120):
             control.step_to(control.clock() + 1)
-        belt = belt_data(control)
-        depot = control.command(f"/data get block {position(DEPOT)} Items")
+            depot = control.command(f"/data get block {position(DEPOT)} Items")
+            if counts(depot).get(OUTPUT, 0) == 1:
+                break
+        belt_state = belt_data(control)
         timer, amount, spout = spout_values(control)
-        if (counts(belt).get(OUTPUT, 0) + counts(depot).get(OUTPUT, 0) != 1
-                or counts(belt).get(INPUT, 0) or counts(depot).get(INPUT, 0)
+        if (counts(depot).get(OUTPUT, 0) != 1
+                or counts(belt_state).get(OUTPUT, 0)
+                or counts(belt_state).get(INPUT, 0) or counts(depot).get(INPUT, 0)
                 or amount != 0 or timer != -1):
             raise RuntimeError(
-                f"Restarted Spout fill did not settle to one output: {spout}; belt={belt}; depot={depot}"
+                f"Restarted Spout fill did not deliver and settle as one output: "
+                f"{spout}; belt={belt_state}; depot={depot}"
             )
 
     # Use a separate route for rejected input: the first belt's shortage
     # bottle is deliberately held in its transport state until fluid arrives.
     with fixture_world(args, "SpoutRejectedInput", belt.STRUCTURE, render=False) as control:
         setup_belt_spout(control, tank=250)
-        control.command(
-            f'/data merge block {START} {{Inventory:{{PositiveOrder:1b,Items:['
-            '{Item:{id:"minecraft:cobblestone",count:1},PrevPos:0.5f,Pos:0.5f,Angle:180}]}}}'
-        )
-        for _ in range(60):
+        add_bottle_to_belt(control, item="minecraft:cobblestone")
+        inserted = belt_data(control)
+        if counts(inserted).get("minecraft:cobblestone", 0) != 1:
+            raise RuntimeError(f"Rejected-input fixture did not insert its cobblestone: {inserted}")
+        for _ in range(100):
             control.step_to(control.clock() + 1)
             depot = control.command(f"/data get block {position(DEPOT)} Items")
             if counts(depot).get("minecraft:cobblestone", 0):
