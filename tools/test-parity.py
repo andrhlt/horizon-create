@@ -375,6 +375,7 @@ CHECKS = (
     ("toolbox-link", "test-toolbox-link"),
     ("toolbox-link-lan", "test-toolbox-link", "--lan"),
     ("toolbox-link-lan-reconnect", "test-toolbox-link", "--lan", "--reconnect"),
+    ("toolbox-reopen", "test-toolbox-reopen"),
     ("toolbox-pickup-linked-solo", "test-toolbox-multi-pickup", "--attacker", "solo"),
     ("toolbox-pickup-linked-host", "test-toolbox-multi-pickup", "--attacker", "host"),
     ("toolbox-pickup-linked-guest", "test-toolbox-multi-pickup", "--attacker", "guest"),
