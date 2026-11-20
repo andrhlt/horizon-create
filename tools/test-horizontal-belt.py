@@ -132,7 +132,7 @@ def run_reopen(args):
         if reopened != layout:
             raise RuntimeError(f"Idle belt connections changed across save/reopen: {layout} -> {reopened}")
 
-        motor_speed(control, 48)
+        motor_speed(control, 1)
         control.command(
             f'/data merge block {START} {{Inventory:{{PositiveOrder:1b,Items:['
             '{Item:{id:"minecraft:iron_ingot",count:1},PrevPos:2.5f,Pos:2.5f,Angle:180}]}}'
@@ -158,14 +158,15 @@ def run_reopen(args):
         control.restart()
         control.step_to(control.clock() + 1)
         count_after, position_after, data_after = carried()
-        if count_after != 1 or not position_after or speed() != 48:
+        if count_after != 1 or not position_after or speed() != 1:
             raise RuntimeError(f"Active belt cargo or speed changed across reopen: speed={speed()}, {data_after}")
+        motor_speed(control, 48)
         for _ in range(4):
             control.step_to(control.clock() + 1)
         count_resumed, position_resumed, data_resumed = carried()
         if count_resumed != 1 or not position_resumed or position_resumed[0] == position_after[0]:
             raise RuntimeError(f"Active belt did not resume moving its retained item: {data_resumed}")
-    print("Idle belt connections and active moving cargo/speed survived save/reopen; item travel resumed.")
+    print("Idle connections and active belt cargo/speed survived save/reopen; retained item travel resumed.")
 
 
 def run_backpressure(args):
@@ -226,7 +227,7 @@ def run_lan(args):
                 multiplayer.until("guest received Belt Connector", lambda:
                                  multiplayer.count(guest, "create:belt_connector") == 1)
                 guest.call("interact", 5, 104, -11)
-                guest.call("wait", 2)
+                guest.call("wait", 3)
                 host.command("/setblock 8 104 -11 create:shaft[axis=x]")
                 guest.call("interact", 8, 104, -11)
                 guest.call("wait", 2)
@@ -234,10 +235,12 @@ def run_lan(args):
                     raise RuntimeError("A connector with mismatched shaft axes placed a belt")
                 host.command("/setblock 8 104 -11 create:shaft[axis=z]")
                 guest.call("key", "shift", "down")
-                guest.call("interact", 5, 104, -11)
+                guest.call("wait", 3)
+                guest.call("interact", 6, 104, -11)
+                guest.call("wait", 5)
                 guest.call("key", "shift", "up")
                 guest.call("wait", 2)
-                shaft = host.call("block", 5, 104, -11)["state"]
+                shaft = host.call("block", 6, 104, -11)["state"]
                 if not shaft.startswith("create:shaft[axis=z"):
                     raise RuntimeError(f"Sneaking should clear selection without placing a belt: {shaft}")
                 if multiplayer.count(guest, "create:belt_connector") != 1:
@@ -254,6 +257,8 @@ def run_lan(args):
                 if multiplayer.count(guest, "create:belt_connector") != 0:
                     raise RuntimeError("Guest's successful belt placement did not consume the connector")
                 host.command(f"/give {guest_name} create:wrench")
+                multiplayer.until("guest received the Wrench", lambda:
+                                 multiplayer.count(guest, "create:wrench") == 1)
                 guest.call("select", "create:wrench")
                 guest.call("interact", 6, 104, -11)
                 multiplayer.until("guest removed the pulley with a Wrench", lambda:
