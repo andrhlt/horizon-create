@@ -103,10 +103,8 @@ speed, while belt `whenItemHeld`/held-item processing is what delivers the
 completed bottle after movement resumes. The Horizon paths in
 `native/spout.rs`, `native/belt.rs`, `native/depot.rs`, and `native/ejector.rs`
 were checked against those rules.
-The Horizon paths in `native/spout.rs`, `native/belt.rs`, `native/depot.rs`,
-and `native/ejector.rs` were checked against those rules. No reproducible
-behavior mismatch was established, so this source audit made no runtime logic
-change.
+No runtime logic change was needed: Spout timing and belt-held item processing
+are separate callbacks, and the belt pauses its held item at zero speed.
 
 The existing bottle, potion-crafting, nine-lane spouting, and Blaze Cake
 fixtures passed on isolated build `native-9f42064-6a3da367a9bb`; potion crafting,
@@ -118,15 +116,28 @@ The boundary case checks a 249 mB shortage against a 250 mB water-bottle
 requirement and passes cobblestone through. It then removes belt RPM after a
 valid bottle is held: the independent Spout timer reaches -1 while the bottle
 stays centered and 250 mB remains; restoring RPM invokes the held-item callback
-and produces exactly one output while consuming 250 mB. These are
-source-aligned checks, not Java tick traces. LAN feed/collection, output
-backpressure, and idle/partway save/reopen cover the remaining ticket gates.
+and produces exactly one output while consuming 250 mB. The test follows that
+output to the Depot, confirms the route is clear, the timer is idle, and there
+is no duplicate. These are source-aligned checks, not Java tick traces. LAN
+feed/collection, output backpressure, and idle/partway save/reopen cover the
+remaining ticket gates.
+
+On the merged tree, all 12 APP-1990 and affected belt checks passed against
+gameplay build `native-9f42064-6a3da367a9bb`, with pack SHA-256
+`8921cd3502ce28d0bf6662e9d46eb33e81ca3cb9d914a6abd9c2aa4ee9047d1c`:
+`water-filling-bottle`, `spout-crafting`, `spouting`, `heated-fluid-food`,
+`spout-lan-feed-collect`, `spout-output-backpressure`,
+`spout-input-timing-boundaries`, `spout-reopen`, `horizontal-belt`,
+`belt-output-backpressure`, `belt-reopen`, and
+`horizontal-belt-lan-guest-placement`. The changed Spout, belt, Depot, and
+ejector runtime sources match the verified build; the follow-up changes only
+correct harness setup and assert delivery through the Depot.
 
 Run the new cases together with the existing Java replays using:
 
 ```sh
 python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 \
-  --check water-filling-bottle --check spout-crafting --check spouting \
+  --check water-filling-bottle --check spout-crafting --check spouting --check heated-fluid-food \
   --check spout-lan-feed-collect --check spout-output-backpressure \
   --check spout-input-timing-boundaries --check spout-reopen
 ```
