@@ -1,13 +1,16 @@
 use std::collections::{BTreeSet, VecDeque};
 
 use horizon_core::geometry::{Aabb, Direction, Vec3};
-use horizon_world::level::flags;
+use horizon_core::position::BlockPos;
+use horizon_world::fluid::FluidKind;
+use horizon_world::level::{LevelAccess, PlacementContext, flags, ordered_by_nearest};
+use horizon_world::registry::BlockStateId;
 use horizon_world::nbt::{Compound, Tag};
 
-use crate::containers::ModBlockEntity;
+use crate::containers::{BlockEntity, ModBlockEntity};
 use crate::items::ItemStack;
 
-use super::Game;
+use super::{Game, GameLevel};
 use super::create_depot::compound;
 use super::create_fan::facing;
 use super::create_fluid_tank::{self, CREATIVE, TANK};
@@ -102,26 +105,277 @@ fn along(face: Direction) -> &'static str {
     }
 }
 
-pub(super) fn open_to(game: &Game<'_>, pos: [i32; 3], face: Direction) -> bool {
-    match game.native_block(pos).as_str() {
-        SMART_PIPE => game
-            .native_block_property(pos, "facing")
-            .and_then(|facing| super::create_machines::facing_axis(&facing))
-            .is_some_and(|axis| face.normal()[axis] != 0),
-        VALVE => create_valve::pipe_axis(game, pos).is_some_and(|axis| face.normal()[axis] != 0),
-        GLASS_PIPE => game.native_block_property(pos, "axis").as_deref() == Some(along(face)),
-        PIPE | ENCASED_PIPE => game.native_block_property(pos, name(face)).as_deref() == Some("true"),
-        PUMP => facing(game, game.world.block(pos[0], pos[1], pos[2]))
-            .is_some_and(|towards| along(towards) == along(face)),
+fn smart_axis(attachment: Option<&str>, facing: Option<&str>) -> Option<usize> {
+    if attachment == Some("wall") {
+        Some(1)
+    } else {
+        super::create_machines::facing_axis(facing?)
+    }
+}
+
+fn pipe_neighbor(level: &GameLevel<'_>, at: BlockPos, side: Direction) -> bool {
+    let [dx, dy, dz] = side.normal();
+    let neighbor = at.offset(dx, dy, dz);
+    let Some(state) = level.registry.state(level.block_state(neighbor)) else {
+        return false;
+    };
+    let property = |key: &str| state.properties.get(key).map(String::as_str);
+    let facing = side.opposite();
+    match state.name.as_str() {
+        PIPE => {
+            let bracketed = matches!(
+                level.world.block_entities.get(&(neighbor.x, neighbor.y, neighbor.z)),
+                Some(BlockEntity::Mod(pipe)) if compound(&pipe.nbt, "Bracket").is_some()
+            );
+            !bracketed || (property(name(side)) == Some("true")
+                && property(name(facing)) == Some("true")
+                && Direction::ALL.into_iter()
+                    .filter(|&d| property(name(d)) == Some("true")).count() == 2)
+        }
+        ENCASED_PIPE | GLASS_PIPE | SMART_PIPE | PUMP | VALVE => state_open(&state.name, property, facing),
+        HOSE => match property("facing") {
+            Some("north") => facing == Direction::West,
+            Some("south") => facing == Direction::East,
+            Some("west") => facing == Direction::South,
+            Some("east") => facing == Direction::North,
+            _ => false,
+        },
+        DRAIN => facing != Direction::Up,
+        SPOUT => facing != Direction::Down,
+        BASIN | TANK | CREATIVE | PORTABLE_INTERFACE
+        | "minecraft:cauldron" | "minecraft:water_cauldron" | "minecraft:lava_cauldron" => true,
+        _ => property("honey_level").is_some(),
+    }
+}
+
+pub(super) fn pipe_connections(
+    level: &GameLevel<'_>,
+    at: BlockPos,
+    state: BlockStateId,
+    preferred: Direction,
+    ignore: Option<Direction>,
+) -> BlockStateId {
+    if matches!(
+        level.world.block_entities.get(&(at.x, at.y, at.z)),
+        Some(BlockEntity::Mod(pipe)) if compound(&pipe.nbt, "Bracket").is_some()
+    ) {
+        return state;
+    }
+    let Some(prior_state) = level.registry.state(state) else {
+        return state;
+    };
+    let prior = Direction::ALL.map(|side| prior_state.properties.get(name(side)).is_some_and(|value| value == "true"));
+    let mut open = Direction::ALL.map(|side| {
+        if Some(side) == ignore { prior[side as usize] } else { pipe_neighbor(level, at, side) }
+    });
+    let mut connections = Direction::ALL.into_iter().filter(|&side| open[side as usize]);
+    match (connections.next(), connections.next()) {
+        (Some(side), None) => open[side.opposite() as usize] = true,
+        (None, _) if prior.into_iter().filter(|&side| side).count() == 2 => return state,
+        (None, _) => {
+            open[preferred as usize] = true;
+            open[preferred.opposite() as usize] = true;
+        }
+        _ => {}
+    }
+    Direction::ALL.into_iter().zip(open).fold(state, |state, (side, connected)| {
+        level.native_state_with_property(state, name(side), if connected { "true" } else { "false" })
+            .unwrap_or(state)
+    })
+}
+
+pub(super) fn place_pipe(
+    level: &GameLevel<'_>,
+    state: BlockStateId,
+    context: &PlacementContext,
+) -> Option<BlockStateId> {
+    let block = level.native_state_block(state)?;
+    let state = match block {
+        PIPE => {
+            // Java's default has no open sides. Keep that placement input
+            // distinct from the straight state used by the Horizon registry.
+            let blank = Direction::ALL.into_iter().try_fold(state, |state, side| {
+                level.native_state_with_property(state, name(side), "false")
+            })?;
+            pipe_connections(level, context.pos, blank, context.nearest_looking_direction(), None)
+        }
+        SMART_PIPE => {
+            let mut directions = ordered_by_nearest(context.yaw, context.pitch);
+            if !context.replace_clicked
+                && let Some(index) = directions.iter().position(|&side| side == context.face.opposite())
+            {
+                directions[..=index].rotate_right(1);
+            }
+            let looking = directions[0];
+            let horizontal = ordered_by_nearest(context.yaw, 0.0)[0];
+            let (mut attachment, mut facing) = match looking {
+                Direction::Up => ("ceiling", horizontal),
+                Direction::Down => ("floor", horizontal),
+                _ => ("wall", looking.opposite()),
+            };
+            let axes = Direction::ALL.into_iter()
+                .filter(|&side| pipe_neighbor(level, context.pos, side))
+                .map(along).collect::<BTreeSet<_>>();
+            if axes.len() == 1 {
+                let axis = *axes.first()?;
+                if axis == "y" {
+                    attachment = "wall";
+                    facing = facing.opposite();
+                } else {
+                    if attachment == "wall" {
+                        attachment = "floor";
+                    }
+                    facing = directions.into_iter().find(|&side| along(side) == axis)?.opposite();
+                }
+            }
+            let state = level.native_state_with_property(state, "face", attachment)?;
+            level.native_state_with_property(state, "facing", name(facing))?
+        }
+        _ => return None,
+    };
+    let fluid = level.behaviours.fluid(level.block_state(context.pos));
+    let wet = fluid.kind() == FluidKind::Water && fluid.is_source();
+    level.native_state_with_property(state, "waterlogged", if wet { "true" } else { "false" })
+}
+
+fn state_open<'a>(block: &str, property: impl Fn(&str) -> Option<&'a str>, face: Direction) -> bool {
+    let has_axis = |axis: usize| face.normal()[axis] != 0;
+    let facing_axis = || property("facing").and_then(super::create_machines::facing_axis);
+    match block {
+        SMART_PIPE => smart_axis(property("face"), property("facing")).is_some_and(has_axis),
+        GLASS_PIPE => property("axis") == Some(along(face)),
+        PIPE | ENCASED_PIPE => property(name(face)) == Some("true"),
+        PUMP => facing_axis().is_some_and(has_axis),
+        VALVE => facing_axis().is_some_and(|rotation| {
+            (0..3).filter(|&axis| axis != rotation)
+                .nth(usize::from(property("axis_along_first") == Some("true")))
+                .is_some_and(has_axis)
+        }),
         _ => false,
     }
 }
 
+pub(super) fn open_to(game: &Game<'_>, pos: [i32; 3], face: Direction) -> bool {
+    let state = game.world.block(pos[0], pos[1], pos[2]);
+    state_open(&game.native_block(pos), |key| game.native_block_state_property(state, key), face)
+}
+
+pub(super) fn wrench_pipe(game: &mut Game<'_>, pos: [i32; 3], face: Direction, block: &str) -> bool {
+    if !game.native_authoritative() {
+        return false;
+    }
+    let at = BlockPos::new(pos[0], pos[1], pos[2]);
+    let prior = Direction::ALL.map(|side| open_to(game, pos, side));
+    let wet = game.native_block_property(pos, "waterlogged").as_deref() == Some("true");
+    let (replacement, open) = if block == PIPE {
+        let straight = Direction::ALL.into_iter().find(|&side| {
+            prior[side as usize] && prior[side.opposite() as usize]
+                && prior.into_iter().filter(|&connected| connected).count() == 2
+        });
+        let direction = straight.or_else(|| {
+            let hit = game.pick().filter(|hit| hit.pos == pos)?;
+            Direction::ALL.into_iter().filter(|&side| along(side) != along(face)).min_by(|a, b| {
+                let distance = |side: Direction| {
+                    hit.point.into_iter().zip(pos).zip(side.normal())
+                        .map(|((point, block), normal)| (point - f64::from(block) - 0.5 - f64::from(normal)).powi(2))
+                        .sum::<f64>()
+                };
+                distance(*a).total_cmp(&distance(*b))
+            })
+        });
+        let Some(direction) = direction.filter(|&side| along(side) != along(face)) else {
+            return false;
+        };
+        let Some(state) = game.native_default_state(GLASS_PIPE) else {
+            return false;
+        };
+        let Some(state) = game.with_level(|_, level, _| {
+            level.native_state_with_property(state, "axis", along(direction))
+        }) else {
+            return false;
+        };
+        (state, Direction::ALL.map(|side| along(side) == along(direction)))
+    } else {
+        let Some(state) = game.native_default_state(PIPE) else {
+            return false;
+        };
+        let Some((state, open)) = game.with_level(|_, level, _| {
+            let seed = Direction::ALL.into_iter().zip(prior).try_fold(state, |state, (side, open)| {
+                level.native_state_with_property(state, name(side), if open { "true" } else { "false" })
+            })?;
+            let preferred = Direction::ALL.into_iter().find(|&side| prior[side as usize])?;
+            let state = pipe_connections(level, at, seed, preferred, None);
+            let entry = level.registry.state(state)?;
+            let faces = Direction::ALL.map(|side| entry.properties.get(name(side)).is_some_and(|value| value == "true"));
+            Some((state, faces))
+        }) else {
+            return false;
+        };
+        (state, open)
+    };
+    let Some(replacement) = game.with_level(|_, level, _| {
+        level.native_state_with_property(replacement, "waterlogged", if wet { "true" } else { "false" })
+    }) else {
+        return false;
+    };
+    let flowing = block == PIPE && mod_entity(game, pos).is_some_and(|entity| {
+        Direction::ALL.into_iter().any(|side| flow(&port(entity, side)).is_some())
+    });
+    if !create_encased_fluid_pipe::replace_with_flow(game, pos, replacement, prior, open) {
+        return false;
+    }
+    if flowing {
+        let player = game.native_acting_id();
+        game.native_trigger_criterion(player, "create:glass_pipe", |_| true);
+    }
+    true
+}
+
+pub(super) fn transport_block(block: &str) -> bool {
+    matches!(block, GLASS_PIPE | PIPE | ENCASED_PIPE | PUMP | VALVE | SMART_PIPE)
+}
+
 pub(super) fn fluid_block(game: &Game<'_>, pos: [i32; 3]) -> bool {
-    matches!(
-        game.native_block(pos).as_str(),
-        GLASS_PIPE | PIPE | ENCASED_PIPE | PUMP | VALVE | SMART_PIPE
-    )
+    transport_block(&game.native_block(pos))
+}
+
+pub(super) fn updates_connections(block: &str) -> bool {
+    transport_block(block) || matches!(block, BASIN | TANK | CREATIVE | PORTABLE_INTERFACE | SPOUT | DRAIN | HOSE)
+}
+
+pub(super) fn tick_changed_pipe(level: &mut GameLevel<'_>, pos: BlockPos, state: BlockStateId) {
+    if !level.native_state_block(state).is_some_and(transport_block) {
+        return;
+    }
+    let at = [pos.x, pos.y, pos.z];
+    let mut visited = BTreeSet::from([at]);
+    let mut frontier = VecDeque::from([(at, 0)]);
+    while let Some((at, distance)) = frontier.pop_front() {
+        let state = level.world.block(at[0], at[1], at[2]);
+        let Some(entry) = level.registry.state(state) else {
+            continue;
+        };
+        let property = |key: &str| entry.properties.get(key).map(String::as_str);
+        if entry.name == PUMP
+            && let Some(BlockEntity::Mod(pump)) = level.world.block_entities.get_mut(&(at[0], at[1], at[2]))
+        {
+            pump.nbt.remove(&"PressureSpeed".into());
+        }
+        if distance >= RANGE || entry.name == PUMP && distance != 0 {
+            continue;
+        }
+        let pos = BlockPos::new(at[0], at[1], at[2]);
+        for side in Direction::ALL {
+            let next = adjacent(at, side);
+            if state_open(&entry.name, &property, side)
+                && level.native_state_block(level.world.block(next[0], next[1], next[2])).is_some_and(transport_block)
+                && pipe_neighbor(level, pos, side)
+                && visited.insert(next)
+            {
+                frontier.push_back((next, distance + 1));
+            }
+        }
+    }
 }
 
 pub(super) fn incoming_matches(
@@ -277,33 +531,108 @@ pub(super) fn liquid_from_stack(stack: &ItemStack, amount: i32) -> Option<Fluid>
 }
 
 fn filter_fluid(entity: &ModBlockEntity, fluid: &Fluid) -> bool {
-    if entity.id != SMART_PIPE {
-        return true;
-    }
-    let filter = compound(&entity.nbt, "Filter").and_then(ItemStack::from_nbt);
-    filter.is_none_or(|sample| {
-        liquid_from_stack(&sample, 1).is_some_and(|want| want.same_variant(fluid))
-    })
+    entity.id != SMART_PIPE || super::create_item_filters::accepts_fluid(&entity.nbt, fluid)
 }
 
-pub(super) fn set_filter(game: &mut Game<'_>, pos: [i32; 3], stack: &ItemStack) -> bool {
-    if game.native_block(pos) != SMART_PIPE || liquid_from_stack(stack, 1).is_none() {
+fn smart_slot(game: &Game<'_>, state: BlockStateId) -> ([f32; 3], f32, f32) {
+    let face = game.native_block_state_property(state, "face");
+    let facing = game.native_block_state_property(state, "facing");
+    let yaw = match facing {
+        Some("north") => 180.0,
+        Some("west") => 90.0,
+        Some("east") => 270.0,
+        _ => 0.0,
+    };
+    let (y, z, yaw, pitch) = match face {
+        Some("ceiling") => (0.55, 4.6, yaw, -45.0),
+        Some("wall") => (11.4, 0.55, yaw + 180.0, 45.0),
+        _ => (15.45, 4.625, yaw, 45.0),
+    };
+    let (sin, cos) = f32::to_radians(yaw).sin_cos();
+    let z = z / 16.0 - 0.5;
+    ([0.5 + z * sin, y / 16.0, 0.5 + z * cos], yaw, pitch)
+}
+
+pub(super) fn filter_target(game: &Game<'_>, hit: &super::Hit, held: Option<&ItemStack>) -> bool {
+    let pos = hit.pos;
+    if game.native_block(pos) != SMART_PIPE || !game.may_build() || held.is_some_and(|stack| {
+        matches!(stack.item.as_ref(), "create:wrench" | "create:mechanical_arm")
+    }) {
         return false;
     }
-    let mut sample = stack.clone();
-    sample.count = 1;
-    if game
-        .native_with_mod_block_entity(pos, |pipe| {
-            pipe.nbt
-                .insert("Filter".into(), super::create_depot::encode(&sample));
-        })
-        .is_none()
+    let state = game.world.block(pos[0], pos[1], pos[2]);
+    let (center, _, _) = smart_slot(game, state);
+    let squared_distance = hit.point.into_iter().zip(pos).zip(center)
+        .map(|((point, block), center)| (point - f64::from(block) - f64::from(center)).powi(2))
+        .sum::<f64>();
+    squared_distance < (0.5f64 * 1.02 / 2.0).powi(2)
+}
+
+pub(super) fn click_filter(game: &mut Game<'_>, hit: &super::Hit) -> bool {
+    if !game.native_authoritative() || game.native_sneaking()
+        || game.hand != horizon_client::first_person::Hand::Main
+        || !filter_target(game, hit, game.held())
     {
         return false;
     }
+    let pos = hit.pos;
+    let mut sample = game.held().cloned();
+    use super::create_threshold_switch::is_filter_item;
+    let previous = mod_entity(game, pos)
+        .and_then(|pipe| compound(&pipe.nbt, "Filter"))
+        .and_then(ItemStack::from_nbt)
+        .filter(is_filter_item);
+    let physical = sample.as_ref().is_some_and(is_filter_item);
+    if let Some(sample) = &mut sample {
+        sample.count = 1;
+    }
+    let filter = sample.as_ref().map_or_else(
+        || Tag::Compound(Compound::new()),
+        super::create_depot::encode,
+    );
+    if game.native_with_mod_block_entity(pos, |pipe| {
+        pipe.nbt.insert("Filter".into(), filter);
+    }).is_none() {
+        return false;
+    }
+    if let Some(previous) = previous
+        && (!game.creative || !game.inventory.iter().chain(std::iter::once(&game.offhand)).flatten()
+            .any(|held| held.same_item_same_components(&previous)))
+    {
+        game.give_or_drop(previous);
+        game.guest_inventory_resend |= game.lan_acting.is_some();
+    }
+    if physical && !game.creative {
+        game.consume_held();
+        game.guest_inventory_resend |= game.lan_acting.is_some();
+    }
+    create_encased_fluid_pipe::reset_network(game, pos, Direction::ALL.map(|side| open_to(game, pos, side)));
     game.native_block_entity_sync(pos);
+    game.native_play_sound_in_place(
+        "minecraft:entity.item_frame.add_item", pos.map(|v| f64::from(v) + 0.5), 4, 0.25, 0.1,
+    );
     game.swing_arm();
     true
+}
+
+pub(super) fn render_filter(
+    game: &Game<'_>,
+    state: BlockStateId,
+    entity: &ModBlockEntity,
+    draw: &mut super::native_block_entity_draw::BlockEntityDraw,
+) {
+    use horizon_assets::item_model::DisplayContext;
+    let Some(stack) = compound(&entity.nbt, "Filter").and_then(ItemStack::from_nbt) else {
+        return;
+    };
+    let (center, yaw, pitch) = smart_slot(game, state);
+    draw.push();
+    draw.translate(center);
+    draw.rotate_about([0., 1., 0.], yaw + 180., [0.; 3]);
+    draw.rotate_about([1., 0., 0.], -pitch, [0.; 3]);
+    draw.scale([0.25; 3]);
+    game.native_draw_item(draw, &stack, DisplayContext::Fixed, None, 0);
+    draw.pop();
 }
 
 fn port(entity: &ModBlockEntity, direction: Direction) -> Compound {
@@ -822,7 +1151,7 @@ fn find_outputs(
             let port = port(entity, face);
             let (inbound, rpm) = pressure(&port);
             if rpm == 0.0
-                || inbound
+                || inbound || !open_to(game, pos, face)
                 || !flow(&port).is_some_and(|(flow, t)| t >= 1.0 && flow.same_variant(fluid))
             {
                 continue;
@@ -832,7 +1161,8 @@ fn find_outputs(
                 continue;
             }
             if fluid_block(game, target) {
-                if let Some(next) = mod_entity(game, target)
+                if open_to(game, target, face.opposite())
+                    && let Some(next) = mod_entity(game, target)
                     && complete(next, face.opposite())
                         .is_some_and(|found| found.same_variant(fluid))
                     && visited.insert(target)
@@ -904,6 +1234,9 @@ fn fluid_tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity, i
     let Some(mut from) = supplied else {
         return;
     };
+    if !from.same_variant(&wanted) {
+        return;
+    }
     let (_, rpm) = pressure(&inlet);
     let now = game.world.game_time;
     let mut targets = find_outputs(game, pos, entity, &from);
@@ -1098,6 +1431,26 @@ fn fluid_tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity, i
     }
 }
 
+fn collide_flows(game: &mut Game<'_>, pos: [i32; 3], entity: &ModBlockEntity, first: &Fluid, other: &Fluid) {
+    let at = BlockPos::new(pos[0], pos[1], pos[2]);
+    if !game.with_level(|behaviour, level, ticks| behaviour.destroy_block(level, ticks, at, true)) {
+        return;
+    }
+    if let Some(filter) = compound(&entity.nbt, "Filter")
+        .and_then(ItemStack::from_nbt)
+        .filter(super::create_threshold_switch::is_filter_item)
+    {
+        game.pop_resource(pos, filter);
+    }
+    let _ = game.process_level_events();
+    if matches!((first.id.as_str(), other.id.as_str()),
+        (WATER, "minecraft:lava") | ("minecraft:lava", WATER))
+        && let Some(cobblestone) = game.native_default_state("minecraft:cobblestone")
+    {
+        game.native_set_block(game.native_dimension(), pos, cobblestone, flags::UPDATE_ALL);
+    }
+}
+
 pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity) {
     if matches!(entity.nbt.get(&"FlowReady".into()), Some(Tag::Long(ready)) if *ready > game.world.game_time)
     {
@@ -1105,19 +1458,25 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
     }
 
     let mut ports = Direction::ALL.map(|face| (face, port(entity, face)));
-    let internal = ports.iter().find_map(|(_, port)| {
+    let mut supplied = ports.iter().filter_map(|(face, port)| {
         let (inward, rpm) = pressure(port);
-        (inward && rpm > 0.0)
-            .then(|| flow(port))
-            .flatten()
-            .filter(|(_, t)| *t >= 1.0)
-            .map(|(fluid, _)| fluid)
+        if !inward || rpm == 0.0 || !open_to(game, pos, *face) {
+            return None;
+        }
+        flow(port).filter(|(_, progress)| *progress >= 1.0).map(|(fluid, _)| fluid)
     });
+    let internal = supplied.next();
+    if let Some(first) = &internal
+        && let Some(other) = supplied.find(|fluid| !fluid.same_variant(first))
+    {
+        collide_flows(game, pos, entity, first, &other);
+        return;
+    }
     let now = game.world.game_time;
     let mut sources = Vec::new();
     for (face, port) in &mut ports {
         let (inward, rpm) = pressure(port);
-        if rpm == 0.0 {
+        if rpm == 0.0 || !open_to(game, pos, *face) {
             continue;
         }
         let fluid = if inward {

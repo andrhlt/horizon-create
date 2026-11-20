@@ -429,7 +429,7 @@ pub(super) fn release_observer_filter(
     let Some(BlockEntity::Mod(entity)) = level.world.block_entities.get(&(pos.x, pos.y, pos.z)) else {
         return;
     };
-    if entity.id != OBSERVER {
+    if !matches!(entity.id.as_str(), OBSERVER | super::create_fluids::SMART_PIPE) {
         return;
     }
     let Some(stack) = super::create_depot::compound(&entity.nbt, "Filter")
@@ -444,7 +444,7 @@ pub(super) fn release_observer_filter(
     });
 }
 
-fn is_filter_item(stack: &ItemStack) -> bool {
+pub(super) fn is_filter_item(stack: &ItemStack) -> bool {
     matches!(
         stack.item.as_ref(),
         "create:filter" | "create:attribute_filter" | "create:package_filter"

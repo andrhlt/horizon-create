@@ -4552,6 +4552,83 @@ same tick, preserved its name and charge, and restored source water. Diving
 movement, wearable breathing and full presentation remain open.
 
 
+## Fluid Pipe, Glass Fluid Pipe and Smart Fluid Pipe
+
+APP-1972 covers the two basic survival recipes, Smart Fluid Pipe crafting,
+and Glass Fluid Pipe acquisition by wrenching a basic pipe. The pinned
+`FluidPipeBlock` and `AxisPipeBlock` callbacks define the connection and
+conversion rules. A side click converts a straight pipe to glass, glass
+uncases back to a basic pipe and reconnects, and both conversions keep
+waterlogging and cached flow. The Glass variant returns a basic pipe when
+dismantled. `SmartFluidPipeBlock` uses the Y axis for wall placement, and
+`SmartFluidPipeBlockEntity` tests incoming fluid against its filter. The
+filter slot accepts a replacement sample or clears with an empty hand.
+
+The [gameplay replays](tools/test-fluid-pipe-gameplay.py) exercise those
+interactions in survival and with an acting LAN guest. They check the
+authoritative host state and eventual guest block-state convergence.
+The solo save cases reopen a wet Glass Pipe and a configured Smart Pipe
+while idle, then reopen a powered vertical line with water still moving.
+The powered runs cover accepting and rejecting fluid, a full receiver, an
+empty source, independent water and lava lanes, and a blocked segment
+removed and reconnected while the pump remains powered. Tank contents are
+measured in millibuckets and checked separately by fluid ID.
+
+The existing [split/combine replay](tools/test-branched-pipes.py) is the
+402-tick Java comparison for single-fluid branch traffic. The
+[collision GameTest patch](tools/java-fluid-pipe-collision.patch) changes the
+north source in the same combine template to lava and runs only that test.
+Apply it to a disposable Create checkout at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`, then run
+`./gradlew --offline --no-daemon --max-workers=2 runGameTestServer` on JDK 21.
+The `CREATE_MIXED_PIPE` rows form the
+[26-sample reference](fixtures/fluid-pipe-collision-java.csv).
+The patch SHA-256 is
+`fac5fc6cf0e6007c76f9201c3fe6f6341125fa751fcfa68fa59ef65eccb426b4`.
+
+Both engines were sampled from tick 0 after switching the pump to combine.
+The junction block, dropped basic-pipe item count, destination fluid and
+amount, and three source amounts all matched at zero tolerance. The
+junction became cobblestone and dropped one basic pipe on tick 15.
+All three sources retained their initial fluid and the destination stayed
+empty through tick 25. Horizon server commands sample authoritative block
+state because the local client block view showed the change one tick later.
+The player stands outside pickup range for the drop count.
+
+The baseline at `native-9f42064-6ce68a31b125` left the junction intact
+despite completed water and lava fronts and transferred 126 mB of lava.
+It also left basic pipes unchanged on a side wrench, kept an empty-hand
+filter click from clearing the slot, and placed a disjoint pipe beside a
+tank. The original Encased Pipe static replay now supports the three-way
+junction during its actual player click and removes those neighbors once
+encased. The Java probe stops after the block interaction returns
+`PASS_TO_DEFAULT_BLOCK_INTERACTION`, before the held casing can place next to
+the pipe and cause a shape update.
+
+The final runtime is `native-9f42064-67bca7338e12`, built using launcher
+0.2.67 and the pinned Horizon revision
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. The clean isolated build took
+20 minutes 55 seconds. The client SHA-256 is
+`09cf090b28190b14bd01ab795fa0e495883c8d965163e6ba8517e2bb9e3ae3e9`.
+The pack was prepared from the pinned Java checkout with `tools/prepare.py`.
+Its SHA-256 is
+`0affa267eaa1404441401e2d08f4c67890210a419e2d5eb6d27a78473b451eb8`.
+The focused regression run passed all 14 selected checks on this runtime and
+pack, including solo and LAN pipe gameplay, collision, lifecycle, encased
+transfer, branch traffic, and dependent fluid regressions.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 \
+  --jobs 3 --check 'fluid-pipe-*' --check 'encased-fluid-pipe*' \
+  --check branched-pipes --check open-pipes --check world-pump \
+  --check pump-startup-pressure --check fluid-observer --check fluid-valve-neighbors
+```
+
+The new interaction and lifecycle cases use source-derived properties and
+conservation bounds. Exact Java save/reopen and guest packet timing,
+further fluid reactions, complex filter configurations, chunk boundaries,
+and additional model and animation combinations remain open.
+
 ## Encased Fluid Pipe
 
 The [original Java probe](tools/java-encased-fluid-pipe-trace.patch)

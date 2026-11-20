@@ -1,0 +1,52 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..ff23662 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestFluids.mixedPipeCollision"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+index 4102b83..51f2939 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestFluids.java
+@@ -117,6 +117,33 @@ public class TestFluids {
+ 		});
+ 	}
+ 
++	@GameTest(template = "3_pipe_combine", timeoutTicks = CreateGameTestHelper.TEN_SECONDS)
++	public static void mixedPipeCollision(CreateGameTestHelper helper) {
++		BlockPos lavaSource = new BlockPos(5, 2, 1);
++		BlockPos waterSource = lavaSource.south();
++		BlockPos secondWaterSource = waterSource.south();
++		BlockPos output = new BlockPos(1, 2, 2);
++		BlockPos junction = new BlockPos(3, 2, 2);
++		com.simibubi.create.content.fluids.tank.FluidTankBlockEntity tank = helper.getBlockEntity(com.simibubi.create.AllBlockEntityTypes.FLUID_TANK.get(), lavaSource);
++		tank.getTankInventory().setFluid(new FluidStack(Fluids.LAVA, 3022));
++		helper.flipBlock(new BlockPos(2, 2, 2));
++		helper.succeedWhen(() -> {
++			var block = helper.getBlockState(junction);
++			int dropped = helper.getLevel().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
++				new net.minecraft.world.phys.AABB(helper.absolutePos(junction)).inflate(3))
++				.stream().filter(e -> e.getItem().is(com.simibubi.create.AllBlocks.FLUID_PIPE.asItem()))
++				.mapToInt(e -> e.getItem().getCount()).sum();
++			System.out.printf("CREATE_MIXED_PIPE %d %s %d %s %d %d %d %d%n", helper.getTick(),
++				net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block.getBlock()), dropped,
++				net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(helper.getTankContents(output).getFluid()),
++				helper.getTankContents(output).getAmount(), helper.getTankContents(lavaSource).getAmount(),
++				helper.getTankContents(waterSource).getAmount(), helper.getTankContents(secondWaterSource).getAmount());
++			helper.assertTrue(helper.getTick() >= 25, "Waiting for both fluid fronts");
++			if (!block.is(net.minecraft.world.level.block.Blocks.COBBLESTONE))
++				helper.fail("Expected incompatible fronts to leave cobblestone");
++		});
++	}
++
+ 	@GameTest(template = "3_pipe_combine", timeoutTicks = CreateGameTestHelper.TWENTY_SECONDS)
+ 	public static void threePipeCombine(CreateGameTestHelper helper) {
+ 		BlockPos tank1Pos = new BlockPos(5, 2, 1);
