@@ -73,7 +73,7 @@ the two measure different levels of evidence.
 
 | Feature | In game | Basic tested | Java comparison | Full 1:1 | Remaining work |
 | --- | --- | --- | --- | --- | --- |
-| Super Glue and assembly selection | Yes | Pass | [Player clicks](tools/test-super-glue-selection.py) and [LAN guest clicks](tools/test-super-glue-lan.py) matched Java region and durability; the region survived reopening, and both final-charge cases matched | Open | Removal, other connectivity and inventory cases, selection presentation and effects |
+| Super Glue and assembly selection | Yes | Pass | [Player and LAN guest checks](tools/test-super-glue-selection.py) cover saved region, final-charge spare-stack fallback, cancellation, overlapping selections, block-preserving removal and guest inventory sync. Solo and LAN train checks cover an assembled carriage and Java-matching motion samples; see [APP-1978](PARITY.md#app-1978-super-glue-and-assembly-selection). | Open | Removal uses a block-hit approximation; exact entity picking, selection presentation, effects, more connectivity and inventory combinations |
 | Linear, Secondary Linear and Radial Chassis | Yes | Pass | Placement, removal, range controls, preview, spin and LAN | Open | Mixed groups, other assemblies and preview timing |
 | Mechanical Bearing | Yes | Pass | Rotating assemblies, powered controls and mounted-interface motion | Open | Remaining payload, collision and multi-axis interactions |
 | Windmill Bearing and colored sails | Yes | Pass | Building and starting windmills, orientation, sails, load and reopen | Open | Remaining sail layouts, speed/load configurations and effects |

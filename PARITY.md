@@ -8398,11 +8398,63 @@ dedicated baseline check passed these bounded cases:
   from +32 to −32 RPM. Its idle and active save/reopen cases passed; the active
   16 RPM motor and shaft resumed after reopening.
 
+## APP-1978 Super Glue and assembly selection
+
+The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+`SuperGlueSelectionHandler` cancels an active selection on sneak, while
+`SuperGlueSelectionPacket` creates the selected region and calls
+`SuperGlueSelectionHelper.collectGlueFromInventory` once for availability and
+again for consumption. Despite its `simulate` argument, that helper calls
+`hurtAndBreak` in both invocations and scans the selected slot followed by the
+remaining inventory. Super Glue durability is 99 (`AllItems.SUPER_GLUE`).
+
+The baseline mismatch was reproduced on `native-9f42064-59c1049d0f04` with the
+new isolated spare-stack case: start with damage-99 Glue in hotbar slot 0 and a
+fresh Glue in slot 1, then select two connected blocks. The region was created
+and slot 0 broke, but Horizon left slot 1 at damage 0. Java consumes one point
+from slot 1 during the second helper call. The original check log was replaced
+by the final run; the observed baseline command, state and failed assertion are
+preserved in `.local/parity/super-glue-selection-baseline-spare-stack-failure.txt`.
+
+Horizon now searches Glue in Java's selected-then-inventory order. It swaps a
+spare stack through the selected slot while calling the ordinary durability
+path, preserving wear handling and break effects, then restores the changed
+stack to its original slot. Guest actions mark the inventory for resend. Glue
+use remains main-hand only, matching Java's client handler. Removal now accepts
+a left-click on a block whose center lies inside a Glue region, when main-hand
+Glue is held and the acting player is within Java's 32-block range. It removes
+the nearest matching region and cancels breaking the underlying block. This
+block-hit route is a usable approximation: the marker has no Java entity
+hitbox, so exact entity ray picking, hit plane presentation, particles and
+sound remain unverified.
+
+On `native-9f42064-8cc365d013ad`, the isolated solo check passed selection,
+saved-region reopen, damage-97/98 last-charge edges, spare-stack final-charge
+fallback, sneak cancellation, two overlapping regions and block-preserving
+removal. The LAN guest check passed normal region/durability, spare-stack
+consumption into slot 1 (damage 1), and guest removal with the block retained.
+The existing train assembly check matched all 125 Java motion ticks, and the
+multiplayer train check assembled on the dedicated server and observed 37
+Java-matching guest motion ticks. These train checks are representative
+integration coverage; they do not establish every glue configuration or full
+train parity. The suite output is in `.local/parity/`.
+
+Runtime identity: client SHA256
+`d78524837d9c33c4d7790a8ce9febcacb7c58679ff1543a98e8958d0714267c2`; control
+tool SHA256 `1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`;
+content pack SHA256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The unchanged train structure fixture used for the isolated worktree has SHA256
+`ff7048a951a87371c5cbe6fc7b98a2f087a6137be85d73b21d43975003cd5c58`.
+
 Commands:
 
 ```sh
 python3 tools/test-server-baseline.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack .local/create.hmod
 python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check hand-crank-lan --check hand-crank-persistence
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-ctl .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-client .local/patched-launcher/versions/native-9f42064-8cc365d013ad/.local/horizon-client/26.3 --jobs 1 --check super-glue-selection
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-ctl .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-client .local/patched-launcher/versions/native-9f42064-8cc365d013ad/.local/horizon-client/26.3 --jobs 1 --check super-glue-selection-lan
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-ctl .local/patched-launcher/versions/native-9f42064-8cc365d013ad/horizon-client .local/patched-launcher/versions/native-9f42064-8cc365d013ad/.local/horizon-client/26.3 --jobs 1 --check manual-train --check multiplayer-train
 ```
 
 The new dedicated check is registered as `server-baseline` in
@@ -8452,3 +8504,6 @@ python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/
 
 Other dimensions, storage groupings and material combinations remain follow-up
 coverage; Full 1:1 stays Open.
+
+APP-1978 bounded outcomes do not claim exact Java packet timing or exhaustive
+connectivity, inventory, rendering or effect parity. Full 1:1 remains Open.

@@ -1092,6 +1092,18 @@ name = "create_glue"
 source = "glue.rs"
 
 [[injection]]
+id = "glue_remove"
+hook = "left_click_block"
+hook_version = 1
+kind = "HEAD"
+helper = "glue_remove.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "self" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
+]
+
+[[injection]]
 id = "train_target"
 target = "horizon_client::game::lan_vehicles::Game<'_>::object_target"
 kind = "HEAD"
