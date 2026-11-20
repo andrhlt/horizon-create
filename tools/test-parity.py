@@ -81,6 +81,7 @@ CHECKS = (
      str(ROOT / "fixtures/copper-nugget-crafting-java.csv")),
     ("intermediate-crafting", "test-machine-crafting", "--reference",
      str(ROOT / "fixtures/intermediate-crafting-java.csv")),
+    ("common-parts-crafting-lan-reopen", "test-multiplayer-common-parts"),
     ("mechanical-saw-placement", "test-mechanical-saw", "--configure"),
     ("mechanical-drill", "test-mechanical-drill", "--visual"),
     ("mechanical-drill-placement", "test-mechanical-drill", "--configure"),

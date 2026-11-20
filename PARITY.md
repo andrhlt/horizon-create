@@ -7415,6 +7415,17 @@ Rose Quartz, Sand Paper, Red Sand Paper and Andesite Alloy using an iron nugget.
 The [Java probe](tools/java-intermediate-crafting-trace.patch) checked recipe
 IDs, outputs, counts and crafting remainders.
 
+The [LAN craft and reopen replay](tools/test-multiplayer-common-parts.py) passed
+on `native-9f42064-6ce68a31b125` with pack SHA256
+`fae54c37367475be514f4565f2bc8f72b089e129601cde3275bc9486c8799187`.
+A survival guest crafted one Andesite Alloy from two Andesite and two Iron
+Nuggets in the player grid. Both inputs were consumed, and the host and guest
+agreed on the resulting inventory. After the guest disconnected, the host
+world was reopened and the guest rejoined with the alloy retained. This checks
+the meaningful persistence path for an instantaneous craft; an active machine
+case does not apply to this recipe fixture. It checks resulting state after
+guest convergence, not exact packet-arrival timing.
+
 ## Sweet Roll, Chocolate Glazed Berries and Honeyed Apple use timing
 
 The [headless replay](tools/test-food-use.py) matched item state, hunger and
