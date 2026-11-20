@@ -3037,6 +3037,52 @@ A loose ingot landed in the center of the Depot on tick 7, played the
 original plop at volume .25 and pitch 1.25, and became an iron sheet on
 tick 15. The earlier solo and LAN deposit and retrieval checks also passed.
 
+### APP-2012 Weighted Ejector gameplay baseline
+
+The receiving Depot baseline established player retrieval, occupied-inventory
+rejection and recovery, and custody through reopen. The Ejector pass uses that
+Depot on a four-block course.
+[APP-1969](https://linear.app/appstu/issue/APP-1969/create-gameplay-baseline-depot) ·
+[PR #29](https://github.com/andrhlt/horizon-create/pull/29)
+
+The reference is Create 6.0.10 at `ac0c444d9828da3453ae8cc65338e8de063286fb`
+(Minecraft 1.21.1, NeoForge 21.1.219). The native base is
+`e8b3918a44b7156a124244af531af911991927ad` on Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` (Minecraft 26.3). The pack SHA-256
+is `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Final native build: `native-9f42064-698ea7382493`. All nine targeted checks
+passed on this post-rebase build. The initial lifecycle result from the earlier
+build is retained under `.local/app-2012-sandbox-diagnostic/`.
+Source review covered the Java recipe and placement packet, `EjectorBlock`
+contact and signal handlers, and `EjectorBlockEntity` charge, launch, target,
+and save rules. The new lifecycle check complements the existing Java
+capture replays. [Lifecycle check](tools/test-weighted-ejector-lifecycle.py)
+
+| Case | Check and comparison |
+| --- | --- |
+| Survival acquisition and configuration | `weighted-ejector-lifecycle` crafts one Ejector from a gold sheet, Depot and Cogwheel, consumes it during ordinary placement, marks a target four blocks east, and sets the stack size to three. `weighted-ejector-target-lan` covers eight Java target cases and clearing the mark. `weighted-ejector-stack-size-lan` compares 46 Java ticks and a guest editing the threshold from three to two. |
+| Short transfer, empty or occupied Depot | `weighted-ejector-empty-lan` and `weighted-ejector-occupied-lan` compare 60 ticks each. The empty course launches at tick 14 and delivers on 34. The occupied course waits until the guest removes the blocker on 20, launches on 22, and delivers on 42. The guest retrieves exactly three ingots in each run. |
+| Obstructed trajectory and moving Belt input | `weighted-ejector-obstacle-lan` compares 42 Java ticks, including collision, physical stack release, and guest pickup. `weighted-ejector-belt-input-lan` compares 90 ticks of ingestion, merge and delivery. |
+| Standing player takeoff and landing | `weighted-ejector-player-lan-host` and `weighted-ejector-player-lan-guest` each compare 27 Java samples aligned to the initial descent. The actual actor lands on the raised course at takeoff +20, at relative position `(4.341349510, 3.0, 0.5)` with 20 health. Each position and velocity axis must differ by less than `2e-7`, and grounded and health fields must match exactly. Both clients hear the launch. |
+| Redstone inhibit, retrigger, and save/reopen | `weighted-ejector-lifecycle` checks 24 ticks of held cargo on each side of the idle reopen. It saves with three ingots at flight age six, then verifies the flight or completed Depot delivery after reopen, allowing the short course to finish during startup while requiring exact cargo conservation. After the Ejector recharges, the second batch stays held for another 24 powered ticks. Removing power delivers the second batch. All six ingots end in the player inventory, with no residual source, flight, destination, or loose cargo in a final 24-tick observation. Target direction, range, threshold, and power are checked after both reopens. These are Horizon gameplay save/reopen checks. |
+
+The strict flat-floor guest trace remains intermittent. On
+`native-9f42064-4a2ebff12602`, three of five repeats matched all 36 samples. In
+two, the guest received the authoritative landing health and velocity correction
+at takeoff +24, one tick earlier than the selected Java client trace. Position,
+grounded state and subsequent samples matched. A second Java client captured
+that correction at +26. Full 1:1 remains Open for packet arrival around contact,
+broader geometry and fluids, and remaining presentation cases.
+
+```sh
+HORIZON_NO_AUDIO=1 python3 tools/test-parity.py "$build/horizon-ctl" "$build/horizon-client" \
+  "$build/.local/horizon-client/26.3" --jobs 1 \
+  --check weighted-ejector-lifecycle --check weighted-ejector-target-lan \
+  --check weighted-ejector-stack-size-lan --check weighted-ejector-empty-lan \
+  --check weighted-ejector-occupied-lan --check weighted-ejector-obstacle-lan \
+  --check weighted-ejector-belt-input-lan --check 'weighted-ejector-player-lan-*'
+```
+
 The [Weighted Ejector Java probe](tools/java-depot-ejector-launch.patch)
 and [Horizon LAN replay](tools/test-depot-ejector-launch.py) matched the
 charge, lid motion, flight age and centered three-ingot delivery across
