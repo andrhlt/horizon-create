@@ -3404,6 +3404,20 @@ crafts three blocks using two andesite alloy and three logs. The pack has
 Group preview transitions, multiplayer adhesive interactions, additional brittle and
 immovable block cases, and other controllers remain unverified.
 
+## Mechanical Bearing moving-payload collision
+
+The bounded APP-1979 fixture in [tools/test-bearing-player-collision.py](tools/test-bearing-player-collision.py)
+uses a glued 3×3 smooth-stone payload with a chest holding seven copper ingots.
+It checks that both the host and a LAN guest stay grounded and follow six bearing
+turns within 0.2 blocks, then verifies active save/reopen, resumed motion, payload
+disassembly and chest restoration. The final isolated build was
+`native-9f42064-fd8337b584f8`; pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The existing elevator-standing 134-tick replay, Rope Pulley 66-tick Java replay,
+Rope Pulley detach case, and Java bearing quarter-turn Gearbox restoration check
+also passed on that build. Full 1:1 remains open for other payload shapes,
+multi-axis collision, packet latency and unusual player poses.
+
 ## Windmill Bearing
 
 The pinned [Java GameTest](tools/java-windmill-trace.patch) covers a
