@@ -10169,3 +10169,50 @@ python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 2 \
 
 Full 1:1 remains Open, including broader target and filter combinations and
 Java-equivalent packet timing.
+# APP-1971 Chute and Smart Chute gameplay baseline
+
+The finite APP-1971 baseline covers survival acquisition, representative
+vertical transfer, Smart Chute controls, backpressure, persistence, and LAN
+guest interaction. Full 1:1 remains Open for airflow, branch and mounted
+layouts and exact Java save/network timing.
+
+`tools/test-chute-crafting.py` verifies the pinned survival recipes: four
+Chutes from iron sheets and an iron ingot, then one Smart Chute from a brass
+sheet, Chute and Electron Tube. `tools/test-creative-crate-chute.py` matches 13
+Java cargo ticks for ordinary downward and upward delivery in solo and LAN.
+`tools/test-item-filter-chute.py` matches all 20 Java Smart Chute snapshots at
+tick 16 in solo and LAN; the lifecycle cases exercise filter edits, rejected
+input, powered stop/resume, and cold reopen with idle and in-flight cargo.
+`tools/test-clipboard-copy.py --chute` checks exact Clipboard transfer for
+filter, amount and mode settings, including List Filter installation and the
+filter-only case, in solo and LAN. The upward full-Chest capacity cases match
+all 19 Java samples in both modes and verify delivery resumes when capacity
+opens.
+
+The focused batch passed 11/11 registered checks on the fresh client built
+from port commit `1da56f2a0e33936df8e007e3c188e09fd20057e0` and pinned Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. Client SHA-256:
+`322cad6d76f2c9c3f9d9f18ab68252035d39e0457ad50c3c4f8a161839ac9ebf`; pack
+SHA-256: `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Checks: `chute-survival-crafting`, `item-filter-chute`,
+`item-filter-chute-lan`, `smart-chute-clipboard`,
+`smart-chute-clipboard-lan`, `creative-crate-chute`,
+`creative-crate-chute-lan`, `creative-crate-chute-upward`,
+`creative-crate-chute-upward-lan`, `upward-chute-capacity`, and
+`upward-chute-capacity-lan`. Runs used isolated fixture worlds; LAN cases
+included a guest. The exact focused command is:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 2 \
+  --check chute-survival-crafting --check item-filter-chute \
+  --check item-filter-chute-lan --check smart-chute-clipboard \
+  --check smart-chute-clipboard-lan --check creative-crate-chute \
+  --check creative-crate-chute-lan --check creative-crate-chute-upward \
+  --check creative-crate-chute-upward-lan --check upward-chute-capacity \
+  --check upward-chute-capacity-lan
+```
+
+These representative cases establish the finite gameplay baseline. They do
+not claim exhaustive Java parity for every inventory, airflow, branch,
+mounted, visual, effect or packet-timing combination.
+
