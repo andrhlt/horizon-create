@@ -665,10 +665,11 @@ storage at disassembly. Run either scenario with
 
 Glue a portable interface and its matching storage to the bearing's
 payload. Place a matching interface along its path, facing the moving
-interface. The two interfaces dock automatically. Hoppers exchange
-items with the moving inventory, and pressurized pipes exchange water
-with its tanks. Both blocks use Create's retracted geometry. Head
-extension is still pending.
+interface. Each pair docks automatically when the moving interface
+reaches the facing receiver. Hoppers exchange items with the moving
+inventory, and pressurized pipes exchange fluid with its tanks. The
+[bearing render checks](tools/test-mounted-moving-port-render.py) cover
+the moving heads extending at the dock and retracting as they leave.
 
 ### Schematicannon
 
