@@ -4168,6 +4168,15 @@ file = "crates/horizon-client/src/game.rs"
 name = "create_nozzle"
 source = "nozzle.rs"
 
+[[injection]]
+id = "nozzle_player_tick"
+target = "horizon_client::game::native_hooks::Game<'_>::native_player_tick"
+kind = "HEAD"
+helper = "nozzle_player_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "self" },
+]
+
 [[module]]
 id = "toolbox"
 file = "crates/horizon-client/src/game.rs"
