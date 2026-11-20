@@ -215,7 +215,11 @@ pub(super) fn saved_block(game: &Game<'_>, world: [i32; 3], anchor: [i32; 3]) ->
 }
 
 pub(super) fn capture(game: &Game<'_>, bearing: [i32; 3], anchor: [i32; 3]) -> Vec<Compound> {
-    capture_attached(game, bearing, anchor, None)
+    let mut blocks = capture_attached(game, bearing, anchor, None);
+    // The same saved shapes drive the shared moving-payload collision path
+    // used by elevators. Capture them before the source blocks are removed.
+    super::create_elevator_collision::capture(game, &mut blocks, anchor);
+    blocks
 }
 
 pub(super) fn capture_attached(
