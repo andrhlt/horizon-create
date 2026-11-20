@@ -3,5 +3,5 @@ fn fake_track_removed(
     ticks: &mut horizon_world::level::Ticks,
     pos: horizon_core::position::BlockPos,
 ) {
-    crate::game::create_fake_track::remove_owner(level, ticks, pos);
+    crate::game::create_track::remove_endpoint(level, ticks, pos);
 }
