@@ -80,12 +80,12 @@ is used. No paid action is involved.
 
 ## Clean final build and checks
 
-After rebasing commit `08fc7ce` onto `origin/main` at `576fe85`, the clean build
-selected client `native-9f42064-bdea6b87fe8e` from pinned Horizon
+After integrating `origin/main` at `7145d9e` in merge commit `1576553`, the clean build
+selected client `native-9f42064-623167a8ed31` from pinned Horizon
 `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`; client SHA-256
-`8f21f9459e31d93135552d5e0fb4ca10ecf364c36a8e981456b66413a9c7a20a`.
+`239cc6928ac97a84b620c0fbb3a1040840ed80c2351dd6329a24d47f53805ef8`.
 Its `native-mods.json` records native mixin bundle SHA-256
-`56a612d5eb70e33c157c2c359394f001bd9b24b4bbeedf05e58aaeea714b71ab`.
+`b024817954cd3fca050fd03b8beebd33764400411c54c5d13de9b0b40464f93c`.
 The selected test pack is `.local/create.hmod`, copied into every isolated
 world with SHA-256
 `fb4bcdfdcf9b1c1f7c0e00f0f8f06941ef8b65b20ddd03cecf466dd84c5db82a`; loader
@@ -96,9 +96,9 @@ Final command:
 
 ```sh
 python3 tools/test-parity.py \
-  .local/patched-launcher/versions/native-9f42064-bdea6b87fe8e/horizon-ctl \
-  .local/patched-launcher/versions/native-9f42064-bdea6b87fe8e/horizon-client \
-  .local/patched-launcher/versions/native-9f42064-bdea6b87fe8e/.local/horizon-client/26.3 \
+  .local/patched-launcher/versions/native-9f42064-623167a8ed31/horizon-ctl \
+  .local/patched-launcher/versions/native-9f42064-623167a8ed31/horizon-client \
+  .local/patched-launcher/versions/native-9f42064-623167a8ed31/.local/horizon-client/26.3 \
   --jobs 1 --check item-drain-gameplay --check item-drain-lan \
   --check item-drain --check depot-comparator
 ```
