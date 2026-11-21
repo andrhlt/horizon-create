@@ -11645,3 +11645,9 @@ The Java behavior references remain pinned to Create
 `ac0c444d9828da3453ae8cc65338e8de063286fb`; earlier per-family sections record
 their capture patches and sampled counts. The persistence case checks ordinary
 Horizon save/reopen and does not claim Java reload parity.
+
+## APP-1967 sequenced assembly baseline
+
+The existing Java-backed checks remain valid starting evidence: `precision-mechanism` compares 108 ticks in the four-belt, three-deployer factory; `track-crafting` compares 190 samples of the three-stage track recipe; and `sturdy-sheet` compares 67 ticks through fluid filling and two press strokes. The Precision Mechanism fixture seeds only its weighted-result roll. These checks preserve concrete item IDs, counts, assembly steps, progress-bearing belt cargo, deployer state, and final outputs where applicable.
+
+The Mechanical Press prerequisite (APP-1960) and Deployer prerequisite (APP-1966) are Done. The APP-1967 completion gates still need a player-driven survival chain using legitimate ingredients, a wrong-step and blocked-output recovery case, representative host/guest agreement, and idle plus partway sequence save/reopen. The Java checkout and compatible Horizon runtime are not present in this worktree, so no fresh replay or resulting build identity is claimed here. Keep Full 1:1 Open; broader recipe combinations and unseeded weighted-roll coverage remain follow-ups.
