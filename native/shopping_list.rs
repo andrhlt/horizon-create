@@ -47,7 +47,10 @@ fn request_entries(entity: &horizon_client::containers::ModBlockEntity) -> Vec<(
     entries
         .iter()
         .filter_map(|entry| {
-            let item = stack(tag(entry, "stack")?)?;
+            // PackageOrderWithCrafts uses `item_stack`; older captures used
+            // `stack`, so accept both encodings while the native bridge is
+            // migrated.
+            let item = stack(tag(entry, "item_stack").or_else(|| tag(entry, "stack"))?)?;
             let count = int(tag(entry, "count"))?.max(0);
             (count > 0).then_some((item, count))
         })
