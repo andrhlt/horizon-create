@@ -78,17 +78,24 @@ def verify(args, scratch):
                 for player in host.call("lan", "status")["guests"]
             ))
             host.call("command", f"/gamemode creative {GUEST}")
-            host.call("command", f"/tp {GUEST} 10.5 101 -10.5")
+            host.call("command", f"/tp {GUEST} 8.5 101 -10.5")
             host.call("command", f"/item replace entity {GUEST} armor.head with create:goggles")
+            advance(host, 1)
+            multiplayer.until("guest to receive the stressometer", lambda: (
+                guest.call("block", *GAUGE)["state"].startswith("create:stressometer")
+            ))
             guest.call("look-at", 6.5, 102.4, -9.5)
-            guest.call("wait", 3)
+            multiplayer.until("guest to target the gauge block", lambda: (
+                guest.call("state")["looking_at"]["kind"] == "block"
+            ))
+            guest.call("wait", 8)
             loaded_readout = latest_readout(guest_log)
             if "Network Stress" not in loaded_readout or "Stress" not in loaded_readout:
                 raise RuntimeError(f"Guest loaded readout did not contain stress output: {loaded_readout}")
 
             host.command("/fill 6 101 -9 6 101 -7 minecraft:air")
             advance(host, 3)
-            guest.call("wait", 3)
+            guest.call("wait", 8)
             recovered_readout = latest_readout(guest_log)
             if recovered_readout == loaded_readout:
                 raise RuntimeError("Guest readout did not change after host removed three millstones")
