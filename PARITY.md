@@ -12669,14 +12669,42 @@ python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jo
 All seven checks in the first command and the 272-context window-culling check
 passed. A Creative Motor render probe was also attempted on the same binary,
 both solo and LAN. Neither run emitted `CREATE_MOTOR_FRAME`; its dedicated
-render check therefore failed while the save/reopen speed check passed. Since
-the client was not built from this worktree, this does not yet establish whether
-the source renderer or that build lacks the callback. Rebuild this ticket branch
-with a private launcher cache and rerun `creative-motor-render` and
-`creative-motor-render-lan` before closing the remaining renderer verification
-item. Early mounted-port and train-port fixture attempts lacked the ignored
-NBTs; after linking the repository's prepared fixtures, both selected checks
-passed. Their initial setup failures are not counted as gameplay failures.
+render check therefore failed while the save/reopen speed check passed.
+
+The checked-out renderer and hook were present: `native/visuals.rs` dispatches
+`create:creative_motor`/`create:motor` to `render_motor`, and the
+`block_entity_submit` hook in `native/horizon-mixin.toml` routes submissions to
+that renderer. The Create pack SHA stayed identical. The missing input was the
+client's motor speed: `block_entity_tick` updated authoritative network speed
+but omitted `create:motor` from the `speed_changed` sync arm. Adding the motor
+there publishes `VisualSpeed` before render capture. The resulting branch
+build, `native-9f42064-c63df6c89898`, used Horizon revision
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client SHA-256
+`5a9a82abd7a6d3a40cd6c41bcf33002cd4088d055cf307ea7dfa8376de3af169`, and the
+same Create pack SHA shown above. Its private launcher data and Cargo target
+kept the build isolated from shared caches.
+
+The seven motor checks passed on that build: placement, placement render,
+solo render, LAN render, reload, competition, and LAN gameplay. Both render
+probes emitted `CREATE_MOTOR_FRAME` (354 solo and 637 LAN records); each sampled
+facing produced 24 shaft vertices. Solo covered all six facings and matched
+Java's axis, side, RPM, phase, and angle at both settings. LAN host and guest
+matched the half-shaft, phase, and RPM at both settings. This confirms the
+motor is visible, the render hook runs, and frame capture works. The failed
+logs from the earlier APP-2097 build remain as motivating evidence, not as
+current branch results.
+
+```sh
+python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 2 \
+  --check 'creative-motor' --check 'creative-motor-placement' \
+  --check 'creative-motor-render' --check 'creative-motor-render-lan' \
+  --check 'creative-motor-reload' --check 'creative-motor-competition' \
+  --check 'creative-motor-lan'
+```
+
+Early mounted-port and train-port fixture attempts lacked the ignored NBTs;
+after linking the repository's prepared fixtures, both selected checks passed.
+Their initial setup failures are not counted as gameplay failures.
 
 Full 1:1 remains Open for the unexamined asset/model combinations, additional
 animation states, pixel comparisons, and renderer compatibility.
