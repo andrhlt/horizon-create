@@ -6621,8 +6621,41 @@ This comparison measures the item counts, signed orb values, spawn
 position and size of the random launch offset. Each client received the
 negative −2 and −1 orb values from the other player's use. Independently,
 Java's seeded launch directions reproduce to 1.5e−12. Live worlds
-draw their own random directions. Orb collection timing, complete
-harvesting and loot replay, and ambient block particles remain open.
+draw their own random directions. Orb collection timing and ambient block
+particles remain open; scoped tool-dependent harvesting is covered below.
+
+### APP-2075 Experience Block harvest and persistence — November 21, 2026
+
+Pinned Java `ac0c444d9828da3453ae8cc65338e8de063286fb` supplies the existing
+`fixtures/experience-harvest-java.csv` cases. The new
+[`experience-harvest` replay](tools/test-experience.py) mines the placed block
+with empty hand, wooden, stone and iron pickaxes, and an iron axe. All five
+reported drops matched Java: the three pickaxes returned one Experience Block;
+empty hand and the axe returned none. A failed intermediate test run exposed
+that the replay counted a prior case's dropped item in the next case; each
+case now clears ground items before mining, and the final isolated replay
+passed.
+
+The existing craft-and-place replay now reopens its saved world and confirms
+the Experience Block and light level 15 remain. The solo and LAN nugget checks
+also passed, including the existing 12 use cases and initial signed-orb values
+and positions for host and guest. In the lifecycle replay, a LAN guest collected
+3 XP from a thrown Nugget; after host save/reopen and guest rejoin, the same XP
+total and five Nuggets remained, with no increase or loss. This is the finite
+APP-2075 gameplay pass; it does not claim exact orb collection timing, ambient
+particle/audio parity, or Full 1:1.
+
+Build/pack used for these replays: Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`,
+client `native-9f42064-6ce68a31b125`, Create pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Commands, selecting each registered check from the worktree root:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check experience-nugget --check experience-nugget-lan --check experience-crafting-and-placement --check experience-harvest --check experience-multiplayer-lifecycle
+```
+
+Final outcomes: 5/5 registered checks passed. The raw harness logs are in the
+worktree's ignored `.local/parity/` directory.
 
 ## Item Hatch
 
