@@ -8569,6 +8569,17 @@ checked wrench interaction, original anchor and orientation, host
 cart removal, item consumption and final stone restoration. Cargo
 rotation, Create actors, coupling and more LAN variants remain open.
 
+APP-2004 extends the portable codec to vanilla chest/barrel block-entity inventory.
+On `native-9f42064-7ed7f56ac77a`, the seven solo payload cases passed, including
+seven copper ingots retained through moving and picked-up reopen, two pickup/place
+cycles and final disassembly. Restored block states match their pre-assembly states. Survival LAN guest stone
+and loaded-chest pickup/redeployment also preserved host cargo and consumed the item.
+The existing assembly capture omits the container display name; this cosmetic
+limitation is documented separately from the verified cargo. See the bounded
+[APP-2004 evidence](APP-2004-EVIDENCE.md) for commands, source/build/pack identity,
+regressions, failures and remaining limits. All 16 selected checks passed, including
+324 Java curve/slope-reversal samples in solo and LAN. Full 1:1 remains Open.
+
 ## Clockwork broad-suite follow-up
 
 The frozen full-catalog replay on `native-9f42064-f4a607d04120`
