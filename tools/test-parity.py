@@ -664,6 +664,7 @@ CHECKS = (
     ("fan-washing-lookup", "test-fan-washing-lookup"),
     ("sawing-lookup", "test-sawing-lookup"),
     ("mixing-lookup", "test-mixing-lookup"),
+    ("filling-lookup", "test-filling-lookup"),
     ("recipe-navigation", "test-recipe-navigation"),
     ("depot-brass-pressing-and-deployer", "test-depot-pressing", "--brass", "--sound"),
     ("stacked-belt-press", "test-stacked-belt-press", "--sound"),
