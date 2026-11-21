@@ -1,0 +1,7 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "patch_sha256": "2fdd2d5b9c726c45e5a9520b8be69481a29791532ed3e542dfada21bff056f1f",
+  "records": 11,
+  "seconds": 19,
+  "scope": "Controlled Java TrainStatusDisplaySource, six delay-format snapshots, four blank-state boundaries and ArrivalSoundQueue endpoints. No moving Java train, packet or audio capture."
+}

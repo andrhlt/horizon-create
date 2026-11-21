@@ -1238,6 +1238,8 @@ CHECKS = (
     ("track-observer-filter-accept", "test-track-observer-train", "--filter-accept"),
     ("track-observer-filter-reject", "test-track-observer-train", "--filter-reject"),
     ("track-observer-lan", "test-track-observer-train", "--lan"),
+    ("train-feedback", "test-train-feedback"),
+    ("train-feedback-lan", "test-train-feedback", "--lan"),
     ("observed-train-display", "test-observed-train-display"),
     ("observed-train-display-lan", "test-observed-train-display", "--lan"),
     ("repackager-initial", "test-repackager-initial"),
