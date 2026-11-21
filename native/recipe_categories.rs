@@ -68,6 +68,13 @@ pub(super) fn categories(game: &mut Game<'_>, categories: &mut Vec<NativeRecipeC
             "create:mechanical_mixer",
         ),
         (
+            "create:filling",
+            "create:filling",
+            "create.recipe.filling",
+            "Filling",
+            "create:spout",
+        ),
+        (
             "create:fan_washing",
             "create:splashing",
             "create.recipe.fan_washing",
@@ -146,24 +153,25 @@ fn category(
         .iter()
         .filter_map(|recipe| {
             let ingredients = recipe.json["ingredients"].as_array()?;
-            if ingredients.is_empty() || (kind != "create:mixing" && ingredients.len() != 1) {
+            let multi_input = matches!(kind, "create:mixing" | "create:filling");
+            if ingredients.is_empty() || (!multi_input && ingredients.len() != 1) {
                 return None;
             }
             let mut inputs = Vec::new();
             let mut fluid_inputs = Vec::new();
             for input in ingredients {
-                if kind == "create:mixing"
+                if multi_input
                     && input["type"].as_str() == Some("neoforge:single")
-                    && input["fluid"].as_str() == Some("minecraft:water")
                     && input.get("components").is_none()
                 {
+                    let fluid = input["fluid"].as_str()?.to_owned();
                     let amount = i32::try_from(input["amount"].as_i64()?)
                         .ok()
                         .filter(|n| *n > 0)?;
                     fluid_inputs.push((
                         inputs.len(),
                         NativeFluidStack {
-                            fluid: "minecraft:water".into(),
+                            fluid,
                             amount,
                             components: Default::default(),
                         },

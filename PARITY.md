@@ -11878,6 +11878,32 @@ dedicated baseline check passed these bounded cases:
   from +32 to −32 RPM. Its idle and active save/reopen cases passed; the active
   16 RPM motor and shaft resumed after reopening.
 
+## APP-2103 Java integration equivalents — November 21, 2026
+
+The pinned Java `SpoutCategory` presents one item ingredient, one sized fluid
+ingredient, one item result, and the Spout catalyst. `FillingRecipe` identifies
+the Spout as its required machine and exposes its fluid requirement. The
+Horizon inventory lookup now collects `create:filling`, retains simple sized
+fluid ingredients in their ingredient slots, and draws multi-input Filling
+recipes with a Spout tab. The bounded new route is glass bottle + 250 mB honey
+→ honey bottle, queried by R over the result and U over the input. The
+registered `filling-lookup` check also checks Back, save/reopen with the lookup
+items retained, and the same route from a LAN guest. Dynamic JEI recipes
+generated for arbitrary fluid containers and potion variants remain outside
+this case.
+
+The new client integration result is pending. The compatible pre-change client
+`native-9f42064-b2e225daec86` (from baseline commit
+`9b0957d7f9ccc84e21cb5f392d7f0ca201074b1e`) reached the inventory but timed out
+waiting for a Filling page, confirming the missing route in that build. Building
+the ticket source with `tools/build-native.sh` is currently blocked before
+compilation: `horizon-advancement-initial-inventory.patch` does not apply
+because the pinned source already contains its first-snapshot change, and
+`horizon-create-potato-impact.patch` targets an older `creatures.rs` layout.
+These unrelated engine patch conflicts were left untouched. The Filling case
+has not passed on a client containing this change; gameplay and integrated
+completion remain unverified.
+
 ## Bogeys and train assembly (APP-2047)
 
 The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
