@@ -5854,6 +5854,52 @@ Package Filter saving regressions. The stock summary UI, address
 suggestions, advanced crafting orders, multi-link tie cases and order
 effects remain open.
 
+### APP-2024 Redstone Requester gameplay baseline
+
+The finite acceptance cases reuse the pinned Java references and add a
+pending-queue reopen check. Java source review at
+`ac0c444d9828da3453ae8cc65338e8de063286fb` covered
+`RedstoneRequesterBlock` placement/neighbor callbacks and
+`RedstoneRequesterBlockEntity` rising-edge, inventory-check, persistence, and
+menu configuration rules. The existing eight-sample Java trace at ticks 3–10
+checks powered state, success output, comparator, stock, packaged contents,
+address and animation. In solo and LAN, full-order mode rejects eight when six
+are available; partial mode sends the six available ingots. Empty orders and
+falling edges do not dispatch. A second rising edge queues a new parcel while
+the first is held. The Java menu and tuning references cover guest edits to
+order quantities, address and partial-order mode, plus tuning and placing a
+Requester with an order.
+
+The new [pending-reopen mode](tools/test-redstone-requester.py) builds a linked
+Barrel/Packager/Requester, ships three of six ingots, drops the signal, then
+raises it with a two-ingot order while the first parcel is held. It cold
+reopens with the Requester still powered and verifies the remaining stock is
+one, the first parcel and queued order retain their contents, and no duplicate
+dispatch occurs. The separate existing source-network case saves and reopens
+the idle configured network and verifies linked frequencies, stock and
+eligibility before successful fulfillment. This is Horizon source-aligned
+gameplay persistence evidence, not an exact Java reload comparison.
+
+On build `native-9f42064-d6dc2ad18d3f`, checks
+`redstone-requester`, `redstone-requester-lan`,
+`redstone-requester-persistence`, `redstone-requester-menu-lan`, and
+`redstone-requester-crafting` all passed (5/5).
+The pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The Java trace/menu/tuning capture patch hashes are respectively
+`9444ee1d95288a0a07b27fb0b87598687631767b7719f28af66e86643b29d1cb`,
+`4dd2193dad744bf951c64a0ba2e14ccd0232a00f1e998bac040e500a0e0a5619`, and
+`25049db2cb0fb94c4da837b23204f8c4478bcf149c50d8364378c6c87fb00b1c`.
+Run the four checks with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check redstone-requester --check redstone-requester-lan --check redstone-requester-persistence --check redstone-requester-menu-lan --check redstone-requester-crafting
+```
+
+Full 1:1 remains Open. Advanced crafting orders, address suggestions,
+multi-network tie cases and request effects are follow-ups; they were not
+needed to establish this bounded gameplay baseline.
+
 ## Stock Ticker
 
 Two headless Java runs produced identical

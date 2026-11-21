@@ -250,6 +250,48 @@ def verify_sources(host, reopen=False):
     print("The Requester refused orders above Java stock totals, shipped from the eligible Barrel, and restored a removed link without double-counting its inventory.")
 
 
+def verify_pending_reopen(host):
+    """An active queued order survives a cold reopen without another dispatch."""
+    host.commands((
+        f"/setblock {xyz(STORAGE)} minecraft:barrel",
+        f"/item replace block {xyz(STORAGE)} container.0 with {ITEM} 6",
+        f"/setblock {xyz(MACHINE)} create:packager[facing=east]",
+        f"/setblock {xyz(LINK)} create:stock_link",
+        f"/data merge block {xyz(LINK)} {{Freq:{FREQ}}}",
+        f"/setblock {xyz(REQUESTER)} {BLOCK}",
+        f"/setblock {xyz(PULSE)} minecraft:air",
+    ))
+    configure(host, 3)
+    pulse(host, True)
+    for _ in range(2):
+        host.step_to(host.clock() + 1)
+    assert quantity(packager.block_value(host, STORAGE, "Items")) == 3
+    assert quantity(packager.block_value(host, MACHINE, 'HeldBox.components."create:package_contents"')) == 3
+
+    pulse(host, False)
+    host.step_to(host.clock() + 1)
+    configure(host, 2)
+    pulse(host, True)
+    assert quantity(packager.block_value(host, STORAGE, "Items")) == 1
+    queued = packager.block_value(host, MACHINE, "QueuedExitingPackages")
+    assert "package_order_data" in queued and "count: 2, item_stack" in queued, queued
+    assert int(packager.block_value(host, REQUESTER, "Success").rstrip("b")) == 1
+
+    host.restart()
+    assert "powered=true" in host.call("block", *REQUESTER)["state"]
+    assert int(packager.block_value(host, REQUESTER, "Success").rstrip("b")) == 1
+    assert quantity(packager.block_value(host, STORAGE, "Items")) == 1
+    data = packager.block_data(host, MACHINE)
+    assert "HeldBox:" in data and "QueuedExitingPackages" in data, data
+    assert quantity(packager.block_value(host, MACHINE, 'HeldBox.components."create:package_contents"')) == 3
+    queued_after = packager.block_value(host, MACHINE, "QueuedExitingPackages")
+    assert "package_order_data" in queued_after and "count: 2, item_stack" in queued_after, queued_after
+    for _ in range(3):
+        host.step_to(host.clock() + 1)
+    assert quantity(packager.block_value(host, STORAGE, "Items")) == 1
+    print("The active Requester and queued order survived cold reopen; held and queued parcels were retained with no duplicate dispatch.")
+
+
 def verify_priority(host, actor):
     with (ROOT / "fixtures/stock-link-priority-java.csv").open() as source:
         row = next(csv.DictReader(source))
@@ -340,4 +382,13 @@ if __name__ == "__main__":
         parser.add_argument(field, type=lambda path: Path(path).resolve(strict=True))
     parser.add_argument("--pack", type=Path, default=ROOT / ".local/create.hmod")
     parser.add_argument("--lan", action="store_true")
-    run(parser.parse_args())
+    parser.add_argument("--persistence", action="store_true",
+                        help="check an active queued shipment across save and cold reopen")
+    args = parser.parse_args()
+    if args.persistence:
+        if args.lan:
+            parser.error("--persistence is a solo cold-reopen check")
+        with fixture_world(args, "RequesterPendingReopen", pack=args.pack, env={"HORIZON_NO_AUDIO": "1"}) as host:
+            verify_pending_reopen(host)
+    else:
+        run(args)
