@@ -54,7 +54,9 @@ def geometry(starts, axes):
     return handle, length, point
 
 
-def test_case(control, row, offset=(0, 0, 0), reset=True):
+def test_case(control, row, offset=(0, 0, 0), reset=True, validate=True, actor="@s", command_fn=None):
+    dedicated_commands = command_fn is not None
+    command_fn = command_fn or (lambda text: control.command("/" + text))
     dx, dy, dz, supplied, remaining = (
         int(row[key]) for key in ("dx", "dy", "dz", "supplied", "remaining")
     )
@@ -65,17 +67,24 @@ def test_case(control, row, offset=(0, 0, 0), reset=True):
         *(("/fill -11 112 -24 25 117 7 minecraft:air",) if reset else ()),
         f"/setblock {coordinates(add(end, (0, -1, 0)))} minecraft:smooth_stone",
         f"/setblock {coordinates(start)} create:track[shape=xo]",
-        f"/tp @s {x + 0.5 + (2 if dx < 0 else -2)} {y} {z + 0.5}",
-        f"/item replace entity @s hotbar.0 with create:track {supplied}",
+        f"/tp {actor} {x + 0.5 + (2 if dx < 0 else -2)} {y} {z + 0.5}",
+        f"/item replace entity {actor} hotbar.0 with create:track {supplied}",
     )
-    control.call("script", script="".join(f"command {json.dumps(cmd)}\n" for cmd in setup))
+    if not dedicated_commands:
+        control.call("script", script="".join(f"command {json.dumps(cmd)}\n" for cmd in setup))
+    else:
+        for cmd in setup:
+            command_fn(cmd.lstrip("/"))
     control.call("wait", 2)
     control.call("select", "create:track")
     control.call("look-at", x + 0.5, y + 0.06, z + 0.5)
     control.call("mouse", "right", "click")
     control.call("wait", 3)
-    start_inventory = control.command("/data get entity @s Inventory")
-    if "create:track_connecting_from" not in start_inventory:
+    if not validate:
+        start_inventory = ""
+    else:
+        start_inventory = control.command("/data get entity @s Inventory")
+    if validate and "create:track_connecting_from" not in start_inventory:
         raise RuntimeError(f"Case {row['case']} did not select the track: {start_inventory}. " + str(control.call("looking-at")))
 
     x, y, z = end
@@ -85,8 +94,10 @@ def test_case(control, row, offset=(0, 0, 0), reset=True):
         "pd": (-1.5, -1.5),
     }[row["shape"]]
     yaw = {"xo": -90 if dx > 0 else 90, "zo": 0 if dz > 0 else 180, "pd": -45}[row["shape"]]
-    control.command(f"/tp @s {x + 0.5 + approach[0]} {y} {z + 0.5 + approach[1]} {yaw} 20")
+    command_fn(f"tp {actor} {x + 0.5 + approach[0]} {y} {z + 0.5 + approach[1]} {yaw} 20")
     control.call("wait", 3)
+    if dedicated_commands:
+        control.call("look-at", x + 0.5, y + 0.06, z + 0.5)
     extended = row["extended"] == "1"
     if extended:
         control.call("key", "ctrl", "down")
@@ -95,6 +106,8 @@ def test_case(control, row, offset=(0, 0, 0), reset=True):
     if extended:
         control.call("key", "ctrl", "up")
     control.call("wait", 3)
+    if not validate:
+        return
     inventory = control.command("/data get entity @s Inventory")
     actual = sum(int(re.search(r"count: (\d+)", slot)[1]) for slot in inventory.split('}, {')
                  if 'id: "create:track"' in slot)

@@ -5,7 +5,7 @@ import json
 import hashlib
 import os
 from pathlib import Path
-from shutil import copy2
+from shutil import copy2, copytree
 import subprocess
 import tempfile
 import time
@@ -51,7 +51,7 @@ def last_command_message(record):
 
 @contextmanager
 def fixture_world(args, world, template=None, *, render=False, env=None, pack=None, terrain_seed=None,
-                  artifact_dir=None):
+                  artifact_dir=None, persist_save_to=None):
     with tempfile.TemporaryDirectory(prefix="hc-fixture-") as tmp:
         scratch = Path(tmp)
         socket = scratch / "ctl.sock"
@@ -69,10 +69,19 @@ def fixture_world(args, world, template=None, *, render=False, env=None, pack=No
             *(("--test-terrain",) if terrain_seed is None else ("--seed", terrain_seed)),
             "--render-distance", 4,
         ))
+        control.game_dir = game
         try:
             control.open()
             yield control
         finally:
+            if persist_save_to is not None:
+                destination = Path(persist_save_to)
+                source = game / "saves" / world
+                if source.exists():
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    if destination.exists():
+                        raise RuntimeError(f"Refusing to overwrite persisted save: {destination}")
+                    copytree(source, destination)
             if socket.exists():
                 control.stop()
             log = scratch / "ctl.log"
@@ -123,6 +132,14 @@ class FixtureWorld:
 
     def command(self, command):
         return self.call("command", command)["chat"][-1]
+
+    def persist_save(self, destination, world):
+        source = Path(self.game_dir) / "saves" / world
+        destination = Path(destination)
+        if destination.exists():
+            raise RuntimeError(f"Refusing to overwrite persisted save: {destination}")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        copytree(source, destination)
 
     def commands(self, commands):
         replies = self.call("script", script="".join(f"command {json.dumps(cmd)}\n" for cmd in commands))

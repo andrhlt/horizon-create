@@ -4,7 +4,7 @@
 import argparse
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
-from shutil import copy2
+from shutil import copy2, copytree
 import socket
 import subprocess
 import tempfile
@@ -29,7 +29,7 @@ def install_pack(home, pack=None):
 
 
 @contextmanager
-def dedicated(args, scratch, *, scenario="multiplayer", overrides=None, pack=None, artifact_dir=None):
+def dedicated(args, scratch, *, scenario="multiplayer", overrides=None, pack=None, artifact_dir=None, seed_world=None):
     home = scratch / "server"
     install_pack(home, pack)
     with socket.socket() as reservation:
@@ -52,6 +52,8 @@ def dedicated(args, scratch, *, scenario="multiplayer", overrides=None, pack=Non
         "".join(f"{k}={v}\n" for k, v in properties.items() if v is not None)
     )
     (home / "eula.txt").write_text("eula=true\n")
+    if seed_world is not None:
+        copytree(seed_world, home / properties["level-name"])
     artifacts = artifact_dir or ROOT / ".local"
     artifacts.mkdir(parents=True, exist_ok=True)
     logfile = artifacts / f"{scenario}-server.log"

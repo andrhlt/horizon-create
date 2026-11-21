@@ -146,6 +146,7 @@ pub(super) fn manage(game: &mut super::Game<'_>, curve: Curve, remove: bool) {
                 entity.data = vec![3];
             }
         });
+        game.native_block_entity_sync(pos);
     }
 }
 
