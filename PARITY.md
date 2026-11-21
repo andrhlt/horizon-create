@@ -11066,3 +11066,55 @@ guest close enough to pick up the input before the saw. Their diagnostics are
 preserved in `.local/parity/mechanical-saw-lan.log`; the final fixture avoids
 both setup errors and passes. Broader tree species, other cutting outputs and
 exact moving-contraption tick timing remain follow-ups. Full 1:1 remains Open.
+## APP-2007 Mechanical Roller gameplay baseline
+
+The finite checks completed on the pinned Create reference
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`:
+
+- Existing Java comparisons `roller_filling` and `roller_paving_and_clearing`
+  passed on the final combined client. Together they compare 262 captured ticks for
+  fill, paving and clearing behavior, including the recorded material cases.
+- `roller-mode-ui` crafted a Roller from its pinned survival recipe, placed it
+  on a full floor, and confirmed the crafted item was consumed. It selected
+  Tunnel Pave, Straight Fill and Wide Fill as host; a LAN guest selected Wide
+  Fill and the host observed the server value. The selected mode persisted
+  through `/save-all flush` and fixture restart. This
+  proves guest convergence and idle mode persistence, not packet-arrival timing
+  parity.
+- Gantry Shaft/Carriage is already Done; its existing integrated regressions
+  include the Roller. APP-2007's latest candidate build is
+  `native-9f42064-7f8245fcd225` (rebuilt after updating from current main);
+  client SHA-256
+  `eaf18600f300ee82c2454820c57ac44ee8cc274c7242ef09f88ea0d97b231b8b`; prepared
+  Create pack SHA-256
+  `921c10ce6a435a3c4e7d45a6651001e1b77bd321cf621d896b348a471c701bbe`.
+  Cursor fix `16af87f` is included in the client.
+- Exact scoped command:
+
+  ```sh
+  python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \\
+    --check roller-filling --check roller-paving-and-clearing \\
+    --check roller-mode-ui
+  ```
+
+The new `native/roller.rs` work adds the mode setter, Roller placement redirect,
+full-block filter validation, and the Java slab-to-double-block filter state.
+`native/speed_controller_controls.rs` exposes the three mode choices through the
+existing Roller value board. `tools/test-roller-mode-ui.py` is the LAN/mode and
+idle-reopen check registered by the parity runner.
+
+The bounded `roller-filling-reopen` fixture matched all 80 Java ticks, saved
+and reopened at tick 40, compared the Gantry carriage position, material stock
+and world blocks at the boundary, then confirmed subsequent ticks resumed with
+no duplicate or skipped work. Shared `gantry-lan-reload` and
+`mounted-drill-gantry-lan-reload` checks additionally cover guest motion,
+active save/reopen, and conserved payload output; these are shared Gantry
+transport evidence rather than a claim of exact packet-timing parity for every
+Roller actor case.
+
+This pass is partial. The current checks do not establish invalid-filter
+rejection and no-loss consumed-material boundaries. That bounded gate remains open;
+we do not claim the whole APP-2007 baseline complete. The placement redirect and filter boundary code still need focused integration
+coverage before calling those paths verified. Additional terrain patterns, drum visuals, animation and exact
+network timing remain follow-ups; Full 1:1 stays Open.
