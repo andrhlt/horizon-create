@@ -12978,3 +12978,23 @@ a Speedometer/Stressometer Goggles readout was not exercised in this pass and
 remains a required follow-up before the APP-1975 multiplayer gate is claimed.
 No direct guest gauge readout or exhaustive visual parity is claimed; Full 1:1
 remains Open.
+
+## APP-1975 close audit — November 21, 2026
+
+The four focused host-side checks were repeated on the source-compatible
+`native-9f42064-76138ca65acb` client from the recorded app-2058 build:
+`small-waterwheel`, `loaded-stressometer`, `gauges-reopen`, and
+`goggles-gauges` passed 4/4. The client production-source hashes for
+`native/factory_gauge.rs`, `native/goggles.rs`, `native/goggles_hud.rs`, and
+`native/stock_network.rs` match this PR head; the differing `machines.rs` is
+outside the gauge/readout paths. The pack remains SHA-256
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`.
+
+The attempted direct LAN gauge inspection is invalid evidence: the dedicated
+server placed the actual four-mill rig and reached the setup commands, but the
+guest exited before opening its control socket with `No space left on device`.
+Its captured zero readout is therefore not a dynamic network observation.
+After reclaiming one verified-inactive 15 GiB native target cache, the volume
+had 7.1 GiB free and the four host-side checks passed. The multiplayer gate
+remains In Progress until a live guest observes the host's idle and loaded
+gauge changes; no `/data merge` result is claimed.
