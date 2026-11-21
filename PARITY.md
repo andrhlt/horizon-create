@@ -12763,3 +12763,56 @@ No production defect appeared in this bounded pass, so no native/UI code or Java
 capture changed. Approximate effort: setup and source/evidence review 8 minutes;
 documentation 4 minutes; Java capture and native build 0 minutes; targeted
 integration checks 1 minute elapsed; fixture setup/debugging 3 minutes.
+## Speedometer and Stressometer gameplay baseline (APP-1975)
+
+Pinned Java reference: Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+The bounded check set reuses the existing small/large wheel needle traces,
+`fixtures/loaded_stressometer-java.csv`, and the original Java Goggles fixtures.
+It covers running/stopped/reversed source behavior from the existing wheel and
+motor comparisons; stress below, exactly at, and above capacity plus recovery;
+readable RPM/stress output; and persistence of idle and active gauges.
+
+On Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, build
+`native-9f42064-d6dc2ad18d3f` (client SHA-256
+`006bfe15a198b29d6af7633d353dcadaa07039121ae66c2081927299835a8811`) with
+Create pack SHA-256
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`:
+
+- `small-waterwheel` passed its pinned fixture replay and rendered needle
+  comparison. The test samples the original gameplay ticks and checks the
+  wheel and both gauge needles against Java.
+- `loaded-stressometer` passed all 105 Java needle/Goggles samples. At 256 SU
+  capacity, loads of 224, 256, and 288 SU produced stress values 0.875, 1.0,
+  and 1.125. Equality remained active; 288 SU stopped effective speedometer
+  output, and removing the load restored 8 RPM and zero stress.
+- `goggles-gauges` matched the 10 Java cases (78 ordered readout lines),
+  including RPM/stress labels, values, colors, and overload strike-through.
+- `gauges-reopen` sampled idle speedometer/stressometer at zero and an active
+  four-member network at 8 RPM, 224/256 SU, saved and reopened the world, then
+  advanced three ticks. All connected readings and the idle readings matched
+  their pre-save values. The active setup warmed for 70 ticks and ran three
+  further ticks before saving.
+
+Commands, from a prepared worktree with the pinned upstream small-wheel NBT
+and Create pack in `.local/`, using the matching `horizon-ctl`, `horizon-client`
+and prepared 26.3 resources:
+
+```sh
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1 --check small-waterwheel --check loaded-stressometer --check goggles-gauges --check gauges-reopen
+```
+
+The first grouped invocation could not find the ignored small-wheel NBT in the
+fresh worktree; after copying that exact fixture from the primary checkout, the
+small-wheel check passed independently. The grouped run then passed the other
+three checks. The dedicated `hand-crank-lan` guest reversal regression was also
+run on this client; see `.local/parity/hand-crank-lan.log` for its result.
+An initial lifecycle attempt sampled the wheel network after only three ticks
+and correctly rejected its not-yet-settled zero reading. The replay now uses the
+existing fixture's 70-tick warmup before sampling; the complete reopen check
+passed with that established setup.
+
+The APP-1943 kinetic network dependency is Done. Direct LAN guest inspection of
+a Speedometer/Stressometer Goggles readout was not exercised in this pass and
+remains a required follow-up before the APP-1975 multiplayer gate is claimed.
+No direct guest gauge readout or exhaustive visual parity is claimed; Full 1:1
+remains Open.
