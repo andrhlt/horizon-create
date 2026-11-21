@@ -13,18 +13,22 @@ spec.loader.exec_module(multiplayer)
 GUEST = "CartGuest"
 
 
-def run(args, scratch):
+def run(args, scratch, cargo=False):
+    block = "minecraft:chest" if cargo else "minecraft:stone"
+    placed = block + ('{Items:[{Slot:0b,count:7,id:"minecraft:copper_ingot"}]}' if cargo else "")
     with fixture_world(args, "MinecartGuest", pack=args.pack) as host:
         host.commands((
             "/fill 4 169 20 16 169 28 minecraft:stone",
             "/setblock 8 170 24 create:cart_assembler[shape=east_west,rail_type=regular]",
-            "/setblock 8 171 24 minecraft:stone",
+            f"/setblock 8 171 24 {placed}",
             "/setblock 8 170 25 minecraft:redstone_block",
             "/setblock 10 170 24 minecraft:rail[shape=north_south]",
             "/setblock 12 170 24 minecraft:rail[shape=north_south]",
             "/setblock 14 170 24 create:cart_assembler[shape=east_west,rail_type=regular]",
             '/summon minecraft:minecart 8.5 170.0625 24.5 {Tags:["guest_cart"]}',
         ))
+        if cargo:
+            host.command('/data merge block 8 171 24 {CustomName:\'"Cart cargo"\'}')
         for _ in range(30):
             host.step_to(host.clock() + 1)
             payload = host.command("/data get entity @e[type=minecraft:marker,tag=create_cart_payload,limit=1] CreateCartPayload")
@@ -51,9 +55,11 @@ def run(args, scratch):
             guest.call("mouse", "right", "click")
             multiplayer.until("the guest's portable Minecart Contraption", lambda: multiplayer.count(guest, "create:minecart_contraption") == 1)
             inventory = host.command(f"/data get entity {GUEST} Inventory")
-            for expected in ('create:minecart_contraption_data', 'minecraft:stone', 'Anchor: [I; 8, 170, 24]', 'InitialOrientation: "WEST"'):
+            for expected in ('create:minecart_contraption_data', block, 'Anchor: [I; 8, 170, 24]', 'InitialOrientation: "WEST"'):
                 if expected not in inventory:
                     raise RuntimeError(f"Host did not preserve {expected}: {inventory}")
+            if cargo and ("minecraft:copper_ingot" not in inventory or "count: 7" not in inventory):
+                raise RuntimeError(f"Guest pickup lost cargo: {inventory}")
             cart = host.command('/execute if entity @e[type=minecraft:minecart,tag=guest_cart]')
             if "Test passed" in cart:
                 raise RuntimeError(f"Host still has the picked-up cart: {cart}")
@@ -67,19 +73,26 @@ def run(args, scratch):
             for _ in range(8):
                 host.step_to(host.clock() + 1)
             payload = host.command("/data get entity @e[type=minecraft:marker,tag=create_cart_payload,limit=1] CreateCartPayload")
-            if 'Anchor: [I; 8, 170, 24]' not in payload or 'InitialOrientation: "WEST"' not in payload or 'minecraft:stone' not in payload:
+            if 'Anchor: [I; 8, 170, 24]' not in payload or 'InitialOrientation: "WEST"' not in payload or block not in payload:
                 raise RuntimeError(f"Host did not restore the mounted payload: {payload}")
             # Move the cart to the unpowered assembler to verify server disassembly.
             host.command('/tp @e[type=minecraft:minecart,limit=1] 14.5 170.0625 24.5')
             for _ in range(30):
                 host.step_to(host.clock() + 1)
-                if host.call("block", 14, 171, 24)["block"] == "minecraft:stone":
+                if host.call("block", 14, 171, 24)["block"] == block:
                     break
             else:
                 raise RuntimeError("The guest-deployed payload did not disassemble on the host")
+            if cargo:
+                contents = host.command("/data get block 14 171 24")
+                if "minecraft:copper_ingot" not in contents or "count: 7" not in contents:
+                    raise RuntimeError(f"Guest redeployment lost cargo: {contents}")
+                loose = host.command('/execute if entity @e[type=minecraft:item,nbt={Item:{id:"minecraft:copper_ingot"}}]')
+                if "Test passed" in loose:
+                    raise RuntimeError(f"Guest round trip duplicated loose cargo: {loose}")
             if host.call("block", 14, 170, 24)["block"] != "create:cart_assembler":
                 raise RuntimeError("Disassembly replaced the host's assembler")
-    print("A survival LAN guest picked up and redeployed the stone contraption; the host preserved its anchor and restored the stone.")
+    print(f"Survival LAN guest picked up and redeployed {block}; anchor and cargo retained.")
 
 
 if __name__ == "__main__":
@@ -88,4 +101,6 @@ if __name__ == "__main__":
         parser.add_argument(name, type=lambda value: Path(value).resolve(strict=True))
     parser.add_argument("--pack", type=lambda value: Path(value).resolve(strict=True))
     with TemporaryDirectory(prefix="hc-cart-guest-") as scratch:
-        run(parser.parse_args(), Path(scratch))
+        args = parser.parse_args()
+        run(args, Path(scratch) / "stone")
+        run(args, Path(scratch) / "cargo", cargo=True)
