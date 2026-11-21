@@ -838,6 +838,8 @@ CHECKS = (
     ("diving-smithing", "test-diving-smithing"),
     ("steam-whistle", "test-steam-whistle"),
     ("steam-whistle-audio", "test-steam-whistle-audio"),
+    ("steam-whistle-persistence", "test-steam-whistle-persistence"),
+    ("steam-whistle-lan", "test-steam-whistle-lan"),
     ("extendo-grip-placement", "test-extendo-grip-placement"),
     ("extendo-grip-placement-lan", "test-extendo-grip-placement", "--lan"),
     ("extendo-grip-crafting", "test-mechanical-tools-crafting", "--recipe", "extendo_grip"),
