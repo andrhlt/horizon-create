@@ -6836,8 +6836,28 @@ matched all 24 states. The [gameplay replay](tools/test-placard.py)
 passed in solo and LAN. The stored item could be inserted, retrieved
 and dropped when the backing block was removed. A matching item
 powered the lamp at ticks 0–18, with zero signal at tick 19.
-Exact support collision, scaling for displayed block items, sounds
-and particles need coverage.
+
+The expanded Placard cases passed on `native-9f42064-d6dc2ad18d3f` with
+pack SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`:
+the 24 placement orientations, solo and LAN use, one survival Item Frame +
+Brass Sheet craft, whitelist rejection/acceptance without consuming either
+held item, and idle plus active pulse save/reopen. The re-opened pulse resumed
+and expired while retaining its displayed diamond.
+
+Pinned Java `PlacardBlock.canAttachLenient` accepts support only when its
+collision shape is nonempty. The new [support regression](tools/test-placard-support.py)
+reproduced the defect on that earlier client: a Placard remained attached to
+`minecraft:structure_void`, whose collision shape is empty. The source fix now
+checks the cached collision shape on placement, survival and neighbor updates.
+This fix has not yet been rebuilt or run: the available launcher source cache
+already has a different Horizon patch set, and `tools/build-native.sh` stops
+while applying `horizon-advancement-initial-inventory.patch`. An isolated
+fetch of the pinned Horizon source also ended with a GitHub sideband disconnect.
+Position-dependent dynamic collision shapes still need a Level-aware query.
+
+The renderer now uses Java's 0.5 scale for registered block items and 0.375
+for flat items. That edit also awaits a rebuilt client and render comparison.
+Sounds, particles and broader visual equivalence remain open.
 
 ## Builder’s Tea
 

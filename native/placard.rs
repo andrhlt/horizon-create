@@ -20,9 +20,11 @@ const STACK: &str = "Item";
 
 fn has_support(level: &GameLevel<'_>, at: BlockPos, support: Direction) -> bool {
     let [dx, dy, dz] = support.normal();
-    !level
+    let state = level.world.block(at.x + dx, at.y + dy, at.z + dz);
+    level
         .behaviours
-        .is_replaceable(level.world.block(at.x + dx, at.y + dy, at.z + dz))
+        .collision_shape(state)
+        .is_some_and(|shape| !shape.is_empty())
 }
 
 fn support_direction(level: &GameLevel<'_>, state: BlockStateId) -> Option<Direction> {
@@ -104,7 +106,10 @@ pub(super) fn update_shape(
     neighbour: BlockStateId,
 ) -> Option<BlockStateId> {
     if support_direction(level, state)? != changed_side
-        || !level.behaviours.is_replaceable(neighbour)
+        || level
+            .behaviours
+            .collision_shape(neighbour)
+            .is_none_or(|shape| shape.is_empty())
     {
         return None;
     }
@@ -175,7 +180,15 @@ pub(super) fn render(game: &Game<'_>, state: BlockStateId, entity: &ModBlockEnti
     draw.rotate_about([0.0, 1.0, 0.0], yaw + if face == Some("ceiling") {180.0} else {0.0}, [0.0; 3]);
     draw.rotate_about([1.0, 0.0, 0.0], match face { Some("floor") => 90.0, Some("ceiling") => -90.0, _ => 0.0 }, [0.0; 3]);
     draw.translate([0.0, 0.0, 0.28125]);
-    draw.scale([0.375; 3]);
+    // Create's PlacardRenderer uses 0.5 for a 3D block model and 0.375 for
+    // flat item models. A registered block default state is the native item
+    // model's 3D-block equivalent for the imported Create assets.
+    let scale = if game.native_default_state(&stack.item).is_some() {
+        0.5
+    } else {
+        0.375
+    };
+    draw.scale([scale; 3]);
     game.native_draw_item(draw, &stack, DisplayContext::Fixed, None, 0);
     draw.pop();
 }
