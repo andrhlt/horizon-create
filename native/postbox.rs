@@ -148,8 +148,8 @@ pub(super) fn before_player_break(game: &Game<'_>, pos: [i32; 3]) {
 pub(super) fn after_player_break(
     game: &mut Game<'_>,
     pos: [i32; 3],
-    result: anyhow::Result<bool>,
-) -> anyhow::Result<bool> {
+    result: crate::Result<bool>,
+) -> crate::Result<bool> {
     if !game.native_authoritative() {
         return result;
     }

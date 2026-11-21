@@ -62,6 +62,18 @@ def ride(host, actor, player, rows):
         multiplayer.until(f"expected mounted state {mounted} for {row['block']}", lambda:
                           elevator.ride(host, player) == mounted)
         if mounted:
+            if actor is not host and row is rows[0]:
+                host_name = host.call("lan", "status")["host"]
+                host.commands((
+                    f"/gamemode survival {host_name}",
+                    f"/tp {host_name} {' '.join(map(str, FEET))}",
+                ))
+                host.call("interact", *AT, "up")
+                host.step_to(host.clock() + 1)
+                if elevator.ride(host, host_name) or not elevator.ride(host, player):
+                    raise RuntimeError("A second player displaced or joined an occupied static Seat.")
+                host.command(f"/tp {host_name} 7.5 171 23.5")
+                print("Occupied static Seat rejected the host while retaining the LAN guest rider.")
             actor.call("key", "shift", "down")
             try:
                 actor.call("wait", 3)
