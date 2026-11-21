@@ -7462,6 +7462,14 @@ next to a lit Soul Campfire. Both bells passed floor placement and
 the powered state cycle. The original fan timing, direct soul-fire
 conversion, animation, sounds, shapes and Haunting effects remain open.
 
+APP-2038 adds source-aligned direct conversion when a Peculiar Bell is
+placed over Soul Fire or a lit Soul Campfire, and when either catalyst
+appears below an existing Peculiar Bell. The callback carries facing,
+attachment and power into the Haunted Bell state. The extended replay
+checks Soul Fire, lit Soul Campfire and rejection of an unlit Soul Campfire;
+these checks still need a rebuilt-client run. Guest ring use, save/reopen,
+bell block-entity behavior and Haunting pulses remain unverified.
+
 ## Sticker
 
 See the [complete Sticker behavior checklist](STICKER-PARITY.md) for the subsequent

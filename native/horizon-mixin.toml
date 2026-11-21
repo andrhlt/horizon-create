@@ -3452,6 +3452,40 @@ file = "crates/horizon-client/src/game.rs"
 name = "create_desk_bell"
 source = "desk_bell.rs"
 
+[[module]]
+id = "peculiar_bell"
+file = "crates/horizon-client/src/game.rs"
+name = "create_peculiar_bell"
+source = "peculiar_bell.rs"
+
+[[injection]]
+id = "peculiar_bell_placement"
+hook = "state_for_placement"
+hook_version = 1
+kind = "HEAD"
+helper = "peculiar_bell_placement.rs"
+bindings = [
+  { name = "level", ty = "&crate::game::GameLevel<'_>", value = "self" },
+  { name = "state", ty = "horizon_world::registry::BlockStateId", value = "state" },
+  { name = "context", ty = "&horizon_world::level::PlacementContext", value = "context" },
+  { name = "fluid", ty = "horizon_world::fluid::FluidState", value = "fluid" },
+  { name = "answer", ty = "&mut Option<Option<horizon_world::registry::BlockStateId>>", value = "&mut *answer" },
+]
+
+[[injection]]
+id = "peculiar_bell_shape"
+hook = "update_shape"
+hook_version = 1
+kind = "HEAD"
+helper = "peculiar_bell_shape.rs"
+bindings = [
+  { name = "level", ty = "&crate::game::GameLevel<'_>", value = "self" },
+  { name = "state", ty = "horizon_world::registry::BlockStateId", value = "state" },
+  { name = "direction", ty = "horizon_core::geometry::Direction", value = "direction" },
+  { name = "neighbour", ty = "horizon_world::registry::BlockStateId", value = "neighbour" },
+  { name = "result", ty = "&mut Option<horizon_world::registry::BlockStateId>", value = "&mut *new" },
+]
+
 [[injection]]
 id = "desk_bell_placement"
 hook = "state_for_placement"

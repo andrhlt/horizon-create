@@ -48,6 +48,21 @@ def place_floor_bell(control, item, support, target, redstone):
         raise RuntimeError(f"Removing redstone did not clear {item}: {unpowered}.")
 
 
+def direct_conversion(control, catalyst, expected):
+    support = (14, 169, 24)
+    target = (14, 170, 24)
+    commands(control, (
+        f"/setblock {support[0]} {support[1]} {support[2]} {catalyst}",
+        f"/item replace entity @s hotbar.0 with {PECULIAR}",
+        f"/tp @s 14.5 170 26.5",
+    ))
+    control.call("select", PECULIAR)
+    control.call("interact", *support, "up")
+    got = control.call("block", *target)["block"]
+    if got != expected:
+        raise RuntimeError(f"Placing a Peculiar Bell over {catalyst} produced {got}, expected {expected}.")
+
+
 def run(args):
     with fixture_world(args, "Peculiar-haunted-bells", render=True, pack=args.pack) as control:
         commands(control, (
@@ -69,6 +84,10 @@ def run(args):
             raise RuntimeError("The original brass block and sheet recipe did not produce one Peculiar Bell.")
 
         place_floor_bell(control, PECULIAR, (9, 169, 24), (9, 170, 24), (8, 170, 24))
+
+        direct_conversion(control, "minecraft:soul_fire", HAUNTED)
+        direct_conversion(control, "minecraft:soul_campfire[lit=true]", HAUNTED)
+        direct_conversion(control, "minecraft:soul_campfire[lit=false]", PECULIAR)
 
         # Mirror Create's Depot fan lane: a soul campfire supplies the haunting
         # catalyst, with the fan pushing east into the Depot.
@@ -107,7 +126,7 @@ def run(args):
         control.command(f"/item replace entity @s hotbar.0 with {HAUNTED}")
         place_floor_bell(control, HAUNTED, (11, 169, 24), (11, 170, 24), (12, 170, 24))
 
-    print(f"Original Peculiar Bell crafting passed; Depot fan produced a Haunted Bell after {haunting_ticks} stepped ticks. Both survival floor placements reported attachment=floor, and each bell changed powered false → true → false with redstone.")
+    print(f"Original Peculiar Bell crafting passed; Depot fan produced a Haunted Bell after {haunting_ticks} stepped ticks. Soul Fire and lit Soul Campfire placement conversion passed, and an unlit Soul Campfire was rejected. Both survival floor placements reported attachment=floor, and each bell changed powered false → true → false with redstone.")
 
 
 def main():
