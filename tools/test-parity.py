@@ -1707,6 +1707,8 @@ CHECKS = (
     ("desk-bell-placement-lan", "test-desk-bell", "--placement", "--lan"),
     ("desk-bell-wet-placement", "test-desk-bell", "--wet-placement"),
     ("desk-bell-wet-placement-lan", "test-desk-bell", "--wet-placement", "--lan"),
+    ("desk-bell-support-removal", "test-desk-bell-lifecycle", "--support-removal"),
+    ("desk-bell-persistence", "test-desk-bell-lifecycle", "--persistence"),
     ("train-passenger-count", "test-train-passenger-count"),
     ("multiplayer-elevator", "test-multiplayer-elevator"),
     ("chain-conveyor-idle-reopen", "test-chain-conveyor-idle-reopen"),

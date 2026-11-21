@@ -5276,22 +5276,48 @@ control sockets. Additional mixed layouts, other controllers, non-default
 range configuration, and all-layout preview transitions remain follow-ups.
 Full 1:1 parity stays Open.
 
-## Desk Bell
+## Desk Bell APP-2037
 
-The [pinned Java probe](tools/java-desk-bell.patch) records pre-press state,
-three presses including an in-flight retrigger, powered removal, and the
-weak and directional direct signal over [55 ticks](fixtures/desk-bell-pulse-java.csv).
-It also records the three original [sound events](fixtures/desk-bell-sound-java.csv)
-and placement states for [all six faces](fixtures/desk-bell-placement-java.csv).
-The [Horizon replay](tools/test-desk-bell.py) matches the two physical dust
-circuits and the bell state every tick in solo and live LAN on
-`native-9f42064-d1574c09aec5`. Both connected clients played all three
-events with the original ID, category, center, gain and pitch. A solo
-player crafted the original recipe. Solo and guest survival placement
-matched all six Java facings in dry blocks and
-[source water](fixtures/desk-bell-water-java.csv). The dry placement replay
-also compared the outer outline plane hit by a center ray from each face.
-The complete collision shape and exact animation remain open.
+Gameplay baseline:
+
+The bounded cases are survival recipe crafting; the [55-tick pinned Java
+replay](fixtures/desk-bell-pulse-java.csv) of three presses (including an
+in-flight retrigger), powered removal, weak and facing-directed direct signal;
+all six dry and source-waterlogged placement facings; support removal; and
+idle/active save and reopen. The [Java probe](tools/java-desk-bell.patch) also
+records three original sound cues. The [Horizon replay](tools/test-desk-bell.py)
+compares every tick and both physical dust circuits in solo and LAN; it checks
+all three sound IDs, categories, positions, gains and pitches, crafts the
+original recipe, and verifies all six placement states in solo and guest play.
+Dry placement also checks the outer outline plane hit from each face.
+
+The lifecycle fixture removes the block behind a north-facing bell and verifies
+that the bell remains with its state and remains usable. This matches the pinned
+`DeskBellBlock.updateShape` implementation, which only updates water and has no
+support-loss removal rule. Idle reopen retains facing, waterlogging, unpowered
+state and zero adjacent dust output. Active reopen retains facing, powered state
+and strength-15 adjacent output; a new ring after reopen completes its 20-tick
+pulse and clears the output. This feature has no inventory or configurable
+connections to preserve.
+
+All eight registered checks passed on `native-9f42064-d6dc2ad18d3f` with pack
+SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`;
+client SHA-256 `006bfe15a198b29d6af7633d353dcadaa07039121ae66c2081927299835a8811`.
+Java source is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`;
+capture-patch SHA-256 `58fd73ebe265eaf157457619eba26570b2064b236de7c19d7288b2e573c3fcc7`.
+The pulse, sound, dry-placement and water-placement trace hashes are,
+respectively, `4ffca90629f25aa1a8a70f5f3ed72bc0e7f9f97dd4779acc75a983a639f9cc04`,
+`76a34332771b1fef6026839b45ab668b24086d782372fb5e119f42d7194b2c96`,
+`f7d7cf99324fc7f03afacf0153a7c63c88f9e9a6f168dfbe844bd3df896bf1f8`, and
+`cde2dab866e62218bf8c87c38f72724656d8953c7be8475fc064a52beb28fc4d`.
+Run the checks through `tools/test-parity.py` named `desk-bell-pulse`,
+`desk-bell-pulse-lan`, `desk-bell-placement`, `desk-bell-placement-lan`,
+`desk-bell-wet-placement`, `desk-bell-wet-placement-lan`,
+`desk-bell-support-removal`, and `desk-bell-persistence`.
+
+Exact animation/collision, sound waveform, concurrent input phases and broader
+power/playback combinations remain nonblocking follow-ups. Full 1:1 remains
+Open; this bounded gameplay baseline passed.
 
 ## Powered redstone latches
 
@@ -7309,12 +7335,20 @@ pinned Netherite diving upgrades and retained the base name.
 
 ## Cuckoo Clocks
 
-The [survival replay](tools/test-cuckoo-clock.py) on
-`native-9f42064-633fa4658824` and `create-clock-whistle-grip.hmod`
-placed both original variants, consumed their block items, and
-transmitted 16 RPM from each rear shaft. The clocks share the original
-block entity type. The timed display, recipes in survival, audio,
-Display Link source and the mysterious trigger remain open.
+APP-1998's [bounded survival replay](tools/test-cuckoo-clock.py) passed on
+`native-9f42064-3413df617042` with `create.hmod` SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The replay crafted the regular clock from planks, andesite casing and a clock,
+then crafted the mysterious variant with four gunpowder. It placed both in
+survival, consumed each item, and read 16 RPM from each rear-shaft network.
+Idle reopen retained both powered clocks. At noon, the regular clock selected
+PIG and the mysterious clock selected SURPRISE; active reopen retained the
+surprise and progress. The guest placed a regular clock in survival with the
+same facing/state as the host. After the synchronized 50-tick event boundary,
+the mysterious clock disappeared on both clients while the separate regular
+clock survived. The block-only blast's exact shape, other speeds/orientations,
+Display Link output, and exact animation/audio timing remain open; this is the
+gameplay baseline, not exhaustive Java parity.
 
 ## Extendo Grip placement and terrain recipes
 

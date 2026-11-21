@@ -188,6 +188,13 @@ pub(super) fn update_tag(entity: &ModBlockEntity) -> Option<Compound> {
         }
         super::create_turntable::BLOCK => set_float(&mut tag, "VisualSpeed", reading(entity, 0)),
         "create:motor" => set_float(&mut tag, "VisualSpeed", reading(entity, 0)),
+        "create:cuckoo_clock" => {
+            for key in ["ClockHour", "ClockMinute", "ClockAnimation", "ClockAnimationProgress", "ClockAnimationStart"] {
+                if let Some(value) = entity.nbt.get(&key.into()) {
+                    tag.insert(key.into(), value.clone());
+                }
+            }
+        }
         WHEEL | LARGE_WHEEL => {
             set_float(&mut tag, "VisualSpeed", reading(entity, 0));
             if let Some(material) = entity.nbt.get(&JavaString::from("Material")) {

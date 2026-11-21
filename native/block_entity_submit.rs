@@ -14,6 +14,10 @@ fn block_entity_submit(
         crate::game::create_lectern_controller::render(game, state, draw);
         return;
     }
+    if entity.id == "create:cuckoo_clock" {
+        crate::game::create_machines::render_cuckoo_clock(game, state, entity, draw);
+        return;
+    }
     if entity.id == crate::game::create_table_cloth::ENTITY {
         if game.native_block_state_property(state, "entity") == Some("true") {
             crate::game::create_table_cloth::render(game, pos, entity, draw);
