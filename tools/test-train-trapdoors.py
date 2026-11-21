@@ -54,7 +54,9 @@ def defaults(host, pack):
         for index, row in enumerate(reference("defaults")):
             name = row["id"].removeprefix("create:")
             path = f"data/create/horizon/block/{name}.json"
-            properties = json.loads(archive.read(path))["properties"]
+            definition = json.loads(archive.read(path))
+            assert definition["template"] == "minecraft:oak_trapdoor", (name, definition["template"])
+            properties = definition["properties"]
             assert properties["hardness"] == float(row["hardness"]), row
             assert properties["explosion_resistance"] == float(row["resistance"]), row
             assert properties["map_color"] == int(row["map_color"]), row
@@ -69,7 +71,6 @@ def defaults(host, pack):
 
 
 def placement(host, actor, player):
-    start = host.clock()
     for index, row in enumerate(reference("placement")):
         name = row["placement"]
         block = row["id"]
@@ -107,6 +108,16 @@ def placement(host, actor, player):
         wait_for_state(host, actor, at, row)
         mp.until(f"the {name} trapdoor to be used from the hotbar", lambda:
                  mp.count(actor, block) == int(row["item_count"]))
+        if name == "floor":
+            host.command(f"/setblock {xyz(support)} minecraft:air")
+            host.step_to(host.clock() + 1)
+            expected = state(row)
+            assert nozzle.state(host, at) == expected and nozzle.state(actor, at) == expected, (
+                "Java TrainTrapdoorBlock inherits TrapDoorBlock.updateShape, which does not require support",
+                block, nozzle.state(host, at), nozzle.state(actor, at),
+            )
+            print(f"{block}: removing the placement block left the trapdoor in place.", flush=True)
+        start = host.clock()
         assert host.clock() == start, (row, start, host.clock())
         print(f"{block} {name}: placement state and item use matched Java.", flush=True)
 

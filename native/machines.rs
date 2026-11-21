@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Mutex, OnceLock};
 
-use horizon_core::geometry::Direction;
+use horizon_core::geometry::{Aabb, Direction};
 use horizon_core::position::BlockPos;
 use horizon_core::random::RandomSource;
 use horizon_world::level::flags;
@@ -32,7 +32,7 @@ use super::create_smart_observer::OBSERVER;
 use super::create_steam::{self, ENGINE, SHAFT as POWERED_SHAFT};
 use super::create_threshold_switch::THRESHOLD_SWITCH;
 use super::create_vault::{self, VAULT};
-use super::{Game, GameLevel};
+use super::{Game, GameLevel, InteractTarget};
 
 const MOTOR: &str = "create:creative_motor";
 pub(super) const COG: &str = "create:cogwheel";
@@ -2967,6 +2967,47 @@ fn deployer_punch(game: &mut Game<'_>, at: [i32; 3], entity: &mut ModBlockEntity
     }
 }
 
+fn deployer_shear_sheep(game: &mut Game<'_>, at: [i32; 3], entity: &mut ModBlockEntity) -> bool {
+    let Some(tool) = entity
+        .items
+        .first()
+        .and_then(Option::as_ref)
+        .filter(|stack| stack.item.as_ref() == "minecraft:shears")
+    else {
+        return false;
+    };
+    let area = Aabb::block(BlockPos::new(at[0], at[1], at[2]));
+    let sheep = game
+        .mobs
+        .iter()
+        .find(|mob| {
+            !mob.removed
+                && mob.alive()
+                && mob.species() == horizon_client::mobs::Species::Sheep
+                && mob.bounds().intersects(area)
+        })
+        .map(|mob| mob.id);
+    let Some(sheep) = sheep else {
+        return false;
+    };
+
+    // Route the action through Horizon's regular entity-interaction code so
+    // sheep age/sheared checks, loot, tool wear, game events and save state
+    // stay shared with manual shearing. Preserve the actual player's hand.
+    let previous = std::mem::replace(game.held_mut(), Some(tool.clone()));
+    let used = game
+        .interact_mob(Some(InteractTarget {
+            id: sheep as i32,
+            location: [0.0; 3],
+        }))
+        .unwrap_or(false);
+    let tool = std::mem::replace(game.held_mut(), previous);
+    if let Some(slot) = entity.items.first_mut() {
+        *slot = tool;
+    }
+    used
+}
+
 fn tick_deployer(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity) {
     let state = network(game, pos, entity);
     let rpm = state.speed();
@@ -3019,13 +3060,16 @@ fn tick_deployer(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity
         "EXPANDING" => {
             if punch {
                 deployer_punch(game, target, entity);
-            } else if let Some(stack) = entity.items.first_mut().and_then(Option::as_mut)
-                && !super::create_wheel_material::use_planks(game, target, stack)
-                && super::create_item_application::apply(game, target, stack)
-            {
-                stack.count -= 1;
-                if stack.count == 0 {
-                    entity.items[0] = None;
+            } else if let Some(stack) = entity.items.first_mut().and_then(Option::as_mut) {
+                if !super::create_wheel_material::use_planks(game, target, stack) {
+                    if super::create_item_application::apply(game, target, stack) {
+                        stack.count -= 1;
+                        if stack.count == 0 {
+                            entity.items[0] = None;
+                        }
+                    } else {
+                        deployer_shear_sheep(game, target, entity);
+                    }
                 }
             }
             ("RETRACTING", 1000)

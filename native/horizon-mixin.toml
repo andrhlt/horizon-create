@@ -468,6 +468,17 @@ bindings = [
 ]
 
 [[injection]]
+id = "roller_invalid_filter_prediction"
+target = "horizon_client::game::remote::Game<'_>::remote_use_item_on"
+kind = "HEAD"
+cancellable = true
+helper = "roller_invalid_filter_prediction.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "self" },
+  { name = "hand", ty = "Hand", value = "hand" },
+]
+
+[[injection]]
 id = "depot_has_analog_output"
 hook = "has_analog_output"
 hook_version = 1
@@ -3226,6 +3237,17 @@ id = "shopping_list"
 file = "crates/horizon-client/src/game.rs"
 name = "create_shopping_list"
 source = "shopping_list.rs"
+
+[[injection]]
+id = "shopping_list_tooltip"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tooltip"
+kind = "HEAD"
+helper = "shopping_list_tooltip.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "self" },
+  { name = "stack", ty = "&ItemStack", value = "stack" },
+  { name = "lines", ty = "&mut Vec<(Text, u32)>", value = "lines" },
+]
 
 [[injection]]
 id = "package_filter_use"

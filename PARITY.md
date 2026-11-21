@@ -305,6 +305,51 @@ authority also recorded both closures on tick 21. The identical
 fixed-tick observation now applies in either mode. Both isolated
 replays passed all their synchronized panel, state and cue samples.
 
+## APP-2057 Sliding Doors gameplay baseline
+
+The bounded acceptance matrix reuses the Java comparisons above for manual
+open/close, paired leaves, material coverage, redstone source handoff, sound,
+and solo/LAN interaction. The elevator walkthrough also verifies that the
+physical doors block the players while closed and allow both host and guest to
+cross after opening. Mounted train-platform scheduling and controls remain in
+their Train Doors issue and are not counted as new APP-2057 coverage.
+
+The new [survival placement check](tools/test-sliding-door-placement.py)
+performs real player clicks in Survival for Andesite folding doors facing
+north/east and Brass sliding doors facing south/west. All four placements
+created the expected Java lower/upper block states, consumed one item, and
+matched at the same frozen tick. Its reopen extension retained both halves of
+an open Andesite pair and a closed Brass pair. The existing cold-open replay
+also saved Brass and Copper pairs during active opening, then matched Java's
+fully open first pose after host reopen and guest rejoin. This is Horizon
+save/reopen evidence, not a Java reload-parity claim.
+
+The placement and static-reopen cases passed with the pinned Horizon Nightly
+9f42064 client build `native-9f42064-d6dc2ad18d3f` and prepared Minecraft 26.3
+resources. The client SHA-256 was
+`006bfe15a198b29d6af7633d353dcadaa07039121ae66c2081927299835a8811`, the
+control client SHA-256 was
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`, and the
+Create pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The comparison reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+Run the new cases with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client \
+  /path/to/prepared/26.3 --check sliding-door-placement
+```
+
+The gameplay baseline is bounded to the four placement cases plus the existing
+five-material manual state/cue checks, representative two-material redstone
+handoff, paired host/guest interaction, closed-door obstruction and open-door
+passage, and idle/active save/reopen. Other placement/property cross-products,
+moving assemblies outside the existing Train Doors evidence, frame-level
+network arrival, and cosmetic equivalence remain open follow-ups. Full 1:1
+parity remains Open.
+
 ## Creative search gear attribution
 
 Pinned Java registers Gearbox, Gearshift and Sequenced Gearshift in
@@ -548,6 +593,44 @@ positions when the surrounding chunks were generated before a sequential
 scan. Further seeds and load sequences remain open. Build with `prepare.py
 --disable-worldgen` to omit the ore features. The original runtime setting
 still needs a Horizon equivalent.
+
+### APP-2060 bounded gameplay baseline
+
+On Horizon build `native-9f42064-6bdf8691aa42` with pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`, the
+bounded acceptance cases passed against Java Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`:
+
+- Seed `810102`, 4×4 Overworld chunks, forced before view and fully generated:
+  all 4,157 positions/materials matched the Java reference and remained the
+  same after save/reopen. This includes 2,676 Striated blocks across Asurine
+  (2,391) and Veridium (285), alongside Zinc and vanilla Gold.
+- Seed `810102`, 6×6 Nether chunks with a two-chunk halo:
+  all 4,787 positions/materials matched and remained the same after
+  save/reopen, including ten Scoria blocks. The disabled Java reference
+  contains the same 4,777 vanilla ore positions.
+- Disabled Create worldgen pack, seed `810102`, 4×4 Overworld chunks:
+  all 422 vanilla Gold positions matched Java and remained unchanged after
+  save/reopen. The pack omitted the nine Create worldgen/biome-modifier data
+  entries, matching the supported `prepare.py --disable-worldgen` mode.
+- A LAN guest mined each of the seven Java-defined Striated stone blocks with
+  an iron pickaxe. Every drop matched its Java block loot table (one matching
+  block item); host and guest agreed on the mined state, and all seven guest
+  drops and mined positions persisted after host reopen and guest rejoin.
+
+The LAN check is registered as `striated-ore-mining-lan` in
+`tools/test-parity.py` and uses the portable Java loot reference
+`fixtures/striated-ore-drops-java.csv`. The headless worldgen replays used
+`tools/test-zinc-worldgen.py` with `--force-before-view --reopen`; Overworld
+and Nether used `fixtures/zinc-worldgen-16-enabled-java.csv` and
+`fixtures/layered-nether-36-forced-java.csv`, respectively. The disabled
+worldgen run used `fixtures/zinc-worldgen-16-disabled-java.csv`.
+
+The nine-entry omission is a pack-build control. Horizon still has no
+in-game/runtime equivalent for Java's `create-common.toml` setting
+`worldgen.disableWorldGen`; that config UI/runtime behavior and further seed
+and load-order sweeps remain open follow-ups. Exact runtime-setting parity is
+not claimed here.
 
 ## Metal bars
 
@@ -856,6 +939,47 @@ power source sets the input state while leaving the lamp off. The
 survival recipe and six byte-identical blockstate, model and texture
 files are included.
 
+### APP-2043 Rose Quartz Lamp gameplay baseline
+
+The bounded cases are survival crafting and placement; a rising and falling
+input on each of three connected lamps; one-tick activation and held latching;
+both comparator directions and redstone wire output; placement beside an
+existing source; two survival Wrench actions; LAN guest interaction; and idle
+and active save/reopen. Java source review covered
+`RoseQuartzLampBlock` defaults, placement, `neighborChanged`, cluster traversal,
+signal output, tick scheduling and Wrench behavior at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+`tools/test-rose-quartz-lamp.py` matched all 39 fixture ticks in solo and LAN.
+The solo check crafted the lamp from the original recipe and exercised the
+source, comparator, wire and Wrench paths. In LAN the guest performed the
+representative Wrench actions and converged on the host's resulting lamp state.
+`tools/test-rose-quartz-lamp-persistence.py` cold-reopened idle and latched
+states and observed the same three block properties afterward. Connected
+output and source removal are covered by the Java-matched gameplay trace; the
+persistence fixture deliberately omits adjacent output wire to avoid feeding
+the lamp's output back into its input. This is a scoped gameplay baseline, not
+full 1:1 verification. Exact renderer behavior and other neighbor/power
+combinations remain open.
+
+The selected Horizon checks passed on the compatible
+`native-9f42064-6bdf8691aa42` client, built from main `781c0ef`; the affected
+Rose Quartz lamp code and fixture are unchanged through the current main base
+`11654d5`. Prepared Minecraft 26.3 resources came from the
+same build. The content pack SHA-256 was
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+The Java fixture SHA-256 is
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`; the
+capture patch SHA-256 is
+`6c2df799cf53b61c099831299b1083b181d7b8788f0166bc31e49c255091e033`.
+Commands selected `rose-quartz-lamp`, `rose-quartz-lamp-lan` and
+`rose-quartz-lamp-persistence` through `tools/test-parity.py` with `--jobs 1`.
+Each passed. The first sandboxed launch attempt was blocked from creating its
+local control socket; rerunning with local socket access completed the checks.
+No gameplay implementation or Java recapture was needed. Time log: source and
+runtime setup 15 minutes; harness coding 10 minutes; native build 0 minutes
+(reused); focused integration and debugging 8 minutes.
+
 ## Window palettes
 
 ### APP-2063 glass windows and panes
@@ -1025,6 +1149,53 @@ the placed assembler at tick 4 and breaks it at tick 10 when the bucket
 removes its water. It drops one assembler and the stored rail on that
 tick. The [Java GameTest patch](tools/java-cart-assembler-rails.patch)
 reproduces both traces.
+
+### APP-2003 Cart Assembler and Controller Rail gameplay baseline
+
+The finite case list follows APP-2003: ordinary and powered/control rail
+acquisition and placement; valid assembly and disassembly; supported cart axes
+and speed control; a moving cargo/harvester case; guest interaction; and idle
+and active reopen. Coupling-chain solving remains with the coupling feature.
+
+All 12 selected checks passed serially on
+`native-9f42064-6bdf8691aa42` using the prepared Minecraft 26.3 resources and
+Create pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+
+| Check | Result |
+| --- | --- |
+| `cart-assembler-rails` | Pass: 8 Java survival placements and 13 Java fill, drain, and drop samples |
+| `minecart-anchor` | Pass: both cart axes assemble and disassemble; the assembler rail remains in place |
+| `crop-farming` | Pass: all 72 Java ticks; moving harvester crops and cart output match, immature crops remain untouched, mature crops are harvested, and output survives save/reopen |
+| `minecart-pickup-lan` | Pass: LAN guest picks up and redeploys a stone payload; host retains anchor/orientation and the payload disassembles at the destination assembler |
+| `controller-rail` | Pass: 12 Java placements, rejected unsupported placement, and 221 power samples |
+| `controller-rail-gradient` | Pass: 490 rail and comparator samples |
+| `controller-rail-motion` | Pass: 52 Java minecart samples for full/partial speed, centering, and braking |
+| `controller-rail-craft` | Pass: survival recipe crafts six rails and consumes all eight inputs |
+| `controller-rail-wrench` | Pass: 12 rotations and two dry/wet pickup cases |
+| `controller-rail-assembler` | Pass: six rail exchanges and 18 directed departure samples |
+| `controller-rail-persistence` | Pass: idle/powered rail states survive reopen and a moving cart resumes |
+| `controller-rail-lan` | Pass: guest converges on host's powered rail state |
+
+The Java-derived comparisons use the pinned fixtures described above; the
+additional reopen, negative placement, and LAN cases are Horizon gameplay
+checks. The guest check proves resulting-state convergence, not Java-equivalent
+packet arrival. Existing source/matrix evidence establishes the APP-1978
+Super Glue/assembly-selection and APP-1979 contraption rendering/collision/
+synchronization prerequisites. No Cart Assembler production mismatch was
+reproduced, so this baseline adds finite acceptance evidence only. Full 1:1
+remains Open for the matrix's remaining carriers, crossings, and entity
+persistence.
+
+Reproduce with the matching checks registered in `tools/test-parity.py`:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check cart-assembler-rails --check minecart-anchor --check crop-farming --check minecart-pickup-lan --check controller-rail --check controller-rail-gradient --check controller-rail-motion --check controller-rail-craft --check controller-rail-wrench --check controller-rail-assembler --check controller-rail-persistence --check controller-rail-lan
+```
+
+Approximate effort: source review and existing Java-fixture selection 10
+minutes; isolated runtime/output setup 10 minutes; focused integration about
+three minutes. No Java recapture or production repair was needed.
 
 ## Controller Rail
 
@@ -4453,6 +4624,89 @@ all 208 ticks and disassembly in that layout too. Run the local replay
 with `--short-curve`. Station prompts, route ordering with signal
 penalties, and automatic dispatch remain under comparison.
 
+## APP-2049 Train Station gameplay baseline
+
+The bounded acceptance pass used Java Create `ac0c444d9828da3453ae8cc65338e8de063286fb`, Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, build `native-9f42064-340cbe866fa7`, and Create pack SHA256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. The existing client contains cursor fix `16af87f`. This ticket changes test coverage and evidence only; it does not modify production behavior.
+
+The finite case list and results are:
+
+- `track-station`: all six Java cases passed, covering selection and placement from either approach, wrong or missing targets, junction rejection, range boundary, saved relative target, and item count.
+- `track-station-controls`: passed. A valid idle station offers Create New Train; its empty assembly screen enables Back and disables Assemble Train; a station without a target exposes no train or schedule controls. The placed station retained the selected target. This is a Horizon control-state check, not a Java trace comparison.
+- `track-station-name` and `track-station-name-lan`: all five Java rename cases passed for default, blank, Unicode with surrounding spaces, and the 25-character boundary. The host's world reopen retained the last name; guest edits converged on the server.
+- `train-bogeys`: all six Java assembly and casing-consumption cases passed.
+- `track-station-schedule` and `track-station-schedule-lan`: passed. Retrieval covered an empty hand and an occupied hand, preserving the progressed two-stop Schedule and returning it to inventory or the station center as Java does.
+- `scheduled-station-approach-lan`: all 123 Java ticks passed for guest-assigned timetable, departure, arrival, waits, and completion.
+- `scheduled-reverse-trip-lan`: all 263 Java ticks passed for departure and return with guest assignment.
+- `scheduled-reverse-trip-reopen`: 237 Java ticks passed; parked and moving states reopened at trace ticks 114 and 157, retaining train occupants and timetable.
+
+Reproduce these cases with `tools/test-parity.py` using the matching `horizon-ctl`, client, and prepared 26.3 resources. Raw logs are under `.local/parity/` with the check names above. No Java recapture or native rebuild was needed for this test-only pass. Java capture patch SHA256 values:
+
+The combined gameplay command was `python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 2 --check track-station --check track-station-name --check track-station-name-lan --check track-station-controls --check train-bogeys --check scheduled-station-approach-lan --check scheduled-reverse-trip-lan --check scheduled-reverse-trip-reopen`; schedule retrieval was run separately with `--check track-station-schedule --check track-station-schedule-lan`. Early control-fixture failures were invalid setup only (missing ignored template, wrong target offset, and an omitted world tick); the fixture was corrected and the final control replay passed.
+
+| Capture | SHA256 |
+| --- | --- |
+| `java-track-station-trace.patch` | `fd4ccacf41752686ef1b81123d1bb9e78fe8ea1c9342042a360f749bc7f605d6` |
+| `java-track-station-name.patch` | `1a1dc564faa8c8583463719155242d9e58d5b26d34bc2b6e218f5210b16a44d5` |
+| `java-train-bogeys-trace.patch` | `363d7029b49782f38bb56390029ef93cd61a566140acaf60499701399b284927` |
+| `java-scheduled-station-approach-trace.patch` | `6c9822cc8a392583cac42ff4a553cd69801259cfb33ea892505fd8c70afa6c8f` |
+| `java-reverse-station-approach-trace.patch` | `ef4cf6d63f826d7d882f06e3684239065447626a6ddb584ac0897c0f310806f1` |
+
+Other station layouts, route choices, exact visual behavior, and exhaustive cross-products remain open under Full 1:1.
+### APP-2051 Manual driving and Train Controls — November 21, 2026
+
+This finite baseline reuses the pinned Java references rather than capturing
+new expected values. Source review covered `Train.tick`,
+`CarriageContraptionEntity.startControlling` and `.control`, and
+`Navigation` at Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+The Java capture patch hashes are:
+
+| Reference | SHA-256 |
+| --- | --- |
+| `java-manual-train-trace.patch` | `1c5dab4780a8bb49420fcd54ab3eda1e3e383a0cabe11cb464a77a6d7ec50699` |
+| `java-train-steer-right-trace.patch` | `7adf8ab985b049702331f3d7d8cd4ed9958dcf8f6cdd699c52a3405590bb6919` |
+| `java-train-steer-left-trace.patch` | `8c295c1787a20e9f4f0101c568a5049260a10e0e4fd255f719008fb8ccd6ef99` |
+| `java-manual-station-approach-trace.patch` | `062c3d47f697003f0fe3bc7662adf645558d28b0e1d54154e7dbc872bfaf7cb6` |
+| `java-reverse-station-approach-trace.patch` | `ef4cf6d63f826d7d882f06e3684239065447626a6ddb584ac0897c0f310806f1` |
+
+The isolated build used Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`,
+launcher `0.2.67`, and private copy-on-write compiler data. It produced
+`native-9f42064-84eb353ebb27` in 579 seconds. The client SHA-256 is
+`123733fa66ee41c3a6d9ed95c741b159bfa80c557cbe0e5e398e7d53a4781683`.
+All fixture worlds used pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+
+The recorded cases passed on that build:
+
+| Check | Case and outcome |
+| --- | --- |
+| `manual-train` | 125 Java samples, ticks 13–137. Forward acceleration/coast, reverse acceleration/coast, speed, four wheel positions and spacing matched within `1.2e-6`. |
+| `train-steer-right`, `train-steer-left` | 160 Java samples per direction through a curved junction; wheel positions matched within `7e-6` and `1e-5` blocks respectively. |
+| `manual-station-approach`, `reverse-station-approach` | 198 Java samples each; braking, stop/arrival, reverse control and disassembly matched the existing traces. |
+| `train-steer-lan` | Guest UUID held authoritative controls while driving; host observations matched 84 Java samples. Guest Sneak released the `Driver` field. |
+| `manual-train-reopen` | Stopped train state matched before/after reopen. A saved moving train resumed, retained the four bogey-point gaps, and accepted reverse input. Java reload timing is not claimed: normal startup ticks occur before the harness freezes time. |
+| `train-multi-carriage` | APP-2047 regression: two carriages/four bogeys assembled, moved, reopened, converged to the LAN guest, and restored both cargo inventories on disassembly. |
+
+The initial run of the augmented LAN check had a test-only `NameError` in a
+post-drive host reacquire assertion after its Java-matching route. That assertion
+was removed as outside this ticket's acceptance list; the corrected guest
+driving and release check passed on rerun. No gameplay mismatch was observed.
+
+The build and focused commands were:
+
+```sh
+sh tools/build-native.sh .local/toolchains/launcher-0.2.67/horizon-launcher .local/app-2051-launcher-data
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-84eb353ebb27/horizon-ctl .local/patched-launcher/versions/native-9f42064-84eb353ebb27/horizon-client .local/patched-launcher/versions/native-9f42064-84eb353ebb27/.local/horizon-client/26.3 --jobs 2 --check manual-train --check manual-train-reopen --check train-steer-right --check train-steer-left --check train-steer-lan --check manual-station-approach --check reverse-station-approach --check reverse-station-approach-lan --check train-multi-carriage
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-84eb353ebb27/horizon-ctl .local/patched-launcher/versions/native-9f42064-84eb353ebb27/horizon-client .local/patched-launcher/versions/native-9f42064-84eb353ebb27/.local/horizon-client/26.3 --jobs 1 --check train-steer-lan
+```
+
+The first batch passed eight checks; after the test-only correction, the LAN
+rerun passed, for all nine cases passing. Existing Java traces were reused;
+capture time was zero. The first full build took 579 seconds, and the focused
+integration batch took about five minutes plus a one-minute LAN rerun. Stopped
+and moving reopen are source-aligned gameplay checks, not exact Java reload
+comparisons. Other slopes/layouts, exhaustive kinematics, interpolation and
+visual effects remain open; Full 1:1 stays Open.
+
 ## Scheduled station travel
 
 In the [original conductor GameTest](tools/java-scheduled-station-approach-trace.patch),
@@ -6606,6 +6860,41 @@ open or close events and two silent steps. Connected face culling,
 Framed Glass connected textures and use on other contraption types
 remain open; mounted-train interactions are covered below.
 
+### APP-2064 gameplay baseline
+
+Completed November 21, 2026.
+
+The finite baseline passed on Horizon `native-9f42064-6bdf8691aa42` (pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, Minecraft 26.3; client SHA-256
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`) with
+Create pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+The Java reference remains Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+The five checks were `train-trapdoors`, `train-trapdoors-lan`,
+`train-trapdoors-reopen`, `train-trapdoors-sound`, and
+`train-trapdoors-sound-lan`. The existing Java comparisons covered 12
+placement states, ten ordered state snapshots per block, and 44 survival
+crafts across 11 wooden trapdoors and both ingredient orders. Host/guest
+placements and state transitions converged; each variant's seven iron sound
+events and two silent transitions matched. The placement replay also removed
+the clicked floor block and verified each trapdoor stayed in place, matching
+the pinned `TrainTrapdoorBlock` inheritance of vanilla `TrapDoorBlock`.
+The new cold reopen replay saved a closed Train Trapdoor and open Framed Glass
+Trapdoor, verified their states after relaunch, then toggled both by hand.
+Both content definitions use the vanilla oak trapdoor template for standard
+state geometry and collision behavior.
+
+Run the five checks with the corresponding pinned build and prepared resources:
+
+```sh
+python3 tools/test-parity.py BUILD/horizon-ctl BUILD/horizon-client BUILD/.local/horizon-client/26.3 --jobs 1 --check train-trapdoors --check train-trapdoors-lan --check train-trapdoors-reopen --check train-trapdoors-sound --check train-trapdoors-sound-lan
+```
+
+Exact connected face culling, Framed Glass connected textures, other states
+and orientations, and additional collision layouts remain follow-ups.
+
 
 ## Experience Block and Experience Nugget
 
@@ -6621,8 +6910,41 @@ This comparison measures the item counts, signed orb values, spawn
 position and size of the random launch offset. Each client received the
 negative −2 and −1 orb values from the other player's use. Independently,
 Java's seeded launch directions reproduce to 1.5e−12. Live worlds
-draw their own random directions. Orb collection timing, complete
-harvesting and loot replay, and ambient block particles remain open.
+draw their own random directions. Orb collection timing and ambient block
+particles remain open; scoped tool-dependent harvesting is covered below.
+
+### APP-2075 Experience Block harvest and persistence — November 21, 2026
+
+Pinned Java `ac0c444d9828da3453ae8cc65338e8de063286fb` supplies the existing
+`fixtures/experience-harvest-java.csv` cases. The new
+[`experience-harvest` replay](tools/test-experience.py) mines the placed block
+with empty hand, wooden, stone and iron pickaxes, and an iron axe. All five
+reported drops matched Java: the three pickaxes returned one Experience Block;
+empty hand and the axe returned none. A failed intermediate test run exposed
+that the replay counted a prior case's dropped item in the next case; each
+case now clears ground items before mining, and the final isolated replay
+passed.
+
+The existing craft-and-place replay now reopens its saved world and confirms
+the Experience Block and light level 15 remain. The solo and LAN nugget checks
+also passed, including the existing 12 use cases and initial signed-orb values
+and positions for host and guest. In the lifecycle replay, a LAN guest collected
+3 XP from a thrown Nugget; after host save/reopen and guest rejoin, the same XP
+total and five Nuggets remained, with no increase or loss. This is the finite
+APP-2075 gameplay pass; it does not claim exact orb collection timing, ambient
+particle/audio parity, or Full 1:1.
+
+Build/pack used for these replays: Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`,
+client `native-9f42064-6ce68a31b125`, Create pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Commands, selecting each registered check from the worktree root:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check experience-nugget --check experience-nugget-lan --check experience-crafting-and-placement --check experience-harvest --check experience-multiplayer-lifecycle
+```
+
+Final outcomes: 5/5 registered checks passed. The raw harness logs are in the
+worktree's ignored `.local/parity/` directory.
 
 ## Item Hatch
 
@@ -7056,6 +7378,29 @@ unchanged durability. The original 108-tick Precision Mechanism replay
 also passed with that pack. Other variants and guest belt presentation
 need gameplay coverage.
 
+### APP-2089 Deployer sheep shearing
+
+The pinned Java `DeployerHandler.activateInner` selects entities in the
+clicked block and runs their normal entity and living-item callbacks. The
+existing Horizon sheep interaction path handles adult/sheared eligibility,
+the Java wool loot table, tool wear, the shear event, and saved sheep state.
+The APP-2089 change passes the Deployer's shears through that path and
+restores the actual player's held item afterward.
+
+`tools/test-deployer-shearing.py` is registered as `deployer-shearing`. Its
+bounded cases cover adult shearing during an active save/reopen, baby and
+already-sheared controls, Unbreaking III, wool output, one tool-wear point,
+and a LAN guest loading the shears and observing the output. Manual shearing
+continues to use the original `shearing` GameTest and trace.
+
+The new replay has not run yet. The compatible-launcher build first stopped
+because the launcher-data source already included an engine patch from the
+repository patch series; a build against the cached patched source then
+could not resolve Horizon revision `9f42064` through GitHub or its mirror
+because DNS/network access was unavailable. Treat the APP-2089 implementation
+and new regression as pending runtime validation; this is not a parity-pass
+claim.
+
 ## Basin materials and cooking
 
 ### Basin compacting lifecycle check
@@ -7111,6 +7456,22 @@ matched 186 original brass ticks, 248 arm-fed brass ticks, 258
 heated-fluid samples and 86 spout samples.
 
 ## Table Cloths
+
+### APP-2030 bounded shop baseline
+
+On Java reference `ac0c444d9828da3453ae8cc65338e8de063286fb` and Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, build
+`native-9f42064-bfe421a867b6` with pack SHA-256
+`314690f98e6aef8de270a6fbea6704d073cd71c071d6f79fd489e7eab75f912d`, the
+[configured shop replay](tools/test-table-cloth-shop.py) issued a shopping
+list from an owner-configured cloth, refused an empty-stock request, and
+preserved a list across world reopen. Existing Table Cloth recipe, placement,
+storage, reset and LAN checks also passed. A LAN guest issuance replay passed
+once and subsequently timed out waiting for the list, so guest issuance is not
+yet a stable pass. The fixture seeds cloth request/price/owner data directly;
+there is no player-facing setup flow. Paid checkout, payment validation,
+fulfillment and ownership transfer remain unimplemented. This is bounded
+evidence only; full Java parity remains open.
 
 The `create-tablecloth-scaffolding.hmod` pack loads all 19 block and
 item IDs and 35 original recipe IDs. On `native-9f42064-7f0b3254fd60`,
@@ -7298,6 +7659,17 @@ On `native-9f42064-a55af2b6a899` with `create-steam-whistle-audio.hmod`,
 passive boiler, silence without heat, records-category loop onset,
 1/12-octave pitch steps, fading and high-octave redstone retrigger.
 The original Steam Engine replay passed all 13 samples on that build.
+APP-1994's [bounded evidence record](fixtures/steam-whistle-app-1994.md) adds
+passing idle/active cold reopen and dedicated-server LAN gates on
+`native-9f42064-d6dc2ad18d3f`, using a pack prepared from the pinned Java
+checkout (SHA-256 `979e715441e3771b25a819364075894133e689d271348e7a5fc5f7e8e7ffaa79`).
+Both LAN clients observed the guest's extension and octave changes and recorded
+muted boiler onset, pitch change, redstone fade/retrigger, boiler heat loss fade
+and heat restoration. Idle and active reopen retained pitch 3, the double+single
+extension, large octave and expected power state; the active setup resumed its
+sound request, then faded fully after redstone was removed. Chiff waveform and
+actual backend playback, exact Java reload equivalence, full-height layouts,
+cosmetic phases and packet timing remain open.
 
 ## Table Cloth display and reset
 
@@ -7465,10 +7837,17 @@ conversion, animation, sounds, shapes and Haunting effects remain open.
 APP-2038 adds source-aligned direct conversion when a Peculiar Bell is
 placed over Soul Fire or a lit Soul Campfire, and when either catalyst
 appears below an existing Peculiar Bell. The callback carries facing,
-attachment and power into the Haunted Bell state. The extended replay
-checks Soul Fire, lit Soul Campfire and rejection of an unlit Soul Campfire;
-these checks still need a rebuilt-client run. Guest ring use, save/reopen,
-bell block-entity behavior and Haunting pulses remain unverified.
+attachment and power into the Haunted Bell state. The rebuilt-client
+[bounded replay](tools/test-peculiar-haunted-bells.py) passed Soul Fire,
+lit Soul Campfire and unlit Soul Campfire rejection, while retaining the
+survival craft, 153-tick Depot fan conversion and both bells' floor
+placement/power checks. The [hit probe](tools/probe-peculiar-haunted-bell-hit.py)
+passed valid-hit behavior. The [LAN lifecycle replay](tools/test-peculiar-haunted-bells-lifecycle.py)
+passed host/guest power convergence and active/idle save/reopen. These
+runs used pinned Java source
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and compatible client build
+`native-9f42064-4b434f2f5e13`. Exact Java hit geometry, swing/audio timing
+and Haunting effects remain open.
 
 ## Sticker
 
@@ -7748,14 +8127,56 @@ next tick. A competing guest visiting the Nether left the existing
 Overworld owner in place. Swapping, visuals and original client
 transport timing remain open.
 
+The bounded persistence checks (`linked-controller-persistence` and
+`lectern-controller-persistence`, each with solo and LAN variants) passed
+on `native-9f42064-6ce68a31b125` with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The handheld retained both pairs (diamond/emerald in slots 0/1 and
+gold/iron in 4/5) and its custom-data marker through a host save/reopen;
+the same named LAN guest rejoined, used the saved bindings, and drove the
+matching receiver and wire 0→15→0. The attached Lectern retained its
+diamond/emerald `ControllerData`, and the host or rejoined guest acquired
+it and resumed input to a matching receiver and adjacent wire after reopen.
+These are source-aligned Horizon save/reopen checks, not Java reload
+comparisons. The four new checks can be rerun with
+`python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client
+/path/to/prepared/26.3 --jobs 1 --check 'linked-controller-persistence*'
+--check 'lectern-controller-persistence*'` after preparing the pack as in
+the README. The first post-rebase LAN run exposed a fixture race before the
+rejoined guest received its test item; the failed output is retained at
+`.local/app-2033/failed/lectern-controller-persistence-lan-first-attempt.log`.
+The fixture now waits for the item to reach the guest inventory before use.
+
 ## Shopping List
 
-The [survival replay](tools/test-shopping-list-discard.py) on
-`native-9f42064-5add64cfcfc1` with `create-shopping-list.hmod`
-retained the list during ordinary use and discarded it when the player
-sneak-used it in air or on a block. The item is absent from the Create
-creative tab, matching the original. List creation, entries, pricing,
-tooltip summaries, purchases and LAN remain open.
+The [APP-2031 bounded flow](tools/test-shopping-list-flow.py) passed on the
+pinned `native-9f42064-3a2d3eb65fc6` build with `create.hmod`
+(`sha256=67ea72a5c560188616f9ac28dd33e97f134fe65d4b14adf1b2f6adbffd039e96`).
+The sampled rules follow pinned Java `TableClothBlockEntity.useShop`,
+`ShoppingListItem.bakeEntries`, and Stock Ticker request handling. In solo, two
+iron ingots could not create a three-ingot purchase; after restocking, the
+list recorded the purchase and refused to increment it beyond available stock.
+The list survived a cold save/reopen. An underfunded attempt retained both the
+list and the buyer's gold. A funded attempt dispatched exactly one `Warehouse` package with three iron
+ingots, left two in stock, removed exactly two gold ingots from the buyer,
+recorded both in the Stock Ticker's payment inventory, and consumed the list
+once. The equivalent LAN
+guest flow passed with payment and list state owned by the guest and delivery
+state shared by the host.
+
+The [discard replay](tools/test-shopping-list-discard.py) passed on the same
+build: ordinary use retained the list and sneak-use discarded it in air or on
+a block. The [Table Cloth storage regression](tools/test-table-cloth-storage.py)
+and [Stock Ticker order replay](tools/test-stock-ticker-order.py) passed in
+solo and LAN. The [Item Hatch unsided-input regression](tools/test-item-hatch.py)
+also passed after adapting the insertion call to the pinned API. These results
+close the bounded APP-2031 gameplay flow; they do not claim exhaustive parity.
+
+Full 1:1 remains open for exact Create tooltip styling and less common
+shop/filter and transaction edges. The implementation reads each referenced
+cloth's saved request, owner, address, target and price, builds readable item
+and cost tooltip lines, enforces current Stock Ticker availability, preflights
+payment, and clears the buyer's list only after package dispatch succeeds.
 
 ## Elevator Contact item
 
@@ -11670,14 +12091,31 @@ The finite checks completed on the pinned Create reference
   through `/save-all flush` and fixture restart. This
   proves guest convergence and idle mode persistence, not packet-arrival timing
   parity.
-- Gantry Shaft/Carriage is already Done; its existing integrated regressions
-  include the Roller. APP-2007's latest candidate build is
-  `native-9f42064-7f8245fcd225` (rebuilt after updating from current main);
-  client SHA-256
-  `eaf18600f300ee82c2454820c57ac44ee8cc274c7242ef09f88ea0d97b231b8b`; prepared
+- The Java `RollerBlockEntity` assigns separate value boxes to filtering
+  (`hOffset=3`) and mode (`hOffset=-3`). Its filter predicate rejects air,
+  block entities, stairs, shapes that are not full-block outlines, and empty
+  collision shapes. `FilteringBehaviour.onShortInteract` returns on an invalid
+  item before consuming it; ordinary valid block materials are stored without
+  consumption. These rules were checked against Create reference commit
+  `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+- `roller-mode-ui` now checks one supported stone and one unsupported chest in
+  solo and LAN. Chest clicks at the filter box retained the count of one,
+  created no chest block, and left the existing filter unchanged. Stone was
+  stored with its count still one. LAN assertions read both the guest inventory
+  prediction and the host's authoritative `RollerGuest` inventory and block
+  entity. The stone filter and host inventory remained after save/reopen.
+  This verifies the filter value-box dispatch as well as item conservation; it
+  does not claim exact packet timing.
+- `roller-filling-reopen` matched all 80 Java ticks, saved and reopened at tick
+  40, compared carriage position, material stock and world blocks at the
+  boundary, then confirmed subsequent work resumed without duplication or
+  skips. `roller_paving_and_clearing` matched all 181 Java ticks. Shared Gantry
+  Shaft/Carriage regressions remain additional transport evidence.
+- Final candidate build: `native-9f42064-5bee4a761065`, pinned Horizon
+  `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`; client SHA-256
+  `8b75ead5d110227f15b5ae07a708d368bad6524841ca8e16550a9f90ed5484f7`; test
   Create pack SHA-256
-  `921c10ce6a435a3c4e7d45a6651001e1b77bd321cf621d896b348a471c701bbe`.
-  Cursor fix `16af87f` is included in the client.
+  `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
 - Exact scoped command:
 
   ```sh
@@ -11692,20 +12130,12 @@ full-block filter validation, and the Java slab-to-double-block filter state.
 existing Roller value board. `tools/test-roller-mode-ui.py` is the LAN/mode and
 idle-reopen check registered by the parity runner.
 
-The bounded `roller-filling-reopen` fixture matched all 80 Java ticks, saved
-and reopened at tick 40, compared the Gantry carriage position, material stock
-and world blocks at the boundary, then confirmed subsequent ticks resumed with
-no duplicate or skipped work. Shared `gantry-lan-reload` and
-`mounted-drill-gantry-lan-reload` checks additionally cover guest motion,
-active save/reopen, and conserved payload output; these are shared Gantry
+The finite APP-2007 gameplay gates pass on this build. Shared `gantry-lan-reload`
+and `mounted-drill-gantry-lan-reload` checks additionally cover guest motion,
+active save/reopen, and conserved payload output. They are shared Gantry
 transport evidence rather than a claim of exact packet-timing parity for every
-Roller actor case.
-
-This pass is partial. The current checks do not establish invalid-filter
-rejection and no-loss consumed-material boundaries. That bounded gate remains open;
-we do not claim the whole APP-2007 baseline complete. The placement redirect and filter boundary code still need focused integration
-coverage before calling those paths verified. Additional terrain patterns, drum visuals, animation and exact
-network timing remain follow-ups; Full 1:1 stays Open.
+Roller actor case. Additional terrain patterns, drum visuals, animation and
+exact network timing remain follow-ups; Full 1:1 stays Open.
 ## Creative Crate gameplay baseline — APP-2016
 
 The finite baseline reuses the supply, filter refund, Hopper, Dropper, Funnel,
