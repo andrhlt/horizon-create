@@ -9510,6 +9510,35 @@ charge-one item. Occluded Glowstone and an unlit block remained unchanged.
 Light acquisition from Depots and Belts, synchronized charge display and
 remaining random sequences stay open.
 
+APP-2073 adds a finite Depot transport case. The pinned Java path checks a
+nearby `TransportedItemStackHandlerBehaviour`, derives the light from a carried
+`BlockItem`, and removes one transported item when it collects light. On
+`native-9f42064-ecb7b798b6e6` with the prepared Create pack, the seeded Horizon
+fixture selected the Depot at `(6, 178, 5)`, consumed its Glowstone, retained one
+plain Chromatic Compound from the input stack of two, and spawned one compound
+with collected-light value `1`. The new [transport check](tools/test-legacy-radiance-beacon.py)
+compares these discrete before/after states; it does not claim Java packet timing
+or full Belt transport parity. Existing references cover the Java conversion,
+beacon controls, void transition, threshold and item reload behavior. The
+isolated build used the pinned Horizon revision and source-mixin launcher 0.2.67;
+the source tree came from the installed pinned launcher cache, with the current
+unsided item insertion patch applied in the isolated build tree. Other current
+engine patch interactions were not re-audited for this family pass.
+
+Bounded APP-2073 results on that build: `legacy-material-float`,
+`legacy-material-float-lan`, `legacy-material-shadow-void`,
+`legacy-radiance-beacon`, `legacy-radiance-beacon-lan`,
+`legacy-radiance-beacon-reload`, `legacy-radiance-light-threshold`,
+`legacy-radiance-light-collection`, and `legacy-radiance-transport` passed.
+The eight established checks replay the existing Java fixtures for dropped
+motion, void conversion, beacon conversion and controls, cold reopen, threshold
+and placed-light collection. The transport check is a one-tick source-aligned
+Depot case with an input stack of two; counts and item identity are exact. The
+LAN guest saw both floating metals and the converted beacon stack, and reopened
+worlds retained conversion state and subsequent motion through tick 8. Belt
+transport, the dynamic charged-stack display/limit, additional configuration
+values and full lifespan expiry remain follow-ups.
+
 ## Creative Search membership
 
 The [Java tab capture](fixtures/creative-tabs-java.csv) has 265 Base and 392

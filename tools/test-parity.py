@@ -1647,6 +1647,7 @@ CHECKS = (
     ("legacy-radiance-beacon-reload", "test-legacy-radiance-beacon", "--reload"),
     ("legacy-radiance-light-threshold", "test-legacy-radiance-beacon", "--charge"),
     ("legacy-radiance-light-collection", "test-legacy-radiance-beacon", "--collection"),
+    ("legacy-radiance-transport", "test-legacy-radiance-beacon", "--transport"),
     ("water-filling-bottle", "test-water-filling-bottle"),
     ("fluid-observer", "test-fluid-observer"),
     ("spouting", "test-spouting"),
