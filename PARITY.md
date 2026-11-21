@@ -7728,3 +7728,66 @@ actual-player old-world reopen/extension guard passed on the refactored build.
 ## Expanded fluid-tank workflow — November 18, 2026
 
 The [tank evidence matrix](TANK-PARITY.md) records 31/31 scripts and 1,430 exact Java records passing through headless Horizon `92ef2557669b`. Its applicable shared production core also passes 19/19 scripts (1,093 records). The integrated build closes sampled split, component, creative, clone/move, window, boiler, comparator, source-light and real container inventory gaps. Original steam timing matches all 13 ticks. Physical local/reopen/LAN light, imported ownership through partial/full unload, vanilla clone inventory, solo/LAN bucket and muted sound-event guards pass. Java client rendering/particles, propagated-light and unload timing, audio pitch verification, mounted storage and remaining consumers are still open. Full-family parity was not promoted.
+
+
+## APP-2099 Sounds, particles and effects
+
+The bounded gameplay baseline reuses the existing pinned Java event traces and
+adds one registered save/reopen check. The Java reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+| Case | Evidence and outcome |
+| --- | --- |
+| Powered machine stop cues | `clockwork-audio` matched all six Java cues at tick 6, including source, position, gain and pitch on host and guest. |
+| Interaction cues and silent steps | `train-trapdoors-sound` and `train-trapdoors-sound-lan` matched seven toggles and two silent transitions in solo and LAN. `package-open` and `package-open-lan` passed. |
+| Processing and event boundaries | `desk-bell-pulse` and `desk-bell-pulse-lan` matched 27 Java state samples and all three cues. `desk-bell-pulse-reopen-lan` additionally saved and reopened the world, retained the bell and both redstone wires, then let a newly joined guest press it; host and guest observed the Java cues. |
+| Event validity, range and particles | `worldshaper-effect` and `worldshaper-effect-lan` delivered one shot, ten End Rods, ten Fireworks and the main-hand cue to each client. The Frogport package-effects replay hit Java catch/deposit starts at ticks 24/37. Nearby guests heard two cues per event; distant guests heard one in-range cue per event. All observers still received five seeded catch-rope particles outside sound range. |
+
+The repeatable test changes are in `tools/test-desk-bell.py` and
+`tools/test-parity.py`. The reopen check compares the saved block and wire
+states before and after `FixtureWorld.restart()`. Sound playback and particles
+are transient events, so they have no independent idle/active setting or
+contents to serialize; the persistent Desk Bell setup is the meaningful
+before/after state. The guest joins after reopening, and the subsequent cue is
+checked on both clients.
+
+Final focused Horizon checks passed on existing compatible candidate
+`native-9f42064-340cbe866fa7` (Minecraft 26.3 / Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`). Client and control tool were taken
+from `/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/`;
+the exact pack SHA-256 was
+`0dc4da44753fdf6dd94d1cdd8d26b82bc35446899a3ad1219a9990377e74b852`.
+Prepared 26.3 resource metadata SHA-256 was
+`c666426f77cadd1e8db01ad53e4900aa9e53930895c3f92243634e27e6ecf0ae`.
+No native runtime source changed between that candidate and this baseline;
+the ticket changes only the Desk Bell test path and evidence. The exact final
+commands were:
+
+```sh
+APP2099_CTL=/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/horizon-ctl
+APP2099_CLIENT=/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/horizon-client
+APP2099_RESOURCES=/Users/andrewholt/dev/horizon-create/.local/app-2017-evidence/native-9f42064-6bdf8691aa42/.local/horizon-client/26.3
+APP2099_PACK=/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/create.hmod
+
+TMPDIR=/private/tmp python3 tools/test-parity.py "$APP2099_CTL" "$APP2099_CLIENT" "$APP2099_RESOURCES" --jobs 2 \
+  --check clockwork-audio --check train-trapdoors-sound --check train-trapdoors-sound-lan \
+  --check desk-bell-pulse --check desk-bell-pulse-lan --check desk-bell-pulse-reopen-lan \
+  --check package-open --check package-open-lan --check worldshaper-effect --check worldshaper-effect-lan
+
+TMPDIR=/private/tmp python3 tools/test-frogport-package-effects.py "$APP2099_CTL" "$APP2099_CLIENT" "$APP2099_RESOURCES" \
+  --pack "$APP2099_PACK" --lan
+TMPDIR=/private/tmp python3 tools/test-frogport-package-effects.py "$APP2099_CTL" "$APP2099_CLIENT" "$APP2099_RESOURCES" \
+  --pack "$APP2099_PACK" --lan --remote
+```
+
+The ten registered checks and both Frogport range runs passed. The first
+unprivileged attempt was invalid because the sandbox denied Horizon's local
+control socket; the same checks passed with the required local socket access.
+An initial LAN-reopen attempt also exposed that the Desk Bell harness assumed
+every successful `/gamemode` command returned chat text. The helper now uses
+the command result directly, and the host/guest reopen case passes. Raw logs
+are preserved under this worktree's `.local/parity/` and `.local/` directories.
+No new Java capture or runtime build was needed. Reuse setup: 0; harness/docs
+changes: about 5 minutes; build: 0; focused runtime checks: about 5 minutes.
+Remaining follow-ups are the other registered sound IDs, actual waveform and
+mixing, exact audio output timing, and exact cosmetic/particle presentation.
