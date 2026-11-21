@@ -779,6 +779,33 @@ files are included.
 
 ## Window palettes
 
+### APP-2063 glass windows and panes
+
+The bounded gameplay baseline reuses the existing 36-state Java palette and
+eight-neighbor traces, placement/waterlogging/crafting/Stonecutter replay,
+eight-recipe recycling trace and six live loot cases. The LAN replay covers
+host and guest survival placement, shared pane connections and guest
+waterlogging. The family is static, so active-operation persistence does not
+apply; `window-reopen` saves and cold-reopens a connected pane beside a
+waterlogged pane and confirms both complete block states are retained.
+The source review covered `ConnectedGlassBlock`, `WindowBlock`,
+`GlassPaneBlock` and `WindowGen`: windows inherit glass behavior and disable
+spawn, redstone-conductor, suffocation and view-blocking checks; panes inherit
+vanilla iron-bar behavior. The original asset audit retains alpha, and the
+272-case directed face-visibility replay matched Java for full blocks and
+stacked/connected panes. Representative oak windows and birch panes were
+rendered with the original assets. On Horizon build
+`native-9f42064-6bdf8691aa42` with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`, the
+five targeted checks passed; the separate window face-visibility check also
+passed. Full 1:1 remains open for remaining shape and connected-texture
+combinations and exhaustive pixel comparisons.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 --check 'window-palettes' --check 'window-palettes-lan' --check 'window-recycling' --check 'window-silk-touch' --check 'window-reopen'
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --window-culling --check 'window-culling'
+```
+
 The pinned [Java GameTest](tools/java-window-palettes-trace.patch) records
 [36 default window and pane states](fixtures/window-palettes-java.csv)
 with material values, eight pane joins and source-water placement. Horizon
