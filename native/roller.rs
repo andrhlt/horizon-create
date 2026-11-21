@@ -427,10 +427,16 @@ pub(super) fn tick(
     stalled
 }
 
-pub(super) fn set_filter(game: &mut Game<'_>, pos: [i32; 3], stack: &ItemStack) -> bool {
-    let Some(mut state) = game.native_default_state(&stack.item) else {
-        return false;
-    };
+fn full_outline(outline: &[[f64; 6]]) -> bool {
+    !outline.is_empty()
+        && (0..3).all(|axis| {
+            outline.iter().map(|bounds| bounds[axis]).reduce(f64::min) == Some(0.0)
+                && outline.iter().map(|bounds| bounds[axis + 3]).reduce(f64::max) == Some(1.0)
+        })
+}
+
+fn filter_state(game: &mut Game<'_>, stack: &ItemStack, pos: [i32; 3]) -> Option<BlockStateId> {
+    let mut state = game.native_default_state(&stack.item)?;
     if game.native_block_state_property(state, "type").is_some() {
         state = game.with_level(|_, level, _| {
             level
@@ -439,10 +445,51 @@ pub(super) fn set_filter(game: &mut Game<'_>, pos: [i32; 3], stack: &ItemStack) 
         });
     }
     let facts = game.res.facts().get(state);
-    if game.native_block(pos) != ROLLER
-        || facts.block_entity
-        || facts.has_class("StairBlock")
-        || !facts.full_collision
+    if facts.block_entity || facts.has_class("EntityBlock") || facts.has_class("StairBlock")
+        || !full_outline(&facts.outline)
+    {
+        return None;
+    }
+    let mut scene = horizon_client::collisions::SceneCollisions {
+        world: &game.world,
+        binding: game.collision,
+        subject: None,
+    };
+    if !game.collision.collision_shape(&mut scene, state, pos).is_ok_and(|shape| !shape.is_empty()) {
+        return None;
+    }
+    Some(state)
+}
+
+pub(super) fn invalid_filter_item(game: &mut Game<'_>, stack: &ItemStack, pos: [i32; 3]) -> bool {
+    filter_state(game, stack, pos).is_none()
+}
+
+pub(super) fn valid_filter_item(game: &mut Game<'_>, stack: &ItemStack, pos: [i32; 3]) -> bool {
+    filter_state(game, stack, pos).is_some()
+}
+
+pub(super) fn claims_filter_box(game: &mut Game<'_>, pos: [i32; 3]) -> bool {
+    let Some(hit) = game.pick() else { return false; };
+    if hit.pos != pos || game.native_block(pos) != ROLLER { return false; }
+    let state = game.world.block(pos[0], pos[1], pos[2]);
+    let (x, z) = match game.native_block_state_property(state, "facing") {
+        Some("north") => (11.0 / 16.0, 11.0 / 16.0),
+        Some("south") => (5.0 / 16.0, 5.0 / 16.0),
+        Some("west") => (15.5 / 16.0, 11.0 / 16.0),
+        Some("east") => (0.5 / 16.0, 5.0 / 16.0),
+        _ => return false,
+    };
+    let dx = hit.point[0] - f64::from(pos[0]) - x;
+    let dy = hit.point[1] - f64::from(pos[1]) - 15.5 / 16.0;
+    let dz = hit.point[2] - f64::from(pos[2]) - z;
+    dx * dx + dy * dy + dz * dz < 1.0 / 9.0
+}
+
+pub(super) fn set_filter(game: &mut Game<'_>, pos: [i32; 3], stack: &ItemStack) -> bool {
+    if !claims_filter_box(game, pos)
+        || game.native_block(pos) != ROLLER
+        || filter_state(game, stack, pos).is_none()
     {
         return false;
     }
