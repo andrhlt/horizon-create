@@ -10643,8 +10643,9 @@ Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, native build
 `native-9f42064-06476b4a74cb`, Create Java reference
 `ac0c444d9828da3453ae8cc65338e8de063286fb`, and pack SHA-256
 `a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
-The `horizon-client` binary SHA-256 is
-`decf18edeccdbad81664750ad6fea2a16bde90f4f5178e2f1e693290af2e1c58`.
+The rebuilt current-main client is `native-9f42064-6a56a7b08e28`; its
+`horizon-client` SHA-256 is
+`849467cabc3e7ae6c013fe321fb0bcab843f37185074c883ea18eb9b941a7751`.
 
 The focused seven-check batch passed 7/7 on this build:
 
@@ -10679,11 +10680,3 @@ guest close enough to pick up the input before the saw. Their diagnostics are
 preserved in `.local/parity/mechanical-saw-lan.log`; the final fixture avoids
 both setup errors and passes. Broader tree species, other cutting outputs and
 exact moving-contraption tick timing remain follow-ups. Full 1:1 remains Open.
-
-The current-main rebase also exposed a compile blocker in the existing Postbox
-mixin (`anyhow::Result` is not available in the generated client); the branch
-uses `horizon_client::Result` so the combined client builds. The existing
-`postbox` regression check then failed after cold reopen because the expected
-parcel was absent from the dropped-item counts. Its log is
-`.local/parity/postbox.log`; this is outside APP-1981 and remains an explicit
-current-main follow-up rather than a saw result.
