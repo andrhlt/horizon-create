@@ -388,6 +388,7 @@ CHECKS = (
     ("stock-link-tuning-lan", "test-stock-link", "--tuning", "--lan"),
     ("redstone-requester", "test-redstone-requester"),
     ("redstone-requester-lan", "test-redstone-requester", "--lan"),
+    ("redstone-requester-persistence", "test-redstone-requester", "--persistence"),
     ("redstone-requester-menu", "test-redstone-requester-menu"),
     ("redstone-requester-menu-lan", "test-redstone-requester-menu", "--lan"),
     ("redstone-requester-crafting", "test-machine-crafting", "--reference", "fixtures/stock-link-requester-crafting-java.csv"),
