@@ -1200,6 +1200,8 @@ CHECKS = (
     ("creative-crate-chute-upward-lan", "test-creative-crate-chute", "--upward", "--lan"),
     ("upward-chute-capacity", "test-creative-crate-chute", "--capacity"),
     ("upward-chute-capacity-lan", "test-creative-crate-chute", "--capacity", "--lan"),
+    ("symmetry-wand-modes", "test-symmetry-wand-modes"),
+    ("symmetry-wand-modes-lan", "test-symmetry-wand-modes", "--lan"),
     ("symmetry-wand-plane", "test-symmetry-wand-plane"),
     ("symmetry-wand-plane-lan", "test-symmetry-wand-plane", "--lan"),
     ("symmetry-wand-break", "test-symmetry-wand-break"),

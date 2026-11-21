@@ -1,0 +1,7 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "patch_sha256": "1ab5a0663c4ef8bcfae98a521aa7cfce8c96e9041d160121023810a568c3c217",
+  "records": 13,
+  "command": "JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ./.local/java-reference/gradlew --offline -p .local/java-reference runGameTestServer",
+  "scope": "Real headless GameTest; process (12,170,25) north-facing oak stairs at origin (10,169,22), cross orthogonal/diagonal and triple-plane; offsets relative to origin in Java HashMap iteration order; discrete zero tolerance."
+}
