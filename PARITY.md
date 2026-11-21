@@ -7039,6 +7039,38 @@ as in the pinned Java source. Mechanical crafting gameplay, entity reach,
 knockback, durability and backtank use, attribute multipliers and animated
 presentation still need coverage.
 
+### APP-2085 scoped gameplay baseline
+
+On `native-9f42064-cefc6d90e4e9` with pack SHA256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`, the
+bounded replay passed all seven selected checks: `extendo-grip-reach`,
+`extendo-grip-reach-lan`, `extendo-grip-crafting`, `extendo-grip-wear`,
+`extendo-grip-wear-lan`, `extendo-grip-placement`, and
+`extendo-grip-placement-lan`. The reach cases compare the existing four block
+distances with no grip, either hand and both hands against Java's 4.5/7.5/7.5/9.5
+survival reach values. The same fixture targets entities with no grip, either
+hand and both hands; the dual-grip target is farther than the single-grip
+target. A guest attack reduces the pig from 10 to 9 health on the host. The LAN
+guest then leaves, rejoins with both grips still equipped, and loses the
+extended entity reach after unequipping. The solo fixture reopens the world
+with both grips and confirms the same retained/removed reach behavior.
+
+The equipped hands are read when Horizon queries the interaction attributes;
+there is no separate persistent reach modifier to restore. Horizon's entity
+range query adds four blocks for a single survival grip and six for dual grips,
+accounting for its one-block-shorter survival entity base to match Java's
+block-reach ray. The pinned mechanical-crafting recipe produced an Extendo Grip
+in the output barrel at tick 50 using a Brass Hand, brass ingots, wooden rods
+and a Precision Mechanism. APP-1965 remains the independent Mechanical Crafter
+baseline. The wear and placement regression checks also passed in solo and LAN,
+including Backtank air use, main-hand priority, successful placement wear and
+rejected-placement no-wear.
+
+Combat durability, the Java +2 knockback effect, arbitrary external attribute
+modifier stacks, exact animation, exhaustive recipe/layout combinations, and
+packet/interpolation timing remain open. The scoped gameplay baseline does not
+establish Full 1:1 parity.
+
 ## Steam Whistle
 
 On `native-9f42064-b72bb1a821ed` and

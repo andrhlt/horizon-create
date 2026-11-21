@@ -820,6 +820,7 @@ CHECKS = (
     ("steam-whistle-audio", "test-steam-whistle-audio"),
     ("extendo-grip-placement", "test-extendo-grip-placement"),
     ("extendo-grip-placement-lan", "test-extendo-grip-placement", "--lan"),
+    ("extendo-grip-crafting", "test-mechanical-tools-crafting", "--recipe", "extendo_grip"),
     ("dirt-path-pressing", "test-dirt-path-pressing"),
     ("honey-chocolate-flow", "test-honey-chocolate-flow"),
     ("honey-pipe", "test-fluid-split-trace", "--fluid", "honey"),
