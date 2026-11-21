@@ -594,6 +594,44 @@ scan. Further seeds and load sequences remain open. Build with `prepare.py
 --disable-worldgen` to omit the ore features. The original runtime setting
 still needs a Horizon equivalent.
 
+### APP-2060 bounded gameplay baseline
+
+On Horizon build `native-9f42064-6bdf8691aa42` with pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`, the
+bounded acceptance cases passed against Java Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`:
+
+- Seed `810102`, 4×4 Overworld chunks, forced before view and fully generated:
+  all 4,157 positions/materials matched the Java reference and remained the
+  same after save/reopen. This includes 2,676 Striated blocks across Asurine
+  (2,391) and Veridium (285), alongside Zinc and vanilla Gold.
+- Seed `810102`, 6×6 Nether chunks with a two-chunk halo:
+  all 4,787 positions/materials matched and remained the same after
+  save/reopen, including ten Scoria blocks. The disabled Java reference
+  contains the same 4,777 vanilla ore positions.
+- Disabled Create worldgen pack, seed `810102`, 4×4 Overworld chunks:
+  all 422 vanilla Gold positions matched Java and remained unchanged after
+  save/reopen. The pack omitted the nine Create worldgen/biome-modifier data
+  entries, matching the supported `prepare.py --disable-worldgen` mode.
+- A LAN guest mined each of the seven Java-defined Striated stone blocks with
+  an iron pickaxe. Every drop matched its Java block loot table (one matching
+  block item); host and guest agreed on the mined state, and all seven guest
+  drops and mined positions persisted after host reopen and guest rejoin.
+
+The LAN check is registered as `striated-ore-mining-lan` in
+`tools/test-parity.py` and uses the portable Java loot reference
+`fixtures/striated-ore-drops-java.csv`. The headless worldgen replays used
+`tools/test-zinc-worldgen.py` with `--force-before-view --reopen`; Overworld
+and Nether used `fixtures/zinc-worldgen-16-enabled-java.csv` and
+`fixtures/layered-nether-36-forced-java.csv`, respectively. The disabled
+worldgen run used `fixtures/zinc-worldgen-16-disabled-java.csv`.
+
+The nine-entry omission is a pack-build control. Horizon still has no
+in-game/runtime equivalent for Java's `create-common.toml` setting
+`worldgen.disableWorldGen`; that config UI/runtime behavior and further seed
+and load-order sweeps remain open follow-ups. Exact runtime-setting parity is
+not claimed here.
+
 ## Metal bars
 
 The [original Java probe](tools/java-metal-bars-trace.patch) captures
