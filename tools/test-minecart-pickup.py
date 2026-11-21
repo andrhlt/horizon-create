@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Pick up and replace simple Minecart Contraptions with a Wrench."""
+"""Pick up and redeploy plain blocks and saved vanilla cargo with a Wrench."""
 import argparse
+import re
 from pathlib import Path
 
 from fixture_world import fixture_world
@@ -11,7 +12,7 @@ def run_case(args, block, backwards=False):
         orientation = "EAST" if backwards else "WEST"
         block_id = block.split("[", 1)[0]
         placed = block
-        if block_id == "minecraft:chest":
+        if block_id in ("minecraft:chest", "minecraft:barrel"):
             placed += '{Items:[{Slot:0b,count:7,id:"minecraft:copper_ingot"}]}'
         world.commands((
             "/fill 4 169 20 16 169 28 minecraft:stone",
@@ -26,6 +27,9 @@ def run_case(args, block, backwards=False):
             "/item replace entity @s hotbar.0 with create:wrench",
             "/tp @s 8.5 170 21.5",
         ))
+        if block_id in ("minecraft:chest", "minecraft:barrel"):
+            world.command('/data merge block 8 171 24 {CustomName:\'"Cart cargo"\'}')
+        original_state = world.call("block", 8, 171, 24)["state"]
         for _ in range(30):
             world.step_to(world.clock() + 1)
             marker = world.command("/data get entity @e[type=minecraft:marker,tag=create_cart_payload,limit=1] CreateCartPayload")
@@ -36,6 +40,37 @@ def run_case(args, block, backwards=False):
         world.command("/tp @e[type=minecraft:minecart,tag=pickup_fixture,limit=1] 10.5 170.0625 24.5")
         for _ in range(8):
             world.step_to(world.clock() + 1)
+        if block_id in ("minecraft:chest", "minecraft:barrel"):
+            cart_selector = "@e[type=minecraft:minecart,tag=pickup_fixture,limit=1]"
+            world.command("/fill 10 170 20 10 170 28 minecraft:rail[shape=north_south]")
+            world.command(f"/data merge entity {cart_selector} {{Motion:[0d,0d,0.1d]}}")
+            world.step_to(world.clock() + 1)
+            def cart_vector(key):
+                data = world.command(f"/data get entity {cart_selector} {key}")
+                values = re.search(r"\[([^]]+)\]", data)
+                if not values:
+                    raise RuntimeError(f"Missing cart {key}: {data}")
+                return [float(value.strip().removesuffix("d")) for value in values[1].split(",")]
+
+            before = cart_vector("Pos")
+            identity = world.command(f"/data get entity {cart_selector} UUID").split("entity data: ")[-1]
+            if cart_vector("Motion")[2] <= 0 or before[2] <= 24.5:
+                raise RuntimeError("Active reopen fixture did not move forward")
+            world.restart()
+            if world.command(f"/data get entity {cart_selector} UUID").split("entity data: ")[-1] != identity:
+                raise RuntimeError("Moving reopen lost the cart identity")
+            # The client can advance simulation before the control socket freezes it.
+            # Verify forward operation, rather than asserting a zero-tick reload boundary.
+            after = cart_vector("Pos")
+            if after[2] < before[2] or cart_vector("Motion")[2] <= 0:
+                raise RuntimeError(f"Moving reopen did not retain forward operation: {before} -> {after}")
+            print(f"Moving cargo reopen retained cart identity and forward motion: {before} -> {after}")
+            payload = world.command("/data get entity @e[type=minecraft:marker,tag=create_cart_payload,limit=1] CreateCartPayload")
+            if "minecraft:copper_ingot" not in payload or "count: 7" not in payload:
+                raise RuntimeError(f"Moving reopen lost cargo: {payload}")
+            world.command(f"/data merge entity {cart_selector} {{Motion:[0d,0d,0d]}}")
+            world.command(f"/tp {cart_selector} 10.5 170.0625 24.5")
+            world.step_to(world.clock() + 1)
         world.command("/tp @s 10.5 170 22.5")
         world.call("key", "1", "tap")
         world.call("look-at", 10.5, 170.2, 24.5)
@@ -43,13 +78,6 @@ def run_case(args, block, backwards=False):
         world.call("mouse", "right", "click")
         world.call("wait", 3)
         inventory = world.command("/data get entity @s Inventory")
-        if block_id == "minecraft:chest":
-            cargo = world.command("/data get entity @e[type=minecraft:marker,tag=create_cart_payload,limit=1] CreateCartPayload")
-            cart = world.command("/execute if entity @e[type=minecraft:minecart,tag=pickup_fixture]")
-            if "create:minecart_contraption" in inventory or "Test passed" not in cart or "minecraft:copper_ingot" not in cargo or "count: 7" not in cargo:
-                raise RuntimeError(f"Unsupported cargo was not retained: {inventory}; {cart}; {cargo}")
-            print("Loaded chest remains mounted with its seven copper ingots.")
-            return
         for text in ("create:minecart_contraption", "create:minecart_contraption_data", "Palette", "BlockList", "create:minecart_anchor", block_id):
             if text not in inventory:
                 raise RuntimeError(f"Wrench pickup did not preserve {text}: {inventory}")
@@ -67,6 +95,13 @@ def run_case(args, block, backwards=False):
         inventory = world.command("/data get entity @s Inventory")
         if inventory.count('id: "create:minecart_contraption"') != 1:
             raise RuntimeError(f"A repeated click duplicated the picked-up item: {inventory}")
+        if block_id in ("minecraft:chest", "minecraft:barrel"):
+            if "minecraft:copper_ingot" not in inventory or "count: 7" not in inventory:
+                raise RuntimeError(f"Portable chest lost its cargo: {inventory}")
+            world.restart()
+            inventory = world.command("/data get entity @s Inventory")
+            if "minecraft:copper_ingot" not in inventory or "count: 7" not in inventory:
+                raise RuntimeError(f"Picked-up reopen lost cargo: {inventory}")
         world.call("select", "create:minecart_contraption")
         world.command("/tp @s 12.5 170 21.5")
         world.call("look-at", 12.5, 170.05, 24.5)
@@ -96,15 +131,22 @@ def run_case(args, block, backwards=False):
                 break
         else:
             raise RuntimeError("Placed contraption did not disassemble onto the destination assembler")
-        if "[" in block and world.call("block", 14, 171, 24)["state"] != block:
+        if world.call("block", 14, 171, 24)["state"] != original_state:
             raise RuntimeError(f"The restored block lost its state: {world.call('block', 14, 171, 24)}")
+        if block_id in ("minecraft:chest", "minecraft:barrel"):
+            cargo = world.command("/data get block 14 171 24")
+            if "minecraft:copper_ingot" not in cargo or "count: 7" not in cargo:
+                raise RuntimeError(f"Disassembly lost chest contents: {cargo}")
+            loose = world.command('/execute if entity @e[type=minecraft:item,nbt={Item:{id:"minecraft:copper_ingot"}}]')
+            if "Test passed" in loose:
+                raise RuntimeError(f"Portable round trip duplicated loose cargo: {loose}")
         if world.call("block", 14, 170, 24)["block"] != "create:cart_assembler":
             raise RuntimeError("The minecart anchor replaced the destination assembler")
     print(f"Wrench pickup and placement retained {block} and the Minecart Anchor.")
 
 
 def run(args):
-    for block, backwards in (("minecraft:stone", False), ("minecraft:oak_planks", True), ("minecraft:cobblestone", False), ("minecraft:glass", True), ("minecraft:oak_log[axis=x]", False), ("minecraft:chest", False)):
+    for block, backwards in (("minecraft:stone", False), ("minecraft:oak_planks", True), ("minecraft:cobblestone", False), ("minecraft:glass", True), ("minecraft:oak_log[axis=x]", False), ("minecraft:chest", False), ("minecraft:barrel", True)):
         run_case(args, block, backwards)
 
 
