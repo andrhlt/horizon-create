@@ -5445,6 +5445,11 @@ both runs matched all 16 Java dye cases, retained text and held dye count,
 preserved the differently mounted neighbor, matched four redstone samples, and
 produced the original orange drop.
 
+The survival replay (`tools/test-nixie-survival.py`) crafted four ordinary
+tubes from the original electronics recipe, placed one with a real player click,
+and verified the held count fell to three. Its registered
+`nixie-survival` check passed through `tools/test-parity.py`.
+
 The Nixie persistence replay (`tools/test-nixie-persistence.py`) checks
 adjacent purple floor-mounted tubes: one retains custom text and one publishes
 numeric redstone strength. Idle save/reopen retained both colors, mounts, and
@@ -5462,9 +5467,14 @@ The successful control log is retained as `.local/horizon-nixiepersistence.log`.
 The dye replays used the same arguments with `tools/test-nixie-colors.py`,
 adding `--lan` for the guest run; their successful logs are
 `.local/horizon-nixiecolors.log` and `.local/horizon-nixiecolorslan.log`.
+The survival check used `python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 1 --check nixie-survival`; its runner log is `.local/parity/nixie-survival.log`.
 Initial harness attempts were invalid: one used the fixture's one-tick step
 helper as a two-tick jump, and another combined custom text with the numeric
-output tube. The final fixture uses the Java reference's separate tube roles.
+output tube. The survival fixture first lacked the ignored NBT structure and
+then aimed through the crafting table; after provisioning the fixture and
+moving the placement to a clear floor tile, it passed. These were test setup
+issues. The final persistence fixture uses the Java reference's separate tube
+roles.
 
 All 16 original blockstate definitions and their direct models match by
 file bytes. The declared geometry matches the

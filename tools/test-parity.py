@@ -483,6 +483,7 @@ CHECKS = (
     ("nixie-colors-lan", "test-nixie-colors", "--lan"),
     ("nixie-colors-visual", "test-nixie-colors", "--visual"),
     ("nixie-persistence", "test-nixie-persistence"),
+    ("nixie-survival", "test-nixie-survival"),
     ("cardboard-sword", "test-cardboard-sword", "--sound-parameters"),
     ("cardboard-sword-lan", "test-cardboard-sword", "--sound-parameters", "--lan"),
     ("cardboard-sword-block", "test-cardboard-sword", "--block-only", "--sound-parameters"),
