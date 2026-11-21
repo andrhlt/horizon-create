@@ -73,7 +73,18 @@ def verify(args):
             ))
             if args.frames:
                 guest.call("screenshot", args.frames / "guest-removed.png")
-    print("The host attached wood and the guest replaced it and used the wrench, receiving both original brackets.")
+            host.command(f"/tp {GUEST} {brackets.GLASS_PIPE[0] + 0.5} {brackets.GLASS_PIPE[1]} {brackets.GLASS_PIPE[2] - 2.0:.2f}")
+            multiplayer.until("the guest to reach the glass pipe", lambda: (
+                guest.call("state")["player"]["position"] == [22.5, 101.0, -12.0]
+            ))
+            brackets.press(guest, brackets.METAL, brackets.GLASS_PIPE, "up", teleport=False)
+            multiplayer.until("the guest metal bracket to reach the glass pipe", lambda: (
+                brackets.attached(host.command(
+                    f"/data get block {brackets.coords(brackets.GLASS_PIPE)} Bracket"
+                )) == ("metal", "pipe", "up", "false")
+                and held(guest, brackets.METAL) == 1
+            ))
+    print("The host attached wood and the guest replaced it, removed it with a wrench, and attached a metal bracket to a glass pipe.")
 
 
 def main():

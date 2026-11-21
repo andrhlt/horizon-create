@@ -17,6 +17,9 @@ const WOOD: &str = "create:wooden_bracket";
 const METAL: &str = "create:metal_bracket";
 const KINETIC: &str = "create:simple_kinetic";
 const KEY: &str = "Bracket";
+const PIPE: &str = "create:fluid_pipe";
+const GLASS_PIPE: &str = "create:glass_fluid_pipe";
+const PUMP: &str = "create:mechanical_pump";
 
 #[derive(Clone, Copy, PartialEq)]
 struct Bracket {
@@ -105,12 +108,42 @@ fn target_bracket(
     face: [i32; 3],
     block: &'static str,
 ) -> Option<Bracket> {
-    let kind = match game.native_block(pos).as_str() {
-        SHAFT => "shaft",
-        COG | LARGE_COG => "cog",
+    let target_block = game.native_block(pos);
+    let (kind, axis) = match target_block.as_str() {
+        SHAFT => ("shaft", game.native_block_property(pos, "axis")?),
+        COG | LARGE_COG => ("cog", game.native_block_property(pos, "axis")?),
+        GLASS_PIPE | PUMP => (
+            "pipe",
+            game.native_block_property(
+                pos,
+                if target_block == PUMP {
+                    "facing"
+                } else {
+                    "axis"
+                },
+            )
+            .and_then(|property| match property.as_str() {
+                "up" | "down" => Some("y".to_owned()),
+                "east" | "west" => Some("x".to_owned()),
+                "north" | "south" => Some("z".to_owned()),
+                "x" | "y" | "z" => Some(property),
+                _ => None,
+            })?,
+        ),
+        PIPE => {
+            let open = Direction::ALL
+                .into_iter()
+                .filter(|&direction| {
+                    game.native_block_property(pos, name(direction)).as_deref() == Some("true")
+                })
+                .collect::<Vec<_>>();
+            if open.len() != 2 || open[0] != open[1].opposite() {
+                return None;
+            }
+            ("pipe", direction_axis(open[0]).to_owned())
+        }
         _ => return None,
     };
-    let axis = game.native_block_property(pos, "axis")?;
     let mut facing = Direction::ALL
         .into_iter()
         .find(|&direction| direction.normal() == face)?;
@@ -151,7 +184,9 @@ pub(super) fn apply(game: &mut Game<'_>, stack: &ItemStack, pos: [i32; 3], face:
         return false;
     }
     game.guest_inventory_resend |= game.lan_acting.is_some();
-    if !game.may_build() || mod_entity(game, pos).is_none_or(|entity| entity.id != KINETIC) {
+    let supported_entity = mod_entity(game, pos)
+        .is_some_and(|entity| matches!(entity.id.as_str(), KINETIC | PIPE | GLASS_PIPE | PUMP));
+    if !game.may_build() || !supported_entity {
         game.use_failed = true;
         return true;
     }
@@ -220,7 +255,7 @@ pub(super) fn on_remove(level: &mut GameLevel<'_>, pos: BlockPos, side_effects: 
 }
 
 pub(super) fn update_tag(entity: &ModBlockEntity, tag: &mut Option<Compound>) {
-    if entity.id == KINETIC {
+    if matches!(entity.id.as_str(), KINETIC | PIPE | GLASS_PIPE | PUMP) {
         // Client update tags merge, so an empty compound clears a removed bracket.
         let value = entity
             .nbt
