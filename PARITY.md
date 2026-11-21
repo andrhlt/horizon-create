@@ -1067,6 +1067,53 @@ removes its water. It drops one assembler and the stored rail on that
 tick. The [Java GameTest patch](tools/java-cart-assembler-rails.patch)
 reproduces both traces.
 
+### APP-2003 Cart Assembler and Controller Rail gameplay baseline
+
+The finite case list follows APP-2003: ordinary and powered/control rail
+acquisition and placement; valid assembly and disassembly; supported cart axes
+and speed control; a moving cargo/harvester case; guest interaction; and idle
+and active reopen. Coupling-chain solving remains with the coupling feature.
+
+All 12 selected checks passed serially on
+`native-9f42064-6bdf8691aa42` using the prepared Minecraft 26.3 resources and
+Create pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+
+| Check | Result |
+| --- | --- |
+| `cart-assembler-rails` | Pass: 8 Java survival placements and 13 Java fill, drain, and drop samples |
+| `minecart-anchor` | Pass: both cart axes assemble and disassemble; the assembler rail remains in place |
+| `crop-farming` | Pass: all 72 Java ticks; moving harvester crops and cart output match, immature crops remain untouched, mature crops are harvested, and output survives save/reopen |
+| `minecart-pickup-lan` | Pass: LAN guest picks up and redeploys a stone payload; host retains anchor/orientation and the payload disassembles at the destination assembler |
+| `controller-rail` | Pass: 12 Java placements, rejected unsupported placement, and 221 power samples |
+| `controller-rail-gradient` | Pass: 490 rail and comparator samples |
+| `controller-rail-motion` | Pass: 52 Java minecart samples for full/partial speed, centering, and braking |
+| `controller-rail-craft` | Pass: survival recipe crafts six rails and consumes all eight inputs |
+| `controller-rail-wrench` | Pass: 12 rotations and two dry/wet pickup cases |
+| `controller-rail-assembler` | Pass: six rail exchanges and 18 directed departure samples |
+| `controller-rail-persistence` | Pass: idle/powered rail states survive reopen and a moving cart resumes |
+| `controller-rail-lan` | Pass: guest converges on host's powered rail state |
+
+The Java-derived comparisons use the pinned fixtures described above; the
+additional reopen, negative placement, and LAN cases are Horizon gameplay
+checks. The guest check proves resulting-state convergence, not Java-equivalent
+packet arrival. Existing source/matrix evidence establishes the APP-1978
+Super Glue/assembly-selection and APP-1979 contraption rendering/collision/
+synchronization prerequisites. No Cart Assembler production mismatch was
+reproduced, so this baseline adds finite acceptance evidence only. Full 1:1
+remains Open for the matrix's remaining carriers, crossings, and entity
+persistence.
+
+Reproduce with the matching checks registered in `tools/test-parity.py`:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check cart-assembler-rails --check minecart-anchor --check crop-farming --check minecart-pickup-lan --check controller-rail --check controller-rail-gradient --check controller-rail-motion --check controller-rail-craft --check controller-rail-wrench --check controller-rail-assembler --check controller-rail-persistence --check controller-rail-lan
+```
+
+Approximate effort: source review and existing Java-fixture selection 10
+minutes; isolated runtime/output setup 10 minutes; focused integration about
+three minutes. No Java recapture or production repair was needed.
+
 ## Controller Rail
 
 Build `df42bb0aa2f2` matched [12 Java placements](fixtures/controller-rail-placement-java.csv)
