@@ -2359,6 +2359,41 @@ Using the pieces as furnace fuel matched all 824
 guest. Each piece burns for 1,000 ticks and produces the first iron ingot
 on tick 200. The LAN guest took the ingot from the furnace.
 
+## APP-2079: Cardboard armor and disguise
+
+The bounded acceptance cases reuse the four original shaped recipes, host and
+guest equipment interactions, the four furnace-fuel traces, and the six
+settled disguise phases recorded above. `tools/test-cardboard-armor.py` now
+also compares each equipped piece's maximum and remaining durability with the
+Java values in `fixtures/cardboard-armor-java.csv` (44 helmet, 64 chestplate,
+60 leggings, 52 boots); all four recipes, equipment slots, defense, and
+durability values passed in solo and LAN.
+
+The new [`cardboard-armor-reopen`](tools/test-cardboard-armor-reopen.py) case
+equips the full set, activates the crouching disguise, cold-reopens the world,
+and checks the four worn item IDs, reactivated 0.6 × 0.8 body, and zero mob
+visibility. It passed on cached build `native-9f42064-6bdf8691aa42` from main
+`781c0ef`, using client SHA-256
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`,
+controller SHA-256
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`,
+prepared Horizon 26.3 resources, and Create pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+The prior disguise replay's six settled Java phases passed solo and LAN on
+`native-9f42064-daabfba12364` with pack SHA-256
+`7ea5f1ceb3e9fe8fca602aa24b64877f0b8e3da9f043caa04fbf45353483f7f5`.
+That earlier runtime has since been pruned; its captured results remain in
+`.local/exact-builds/stack-disguise-train.4eMBqP/`.
+
+The case list is: shaped survival craft/equip for each of four slots and
+defense/durability; four fuel types; full-set crouching disguise activation,
+removal and visibility; host/guest observation; and equipped full-set cold
+reopen followed by disguise reactivation. Create 6.0.10 source at
+`ac0c444d9828da3453ae8cc65338e8de063286fb` defines zero visibility for a
+crouching player wearing all four pieces, except while flying. Exact overlay,
+trims, every hostile target-loss transition, damage/repair combinations, and
+all mob types remain follow-ups; Full 1:1 stays Open.
+
 The [Cardboard Sword replay](tools/test-cardboard-sword.py) matched 88
 [original mob samples](fixtures/cardboard-sword-targets-java.csv) in solo
 and with a real LAN guest. It checks health, Slowness X, and knockback
