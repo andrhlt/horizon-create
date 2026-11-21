@@ -156,6 +156,9 @@ pub(super) fn remove_markers(
 ) {
     use horizon_world::level::flags;
     for at in rasterise(curve) {
+        if super::create_track::marker_owned_by_other(level, at, curve) {
+            continue;
+        }
         let state = level.world.block(at[0], at[1], at[2]);
         let Some(block) = level.registry.state(state) else {
             continue;
