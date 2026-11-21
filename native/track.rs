@@ -520,6 +520,59 @@ fn remove_inbound(
     true
 }
 
+fn same_curve(a: Curve, b: Curve) -> bool {
+    let matches = |left: Curve, right: Curve| {
+        left.ends
+            .iter()
+            .zip(right.ends.iter())
+            .all(|(left, right)| {
+                left.pos == right.pos
+                    && left.axis.distance(right.axis) < 1.0e-6
+                    && left.normal.distance(right.normal) < 1.0e-6
+            })
+            && left
+                .starts
+                .iter()
+                .zip(right.starts.iter())
+                .all(|(left, right)| left.distance(*right) < 1.0e-6)
+            && left.segments == right.segments
+    };
+    matches(a, b)
+        || matches(
+            a,
+            Curve {
+                ends: [b.ends[1], b.ends[0]],
+                starts: [b.starts[1], b.starts[0]],
+                ..b
+            },
+        )
+}
+
+pub(super) fn marker_owned_by_other(level: &GameLevel<'_>, at: [i32; 3], removed: Curve) -> bool {
+    let mut skipped_removed = false;
+    for (&(x, y, z), block_entity) in level.world.block_entities.iter() {
+        let BlockEntity::Mod(entity) = block_entity else {
+            continue;
+        };
+        if entity.id != TRACK {
+            continue;
+        }
+        for data in connections(entity) {
+            let Some(candidate) = curve(data).map(|curve| absolute_curve(curve, [x, y, z])) else {
+                continue;
+            };
+            if !skipped_removed && same_curve(candidate, removed) {
+                skipped_removed = true;
+                continue;
+            }
+            if super::create_fake_track::rasterise(candidate).contains(&at) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 fn drop_curve_items(level: &mut GameLevel<'_>, curve: Curve, girder: bool) {
     use super::spill::Spawn;
     let segments = curve.segments as f32;

@@ -8513,6 +8513,27 @@ placement, refresh, physical and command cleanup, standalone expiry
 and water restoration. It covers one flat curve. Shared markers
 and an exact raster trace remain open.
 
+### APP-2046 gameplay baseline
+
+The finite owner/lifecycle pass was rerun on 2026-11-21 with
+`native-9f42064-6bde2ea90cf2`, Minecraft 26.3 resources from that build,
+and `create.hmod` SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+`tools/test-fake-track.py` passed its one flat primary-curve case: the
+owner created markers, they remained after 120 ticks, physical break and
+command replacement removed them, and standalone dry/waterlogged markers
+expired with the expected air/water result. `tools/test-track-curve.py`
+passed all 10 pinned-Java placement cases on the same build. These checks
+exercise host-side marker creation, refresh, cleanup and the curve owner.
+
+This does not establish APP-2046's guest convergence or save/reopen gates.
+The tests above use a single local client and their world lifetime ends with
+the fixture; they do not test shared-marker ownership across two surviving
+curves. Keep the gameplay baseline Partial until a guest observes marker
+creation/removal and a saved curve is reopened with its marker lifecycle
+intact. The exact raster comparison, shared-marker layouts and visual parity
+remain open follow-ups; Full 1:1 remains Open.
+
 ## Tree Fertilizer
 
 APP-2088 preserves the existing family evidence, which
@@ -8763,6 +8784,44 @@ navigate through it in the original order and back to their relays.
 The screenshot shows the lifted, turned, and swapped gear
 configurations. Rotation-speed particles, exact movement
 interpolation, full catalog, and container return remain open.
+
+### APP-2101 bounded gameplay baseline
+
+The finite case set for this ticket reuses the Shaft relay and encasing,
+Small and Large Cogwheel relays, Gearshift navigation, survival Back/Escape,
+and Creative-tab return above. The [Shaft replay check](tools/test-ponder-shaft.py)
+now also pauses at tick 5, waits eight client ticks, confirms the tick-20 event
+has not fired, then resumes through the existing Java event markers to tick 65.
+It passed with nonempty scene geometry, replay, Escape, and unchanged inventory
+and world marker. The new [LAN check](tools/test-ponder-guest.py) passed with
+both host and guest opening Ponder from their survival inventories, returning
+to inventory, and retaining their Shaft counts; the guest UI did not change the
+host's state. Existing [Creative Back evidence](tools/test-ponder-creative-back.py)
+shows the selected Redstone Blocks tab and item grid restored byte-for-byte.
+The LAN fixture then stopped and reopened the dedicated world and rejoined both
+players; their Shaft inventories and the diamond-block world marker survived.
+Ponder itself is a read-only client presentation with no mutable scene save
+state, so this inventory/world save-reopen and the Creative selection across
+opening and closing are the applicable persistence checks.
+
+The two new focused replays ran against pack SHA-256
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`,
+prepared 26.3 resources from installed build `native-9f42064-68c7ab9c0826`,
+`horizon-ctl` SHA-256
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`, and
+the offscreen `native/target/fast/horizon-client` SHA-256
+`7de8fae06dd9f92a2ccb059e732120931f3f56e15396325fb5bf0fef4b185b96`.
+Commands from the repository root:
+
+```sh
+python3 tools/test-ponder-shaft.py "$CTL" "$CLIENT" "$RESOURCES" --pack /path/to/create.hmod
+python3 tools/test-ponder-guest.py "$CTL" "$CLIENT" "$RESOURCES" --pack /path/to/create.hmod
+```
+
+The guest test is registered as `ponder-guest` in `tools/test-parity.py`.
+These representative cases establish the gameplay baseline only; the full
+catalog, remaining storyboards, container return, exact pixels, and exact
+movement interpolation remain open in the matrix.
 
 
 The Depot replay on `native-9f42064-e1f836744b54` also matched all
@@ -11650,6 +11709,68 @@ actual-player old-world reopen/extension guard passed on the refactored build.
 
 The [tank evidence matrix](TANK-PARITY.md) records 31/31 scripts and 1,430 exact Java records passing through headless Horizon `92ef2557669b`. Its applicable shared production core also passes 19/19 scripts (1,093 records). The integrated build closes sampled split, component, creative, clone/move, window, boiler, comparator, source-light and real container inventory gaps. Original steam timing matches all 13 ticks. Physical local/reopen/LAN light, imported ownership through partial/full unload, vanilla clone inventory, solo/LAN bucket and muted sound-event guards pass. Java client rendering/particles, propagated-light and unload timing, audio pitch verification, mounted storage and remaining consumers are still open. Full-family parity was not promoted.
 
+
+## APP-2099 Sounds, particles and effects
+
+The bounded gameplay baseline reuses the existing pinned Java event traces and
+adds one registered save/reopen check. The Java reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+| Case | Evidence and outcome |
+| --- | --- |
+| Powered machine stop cues | `clockwork-audio` matched all six Java cues at tick 6, including source, position, gain and pitch on host and guest. |
+| Interaction cues and silent steps | `train-trapdoors-sound` and `train-trapdoors-sound-lan` matched seven toggles and two silent transitions in solo and LAN. `package-open` and `package-open-lan` passed. |
+| Processing and event boundaries | `desk-bell-pulse` and `desk-bell-pulse-lan` matched 27 Java state samples and all three cues. `desk-bell-pulse-reopen-lan` additionally saved and reopened the world, retained the bell and both redstone wires, then let a newly joined guest press it; host and guest observed the Java cues. |
+| Event validity, range and particles | `worldshaper-effect` and `worldshaper-effect-lan` delivered one shot, ten End Rods, ten Fireworks and the main-hand cue to each client. The Frogport package-effects replay hit Java catch/deposit starts at ticks 24/37. Nearby guests heard two cues per event; distant guests heard one in-range cue per event. All observers still received five seeded catch-rope particles outside sound range. |
+
+The repeatable test changes are in `tools/test-desk-bell.py` and
+`tools/test-parity.py`. The reopen check compares the saved block and wire
+states before and after `FixtureWorld.restart()`. Sound playback and particles
+are transient events, so they have no independent idle/active setting or
+contents to serialize; the persistent Desk Bell setup is the meaningful
+before/after state. The guest joins after reopening, and the subsequent cue is
+checked on both clients.
+
+Final focused Horizon checks passed on existing compatible candidate
+`native-9f42064-340cbe866fa7` (Minecraft 26.3 / Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`). Client and control tool were taken
+from `/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/`;
+the exact pack SHA-256 was
+`0dc4da44753fdf6dd94d1cdd8d26b82bc35446899a3ad1219a9990377e74b852`.
+Prepared 26.3 resource metadata SHA-256 was
+`c666426f77cadd1e8db01ad53e4900aa9e53930895c3f92243634e27e6ecf0ae`.
+No native runtime source changed between that candidate and this baseline;
+the ticket changes only the Desk Bell test path and evidence. The exact final
+commands were:
+
+```sh
+APP2099_CTL=/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/horizon-ctl
+APP2099_CLIENT=/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/horizon-client
+APP2099_RESOURCES=/Users/andrewholt/dev/horizon-create/.local/app-2017-evidence/native-9f42064-6bdf8691aa42/.local/horizon-client/26.3
+APP2099_PACK=/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/create.hmod
+
+TMPDIR=/private/tmp python3 tools/test-parity.py "$APP2099_CTL" "$APP2099_CLIENT" "$APP2099_RESOURCES" --jobs 2 \
+  --check clockwork-audio --check train-trapdoors-sound --check train-trapdoors-sound-lan \
+  --check desk-bell-pulse --check desk-bell-pulse-lan --check desk-bell-pulse-reopen-lan \
+  --check package-open --check package-open-lan --check worldshaper-effect --check worldshaper-effect-lan
+
+TMPDIR=/private/tmp python3 tools/test-frogport-package-effects.py "$APP2099_CTL" "$APP2099_CLIENT" "$APP2099_RESOURCES" \
+  --pack "$APP2099_PACK" --lan
+TMPDIR=/private/tmp python3 tools/test-frogport-package-effects.py "$APP2099_CTL" "$APP2099_CLIENT" "$APP2099_RESOURCES" \
+  --pack "$APP2099_PACK" --lan --remote
+```
+
+The ten registered checks and both Frogport range runs passed. The first
+unprivileged attempt was invalid because the sandbox denied Horizon's local
+control socket; the same checks passed with the required local socket access.
+An initial LAN-reopen attempt also exposed that the Desk Bell harness assumed
+every successful `/gamemode` command returned chat text. The helper now uses
+the command result directly, and the host/guest reopen case passes. Raw logs
+are preserved under this worktree's `.local/parity/` and `.local/` directories.
+No new Java capture or runtime build was needed. Reuse setup: 0; harness/docs
+changes: about 5 minutes; build: 0; focused runtime checks: about 5 minutes.
+Remaining follow-ups are the other registered sound IDs, actual waveform and
+mixing, exact audio output timing, and exact cosmetic/particle presentation.
 ## APP-1949 sequencer validation on latest main — November 19, 2026
 
 After rebasing onto `origin/main` at `9341ef5cb462c3bb3f13c028b54a38c6c7ce2853`,
@@ -12507,6 +12628,47 @@ LAN; the reverse-trip replay reopened parked and moving trains at its Java
 trace ticks and passed the active mid-entry persistence/no-duplicate-dispatch
 case. The client and fixture bundle were provisioned outside Git under the
 worktree `.local` directory.
+
+## APP-2053 scheduled routing and arrival
+
+This bounded pass covers the compact two-station route, one branch choice,
+arrival/departure/wait, missing and unreachable destinations, canceled-route
+recovery, host/guest state, and en-route/dwelling reopen. It reuses the APP-2052
+active and parked reverse-trip reopen evidence; those cases were not rerun for
+this ticket. Full 1:1 remains Open for broader route selection, network size,
+cross-dimension movement and interactions.
+
+The pinned references are Create `ac0c444d9828da3453ae8cc65338e8de063286fb`
+and Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. The runtime was
+`native-9f42064-6bdf8691aa42` (client SHA-256
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe3`,
+pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`;
+prepared 26.3 resources). Existing `scheduled-station-approach` and
+`scheduled-station-approach-lan` each matched 123 Java samples for arrival,
+departure and dwell. `scheduled-wildcard-route-red-lan` matched 198 Java
+samples for a guest-assigned wildcard timetable selecting the farther route
+with the short branch forced red. `scheduled-reverse-trip-reopen` passed in
+APP-2052 on build `native-9f42064-6bde2ea90cf2`, including parked wait and
+active mid-entry reopen without duplicate dispatch.
+
+The new `scheduled-route-recovery` integration check passed on the identified
+runtime. It verified that an unavailable named destination leaves the train
+parked and the schedule unpaused, restoring the station causes a retry and
+arrival, taking Train Controls cancels the route and clears transit state, and
+resuming the conductor timetable redispatches and arrives. The source-aligned
+Java paths are `ScheduleRuntime`, `DestinationInstruction`,
+`Navigation.cancelNavigation`, `CarriageContraptionEntity.startControlling`,
+and `ScheduleItemEntityInteraction`.
+
+The matching LAN recovery check remains unverified: the isolated guest launch
+could not open its control socket because `/private/tmp` ran out of space. The
+failed setup log is `.local/parity/scheduled-route-recovery-lan.log`; earlier
+sandbox-denied socket attempts are also invalid setup, not gameplay failures.
+The separate station-approach and forced-red branch LAN checks passed, so host
+and guest route state is covered for the accepted arrival and branch cases, but
+not yet for canceled-route recovery. No exhaustive route or packet-timing claim
+is made.
 
 ## APP-2059 train display, prompts and arrival audio
 
