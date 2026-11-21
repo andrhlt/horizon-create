@@ -179,7 +179,9 @@ pub(super) fn click(game: &mut Game<'_>, at: [i32; 3], hit: [f64; 3]) -> bool {
             continue;
         }
         let before = stack.count;
-        let rest = game.native_insert_item_unsided(storage, stack);
+        // A horizontal Item Hatch exposes furnace inputs from above; feeding
+        // from its attached horizontal face would only reach the fuel slot.
+        let rest = game.native_insert_item(storage, Direction::Up, stack);
         if rest.as_ref().is_some_and(|left| left.count == before) {
             continue;
         }

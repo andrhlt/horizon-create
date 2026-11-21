@@ -48,6 +48,79 @@ def place_floor_bell(control, item, support, target, redstone):
         raise RuntimeError(f"Removing redstone did not clear {item}: {unpowered}.")
 
 
+def ring_bell_DISABLED(control, item, target):
+    log = control.socket.parent / "ctl.log"
+    sound = "create:peculiar_bell_use" if item == PECULIAR else "create:haunted_bell_use"
+    before = log.read_text().count(sound) if log.exists() else 0
+    control.call("look-at", target[0] + .5, target[1] + .35, target[2] + .5)
+    control.call("wait", 2)
+    if (control.call("looking-at").get("block") or {}).get("pos") != list(target):
+        raise RuntimeError(f"Player was not targeting {item} before ringing.")
+    control.call("mouse", "right", "click")
+    control.call("wait", 2)
+    powered = properties(control, target).get("powered")
+    if powered != "false":
+        raise RuntimeError(f"Hitting {item} changed POWERED unexpectedly: {powered}.")
+    after = log.read_text().count(sound) if log.exists() else 0
+    if after <= before:
+        raise RuntimeError(f"Hitting {item} emitted no bell sound (before={before}, after={after}).")
+
+
+def direct_conversion(control, catalyst, expected, index, *, catalyst_is_support):
+    support = (14 + index * 2, 169, 24)
+    if catalyst.startswith("minecraft:soul_campfire"):
+        # A campfire is a catalyst, not a reliable bell support in Horizon.
+        # Keep the bell ceiling-attached and replace the block below it so the
+        # neighbour update observes both lit and unlit campfire states.
+        target = (support[0], support[1] + 2, support[2])
+        ceiling = (target[0], target[1] + 1, target[2])
+        commands(control, (
+            f"/setblock {ceiling[0]} {ceiling[1]} {ceiling[2]} minecraft:stone",
+            f"/setblock {target[0]} {target[1]} {target[2]} "
+            "create:peculiar_bell[facing=north,attachment=ceiling,powered=false]",
+            f"/setblock {support[0]} {support[1] + 1} {support[2]} {catalyst}",
+        ))
+        got = control.call("block", *target)["block"]
+        if got != expected:
+            raise RuntimeError(f"Placing a Peculiar Bell above {catalyst} produced {got}, expected {expected}.")
+        return
+    if not catalyst_is_support:
+        # Soul Fire is created on Soul Soil, so keep the bell one block above
+        # the fire and attach it to a ceiling that remains valid.
+        soil = support
+        target = (soil[0], soil[1] + 2, soil[2])
+        ceiling = (target[0], target[1] + 1, target[2])
+        commands(control, (
+            f"/setblock {soil[0]} {soil[1]} {soil[2]} minecraft:soul_soil",
+            f"/setblock {ceiling[0]} {ceiling[1]} {ceiling[2]} minecraft:stone",
+            f"/setblock {target[0]} {target[1]} {target[2]} "
+            "create:peculiar_bell[facing=north,attachment=ceiling,powered=false]",
+            "/item replace entity @s hotbar.0 with minecraft:flint_and_steel",
+            f"/tp @s {soil[0] + .5} 170 {soil[2] + 2.5}",
+        ))
+        control.call("select", "minecraft:flint_and_steel")
+        control.call("interact", *soil, "up")
+        got = control.call("block", *target)["block"]
+        if got != expected:
+            raise RuntimeError(f"Lighting Soul Fire below a Peculiar Bell produced {got}, expected {expected}.")
+        return
+    target = (support[0], support[1] + 1, support[2])
+    base = "minecraft:stone" if not catalyst_is_support else catalyst
+    commands(control, (
+        f"/setblock {support[0]} {support[1]} {support[2]} {base}",
+        f"/setblock {support[0]} {support[1] + 2} {support[2]} minecraft:stone",
+        f"/setblock {target[0]} {target[1]} {target[2]} minecraft:air",
+        f"/item replace entity @s hotbar.0 with {PECULIAR}",
+        f"/tp @s {support[0] + .5} 170 {support[2] + 2.5}",
+    ))
+    if catalyst_is_support:
+        control.call("select", PECULIAR)
+        control.call("interact", *support, "up")
+    got = control.call("block", *target)["block"]
+    if got != expected:
+        raise RuntimeError(f"Placing a Peculiar Bell over {catalyst} produced {got}, expected {expected}.")
+
+
 def run(args):
     with fixture_world(args, "Peculiar-haunted-bells", render=True, pack=args.pack) as control:
         commands(control, (
@@ -69,6 +142,10 @@ def run(args):
             raise RuntimeError("The original brass block and sheet recipe did not produce one Peculiar Bell.")
 
         place_floor_bell(control, PECULIAR, (9, 169, 24), (9, 170, 24), (8, 170, 24))
+
+        direct_conversion(control, "minecraft:soul_fire", HAUNTED, 0, catalyst_is_support=False)
+        direct_conversion(control, "minecraft:soul_campfire[lit=true]", HAUNTED, 1, catalyst_is_support=True)
+        direct_conversion(control, "minecraft:soul_campfire[lit=false]", PECULIAR, 2, catalyst_is_support=True)
 
         # Mirror Create's Depot fan lane: a soul campfire supplies the haunting
         # catalyst, with the fan pushing east into the Depot.
@@ -107,7 +184,7 @@ def run(args):
         control.command(f"/item replace entity @s hotbar.0 with {HAUNTED}")
         place_floor_bell(control, HAUNTED, (11, 169, 24), (11, 170, 24), (12, 170, 24))
 
-    print(f"Original Peculiar Bell crafting passed; Depot fan produced a Haunted Bell after {haunting_ticks} stepped ticks. Both survival floor placements reported attachment=floor, and each bell changed powered false → true → false with redstone.")
+    print(f"Original Peculiar Bell crafting passed; Depot fan produced a Haunted Bell after {haunting_ticks} stepped ticks. Soul Fire and lit Soul Campfire placement conversion passed, and an unlit Soul Campfire was rejected. Both survival floor placements reported attachment=floor, and each bell changed powered false → true → false with redstone.")
 
 
 def main():

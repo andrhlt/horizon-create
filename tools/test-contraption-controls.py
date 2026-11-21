@@ -84,13 +84,48 @@ def press(control):
     control.call("interact", *at(BUTTON))
 
 
+def assert_disabled_control(control, pos, expected):
+    nbt = control.command(f"/data get block {' '.join(map(str, at(pos)))} Disabled")
+    value = nbt.rsplit(":", 1)[-1].strip()
+    actual = value in ("1b", "1", "true")
+    if actual != expected:
+        raise RuntimeError(f"Contraption control at {pos} saved Disabled={actual}, expected {expected}: {nbt}")
+
+
+def check_reassembly(control):
+    # The original bearing completes a full turn at tick 97 and restores its
+    # blocks. Java's stopMoving callback copies each actor filter's state to
+    # the corresponding controls block entity before disassembly.
+    assert_disabled_control(control, (6, 3, 4), True)  # plough
+    assert_disabled_control(control, (7, 3, 4), True)  # harvester
+    control.restart()
+    assert_disabled_control(control, (6, 3, 4), True)
+    assert_disabled_control(control, (7, 3, 4), True)
+
+    before = sample(control)[-2:]
+    press(control)
+    bearing = " ".join(map(str, at(BEARING)))
+    filters = ""
+    for _ in range(5):
+        control.step_to(control.clock() + 1)
+        filters = control.command(f"/data get block {bearing} DisabledActors")
+        if '"create:mechanical_harvester"' in filters and '"create:mechanical_plough"' in filters:
+            break
+    else:
+        raise RuntimeError(f"Reassembled bearing did not restore both disabled actor filters: {filters}")
+    after = sample(control)[-2:]
+    if after != before:
+        raise RuntimeError(f"Disabled harvesting/plough actors changed crops or soil after reassembly: {before} -> {after}")
+
+
 def run(args):
     with (ROOT / "fixtures/controls-java.csv").open() as file:
         reader = csv.DictReader(file)
         keys = ("tick", "world_time_mod_20", "sequence_state", "button_powered",
                 "bearing_angle", "harvester_disabled", "plough_disabled", "tilled_soils", "crop_ages")
         expected = [[row[key] for key in keys] for row in reader][:args.ticks]
-    with fixture_world(args, "contraption_controls", TEMPLATE) as control:
+    artifacts = ROOT / ".local/app-2005"
+    with fixture_world(args, "contraption_controls", TEMPLATE, artifact_dir=artifacts) as control:
         control.command("/gamerule random_tick_speed 0")
         while control.clock() % 20 != int(expected[0][1]):
             control.step_to(control.clock()+1)
@@ -111,7 +146,8 @@ def run(args):
                 if tick != 83:
                     click_actor_control(control, HARVESTER if tick == 41 else PLOUGH)
                 press(control)
-    out = ROOT / ".local/controls-horizon.csv"
+        check_reassembly(control)
+    out = artifacts / "controls-horizon.csv"
     with out.open("w",newline="") as file:
         writer = csv.writer(file, lineterminator="\n")
         writer.writerow(keys)
@@ -119,7 +155,7 @@ def run(args):
     mismatches = [(a,b) for a,b in zip(expected,actual,strict=True) if a!=b]
     if mismatches:
         raise SystemExit(f"{len(mismatches)} mismatches in the first {len(expected)} ticks. {mismatches[:6]}. See {out}")
-    print(f"All {len(expected)} ticks matched. See {out}")
+    print(f"All {len(expected)} Java ticks matched; disabled controls survived disassembly, save/reopen and reassembly. See {out}")
 
 
 if __name__ == "__main__":

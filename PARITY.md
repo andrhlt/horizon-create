@@ -4526,9 +4526,17 @@ section, resumes its speed/wheels and all four lamps against the Java trace, and
 then samples the settled end state. The capture matched 119 Java samples around
 the client restart; startup advances the live world before the harness can
 freeze it, so resumed samples use the corresponding shifted Java tick. The
-occupied and unoccupied checks exercise one train. The required concurrent
-two-train junction case and signal-state observation by a guest during train
-occupancy remain open; this evidence does not complete APP-2050's baseline.
+occupied and unoccupied checks exercise one train. The second-station assembly
+probe found that the station needs one discovery tick before its bogeys become
+eligible; after that, a second two-bogey train assembled with four wheel
+TrackPoints. A candidate-only moving probe changed the affected lamps from
+green to red as that train entered the signal section, but has not compared a
+two-train trace to pinned Java or verified clearance after both trains leave.
+This does not complete APP-2050's baseline.
+
+The branched LAN replay matched host train motion and all six lamps to 160 Java
+ticks. The guest's local lamp state matched the host at seven reads spanning
+five Java occupancy transition points (east-out and north-out changes).
 
 ## Track Station naming
 
@@ -7855,6 +7863,23 @@ next to a lit Soul Campfire. Both bells passed floor placement and
 the powered state cycle. The original fan timing, direct soul-fire
 conversion, animation, sounds, shapes and Haunting effects remain open.
 
+APP-2038 adds source-aligned direct conversion when a Peculiar Bell is
+placed over Soul Fire or a lit Soul Campfire, and when either catalyst
+appears below an existing Peculiar Bell. The callback carries facing,
+attachment and power into the Haunted Bell state. The rebuilt-client
+[bounded replay](tools/test-peculiar-haunted-bells.py) passed Soul Fire,
+lit Soul Campfire and unlit Soul Campfire rejection, while retaining the
+survival craft, 153-tick Depot fan conversion and both bells' floor
+placement/power checks. The [hit probe](tools/probe-peculiar-haunted-bell-hit.py)
+kept the Haunted Bell intact after a valid creative left-click. The pinned
+control log exposed no sound/event lines, so event delivery remains
+unverified. The [LAN lifecycle replay](tools/test-peculiar-haunted-bells-lifecycle.py)
+passed host/guest power convergence and active/idle save/reopen. These
+runs used pinned Java source
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and compatible client build
+`native-9f42064-55bc0a64ce79`. Exact Java hit geometry, swing/audio timing
+and Haunting effects remain open.
+
 ## Sticker
 
 See the [complete Sticker behavior checklist](STICKER-PARITY.md) for the subsequent
@@ -8155,12 +8180,34 @@ The fixture now waits for the item to reach the guest inventory before use.
 
 ## Shopping List
 
-The [survival replay](tools/test-shopping-list-discard.py) on
-`native-9f42064-5add64cfcfc1` with `create-shopping-list.hmod`
-retained the list during ordinary use and discarded it when the player
-sneak-used it in air or on a block. The item is absent from the Create
-creative tab, matching the original. List creation, entries, pricing,
-tooltip summaries, purchases and LAN remain open.
+The [APP-2031 bounded flow](tools/test-shopping-list-flow.py) passed on the
+pinned `native-9f42064-3a2d3eb65fc6` build with `create.hmod`
+(`sha256=67ea72a5c560188616f9ac28dd33e97f134fe65d4b14adf1b2f6adbffd039e96`).
+The sampled rules follow pinned Java `TableClothBlockEntity.useShop`,
+`ShoppingListItem.bakeEntries`, and Stock Ticker request handling. In solo, two
+iron ingots could not create a three-ingot purchase; after restocking, the
+list recorded the purchase and refused to increment it beyond available stock.
+The list survived a cold save/reopen. An underfunded attempt retained both the
+list and the buyer's gold. A funded attempt dispatched exactly one `Warehouse` package with three iron
+ingots, left two in stock, removed exactly two gold ingots from the buyer,
+recorded both in the Stock Ticker's payment inventory, and consumed the list
+once. The equivalent LAN
+guest flow passed with payment and list state owned by the guest and delivery
+state shared by the host.
+
+The [discard replay](tools/test-shopping-list-discard.py) passed on the same
+build: ordinary use retained the list and sneak-use discarded it in air or on
+a block. The [Table Cloth storage regression](tools/test-table-cloth-storage.py)
+and [Stock Ticker order replay](tools/test-stock-ticker-order.py) passed in
+solo and LAN. The [Item Hatch unsided-input regression](tools/test-item-hatch.py)
+also passed after adapting the insertion call to the pinned API. These results
+close the bounded APP-2031 gameplay flow; they do not claim exhaustive parity.
+
+Full 1:1 remains open for exact Create tooltip styling and less common
+shop/filter and transaction edges. The implementation reads each referenced
+cloth's saved request, owner, address, target and price, builds readable item
+and cost tooltip lines, enforces current Stock Ticker availability, preflights
+payment, and clears the buyer's list only after package dispatch succeeds.
 
 ## Elevator Contact item
 
@@ -12159,3 +12206,48 @@ Horizon save/reopen and does not claim Java reload parity.
 The existing Java-backed checks remain valid starting evidence: `precision-mechanism` compares 108 ticks in the four-belt, three-deployer factory; `track-crafting` compares 190 samples of the three-stage track recipe; and `sturdy-sheet` compares 67 ticks through fluid filling and two press strokes. The Precision Mechanism fixture seeds only its weighted-result roll. These checks preserve concrete item IDs, counts, assembly steps, progress-bearing belt cargo, deployer state, and final outputs where applicable.
 
 The Mechanical Press prerequisite (APP-1960) and Deployer prerequisite (APP-1966) are Done. The APP-1967 completion gates still need a player-driven survival chain using legitimate ingredients, a wrong-step and blocked-output recovery case, representative host/guest agreement, and idle plus partway sequence save/reopen. The Java checkout and compatible Horizon runtime are not present in this worktree, so no fresh replay or resulting build identity is claimed here. Keep Full 1:1 Open; broader recipe combinations and unseeded weighted-roll coverage remain follow-ups.
+
+## APP-2005 Contraption Controls
+
+The existing `contraption-controls` check compares all 105 Java ticks for the
+representative rotating harvester and plough fixture. It also toggles both
+moving controls, checks their disabled settings after disassembly and a world
+save/reopen, then reassembles and confirms the disabled actor filters return
+without changing the sampled crop or soil state. The native bearing now copies
+saved control settings into the moving assembly at start and writes the moving
+settings back to each control block before disassembly, following
+`Contraption.startMoving` and `ContraptionControlsMovement.stopMoving` in the
+pinned Java source.
+
+This passed on `native-9f42064-5c89103ca2f5` with `create.hmod` SHA-256
+`825e822d982dc624a691f0cced1ca2db370d030bea0899f46432021c7036642b` and
+prepared 26.3 resources:
+
+```sh
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1 \
+  --check contraption-controls
+```
+
+The deployed actor effect and host input are covered by the replay. The related
+Deployer regressions also pass on the same build and pack: the six-lane
+application replay passes in solo and LAN, including item applications over 25
+ticks, and the Deployer baseline verifies Wrench mode changes, hand exchange,
+filter replacement, and exact 65-item conservation. The LAN baseline has the
+guest perform those actions and confirms host/guest inventory convergence. The
+idle and active Deployer save/reopen cases retain filters and held items and
+resume one application with a single consumed item.
+
+```sh
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1 \
+  --check deployer-applications --check deployer-applications-lan
+python3 tools/test-deployer-baseline.py "$CTL" "$CLIENT" "$RESOURCES" \
+  --pack .local/create.hmod --persistence
+python3 tools/test-deployer-baseline.py "$CTL" "$CLIENT" "$RESOURCES" \
+  --pack .local/create.hmod --lan
+```
+
+These checks use `native-9f42064-5c89103ca2f5`, prepared 26.3 resources and
+pack SHA-256 `825e822d982dc624a691f0cced1ca2db370d030bea0899f46432021c7036642b`.
+The Deployer behavior remains shared with APP-1966; this ticket adds no
+duplicate Deployer implementation. Full 1:1 remains Open for broader actor
+types, settings, effects and packet timing.

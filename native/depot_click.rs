@@ -29,6 +29,10 @@ fn depot_click(
         *canceled = true;
         return;
     }
+    if !*canceled && crate::game::create_shopping_list::ticker_click(game, pos) {
+        *canceled = true;
+        return;
+    }
     if !*canceled && crate::game::create_placard::click(game, pos) {
         *canceled = true;
         return;
