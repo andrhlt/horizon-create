@@ -7630,20 +7630,34 @@ transport timing remain open.
 
 ## Shopping List
 
-The [survival replay](tools/test-shopping-list-discard.py) on
-`native-9f42064-5add64cfcfc1` with `create-shopping-list.hmod`
-retained the list during ordinary use and discarded it when the player
-sneak-used it in air or on a block. The item is absent from the Create
-creative tab, matching the original. List creation, entries, pricing,
-tooltip summaries, purchases and LAN remain open.
+The [APP-2031 bounded flow](tools/test-shopping-list-flow.py) passed on the
+pinned `native-9f42064-3a2d3eb65fc6` build with `create.hmod`
+(`sha256=67ea72a5c560188616f9ac28dd33e97f134fe65d4b14adf1b2f6adbffd039e96`).
+The sampled rules follow pinned Java `TableClothBlockEntity.useShop`,
+`ShoppingListItem.bakeEntries`, and Stock Ticker request handling. In solo, two
+iron ingots could not create a three-ingot purchase; after restocking, the
+list recorded the purchase and refused to increment it beyond available stock.
+The list survived a cold save/reopen. An underfunded attempt retained both the
+list and the buyer's gold. A funded attempt dispatched exactly one `Warehouse` package with three iron
+ingots, left two in stock, removed exactly two gold ingots from the buyer,
+recorded both in the Stock Ticker's payment inventory, and consumed the list
+once. The equivalent LAN
+guest flow passed with payment and list state owned by the guest and delivery
+state shared by the host.
 
-The APP-2031 branch adds an initial Table Cloth transaction path that reads
-Create's saved request, owner, target address and Stock Ticker frequency and
-stores purchases in the original `create:shopping_list` component shape. This
-source change has only passed `rustfmt --check` and `git diff --check`; it has
-not been built or replayed. Stock availability/pricing, fulfillment, readable
-entry summaries, host/guest interaction and save/reopen still require the
-bounded APP-2031 checks before this is gameplay evidence.
+The [discard replay](tools/test-shopping-list-discard.py) passed on the same
+build: ordinary use retained the list and sneak-use discarded it in air or on
+a block. The [Table Cloth storage regression](tools/test-table-cloth-storage.py)
+and [Stock Ticker order replay](tools/test-stock-ticker-order.py) passed in
+solo and LAN. The [Item Hatch unsided-input regression](tools/test-item-hatch.py)
+also passed after adapting the insertion call to the pinned API. These results
+close the bounded APP-2031 gameplay flow; they do not claim exhaustive parity.
+
+Full 1:1 remains open for exact Create tooltip styling and less common
+shop/filter and transaction edges. The implementation reads each referenced
+cloth's saved request, owner, address, target and price, builds readable item
+and cost tooltip lines, enforces current Stock Ticker availability, preflights
+payment, and clears the buyer's list only after package dispatch succeeds.
 
 ## Elevator Contact item
 
