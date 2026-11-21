@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 from fixture_world import ROOT, fixture_world
 
 placement = import_module("test-package-placement")
+multiplayer = import_module("test-multiplayer")
 SWORD = "create:cardboard_sword"
 
 
