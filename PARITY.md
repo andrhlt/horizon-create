@@ -7842,11 +7842,13 @@ attachment and power into the Haunted Bell state. The rebuilt-client
 lit Soul Campfire and unlit Soul Campfire rejection, while retaining the
 survival craft, 153-tick Depot fan conversion and both bells' floor
 placement/power checks. The [hit probe](tools/probe-peculiar-haunted-bell-hit.py)
-passed valid-hit behavior. The [LAN lifecycle replay](tools/test-peculiar-haunted-bells-lifecycle.py)
+kept the Haunted Bell intact after a valid creative left-click. The pinned
+control log exposed no sound/event lines, so event delivery remains
+unverified. The [LAN lifecycle replay](tools/test-peculiar-haunted-bells-lifecycle.py)
 passed host/guest power convergence and active/idle save/reopen. These
 runs used pinned Java source
 `ac0c444d9828da3453ae8cc65338e8de063286fb` and compatible client build
-`native-9f42064-4b434f2f5e13`. Exact Java hit geometry, swing/audio timing
+`native-9f42064-55bc0a64ce79`. Exact Java hit geometry, swing/audio timing
 and Haunting effects remain open.
 
 ## Sticker
