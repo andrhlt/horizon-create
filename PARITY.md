@@ -4509,6 +4509,27 @@ Run `tools/test-train-signal.py --comparator`, `--lan`, `--craft`,
 with the standard Horizon arguments. Branched signal sections,
 graph reservations, and rail overlays remain under comparison.
 
+## APP-2050 finite occupancy persistence pass
+
+Train Track/railway casing (APP-2045) and Bogeys/train assembly (APP-2047)
+are Done. On candidate `native-9f42064-6bdf8691aa42` with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`,
+the existing `train-signal-occupancy` replay matched all 125 Java ticks,
+including speed, four wheel positions and four signal lamps. The real LAN
+placement check matched host/guest convergence when the guest bound the
+opposite direction and changed only that side to a Cross Signal.
+
+The new `train-signal-occupancy-reopen` check establishes a graph through a
+station, disassembles the train, and confirms all four clear sections remain
+green through idle save/reopen. Its active case saves a train inside a signalled
+section, resumes its speed/wheels and all four lamps against the Java trace, and
+then samples the settled end state. The capture matched 119 Java samples around
+the client restart; startup advances the live world before the harness can
+freeze it, so resumed samples use the corresponding shifted Java tick. The
+occupied and unoccupied checks exercise one train. The required concurrent
+two-train junction case and signal-state observation by a guest during train
+occupancy remain open; this evidence does not complete APP-2050's baseline.
+
 ## Track Station naming
 
 The [original Java GameTest](tools/java-track-station-name.patch) renames a
