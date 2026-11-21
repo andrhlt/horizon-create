@@ -856,6 +856,47 @@ power source sets the input state while leaving the lamp off. The
 survival recipe and six byte-identical blockstate, model and texture
 files are included.
 
+### APP-2043 Rose Quartz Lamp gameplay baseline
+
+The bounded cases are survival crafting and placement; a rising and falling
+input on each of three connected lamps; one-tick activation and held latching;
+both comparator directions and redstone wire output; placement beside an
+existing source; two survival Wrench actions; LAN guest interaction; and idle
+and active save/reopen. Java source review covered
+`RoseQuartzLampBlock` defaults, placement, `neighborChanged`, cluster traversal,
+signal output, tick scheduling and Wrench behavior at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+`tools/test-rose-quartz-lamp.py` matched all 39 fixture ticks in solo and LAN.
+The solo check crafted the lamp from the original recipe and exercised the
+source, comparator, wire and Wrench paths. In LAN the guest performed the
+representative Wrench actions and converged on the host's resulting lamp state.
+`tools/test-rose-quartz-lamp-persistence.py` cold-reopened idle and latched
+states and observed the same three block properties afterward. Connected
+output and source removal are covered by the Java-matched gameplay trace; the
+persistence fixture deliberately omits adjacent output wire to avoid feeding
+the lamp's output back into its input. This is a scoped gameplay baseline, not
+full 1:1 verification. Exact renderer behavior and other neighbor/power
+combinations remain open.
+
+The selected Horizon checks passed on the compatible
+`native-9f42064-6bdf8691aa42` client, built from main `781c0ef`; the affected
+Rose Quartz lamp code and fixture are unchanged through the current main base
+`11654d5`. Prepared Minecraft 26.3 resources came from the
+same build. The content pack SHA-256 was
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+The Java fixture SHA-256 is
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`; the
+capture patch SHA-256 is
+`6c2df799cf53b61c099831299b1083b181d7b8788f0166bc31e49c255091e033`.
+Commands selected `rose-quartz-lamp`, `rose-quartz-lamp-lan` and
+`rose-quartz-lamp-persistence` through `tools/test-parity.py` with `--jobs 1`.
+Each passed. The first sandboxed launch attempt was blocked from creating its
+local control socket; rerunning with local socket access completed the checks.
+No gameplay implementation or Java recapture was needed. Time log: source and
+runtime setup 15 minutes; harness coding 10 minutes; native build 0 minutes
+(reused); focused integration and debugging 8 minutes.
+
 ## Window palettes
 
 ### APP-2063 glass windows and panes
