@@ -471,6 +471,7 @@ CHECKS = (
     ("copper-roof-actions", "test-copper-roof-actions"),
     ("copper-roof-actions-lan", "test-copper-roof-actions", "--lan"),
     ("copper-roof-oxidation", "test-copper-roof-oxidation"),
+    ("copper-roof-persistence", "test-copper-roof-persistence"),
     ("brass-diode-pulses", "test-brass-diodes"),
     ("brass-diode-pulses-lan", "test-brass-diodes", "--lan"),
     ("brass-diode-actions", "test-brass-diode-actions"),
