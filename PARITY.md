@@ -12494,5 +12494,16 @@ compiler cache in the ticket worktree. The original successful build took 447 s;
 intermediate builds took 208 s and 129 s, and the synchronized-screen build 296 s.
 Source/fixture authoring and debugging overlapped those builds. Setup/reference
 review and pre-fix captures occupied about 5 minutes; authoring/debugging about
-25 minutes; final integration/CI time is recorded with delivery. Syntax checks
-and `git diff --check` passed. No full-suite or desktop-game run was used.
+25 minutes; final integration/CI took about 10 minutes. After rebasing onto
+`2b929215292973f625d55248cbc1940435557da3`, the PR-head build
+`native-9f42064-edcfe16aa867` completed in 321 s using the same pinned launcher,
+pack hash and isolated worktree cache. Its three directly affected checks all
+passed: `schematicannon-baseline`, `schematicannon-baseline-lan`, and
+`schematicannon`. The preceding synchronized-screen build passed the five-check
+batch (`schematicannon`, both baselines, `schematic-table`, and
+`schematic-java-import`); the small follow-up UI change only adds the visible
+required count, and the three directly affected checks were rerun on the final
+build. `python3 tools/check-source.py` and `git diff --check` passed. The
+original Java replay covers ticks 0–232 with zero differences in its discrete
+fields, six-decimal progress and flight counters. No full-suite or desktop-game
+run was used.
