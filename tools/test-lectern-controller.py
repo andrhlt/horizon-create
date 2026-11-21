@@ -157,6 +157,52 @@ def check_clone(host, actor, player):
     print('Pick-block returned a vanilla lectern.')
 
 
+def check_reopen(host, actor, player, args, scope, scratch, port, env):
+    host.command('/setblock 5 170 20 minecraft:lectern[facing=east,has_book=false,powered=false]')
+    actor.call('select', ITEM)
+    probe.aim(actor, (5.5, 170.7, 20.5), AT)
+    actor.call('mouse', 'right', 'click')
+    mp.until('controller attached before persistence check',
+             lambda: probe.state(host, AT).startswith('create:lectern_controller'))
+    host.command('/save-all flush')
+    if args.lan:
+        actor.call('quit')
+        mp.until('guest disconnected before host reopen', lambda: not any(
+            guest['name'] == player and guest['placed'] for guest in host.call('lan', 'status')['guests']))
+    host.restart()
+    if args.lan:
+        port = host.call('lan', 'open', '0', 'commands', 'force')['port']
+        actor = scope.enter_context(mp.joined_client(
+            args, scratch, f'127.0.0.1:{port}', player, render=True,
+            scenario='lectern-controller-reopen', pack=args.pack, env=env,
+        ))
+        mp.until('guest rejoined after host reopen', lambda: any(
+            guest['name'] == player and guest['placed'] for guest in host.call('lan', 'status')['guests']))
+    state = probe.state(host, AT)
+    assert state.startswith('create:lectern_controller') and 'facing=east' in state, state
+    data = host.command('/data get block 5 170 20 ControllerData')
+    assert 'diamond' in data and 'emerald' in data, data
+    host.commands((
+        f'/tp {player} 5.5 170 21.5',
+        '/setblock 8 170 20 create:redstone_link[facing=up,receiver=true,powered=false]',
+        '/data merge block 8 170 20 {FrequencyFirst:{id:"minecraft:diamond",count:1},FrequencyLast:{id:"minecraft:emerald",count:1}}',
+        '/setblock 9 170 20 minecraft:redstone_wire',
+        f'/item replace entity {player} hotbar.1 with minecraft:stone',
+    ))
+    mp.until('stone reached resumed player inventory', lambda: mp.count(actor, 'minecraft:stone') == 1)
+    actor.call('select', 'minecraft:stone')
+    probe.aim(actor, (5.5, 170.7, 20.5), AT)
+    actor.call('mouse', 'right', 'click')
+    mp.until('resumed player acquired persisted controller',
+             lambda: 'User:' in host.command('/data get block 5 170 20'))
+    actor.call('key', 'w', 'down')
+    mp.until('persisted frequency resumed input', lambda: host.command('/data get block 8 170 20 Receive').endswith('15'))
+    host.step_to(host.clock() + 1)
+    mp.until('resumed receiver powered adjacent wire', lambda: 'power=15' in probe.state(host, WIRE))
+    actor.call('key', 'w', 'up')
+    print('Lectern contents and wireless use survived host save/reopen and host/guest resumption.')
+
+
 def run(args):
     env = {'HORIZON_NO_AUDIO': '1'}
     if args.sounds:
@@ -180,6 +226,9 @@ def run(args):
                 for guest in host.call('lan', 'status')['guests']
             ))
         replay(host, actor, player)
+        if args.persistence:
+            check_reopen(host, actor, player, args, scope,
+                         scratch if args.lan else None, port if args.lan else None, env)
         if args.sounds:
             log = host.socket.parent / 'ctl.log'
             def played():
@@ -205,4 +254,5 @@ if __name__ == '__main__':
     parser.add_argument('--lan', action='store_true')
     parser.add_argument('--break-drops', action='store_true')
     parser.add_argument('--sounds', action='store_true')
+    parser.add_argument('--persistence', action='store_true', help='save/reopen the mounted controller and resume host/guest use')
     run(parser.parse_args())

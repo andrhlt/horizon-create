@@ -7089,6 +7089,29 @@ unchanged durability. The original 108-tick Precision Mechanism replay
 also passed with that pack. Other variants and guest belt presentation
 need gameplay coverage.
 
+### APP-2089 Deployer sheep shearing
+
+The pinned Java `DeployerHandler.activateInner` selects entities in the
+clicked block and runs their normal entity and living-item callbacks. The
+existing Horizon sheep interaction path handles adult/sheared eligibility,
+the Java wool loot table, tool wear, the shear event, and saved sheep state.
+The APP-2089 change passes the Deployer's shears through that path and
+restores the actual player's held item afterward.
+
+`tools/test-deployer-shearing.py` is registered as `deployer-shearing`. Its
+bounded cases cover adult shearing during an active save/reopen, baby and
+already-sheared controls, Unbreaking III, wool output, one tool-wear point,
+and a LAN guest loading the shears and observing the output. Manual shearing
+continues to use the original `shearing` GameTest and trace.
+
+The new replay has not run yet. The compatible-launcher build first stopped
+because the launcher-data source already included an engine patch from the
+repository patch series; a build against the cached patched source then
+could not resolve Horizon revision `9f42064` through GitHub or its mirror
+because DNS/network access was unavailable. Treat the APP-2089 implementation
+and new regression as pending runtime validation; this is not a parity-pass
+claim.
+
 ## Basin materials and cooking
 
 ### Basin compacting lifecycle check
@@ -7144,6 +7167,22 @@ matched 186 original brass ticks, 248 arm-fed brass ticks, 258
 heated-fluid samples and 86 spout samples.
 
 ## Table Cloths
+
+### APP-2030 bounded shop baseline
+
+On Java reference `ac0c444d9828da3453ae8cc65338e8de063286fb` and Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, build
+`native-9f42064-bfe421a867b6` with pack SHA-256
+`314690f98e6aef8de270a6fbea6704d073cd71c071d6f79fd489e7eab75f912d`, the
+[configured shop replay](tools/test-table-cloth-shop.py) issued a shopping
+list from an owner-configured cloth, refused an empty-stock request, and
+preserved a list across world reopen. Existing Table Cloth recipe, placement,
+storage, reset and LAN checks also passed. A LAN guest issuance replay passed
+once and subsequently timed out waiting for the list, so guest issuance is not
+yet a stable pass. The fixture seeds cloth request/price/owner data directly;
+there is no player-facing setup flow. Paid checkout, payment validation,
+fulfillment and ownership transfer remain unimplemented. This is bounded
+evidence only; full Java parity remains open.
 
 The `create-tablecloth-scaffolding.hmod` pack loads all 19 block and
 item IDs and 35 original recipe IDs. On `native-9f42064-7f0b3254fd60`,
@@ -7772,6 +7811,26 @@ owner changing dimensions cleared the original Lectern user by the
 next tick. A competing guest visiting the Nether left the existing
 Overworld owner in place. Swapping, visuals and original client
 transport timing remain open.
+
+The bounded persistence checks (`linked-controller-persistence` and
+`lectern-controller-persistence`, each with solo and LAN variants) passed
+on `native-9f42064-6ce68a31b125` with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The handheld retained both pairs (diamond/emerald in slots 0/1 and
+gold/iron in 4/5) and its custom-data marker through a host save/reopen;
+the same named LAN guest rejoined, used the saved bindings, and drove the
+matching receiver and wire 0→15→0. The attached Lectern retained its
+diamond/emerald `ControllerData`, and the host or rejoined guest acquired
+it and resumed input to a matching receiver and adjacent wire after reopen.
+These are source-aligned Horizon save/reopen checks, not Java reload
+comparisons. The four new checks can be rerun with
+`python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client
+/path/to/prepared/26.3 --jobs 1 --check 'linked-controller-persistence*'
+--check 'lectern-controller-persistence*'` after preparing the pack as in
+the README. The first post-rebase LAN run exposed a fixture race before the
+rejoined guest received its test item; the failed output is retained at
+`.local/app-2033/failed/lectern-controller-persistence-lan-first-attempt.log`.
+The fixture now waits for the item to reach the guest inventory before use.
 
 ## Shopping List
 
@@ -11695,14 +11754,31 @@ The finite checks completed on the pinned Create reference
   through `/save-all flush` and fixture restart. This
   proves guest convergence and idle mode persistence, not packet-arrival timing
   parity.
-- Gantry Shaft/Carriage is already Done; its existing integrated regressions
-  include the Roller. APP-2007's latest candidate build is
-  `native-9f42064-7f8245fcd225` (rebuilt after updating from current main);
-  client SHA-256
-  `eaf18600f300ee82c2454820c57ac44ee8cc274c7242ef09f88ea0d97b231b8b`; prepared
+- The Java `RollerBlockEntity` assigns separate value boxes to filtering
+  (`hOffset=3`) and mode (`hOffset=-3`). Its filter predicate rejects air,
+  block entities, stairs, shapes that are not full-block outlines, and empty
+  collision shapes. `FilteringBehaviour.onShortInteract` returns on an invalid
+  item before consuming it; ordinary valid block materials are stored without
+  consumption. These rules were checked against Create reference commit
+  `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+- `roller-mode-ui` now checks one supported stone and one unsupported chest in
+  solo and LAN. Chest clicks at the filter box retained the count of one,
+  created no chest block, and left the existing filter unchanged. Stone was
+  stored with its count still one. LAN assertions read both the guest inventory
+  prediction and the host's authoritative `RollerGuest` inventory and block
+  entity. The stone filter and host inventory remained after save/reopen.
+  This verifies the filter value-box dispatch as well as item conservation; it
+  does not claim exact packet timing.
+- `roller-filling-reopen` matched all 80 Java ticks, saved and reopened at tick
+  40, compared carriage position, material stock and world blocks at the
+  boundary, then confirmed subsequent work resumed without duplication or
+  skips. `roller_paving_and_clearing` matched all 181 Java ticks. Shared Gantry
+  Shaft/Carriage regressions remain additional transport evidence.
+- Final candidate build: `native-9f42064-5bee4a761065`, pinned Horizon
+  `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`; client SHA-256
+  `8b75ead5d110227f15b5ae07a708d368bad6524841ca8e16550a9f90ed5484f7`; test
   Create pack SHA-256
-  `921c10ce6a435a3c4e7d45a6651001e1b77bd321cf621d896b348a471c701bbe`.
-  Cursor fix `16af87f` is included in the client.
+  `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
 - Exact scoped command:
 
   ```sh
@@ -11717,20 +11793,12 @@ full-block filter validation, and the Java slab-to-double-block filter state.
 existing Roller value board. `tools/test-roller-mode-ui.py` is the LAN/mode and
 idle-reopen check registered by the parity runner.
 
-The bounded `roller-filling-reopen` fixture matched all 80 Java ticks, saved
-and reopened at tick 40, compared the Gantry carriage position, material stock
-and world blocks at the boundary, then confirmed subsequent ticks resumed with
-no duplicate or skipped work. Shared `gantry-lan-reload` and
-`mounted-drill-gantry-lan-reload` checks additionally cover guest motion,
-active save/reopen, and conserved payload output; these are shared Gantry
+The finite APP-2007 gameplay gates pass on this build. Shared `gantry-lan-reload`
+and `mounted-drill-gantry-lan-reload` checks additionally cover guest motion,
+active save/reopen, and conserved payload output. They are shared Gantry
 transport evidence rather than a claim of exact packet-timing parity for every
-Roller actor case.
-
-This pass is partial. The current checks do not establish invalid-filter
-rejection and no-loss consumed-material boundaries. That bounded gate remains open;
-we do not claim the whole APP-2007 baseline complete. The placement redirect and filter boundary code still need focused integration
-coverage before calling those paths verified. Additional terrain patterns, drum visuals, animation and exact
-network timing remain follow-ups; Full 1:1 stays Open.
+Roller actor case. Additional terrain patterns, drum visuals, animation and
+exact network timing remain follow-ups; Full 1:1 stays Open.
 ## Creative Crate gameplay baseline — APP-2016
 
 The finite baseline reuses the supply, filter refund, Hopper, Dropper, Funnel,

@@ -1,5 +1,5 @@
 use horizon_core::geometry::Direction;
-use horizon_world::level::PlaceContext;
+use horizon_world::{level::PlaceContext, nbt::{Compound, Tag}};
 use crate::items::ItemStack;
 use super::Game;
 
@@ -53,6 +53,104 @@ pub(super) fn blocked(game: &mut Game<'_>, pos: [i32; 3], face: [i32; 3], stack:
 }
 
 pub(super) const ENTITY: &str = "create:table_cloth";
+const AUTO_REQUEST: &str = "create:auto_request_data";
+const SHOPPING_LIST: &str = "create:shopping_list";
+const SHOPPING_LIST_ADDRESS: &str = "create:shopping_list_address";
+const SHOP_TRACE: &str = "CREATE_TABLE_CLOTH_SHOP_TRACE";
+
+fn shop_trace(message: impl std::fmt::Display) {
+    if std::env::var_os(SHOP_TRACE).is_some() {
+        eprintln!("CREATE_TABLE_CLOTH_SHOP {message}");
+    }
+}
+
+pub(super) fn register(types: &mut Vec<String>) {
+    types.extend([AUTO_REQUEST.into(), SHOPPING_LIST.into(), SHOPPING_LIST_ADDRESS.into()]);
+}
+
+fn position(tag: &Tag) -> Option<[i32; 3]> {
+    let Tag::List(values) = tag else { return None };
+    let at = |i: usize| match values.get(i)? { Tag::Int(value) => Some(*value), _ => None };
+    Some([at(0)?, at(1)?, at(2)?])
+}
+
+fn purchase_rows(tag: &Tag) -> Vec<(i32, [i32; 3])> {
+    let Some(Tag::List(rows)) = tag.get("purchases") else { return Vec::new() };
+    rows.iter().filter_map(|row| {
+        let Tag::Compound(row) = row else { return None };
+        let Tag::Int(count) = row.get(&"first".into())? else { return None };
+        Some((*count, position(row.get(&"second".into())?)?))
+    }).collect()
+}
+
+fn shop_click(game: &mut Game<'_>, pos: [i32; 3], nbt: &Compound) -> bool {
+    shop_trace(format_args!("click at {pos:?}"));
+    let Some(Tag::Compound(request)) = nbt.get(&"RequestData".into()) else { return false };
+    let Some(encoded) = request.get(&"encoded_request".into()) else { return false };
+    let order = super::create_stock_network::order_stacks(encoded);
+    shop_trace(format_args!("order {} authoritative {} hand {:?}", order.len(), game.native_authoritative(), game.hand));
+    if order.is_empty() || !game.native_authoritative() || game.hand != horizon_client::first_person::Hand::Main { return !order.is_empty(); }
+
+    let held = game.held().cloned();
+    if held.as_ref().is_some_and(|stack| stack.item.as_ref() != SHOPPING_LIST) {
+        return true;
+    }
+    let Some(player) = game.native_acting_player() else { shop_trace("no acting player"); return true };
+    let Some(Tag::IntArray(owner)) = nbt.get(&"OwnerUUID".into()) else { return true };
+    let Ok(owner) = <[i32; 4]>::try_from(owner.as_slice()) else { return true };
+    let Some(_price) = nbt.get(&"Filter".into()).and_then(|tag| match tag {
+        Tag::Compound(data) => ItemStack::from_nbt(data),
+        _ => None,
+    }) else {
+        game.native_action_bar(player.uuid, horizon_client::text::Text::translate("create.stock_keeper.no_price_set", &[]));
+        return true;
+    };
+    let _price_amount = super::create_machines::int(nbt, "FilterAmount").unwrap_or(1).max(1);
+    let Some(target) = request.get(&"target_offset".into()).and_then(position) else { shop_trace("no target offset"); return true };
+    let ticker_pos = [pos[0] + target[0], pos[1] + target[1], pos[2] + target[2]];
+    let ticker = game.native_with_mod_block_entity(ticker_pos, |entity| {
+        (entity.id == super::create_stock_ticker::TICKER).then(|| entity.nbt.clone())
+    }).flatten();
+    let Some(ticker) = ticker else { shop_trace("missing ticker"); return true };
+    let Some(Tag::IntArray(freq)) = ticker.get(&"Freq".into()) else { shop_trace("missing ticker frequency"); return true };
+    let Ok(frequency) = <[i32; 4]>::try_from(freq.as_slice()) else { shop_trace("invalid ticker frequency"); return true };
+
+    let previous = held.as_ref().and_then(|stack| game.native_component(stack, SHOPPING_LIST).ok().flatten());
+    let previous = previous.and_then(|tag| match tag { Tag::Compound(data) => Some(data.clone()), _ => None });
+    let same_list = previous.as_ref().is_some_and(|data| {
+        matches!(data.get(&"shop_owner".into()), Some(Tag::IntArray(value)) if value.as_slice() == owner)
+            && matches!(data.get(&"shop_network".into()), Some(Tag::IntArray(value)) if value.as_slice() == frequency)
+    });
+    let mut purchases = if same_list { previous.as_ref().map(|data| purchase_rows(&Tag::Compound(data.clone()))).unwrap_or_default() } else { Vec::new() };
+    let summary = super::create_stock_network::summary(game, frequency, true);
+    let available = order.iter().map(|required| {
+        let stock: u32 = summary.items.iter().filter(|item| item.same_item_same_components(required)).map(|item| item.count).sum();
+        let reserved = purchases.iter().filter(|(_, at)| *at == pos).map(|(count, _)| *count as u32).sum::<u32>() * required.count;
+        stock.saturating_sub(reserved) / required.count.max(1)
+    }).min().unwrap_or(0);
+    let bought = purchases.iter().find(|(_, at)| *at == pos).map_or(0, |(count, _)| *count.max(&0) as u32);
+    shop_trace(format_args!("stock {available}, prior {bought}"));
+    if available == 0 || bought >= available { return true; }
+    if bought == 0 { purchases.push((1, pos)); }
+    else if let Some((count, _)) = purchases.iter_mut().find(|(_, at)| *at == pos) { *count += 1; }
+
+    let components = Compound::from([
+        ("purchases".into(), Tag::List(purchases.iter().map(|(count, at)| Tag::Compound(Compound::from([
+            ("first".into(), Tag::Int(*count)),
+            ("second".into(), Tag::List(at.iter().copied().map(Tag::Int).collect())),
+        ]))).collect())),
+        ("shop_owner".into(), Tag::IntArray(owner.to_vec())),
+        ("shop_network".into(), Tag::IntArray(frequency.to_vec())),
+    ]);
+    let mut list = held.unwrap_or_else(|| ItemStack::new(SHOPPING_LIST, 1));
+    if game.native_set_component(&mut list, SHOPPING_LIST, Tag::Compound(components)).is_err() { shop_trace("failed to set shopping list component"); return true; }
+    let address = match request.get(&"encoded_target_address".into()) { Some(Tag::String(value)) => Tag::String(value.clone()), _ => Tag::String("".into()) };
+    let _ = game.native_set_component(&mut list, SHOPPING_LIST_ADDRESS, address);
+    *game.held_mut() = Some(list);
+    game.guest_inventory_resend |= game.lan_acting.is_some();
+    shop_trace("list issued");
+    true
+}
 
 pub(super) fn stateful(block: &str, stateful: &mut bool) {
     *stateful |= is_cloth(block);
@@ -90,6 +188,11 @@ pub(super) fn click(game: &mut Game<'_>, pos: [i32; 3], face: [i32; 3]) -> bool 
         return false;
     }
     let active = game.native_block_property(pos, "entity").as_deref() == Some("true");
+    if active {
+        if let Some(nbt) = game.native_with_mod_block_entity(pos, |entity| entity.nbt.clone()) {
+            if shop_click(game, pos, &nbt) { return true; }
+        }
+    }
     if !active && (game.native_sneaking() || held.is_none()) {
         return false;
     }
