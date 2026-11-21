@@ -10643,9 +10643,11 @@ Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, native build
 `native-9f42064-06476b4a74cb`, Create Java reference
 `ac0c444d9828da3453ae8cc65338e8de063286fb`, and pack SHA-256
 `a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
-The rebuilt current-main client is `native-9f42064-6a56a7b08e28`; its
+The rebuilt client is `native-9f42064-6a56a7b08e28`; its
 `horizon-client` SHA-256 is
 `849467cabc3e7ae6c013fe321fb0bcab843f37185074c883ea18eb9b941a7751`.
+It was built with `main` at `10b9850`. The later `main` updates through
+`4c28752` contain no `native/` changes, so the saw runtime source is unchanged.
 
 The focused seven-check batch passed 7/7 on this build:
 
