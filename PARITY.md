@@ -2780,7 +2780,12 @@ dropped brackets. Both original recipes craft four brackets in survival.
 A live host places wood. The guest replaces it with metal, receives the
 wood, and removes and receives the metal with a Wrench. The guest’s frames
 show the mounted bracket and the shaft after removal. The port uses the
-original block and item models and textures. Pipe brackets remain open.
+original block and item models and textures. The bounded APP-2070 extension
+adds wooden attachment to a straight standard pipe and metal attachment to a
+straight glass pipe, checks Java orientation, rejects a bent pipe, and saves
+and reopens both attached states. A LAN guest also attached a metal bracket to
+a straight glass pipe; the host observed the expected state and the guest used
+one item. Other pipe families and presentations remain follow-ups.
 
 `tools/java-kinetic-brackets-trace.patch` records
 `fixtures/kinetic-brackets-java.csv`.
@@ -2790,6 +2795,45 @@ python3 tools/test-kinetic-brackets.py /path/to/horizon-ctl /path/to/horizon-cli
 python3 tools/test-kinetic-brackets.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --craft
 python3 tools/test-multiplayer-kinetic-brackets.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
+
+The bracket fixture's shaft/cog trace remains the Java-captured comparison.
+Its additional pipe cases run after the trace and check persisted block-entity
+state directly; they do not claim Java tick-by-tick pipe parity.
+
+### APP-2070 bounded gameplay pass (November 20, 2026)
+
+Built from Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` with engine patch
+digest `664100af7e67dd9fdd01c04d91f175f7e221e39d`, producing
+`native-9f42064-672cc8e442cb`. The installed pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Java trace patch SHA-256 was
+`719a8212c002c375dd6cc5756fe1aaf2c5d0db3c93c36074690237dca507ba69`.
+The existing Java reference was reused; no new capture was needed. Approximate
+worker time: source/setup 5 min, coding/repair 8 min, private cache/build 8 min,
+fast checks and integration 4 min, debugging 2 min.
+
+- `tools/test-kinetic-brackets.py ... --pack <pack>`: all 13 shaft/cog samples
+  matched `fixtures/kinetic-brackets-java.csv`; wooden/standard-pipe and
+  metal/glass-pipe attachments had the expected state, a bent pipe was
+  rejected, and both bracket states survived world save/reopen. Brackets are
+  static decoration, so active-operation persistence does not apply.
+- `tools/test-multiplayer-kinetic-brackets.py ... --pack <pack>`: host wood
+  placement, guest metal replacement and wrench return, then guest metal
+  attachment to the glass pipe all converged to the expected server state and
+  inventory counts.
+- `tools/test-kinetic-brackets.py ... --craft --pack <pack>`: both original
+  survival recipes passed.
+- `python3 -m py_compile` on both bracket test scripts, `rustfmt --edition
+  2024 --check native/bracket.rs`, and `git diff --check` passed.
+
+The first pipe test attempt used direction names that the fixture helper did
+not implement, so the click hit the top face; it was corrected to the helper's
+supported `up` target and passed. The first guest-pipe attempt tried to
+teleport from the guest, which lacks command permission; the host now moves the
+guest before the click, and the LAN check passed. The recipe runner also needed
+the existing `wheat_milling.nbt` copied into this isolated worktree. No Java
+pipe tick trace was added; axis rules were translated from the pinned
+`BracketBlock.getSuitableBracket` and `FluidPropagator.getStraightPipeAxis`.
 
 ## Creative Motor
 
