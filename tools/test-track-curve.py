@@ -54,16 +54,17 @@ def geometry(starts, axes):
     return handle, length, point
 
 
-def test_case(control, row):
+def test_case(control, row, offset=(0, 0, 0), reset=True):
     dx, dy, dz, supplied, remaining = (
         int(row[key]) for key in ("dx", "dy", "dz", "supplied", "remaining")
     )
-    end = add(START, (dx, dy, dz))
-    x, y, z = START
+    start = add(START, offset)
+    end = add(start, (dx, dy, dz))
+    x, y, z = start
     setup = (
-        "/fill -11 112 -24 25 117 7 minecraft:air",
+        *(("/fill -11 112 -24 25 117 7 minecraft:air",) if reset else ()),
         f"/setblock {coordinates(add(end, (0, -1, 0)))} minecraft:smooth_stone",
-        f"/setblock {coordinates(START)} create:track[shape=xo]",
+        f"/setblock {coordinates(start)} create:track[shape=xo]",
         f"/tp @s {x + 0.5 + (2 if dx < 0 else -2)} {y} {z + 0.5}",
         f"/item replace entity @s hotbar.0 with create:track {supplied}",
     )
@@ -110,7 +111,7 @@ def test_case(control, row):
         raise RuntimeError(f"Case {row['case']} left the old track selected after placement")
 
     first, second = (
-        add(START, tuple(int(row[f"p{index}_{axis}"]) for axis in "xyz"))
+        add(start, tuple(int(row[f"p{index}_{axis}"]) for axis in "xyz"))
         for index in (1, 2)
     )
     commands = [
@@ -127,7 +128,7 @@ def test_case(control, row):
     if int(length * 2) != int(row["segments"]):
         raise RuntimeError(f"Case {row['case']} expected {row['segments']} track segments, read {int(length * 2)}")
     numeric = [("handle", handle), ("length", length)]
-    origin = tuple(-part for part in START)
+    origin = tuple(-part for part in start)
     for index in range(5):
         numeric.extend((f"q{index}_{axis}", value)
                        for axis, value in zip("xyz", add(point(index / 4), origin), strict=True))
