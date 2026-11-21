@@ -463,6 +463,7 @@ CHECKS = (
     ("cardboard-armor-fuel-lan", "test-cardboard-armor-fuel", "--lan"),
     ("cardboard-disguise", "test-cardboard-disguise"),
     ("cardboard-disguise-lan", "test-cardboard-disguise", "--lan"),
+    ("cardboard-armor-reopen", "test-cardboard-armor-reopen"),
     ("copper-roofs", "test-copper-roofs"),
     ("copper-roofs-lan", "test-copper-roofs", "--lan"),
     ("copper-roof-actions", "test-copper-roof-actions"),
