@@ -53,6 +53,7 @@ CHECKS = (
     ("metal-girder-loot", "test-metal-girder-loot"),
     ("metal-girder-pickup", "test-metal-girder-pickup"),
     ("metal-girder-pickup-lan", "test-multiplayer-metal-girder-pickup"),
+    ("metal-girder-reopen", "test-metal-girder-persistence"),
     ("kinetic-brackets", "test-kinetic-brackets"),
     ("kinetic-brackets-crafting", "test-kinetic-brackets", "--craft"),
     ("kinetic-brackets-lan", "test-multiplayer-kinetic-brackets"),
