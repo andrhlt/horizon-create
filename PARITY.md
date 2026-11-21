@@ -6814,8 +6814,26 @@ states. All three [stonecutter recipes](fixtures/metal-scaffolding-recipe-java.c
 also passed in survival. On `native-9f42064-0cdf90d69773` with the same
 pack, the [descent replay](tools/test-metal-scaffolding-descent.py)
 matched 39 Java position and velocity samples across the three materials
-in solo and as a LAN guest. Longer runs, mixed support, ascending
-controls and visual parity remain open.
+in solo and as a LAN guest. The persistence check below also verifies ascent
+and exit after reopening. Longer runs, mixed support and visual parity remain
+open.
+
+The [persistence check](tools/test-metal-scaffolding-persistence.py) saves and
+reopens five-block stacks of each metal, checks all 15 block states, and
+confirms the player can ascend and walk off a restored stack. It passed on
+`native-9f42064-6bdf8691aa42` with pack SHA-256
+`65fe01c27a564f92bb25124ca48c021cc1a3b1496a08bc98b029b8c52f4e4b84` using:
+
+```sh
+TMPDIR=/private/tmp python3 tools/test-metal-scaffolding-persistence.py \
+  /path/to/native-9f42064-6bdf8691aa42/horizon-ctl \
+  /path/to/native-9f42064-6bdf8691aa42/horizon-client \
+  /path/to/prepared/26.3
+```
+
+This covers ordinary idle persistence and a representative post-reopen movement
+interaction; it does not claim Java save-format equivalence. Extended horizontal
+placement limits and mixed-support combinations remain follow-ups.
 
 ## Sweet Roll, Chocolate Glazed Berries and Honeyed Apple
 
