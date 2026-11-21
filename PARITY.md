@@ -11056,10 +11056,10 @@ The finite checks completed on the pinned Create reference
   proves guest convergence and idle mode persistence, not packet-arrival timing
   parity.
 - Gantry Shaft/Carriage is already Done; its existing integrated regressions
-  include the Roller. APP-2007's candidate build is
-  `native-9f42064-8c322a43eb76` (rebuilt after updating from current main);
+  include the Roller. APP-2007's latest candidate build is
+  `native-9f42064-7f8245fcd225` (rebuilt after updating from current main);
   client SHA-256
-  `3c5fa8aa760cec7ffa45556fb8f99caa02bab0cb0f426500c95f1bb2db4c561c`; prepared
+  `eaf18600f300ee82c2454820c57ac44ee8cc274c7242ef09f88ea0d97b231b8b`; prepared
   Create pack SHA-256
   `921c10ce6a435a3c4e7d45a6651001e1b77bd321cf621d896b348a471c701bbe`.
   Cursor fix `16af87f` is included in the client.
@@ -11077,9 +11077,17 @@ full-block filter validation, and the Java slab-to-double-block filter state.
 existing Roller value board. `tools/test-roller-mode-ui.py` is the LAN/mode and
 idle-reopen check registered by the parity runner.
 
+The bounded `roller-filling-reopen` fixture matched all 80 Java ticks, saved
+and reopened at tick 40, compared the Gantry carriage position, material stock
+and world blocks at the boundary, then confirmed subsequent ticks resumed with
+no duplicate or skipped work. Shared `gantry-lan-reload` and
+`mounted-drill-gantry-lan-reload` checks additionally cover guest motion,
+active save/reopen, and conserved payload output; these are shared Gantry
+transport evidence rather than a claim of exact packet-timing parity for every
+Roller actor case.
+
 This pass is partial. The current checks do not establish invalid-filter
-rejection, exact consumed-material boundaries, active moving save/reopen, or
-actor transport. Those bounded gates remain open;
+rejection and no-loss consumed-material boundaries. That bounded gate remains open;
 we do not claim the whole APP-2007 baseline complete. The placement redirect and filter boundary code still need focused integration
 coverage before calling those paths verified. Additional terrain patterns, drum visuals, animation and exact
 network timing remain follow-ups; Full 1:1 stays Open.
