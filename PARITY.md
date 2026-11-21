@@ -12399,6 +12399,48 @@ The Deployer behavior remains shared with APP-1966; this ticket adds no
 duplicate Deployer implementation. Full 1:1 remains Open for broader actor
 types, settings, effects and packet timing.
 
+## APP-2052 train schedules, conductor and condition editor
+
+This finite baseline reuses the pinned Java schedule and conductor captures
+above. The accepted cases are schedule creation and copying; destination,
+delay and one stock/passenger condition; start, pause, cancel and looping;
+conductor assignment and retrieval; guest editing; and idle or active reopen
+without duplicate dispatch. The editor replays cover the exact serialized
+components and save/reopen state in solo and LAN. The conductor replay covers
+the controlling-seat acceptance, non-controlling-seat rejection, paused
+resume, returned timetable component and guest convergence. The scheduled
+station replays cover destination matching, reversal, cargo-idle and mounted
+item/fluid threshold behavior through the existing Java tick traces.
+
+The evidence uses Create `ac0c444d9828da3453ae8cc65338e8de063286fb`, Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, and the compatible 0.2.67
+launcher builds identified in the preceding fixture sections. Representative
+editor and conductor runs compare exact components and nine hand/assignment
+observations; scheduled routing runs compare 123 Java ticks in solo and LAN,
+including a five-tick delay, cargo-idle reset, passenger-count alternatives,
+and mounted stock/fluid thresholds. Ordinary save/reopen is covered by the
+entry, multi-entry, progress, condition and conductor replays. Exact packet
+arrival timing, exhaustive condition/layout combinations, cross-dimension
+routes and cosmetic presentation remain Full 1:1 follow-ups rather than
+baseline blockers.
+
+For this checkout, the focused runtime verification used
+`native-9f42064-6bde2ea90cf2` with prepared 26.3 resources and the isolated
+Create pack (`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`):
+
+```sh
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1 \
+  --check train-schedule-progress --check train-schedule-progress-lan \
+  --check train-conductor --check train-conductor-lan \
+  --check scheduled-reverse-trip-reopen
+```
+
+All five checks passed. The progress and conductor checks passed in solo and
+LAN; the reverse-trip replay reopened parked and moving trains at its Java
+trace ticks and passed the active mid-entry persistence/no-duplicate-dispatch
+case. The client and fixture bundle were provisioned outside Git under the
+worktree `.local` directory.
+
 ## APP-2059 train display, prompts and arrival audio
 
 On `native-9f42064-76138ca65acb`, the [bounded feedback pass](TRAIN-FEEDBACK-PARITY.md)
