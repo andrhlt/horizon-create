@@ -121,17 +121,17 @@ python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/
 python3 tools/test-sticker-callback-core.py
 ```
 
-The Sticker implementation files and pack match the cited candidate; the
-APP-2011 code change adjusts the shared Wrench test helper and evidence. The
-candidate predates later `origin/main` changes for mounted-drill handling in
-Mechanical Pistons (APP-1971) and Mechanical Saw actors on Bearings (APP-1981).
-The recorded piston fixture contains no drill or saw actor, but a current-tip
-combined build has not been verified. A private
-`sh tools/build-native.sh /path/to/horizon-launcher /path/to/private-launcher-data`
-attempt stopped before compilation: the copied Horizon source already contained
-applied patches and rejected reapplication of `horizon-advancement-initial-inventory.patch`.
-Resolve the local source-cache state and rerun the focused checks before closing
-the ticket.
+The Sticker implementation files, Horizon patches, and pack-producing inputs
+are unchanged between the cited candidate and the rebased final tree. The
+intervening `origin/main` commits add documentation and test fixtures only;
+the later Mechanical Saw and mounted-drill production changes were already in
+the candidate's parent. Therefore the recovered candidate build remains
+applicable evidence for this final tree. Against that exact build and pack, the
+rebased worktree reran all 8 Sticker checks, `mechanical-piston-actors-lan`,
+and `mechanical-piston-reload`; all passed. The callback-core regression also
+passed with 384 bit-exact physics and 120 fall-call comparisons. A fresh build
+was not required because no relevant production input changed; the earlier
+private build attempt is retained as historical recovery evidence only.
 
 Full 1:1 remains Open: current-tip combined-build verification, inherited
 structure transforms, wider connected-face/player-item combinations, exact
