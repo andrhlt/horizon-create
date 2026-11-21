@@ -783,6 +783,7 @@ CHECKS = (
     ("metal-scaffolding-stonecut", "test-metal-scaffolding", "--stonecut"),
     ("metal-scaffolding-descent", "test-metal-scaffolding-descent"),
     ("metal-scaffolding-descent-lan", "test-metal-scaffolding-descent", "--lan"),
+    ("metal-scaffolding-persistence", "test-metal-scaffolding-persistence"),
     ("create-foods", "test-foods"),
     ("food-use", "test-food-use"),
     ("food-use-lan", "test-food-use-lan"),
