@@ -10787,6 +10787,13 @@ The finite checks completed on the pinned Create reference
   through `/save-all flush` and fixture restart. This
   proves guest convergence and idle mode persistence, not packet-arrival timing
   parity.
+- `roller-filling-reopen` matched all 80 Java samples with a save/reopen at tick
+  40; actor position, material stock and world blocks were unchanged at the
+  reopen boundary and work continued afterward.
+- Shared `gantry-lan-reload` and `mounted-drill-gantry-lan-reload` checks passed
+  guest-started motion, active save/reopen/resume, and exactly one conserved
+  mounted payload drop. These establish shared contraption transport, not exact
+  Java packet timing.
 - Gantry Shaft/Carriage is already Done; its existing integrated regressions
   include the Roller. APP-2007's candidate build is
   `native-9f42064-8c322a43eb76` (rebuilt after updating from current main);
