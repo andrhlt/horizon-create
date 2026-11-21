@@ -7091,6 +7091,29 @@ unchanged durability. The original 108-tick Precision Mechanism replay
 also passed with that pack. Other variants and guest belt presentation
 need gameplay coverage.
 
+### APP-2089 Deployer sheep shearing
+
+The pinned Java `DeployerHandler.activateInner` selects entities in the
+clicked block and runs their normal entity and living-item callbacks. The
+existing Horizon sheep interaction path handles adult/sheared eligibility,
+the Java wool loot table, tool wear, the shear event, and saved sheep state.
+The APP-2089 change passes the Deployer's shears through that path and
+restores the actual player's held item afterward.
+
+`tools/test-deployer-shearing.py` is registered as `deployer-shearing`. Its
+bounded cases cover adult shearing during an active save/reopen, baby and
+already-sheared controls, Unbreaking III, wool output, one tool-wear point,
+and a LAN guest loading the shears and observing the output. Manual shearing
+continues to use the original `shearing` GameTest and trace.
+
+The new replay has not run yet. The compatible-launcher build first stopped
+because the launcher-data source already included an engine patch from the
+repository patch series; a build against the cached patched source then
+could not resolve Horizon revision `9f42064` through GitHub or its mirror
+because DNS/network access was unavailable. Treat the APP-2089 implementation
+and new regression as pending runtime validation; this is not a parity-pass
+claim.
+
 ## Basin materials and cooking
 
 ### Basin compacting lifecycle check
@@ -7146,6 +7169,22 @@ matched 186 original brass ticks, 248 arm-fed brass ticks, 258
 heated-fluid samples and 86 spout samples.
 
 ## Table Cloths
+
+### APP-2030 bounded shop baseline
+
+On Java reference `ac0c444d9828da3453ae8cc65338e8de063286fb` and Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, build
+`native-9f42064-bfe421a867b6` with pack SHA-256
+`314690f98e6aef8de270a6fbea6704d073cd71c071d6f79fd489e7eab75f912d`, the
+[configured shop replay](tools/test-table-cloth-shop.py) issued a shopping
+list from an owner-configured cloth, refused an empty-stock request, and
+preserved a list across world reopen. Existing Table Cloth recipe, placement,
+storage, reset and LAN checks also passed. A LAN guest issuance replay passed
+once and subsequently timed out waiting for the list, so guest issuance is not
+yet a stable pass. The fixture seeds cloth request/price/owner data directly;
+there is no player-facing setup flow. Paid checkout, payment validation,
+fulfillment and ownership transfer remain unimplemented. This is bounded
+evidence only; full Java parity remains open.
 
 The `create-tablecloth-scaffolding.hmod` pack loads all 19 block and
 item IDs and 35 original recipe IDs. On `native-9f42064-7f0b3254fd60`,
