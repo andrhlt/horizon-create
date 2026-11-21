@@ -10778,7 +10778,7 @@ The finite checks completed on the pinned Create reference
 `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`:
 
 - Existing Java comparisons `roller_filling` and `roller_paving_and_clearing`
-  passed on the candidate client. Together they compare 146 captured ticks for
+  passed on the final combined client. Together they compare 262 captured ticks for
   fill, paving and clearing behavior, including the recorded material cases.
 - `roller-mode-ui` crafted a Roller from its pinned survival recipe, placed it
   on a full floor, and confirmed the crafted item was consumed. It selected
