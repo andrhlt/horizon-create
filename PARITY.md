@@ -1862,16 +1862,22 @@ remains Open for broader attachment and renderer coverage.
 | Output direction and support drop | `valve-action-ticks-java.csv`: 48 samples in both directions with large/small cog outputs; `valve-support-removal-java.csv`: three dry/wet copper/dyed cases, immediate single drop and source-water restoration | Existing integration evidence |
 | Dyed conversion | `dyed-valve-handle-dye-java.csv` and `dyed-valve-handle-state-java.csv`: all 16 colors; survival crafting covers all 16 recolors and dyed-to-copper | Existing integration evidence |
 | Guest interaction | Copper guest angle/stroke and dyed guest recolor/power checks; guest state converged with host | Existing integration evidence; arrival timing not compared |
-| Persistence | Idle dyed state and active copper stroke with retained setting, support, direction and resumed output | Pending current-build run |
+| Persistence | Idle dyed state and active copper stroke with retained setting, support, direction and resumed output | Passed on compatible existing client |
 
 Pinned reference: Create `ac0c444d9828da3453ae8cc65338e8de063286fb` (6.0.10),
 Minecraft 1.21.1 / NeoForge 21.1.219. Horizon pin: `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`
-on Minecraft 26.3. Existing runtime files were located, but no matching writable
-launcher/cache and exact pack/client pair was available in this checkout. A
-current native build was not run: the shared compile cache is 12 GiB and the
-workspace filesystem had 6.6 GiB free. Do not count persistence as passed until
-the pending case is run with one identified client, control binary, resources,
-and pack on an isolated writable cache. Java trace patch SHA-256 values are
+on Minecraft 26.3. The regenerated pack was loaded successfully by the
+source-compatible existing client `native-9f42064-a5156e57df79`; no rebuild or
+shared-cache reclamation was needed. The isolated save/reopen check and all
+eight affected valve checks passed (9/9 total). Client SHA-256 is
+`576fdd13e4822abce20c85d3c78add24bc199405bce6c742c126fcb2a6064c72`, control
+SHA-256 is `1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`,
+and regenerated Create pack SHA-256 is
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`.
+The first candidate client `native-9f42064-6ce68a31b125` loaded the pack but
+failed the idle reopen check (the dyed handle reopened as air); this was
+isolated to client compatibility by the successful `a5156e57df79` run and a
+known-good prior pack comparison. Java trace patch SHA-256 values are
 `8cd1070aa1e48ca5c71e46300a6e6b142aa685ad0f56c3ef52100e177e4193d6` for
 angle/placement, `5c05f867387874c561dd4bb3ff328d016b0baf9fc088d5c6787d482c24ed0a18`
 for dye state/render, and `8a5b97d4a8517ea7b64b01de8a20a83ec9bd77d2c4339c5886d13800dd846f19`
@@ -1895,6 +1901,16 @@ python3 tools/test-multiplayer-dyed-valve-handle.py /path/to/horizon-ctl /path/t
 python3 tools/test-valve-action-ticks.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
 python3 tools/test-valve-support-removal.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
 ```
+
+Final verification used the compatible existing client and regenerated pack:
+
+```sh
+HORIZON_NO_AUDIO=1 python3 tools/test-parity.py <horizon-ctl-a5156e57df79> <horizon-client-a5156e57df79> <prepared-26.3> --jobs 1 --check copper-valve-handle --check copper-valve-handle-placement --check copper-valve-handle-lan --check dyed-valve-handle --check valve-dye-crafting --check dyed-valve-handle-lan --check valve-action-ticks --check valve-support-removal --check valve-handle-persistence
+```
+
+All 9/9 checks passed, including host/guest operation and idle/active
+save/reopen. The temporary pack copy used by the runner was removed after the
+run; no runtime artifacts are part of the PR.
 
 The [Java angle trace](fixtures/copper-valve-handle-angle-java.csv) contains
 93 samples at +95°, −137° and +1°. The replay checks the 180° settings board
