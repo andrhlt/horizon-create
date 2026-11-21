@@ -413,7 +413,10 @@ pub(super) fn block_entity_ticks(block: &str, ticks: &mut bool) {
                 | super::create_item_hatch::HATCH
                 | SCHEMATIC_TABLE
         )
-    }) || block == super::create_track::TRACK;
+    }) || matches!(
+        block,
+        super::create_track::TRACK | super::create_factory_gauge::BLOCK
+    );
 }
 
 pub(super) fn block_entity_container(block: &str, container: &mut Option<ModContainer>) {
@@ -3096,6 +3099,157 @@ fn tick_deployer(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity
     entity.nbt.insert("Timer".into(), Tag::Int(timer));
 }
 
+const CUCKOO_ANIMATION: &str = "ClockAnimation";
+const CUCKOO_PROGRESS: &str = "ClockAnimationProgress";
+
+fn cuckoo_animation(entity: &ModBlockEntity) -> String {
+    string(&entity.nbt, CUCKOO_ANIMATION).unwrap_or_else(|| "NONE".into())
+}
+
+fn tick_cuckoo_clock(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity, speed: f32) {
+    if speed == 0.0 || game.dim.id() != "minecraft:overworld" {
+        return;
+    }
+
+    let day_time = game.native_day_time().rem_euclid(24_000) as i32;
+    let hours = (day_time / 1_000 + 6) % 24;
+    let minutes = day_time % 1_000 * 60 / 1_000;
+    let hour_angle = (hours % 12) * 30;
+    let minute_angle = minutes * 6;
+    let hands_changed = int(&entity.nbt, "ClockHour") != Some(hour_angle)
+        || int(&entity.nbt, "ClockMinute") != Some(minute_angle);
+    entity.nbt.insert("ClockHour".into(), Tag::Int(hour_angle));
+    entity.nbt.insert("ClockMinute".into(), Tag::Int(minute_angle));
+
+    let mut animation = cuckoo_animation(entity);
+    let mut changed = hands_changed;
+    if animation == "NONE" {
+        let trigger = if hours == 12 && minutes < 5 {
+            Some("PIG")
+        } else if hours == 18 && (32..36).contains(&minutes) {
+            Some("CREEPER")
+        } else {
+            None
+        };
+        if let Some(trigger) = trigger {
+            animation = if game.native_block(pos) == "create:mysterious_cuckoo_clock" {
+                "SURPRISE".into()
+            } else {
+                trigger.into()
+            };
+            entity.nbt.insert(CUCKOO_ANIMATION.into(), Tag::String(animation.as_str().into()));
+            entity.nbt.insert(CUCKOO_PROGRESS.into(), Tag::Int(0));
+            entity.nbt.insert("ClockAnimationStart".into(), Tag::Long(game.world.game_time));
+            changed = true;
+            let at = pos.map(|coordinate| f64::from(coordinate) + 0.5);
+            game.native_play_sound_in_place("minecraft:block.note_block.chime", at, 4, 0.25, 0.5);
+        }
+    } else {
+        let progress = int(&entity.nbt, CUCKOO_PROGRESS).unwrap_or(0) + 1;
+        entity.nbt.insert(CUCKOO_PROGRESS.into(), Tag::Int(progress));
+        if progress == 30 || progress == 60 {
+            let sound = if animation == "PIG" {
+                "minecraft:entity.pig.ambient"
+            } else {
+                "minecraft:entity.creeper.hurt"
+            };
+            game.native_play_sound_in_place(sound, pos.map(|c| f64::from(c) + 0.5), 4, 0.25, 1.0);
+        }
+        if animation == "SURPRISE" && progress == 50 {
+            let center = pos.map(|coordinate| f64::from(coordinate) + 0.5);
+            if let Some(air) = game.native_default_state("minecraft:air") {
+                game.native_set_block(game.native_dimension(), pos, air, flags::UPDATE_ALL);
+            }
+            game.native_explode(game.native_dimension(), center, 3.0, false, super::native_explosions::NativeBlast::Block);
+            return;
+        }
+        if progress > 100 {
+            entity.nbt.insert(CUCKOO_ANIMATION.into(), Tag::String("NONE".into()));
+            entity.nbt.insert(CUCKOO_PROGRESS.into(), Tag::Int(0));
+            changed = true;
+        }
+    }
+    if changed {
+        game.native_block_entity_sync(pos);
+    }
+}
+
+pub(super) fn render_cuckoo_clock(
+    game: &Game<'_>,
+    state: horizon_world::registry::BlockStateId,
+    entity: &ModBlockEntity,
+    draw: &mut super::native_block_entity_draw::BlockEntityDraw,
+) {
+    let facing = game.native_block_state_property(state, "facing").unwrap_or("north");
+    let yaw = match facing {
+        "north" => 90.0,
+        "south" => 270.0,
+        "west" => 0.0,
+        "east" => 180.0,
+        _ => 0.0,
+    };
+    let rotate_part = |draw: &mut super::native_block_entity_draw::BlockEntityDraw,
+                       model: &str,
+                       degrees: f32,
+                       pivot: [f32; 3],
+                       axis: [f32; 3]| {
+        draw.push();
+        draw.rotate_about([0.0, 1.0, 0.0], yaw, [0.5; 3]);
+        draw.push();
+        draw.translate(pivot);
+        draw.rotate_about(axis, degrees, [0.0; 3]);
+        draw.translate(pivot.map(|value| -value));
+        game.native_draw_model(draw, model, 0xFFFFFF);
+        draw.pop();
+        draw.pop();
+    };
+
+    let minute = int(&entity.nbt, "ClockMinute").unwrap_or(0) as f32;
+    let hour = int(&entity.nbt, "ClockHour").unwrap_or(0) as f32;
+    rotate_part(draw, "create:block/cuckoo_clock/minute_hand", minute, [2.0 / 16.0, 6.0 / 16.0, 8.0 / 16.0], [1.0, 0.0, 0.0]);
+    rotate_part(draw, "create:block/cuckoo_clock/hour_hand", hour, [2.0 / 16.0, 6.0 / 16.0, 8.0 / 16.0], [1.0, 0.0, 0.0]);
+
+    let animation = cuckoo_animation(entity);
+    let progress = match entity.nbt.get(&"ClockAnimationStart".into()) {
+        Some(Tag::Long(start)) => (draw.game_time - *start) as f32 + draw.partial,
+        _ => int(&entity.nbt, CUCKOO_PROGRESS).unwrap_or(0) as f32,
+    };
+    let step = if animation == "SURPRISE" { 3.0 } else { 15.0 };
+    let mut door_angle: f32 = 0.0;
+    if animation != "NONE" {
+        for phase in (30..=60).step_by(step as usize) {
+            let local = progress - phase as f32;
+            if local >= -step / 3.0 && local < 0.0 {
+                door_angle = ((progress - (phase as f32 - 5.0)) / 5.0).clamp(0.0, 1.0) * 135.0;
+                break;
+            }
+            if (0.0..step / 3.0).contains(&local) {
+                door_angle = 135.0;
+                break;
+            }
+            if local >= step / 3.0 && local < 2.0 * step / 3.0 {
+                door_angle = (1.0 - (progress - (phase as f32 + 5.0)) / 5.0).clamp(0.0, 1.0) * 135.0;
+                break;
+            }
+        }
+    }
+    rotate_part(draw, "create:block/cuckoo_clock/left_door", -door_angle, [2.0 / 16.0, 0.0, 6.0 / 16.0], [0.0, 1.0, 0.0]);
+    rotate_part(draw, "create:block/cuckoo_clock/right_door", door_angle, [2.0 / 16.0, 0.0, 10.0 / 16.0], [0.0, 1.0, 0.0]);
+
+    if matches!(animation.as_str(), "PIG" | "CREEPER" | "SURPRISE") {
+        let offset = -(door_angle / 135.0) * 0.5 + 10.0 / 16.0;
+        draw.push();
+        draw.rotate_about([0.0, 1.0, 0.0], yaw, [0.5; 3]);
+        draw.translate([offset, 0.0, 0.0]);
+        game.native_draw_model(
+            draw,
+            if animation == "PIG" { "create:block/cuckoo_clock/pig" } else { "create:block/cuckoo_clock/creeper" },
+            0xFFFFFF,
+        );
+        draw.pop();
+    }
+}
+
 pub(super) fn string(nbt: &Compound, key: &str) -> Option<String> {
     match nbt.get(&JavaString::from(key))? {
         Tag::String(value) => Some(value.to_string_lossy()),
@@ -3163,6 +3317,9 @@ pub(super) fn block_entity_tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut
             let gauge_changed = matches!(entity.id.as_str(), SPEEDOMETER | STRESSOMETER)
                 && network_values(&entity.nbt) != [state.rpm, state.capacity, state.stress];
             publish_network(entity, &state);
+            if entity.id == "create:cuckoo_clock" {
+                tick_cuckoo_clock(game, pos, entity, state.speed());
+            }
             match entity.id.as_str() {
                 WHEEL | LARGE_WHEEL | "create:simple_kinetic" if speed_changed => {
                     game.native_block_entity_sync(pos);

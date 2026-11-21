@@ -5276,22 +5276,48 @@ control sockets. Additional mixed layouts, other controllers, non-default
 range configuration, and all-layout preview transitions remain follow-ups.
 Full 1:1 parity stays Open.
 
-## Desk Bell
+## Desk Bell APP-2037
 
-The [pinned Java probe](tools/java-desk-bell.patch) records pre-press state,
-three presses including an in-flight retrigger, powered removal, and the
-weak and directional direct signal over [55 ticks](fixtures/desk-bell-pulse-java.csv).
-It also records the three original [sound events](fixtures/desk-bell-sound-java.csv)
-and placement states for [all six faces](fixtures/desk-bell-placement-java.csv).
-The [Horizon replay](tools/test-desk-bell.py) matches the two physical dust
-circuits and the bell state every tick in solo and live LAN on
-`native-9f42064-d1574c09aec5`. Both connected clients played all three
-events with the original ID, category, center, gain and pitch. A solo
-player crafted the original recipe. Solo and guest survival placement
-matched all six Java facings in dry blocks and
-[source water](fixtures/desk-bell-water-java.csv). The dry placement replay
-also compared the outer outline plane hit by a center ray from each face.
-The complete collision shape and exact animation remain open.
+Gameplay baseline:
+
+The bounded cases are survival recipe crafting; the [55-tick pinned Java
+replay](fixtures/desk-bell-pulse-java.csv) of three presses (including an
+in-flight retrigger), powered removal, weak and facing-directed direct signal;
+all six dry and source-waterlogged placement facings; support removal; and
+idle/active save and reopen. The [Java probe](tools/java-desk-bell.patch) also
+records three original sound cues. The [Horizon replay](tools/test-desk-bell.py)
+compares every tick and both physical dust circuits in solo and LAN; it checks
+all three sound IDs, categories, positions, gains and pitches, crafts the
+original recipe, and verifies all six placement states in solo and guest play.
+Dry placement also checks the outer outline plane hit from each face.
+
+The lifecycle fixture removes the block behind a north-facing bell and verifies
+that the bell remains with its state and remains usable. This matches the pinned
+`DeskBellBlock.updateShape` implementation, which only updates water and has no
+support-loss removal rule. Idle reopen retains facing, waterlogging, unpowered
+state and zero adjacent dust output. Active reopen retains facing, powered state
+and strength-15 adjacent output; a new ring after reopen completes its 20-tick
+pulse and clears the output. This feature has no inventory or configurable
+connections to preserve.
+
+All eight registered checks passed on `native-9f42064-d6dc2ad18d3f` with pack
+SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`;
+client SHA-256 `006bfe15a198b29d6af7633d353dcadaa07039121ae66c2081927299835a8811`.
+Java source is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`;
+capture-patch SHA-256 `58fd73ebe265eaf157457619eba26570b2064b236de7c19d7288b2e573c3fcc7`.
+The pulse, sound, dry-placement and water-placement trace hashes are,
+respectively, `4ffca90629f25aa1a8a70f5f3ed72bc0e7f9f97dd4779acc75a983a639f9cc04`,
+`76a34332771b1fef6026839b45ab668b24086d782372fb5e119f42d7194b2c96`,
+`f7d7cf99324fc7f03afacf0153a7c63c88f9e9a6f168dfbe844bd3df896bf1f8`, and
+`cde2dab866e62218bf8c87c38f72724656d8953c7be8475fc064a52beb28fc4d`.
+Run the checks through `tools/test-parity.py` named `desk-bell-pulse`,
+`desk-bell-pulse-lan`, `desk-bell-placement`, `desk-bell-placement-lan`,
+`desk-bell-wet-placement`, `desk-bell-wet-placement-lan`,
+`desk-bell-support-removal`, and `desk-bell-persistence`.
+
+Exact animation/collision, sound waveform, concurrent input phases and broader
+power/playback combinations remain nonblocking follow-ups. Full 1:1 remains
+Open; this bounded gameplay baseline passed.
 
 ## Powered redstone latches
 
@@ -5440,12 +5466,48 @@ alone. A purple tube dropped the original orange item when mined. The
 and power-off ticks with the other tube retaining its text. The existing
 Display Link fixture still matched all 146 Java ticks.
 
+The existing dye replay was rerun in solo and LAN on the same client and pack;
+both runs matched all 16 Java dye cases, retained text and held dye count,
+preserved the differently mounted neighbor, matched four redstone samples, and
+produced the original orange drop.
+
+The survival replay (`tools/test-nixie-survival.py`) crafted four ordinary
+tubes from the original electronics recipe, placed one with a real player click,
+and verified the held count fell to three. Its registered
+`nixie-survival` check passed through `tools/test-parity.py`.
+
+The Nixie persistence replay (`tools/test-nixie-persistence.py`) checks
+adjacent purple floor-mounted tubes: one retains custom text and one publishes
+numeric redstone strength. Idle save/reopen retained both colors, mounts, and
+text. Powered save/reopen retained the output strength; removing power after
+the active reopen returned it to zero. This is a Horizon gameplay persistence
+check, not a Java reload parity claim.
+
+The replay passed on the pinned Horizon Nightly 9f42064 client with
+`horizon-client` SHA-256 `63d4babf8091fe41f7712bc92d85b7467beecc4721dc54e0dfc50da7a5c97887`,
+`horizon-ctl` SHA-256 `1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`,
+prepared Minecraft 26.3 resources, and the Create pack SHA-256
+`6e169b2d4918f54d31d19ee9539b19b6de3d9b4d5464d62c78c9c7a52f51e509`.
+Command: `python3 tools/test-nixie-persistence.py <horizon-ctl> <horizon-client> <prepared-26.3> --pack <create.hmod>`.
+The successful control log is retained as `.local/horizon-nixiepersistence.log`.
+The dye replays used the same arguments with `tools/test-nixie-colors.py`,
+adding `--lan` for the guest run; their successful logs are
+`.local/horizon-nixiecolors.log` and `.local/horizon-nixiecolorslan.log`.
+After syncing current `origin/main` at `a5adcc5`, both registered checks passed together with `python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 1 --check nixie-survival --check nixie-persistence`. Runner logs are `.local/parity/nixie-survival.log` and `.local/parity/nixie-persistence.log`.
+Initial harness attempts were invalid: one used the fixture's one-tick step
+helper as a two-tick jump, and another combined custom text with the numeric
+output tube. The survival fixture first lacked the ignored NBT structure and
+then aimed through the crafting table; after provisioning the fixture and
+moving the placement to a clear floor tile, it passed. These were test setup
+issues. The final persistence fixture uses the Java reference's separate tube
+roles.
+
 All 16 original blockstate definitions and their direct models match by
 file bytes. The declared geometry matches the
 [16 Java mount/facing combinations](fixtures/nixie-shapes-java.csv), and
 the muted offscreen client emitted the original
 [base palettes](fixtures/nixie-colors-java.csv). Per-frame flicker,
-pixel parity, all placement paths, and save/reopen still need checks.
+pixel parity, all placement paths and exact Java reload parity remain open.
 
 ## Chain Conveyor Java reference
 
@@ -7296,12 +7358,20 @@ pinned Netherite diving upgrades and retained the base name.
 
 ## Cuckoo Clocks
 
-The [survival replay](tools/test-cuckoo-clock.py) on
-`native-9f42064-633fa4658824` and `create-clock-whistle-grip.hmod`
-placed both original variants, consumed their block items, and
-transmitted 16 RPM from each rear shaft. The clocks share the original
-block entity type. The timed display, recipes in survival, audio,
-Display Link source and the mysterious trigger remain open.
+APP-1998's [bounded survival replay](tools/test-cuckoo-clock.py) passed on
+`native-9f42064-3413df617042` with `create.hmod` SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The replay crafted the regular clock from planks, andesite casing and a clock,
+then crafted the mysterious variant with four gunpowder. It placed both in
+survival, consumed each item, and read 16 RPM from each rear-shaft network.
+Idle reopen retained both powered clocks. At noon, the regular clock selected
+PIG and the mysterious clock selected SURPRISE; active reopen retained the
+surprise and progress. The guest placed a regular clock in survival with the
+same facing/state as the host. After the synchronized 50-tick event boundary,
+the mysterious clock disappeared on both clients while the separate regular
+clock survived. The block-only blast's exact shape, other speeds/orientations,
+Display Link output, and exact animation/audio timing remain open; this is the
+gameplay baseline, not exhaustive Java parity.
 
 ## Extendo Grip placement and terrain recipes
 
@@ -7693,6 +7763,26 @@ next tick. A competing guest visiting the Nether left the existing
 Overworld owner in place. Swapping, visuals and original client
 transport timing remain open.
 
+The bounded persistence checks (`linked-controller-persistence` and
+`lectern-controller-persistence`, each with solo and LAN variants) passed
+on `native-9f42064-6ce68a31b125` with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The handheld retained both pairs (diamond/emerald in slots 0/1 and
+gold/iron in 4/5) and its custom-data marker through a host save/reopen;
+the same named LAN guest rejoined, used the saved bindings, and drove the
+matching receiver and wire 0→15→0. The attached Lectern retained its
+diamond/emerald `ControllerData`, and the host or rejoined guest acquired
+it and resumed input to a matching receiver and adjacent wire after reopen.
+These are source-aligned Horizon save/reopen checks, not Java reload
+comparisons. The four new checks can be rerun with
+`python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client
+/path/to/prepared/26.3 --jobs 1 --check 'linked-controller-persistence*'
+--check 'lectern-controller-persistence*'` after preparing the pack as in
+the README. The first post-rebase LAN run exposed a fixture race before the
+rejoined guest received its test item; the failed output is retained at
+`.local/app-2033/failed/lectern-controller-persistence-lan-first-attempt.log`.
+The fixture now waits for the item to reach the guest inventory before use.
+
 ## Shopping List
 
 The [survival replay](tools/test-shopping-list-discard.py) on
@@ -7980,6 +8070,22 @@ value-first row `12   Iron Ingot ` on a Nixie. The [guest replay](tools/test-fac
 passed the entire flow from tuning through the Nixie result.
 Promises, restocking,
 multiple rows, and exact Display Board sections remain open.
+
+### APP-2026 Factory Gauge configuration and replenishment
+
+The prerequisite Redstone Requester issue APP-2024 is Done. This work extends the existing Factory Gauge port with player-facing target amount/unit controls and a periodic panel restock path. Matching Stock Link sources are discovered through the existing stock network code; inventory insertion is preflighted before source withdrawal, both sides commit together, and packager notifications refresh the affected inventories. Factory Panels are now included in native block-entity ticking.
+
+The [item replay](tools/test-factory-gauge-item.py) first filled the destination barrel with unrelated items and verified the source stayed at 12. It then removed the matching Stock Link frequency and verified the target stayed at two iron and the source stayed at 12. Restoring the matching frequency let five-item mode move exactly five iron ingots (source 12 → 9, target 2 → 5). It then switched the same panel to stack mode and verified the remaining nine move (source 9 → 0, target 5 → 14), with no additional transfer through two further 100-tick windows. The target amount, unit setting (`UpTo: 0b`), target inventory, and source inventory survived cold save/reopen. The [LAN replay](tools/test-factory-gauge-lan.py) had a guest set the target to one item and toggle units, then confirmed host state synchronization, one-item replenishment (source 12 → 11), and no duplicate after another 100 ticks. Existing filter, Display Link stock output, and idle reopen checks also passed.
+
+The checks ran against Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, build `native-9f42064-63b75493cc50` (client SHA-256 `e5efb1b4d79c04352a2894694a9fcefb61d01b3c0d794944099f4bd593db30f7`) and Create pack SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. The five final checks were `factory-gauge-filter`, `factory-gauge-stock-display`, `factory-gauge-reopen`, `factory-gauge-restock`, and `factory-gauge-stock-display-lan`; all passed. Run them with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check factory-gauge-filter --check factory-gauge-stock-display --check factory-gauge-reopen --check factory-gauge-restock --check factory-gauge-stock-display-lan
+```
+
+For reproducibility, the initial isolated build attempt hit the patch mismatch at `horizon-advancement-initial-inventory.patch`; resolving the mismatch in this APP-2026 private source/cache enabled the actual build without changing other workers' caches. The first regression attempt also hit OS socket denial before gameplay; rerunning fixtures with the authorized socket access produced the results above. These invalid attempts are summarized in `.local/app-2026-evidence/attempts.md`.
+
+The bounded gameplay path is implemented and verified. Broader Java logistics-manager package/address/promise semantics and remaining orientations/timing are follow-ups; this evidence does not claim exhaustive 1:1 parity. Restocking here is synchronous into the target packager's attached inventory, so there is no in-flight request state to persist or reopen.
 
 
 ## Portable Minecart Contraption pickup
@@ -11668,3 +11774,9 @@ The Java behavior references remain pinned to Create
 `ac0c444d9828da3453ae8cc65338e8de063286fb`; earlier per-family sections record
 their capture patches and sampled counts. The persistence case checks ordinary
 Horizon save/reopen and does not claim Java reload parity.
+
+## APP-1967 sequenced assembly baseline
+
+The existing Java-backed checks remain valid starting evidence: `precision-mechanism` compares 108 ticks in the four-belt, three-deployer factory; `track-crafting` compares 190 samples of the three-stage track recipe; and `sturdy-sheet` compares 67 ticks through fluid filling and two press strokes. The Precision Mechanism fixture seeds only its weighted-result roll. These checks preserve concrete item IDs, counts, assembly steps, progress-bearing belt cargo, deployer state, and final outputs where applicable.
+
+The Mechanical Press prerequisite (APP-1960) and Deployer prerequisite (APP-1966) are Done. The APP-1967 completion gates still need a player-driven survival chain using legitimate ingredients, a wrong-step and blocked-output recovery case, representative host/guest agreement, and idle plus partway sequence save/reopen. The Java checkout and compatible Horizon runtime are not present in this worktree, so no fresh replay or resulting build identity is claimed here. Keep Full 1:1 Open; broader recipe combinations and unseeded weighted-roll coverage remain follow-ups.

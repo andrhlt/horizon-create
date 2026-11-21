@@ -11,6 +11,8 @@ fn block_entity_tick(
         crate::game::create_packager::tick(game, pos, entity);
     } else if entity.id == crate::game::create_stock_link::LINK {
         crate::game::create_stock_link::tick(game, pos, entity);
+    } else if entity.id == crate::game::create_factory_gauge::ENTITY {
+        crate::game::create_factory_gauge::tick(game, pos, entity);
     } else if entity.id == crate::game::create_steam_whistle::WHISTLE {
         crate::game::create_steam_whistle_audio::server_tick(game, pos, entity);
     } else if entity.id == crate::game::create_desk_bell::BELL {
