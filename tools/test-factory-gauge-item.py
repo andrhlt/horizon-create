@@ -16,6 +16,11 @@ FREQUENCY = "Freq: [I; 42, 123, -456, 789]"
 SECOND_FREQUENCY = "Freq: [I; 43, 234, -567, 890]"
 
 
+def step_ticks(world, count):
+    for _ in range(count):
+        world.step_to(world.clock() + 1)
+
+
 def aim_at_wall(world):
     world.command("/tp @s 14.5 170 22.5")
     mp.until("the actor to approach the gauge support", lambda:
@@ -76,10 +81,16 @@ def main():
     parser.add_argument("--filter", action="store_true", help="set a panel filter with a held item")
     parser.add_argument("--connection", action="store_true", help="connect the configured panel to a Display Link")
     parser.add_argument("--stock-display", action="store_true", help="display real linked network stock")
+    parser.add_argument("--reopen", action="store_true", help="verify configured panel and stock display after an idle save/reopen")
+    parser.add_argument("--restock", action="store_true", help="verify target controls, exact replenishment, duplicate suppression, and persistence")
     parser.add_argument("--support-removal", action="store_true", help="check multi-panel support loss and drops")
     parser.add_argument("--panel-break", action="store_true", help="check survival removal of one panel")
     parser.add_argument("--placement-screenshot", type=Path)
     args = parser.parse_args()
+    if args.reopen:
+        args.stock_display = True
+    if args.restock:
+        args.connection = True
     if args.stock_display:
         args.connection = True
     if args.connection:
@@ -197,6 +208,93 @@ def main():
                         text = mp.until("the Display Link to publish the network's twelve iron ingots", displayed)
                         print(f"Linked Gauge published stock to the Nixie: {text}")
                         world.call("close")
+                    if args.reopen:
+                        world.call("save")
+                        world.restart()
+                        panel = world.command("/data get block 14 171 23 bottom_right")
+                        assert all(value in panel for value in ("minecraft:iron_ingot", FREQUENCY)), panel
+                        linked = world.command("/data get block 13 171 23 LinkedGauges")
+                        assert "bottom_right" in linked and "14, 171, 23" in linked, linked
+                        world.step_to(world.clock() + 1)
+                        output = world.command("/data get block 13 172 23 CustomText")
+                        assert "12" in output and "Iron Ingot" in output, output
+                        print("Idle save/reopen retained the filtered panel and Display Link connection, and republished twelve stocked ingots.")
+                    if args.restock:
+                        world.call("key", "2", "tap")
+                        world.call("look-at", 14.25, 171.25, 23.875)
+                        world.call("wait", 4)
+                        world.call("mouse", "right", "click")
+                        mp.until("the Factory Gauge target controls", lambda:
+                                 any(button.get("label") == "Increase target" for button in world.call("screen").get("buttons", [])))
+                        for _ in range(5):
+                            world.call("click-button", "Increase target")
+                            world.call("wait", 2)
+                        target_data = world.command("/data get block 14 171 23 bottom_right.TargetAmount")
+                        assert "5" in target_data, target_data
+                        world.call("close")
+                        world.commands((
+                            "/setblock 14 171 24 create:packager[facing=north]",
+                            "/setblock 14 171 25 minecraft:barrel",
+                            "/item replace block 14 171 25 container.0 with minecraft:iron_ingot 2",
+                            "/setblock 18 170 24 minecraft:barrel",
+                            "/setblock 19 170 24 create:packager[facing=east]",
+                            "/setblock 19 171 24 create:stock_link[face=floor]",
+                            f"/data merge block 19 171 24 {{{FREQUENCY}}}",
+                            "/item replace block 18 170 24 container.0 with minecraft:iron_ingot 12",
+                        ))
+                        world.commands(tuple(
+                            f"/item replace block 14 171 25 container.{slot} with minecraft:cobblestone 64"
+                            for slot in range(27)
+                        ))
+                        step_ticks(world, 20)
+                        full_target = world.command("/data get block 14 171 25 Items")
+                        full_source = world.command("/data get block 18 170 24 Items")
+                        assert "count: 64" in full_target, full_target
+                        assert "count: 12" in full_source, full_source
+                        world.commands(("/setblock 14 171 25 minecraft:barrel",
+                                        "/item replace block 14 171 25 container.0 with minecraft:iron_ingot 2",
+                                        f"/data merge block 19 171 24 {{{SECOND_FREQUENCY}}}"))
+                        step_ticks(world, 20)
+                        absent_target = world.command("/data get block 14 171 25 Items")
+                        absent_source = world.command("/data get block 18 170 24 Items")
+                        assert "count: 2" in absent_target, absent_target
+                        assert "count: 12" in absent_source, absent_source
+                        world.command(f"/data merge block 19 171 24 {{{FREQUENCY}}}")
+                        step_ticks(world, 100)
+                        destination = world.command("/data get block 14 171 25 Items")
+                        source = world.command("/data get block 18 170 24 Items")
+                        assert "minecraft:iron_ingot" in destination and "count: 5" in destination, destination
+                        assert "minecraft:iron_ingot" in source and "count: 9" in source, source
+                        step_ticks(world, 100)
+                        destination_after = world.command("/data get block 14 171 25 Items")
+                        source_after = world.command("/data get block 18 170 24 Items")
+                        assert "count: 5" in destination_after, destination_after
+                        assert "count: 9" in source_after, source_after
+                        world.call("key", "2", "tap")
+                        world.call("look-at", 14.25, 171.25, 23.875)
+                        world.call("wait", 4)
+                        world.call("mouse", "right", "click")
+                        mp.until("the Factory Gauge target controls after item replenishment", lambda:
+                                 any(button.get("label") == "Toggle target units" for button in world.call("screen").get("buttons", [])))
+                        world.call("click-button", "Toggle target units")
+                        world.call("wait", 2)
+                        world.call("close")
+                        step_ticks(world, 100)
+                        stacked_destination = world.command("/data get block 14 171 25 Items")
+                        stacked_source = world.command("/data get block 18 170 24 Items")
+                        assert "count: 14" in stacked_destination, stacked_destination
+                        assert "minecraft:iron_ingot" not in stacked_source, stacked_source
+                        step_ticks(world, 100)
+                        assert "count: 14" in world.command("/data get block 14 171 25 Items")
+                        assert "minecraft:iron_ingot" not in world.command("/data get block 18 170 24 Items")
+                        world.call("save")
+                        world.restart()
+                        persisted = world.command("/data get block 14 171 23 bottom_right")
+                        assert "TargetAmount: 5" in persisted and "UpTo: 0b" in persisted, persisted
+                        step_ticks(world, 10)
+                        assert "count: 14" in world.command("/data get block 14 171 25 Items")
+                        assert "minecraft:iron_ingot" not in world.command("/data get block 18 170 24 Items")
+                        print("Item mode replenished five exactly; stack mode moved only the remaining nine; settings and inventories survived save/reopen without duplicates or loss.")
                     world.call("key", "1", "tap")
             next_frequency = SECOND_FREQUENCY if args.panels else FREQUENCY
             world.command(f"/data merge block 10 170 24 {{{next_frequency}}}")
