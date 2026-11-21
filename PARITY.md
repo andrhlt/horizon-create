@@ -8697,6 +8697,44 @@ The screenshot shows the lifted, turned, and swapped gear
 configurations. Rotation-speed particles, exact movement
 interpolation, full catalog, and container return remain open.
 
+### APP-2101 bounded gameplay baseline
+
+The finite case set for this ticket reuses the Shaft relay and encasing,
+Small and Large Cogwheel relays, Gearshift navigation, survival Back/Escape,
+and Creative-tab return above. The [Shaft replay check](tools/test-ponder-shaft.py)
+now also pauses at tick 5, waits eight client ticks, confirms the tick-20 event
+has not fired, then resumes through the existing Java event markers to tick 65.
+It passed with nonempty scene geometry, replay, Escape, and unchanged inventory
+and world marker. The new [LAN check](tools/test-ponder-guest.py) passed with
+both host and guest opening Ponder from their survival inventories, returning
+to inventory, and retaining their Shaft counts; the guest UI did not change the
+host's state. Existing [Creative Back evidence](tools/test-ponder-creative-back.py)
+shows the selected Redstone Blocks tab and item grid restored byte-for-byte.
+The LAN fixture then stopped and reopened the dedicated world and rejoined both
+players; their Shaft inventories and the diamond-block world marker survived.
+Ponder itself is a read-only client presentation with no mutable scene save
+state, so this inventory/world save-reopen and the Creative selection across
+opening and closing are the applicable persistence checks.
+
+The two new focused replays ran against pack SHA-256
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`,
+prepared 26.3 resources from installed build `native-9f42064-68c7ab9c0826`,
+`horizon-ctl` SHA-256
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`, and
+the offscreen `native/target/fast/horizon-client` SHA-256
+`7de8fae06dd9f92a2ccb059e732120931f3f56e15396325fb5bf0fef4b185b96`.
+Commands from the repository root:
+
+```sh
+python3 tools/test-ponder-shaft.py "$CTL" "$CLIENT" "$RESOURCES" --pack /path/to/create.hmod
+python3 tools/test-ponder-guest.py "$CTL" "$CLIENT" "$RESOURCES" --pack /path/to/create.hmod
+```
+
+The guest test is registered as `ponder-guest` in `tools/test-parity.py`.
+These representative cases establish the gameplay baseline only; the full
+catalog, remaining storyboards, container return, exact pixels, and exact
+movement interpolation remain open in the matrix.
+
 
 The Depot replay on `native-9f42064-e1f836744b54` also matched all
 21 original Package frames in solo and LAN using muted software

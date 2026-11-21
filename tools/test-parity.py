@@ -35,6 +35,7 @@ CHECKS = (
     ("ponder-creative-back", "test-ponder-creative-back"),
     ("ponder-large-cogwheel", "test-ponder-large-cogwheel"),
     ("ponder-gearshift", "test-ponder-gearshift"),
+    ("ponder-guest", "test-ponder-guest"),
     ("shaft-casing", "test-shaft-casing"),
     ("shaft-casing-lan", "test-multiplayer-shaft-casing"),
     ("shaft-reopen", "test-shaft-reopen"),
