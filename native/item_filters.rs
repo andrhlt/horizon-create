@@ -94,7 +94,7 @@ pub(super) fn accepts_fluid(nbt: &Compound, fluid: &Fluid) -> bool {
     compound(nbt, "Filter").is_none_or(|filter| matches_fluid(filter, fluid, true))
 }
 
-fn matches_fluid(filter: &Compound, fluid: &Fluid, respect: bool) -> bool {
+pub(super) fn matches_fluid(filter: &Compound, fluid: &Fluid, respect: bool) -> bool {
     let Some(sample) = ItemStack::from_nbt(filter) else {
         return true;
     };

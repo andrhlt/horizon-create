@@ -310,6 +310,15 @@ impl SignalSection {
     }
 }
 
+/// Whether a bogey point lies on the straight or curved edge data stored by a track block.
+/// Track Observers attach to a particular rail block, including diagonal and curve blocks.
+pub(super) fn point_on_track(game: &Game<'_>, track: [i32; 3], point: Point) -> bool {
+    open_edges(game, track).into_iter().any(|edge| {
+        let key = point.edge.key();
+        edge.key() == key || edge.reversed().key() == key
+    })
+}
+
 fn routed_next(game: &Game<'_>, current: Edge, route: &StationRoute) -> Option<Edge> {
     let key = route.next.get(&current.key())?;
     connected_edges(game, current, true)
