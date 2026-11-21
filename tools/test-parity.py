@@ -1224,6 +1224,7 @@ CHECKS = (
     ("crafter-process-reopen", "test-crafter-gameplay", "--case", "process"),
     ("crafter-invalid-grid", "test-crafter-gameplay", "--case", "wrong"),
     ("potion-brewing", "test-potion-brewing"),
+    ("potion-brewing-no-heat", "test-potion-brewing", "--no-heat"),
     ("hose-pulley", "test-hose-pulley"),
     ("sequenced-pulley", "test-sequenced-pulley"),
     ("super-glue-selection", "test-super-glue-selection"),

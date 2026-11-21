@@ -146,6 +146,57 @@ The zero-RPM timing gate intentionally distinguishes the Spout machine tick
 from belt-held-item processing: timer completion alone does not fill the bottle
 until belt movement resumes.
 
+## APP-1991 Potion fluids and heated brewing
+
+The finite acceptance set is: (1) the original water → Healing potion recipe
+with Nether Wart and Glistering Melon Slice, including basin tank identity and
+amounts, mixer state, filtered pipe, Spout timer and final bottle; (2) a
+no-heat rejection control; (3) potion fill/empty and container remainder; (4)
+guest insertion/result convergence; and (5) idle and active save/reopen of the
+basin and Spout path. The original replay at
+[`tools/test-potion-brewing.py`](tools/test-potion-brewing.py) compares all 394
+Java observations in [`fixtures/potion_brewing-java.csv`](fixtures/potion_brewing-java.csv),
+including both basin tank pairs and the Spout tank, through delivery of Healing
+potion to the chest. Its reference is the pinned Create 6.0.10 GameTest and
+`tools/java-potion-brewing-trace.patch`.
+
+The pinned source audit covered `PotionMixingRecipes.createRecipe` and
+`PotionFluidHandler`: vanilla potion recipes preserve bottle type and potion
+contents, consume 1,000 mB, and require heat; emptying an ordinary water potion
+uses water while other potion contents retain the `create:potion` identity;
+filling consumes the matching amount and returns the appropriate container.
+The existing [Basin lifecycle](tools/test-basin-lifecycle.py) covers real guest
+insertion/collection and active/idle reopen. APP-1990's [Spout baseline](tools/test-spout-gameplay.py)
+covers guest feed/collection and idle/partway reopen. These neighboring gates
+apply to the same authoritative basin inventory and Spout transfer paths; they
+do not claim packet-timing parity for a guest-triggered potion brew.
+
+The replay was rerun from the isolated ticket worktree on client build
+`native-9f42064-6bdf8691aa42` with pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`; all 394
+Java rows matched exactly. Horizon output is in the worktree's
+`.local/potion_brewing-horizon.csv`, and the runner log is
+`.local/horizon-potion-brewing.log`. The no-heat rule is source-aligned in both
+Java (`PotionMixingRecipes.createRecipe` requires `HEATED`) and Horizon
+(`native/mixer.rs::recipe` blocks heat-required recipes and `brew` requires
+heat). The new `potion-brewing-no-heat` control clears every burner in the
+isolated fixture, runs 120 ticks, and confirms the mixer stays idle while all
+five fluid amounts, both ingredients, and the empty output remain conserved.
+The neighboring Basin lifecycle and Spout checks provide the potion-path
+guest insertion/result convergence and idle/active reopen gates: on the same
+build, `basin-lifecycle`, `spout-lan-feed-collect`, and `spout-reopen` all pass.
+These checks establish guest convergence and persistence, not Java packet
+arrival timing. Remaining potion variants, splash/lingering handling and
+exhaustive fluid component combinations stay follow-ups.
+
+Reproduce the Java trace comparison with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 \
+  --check potion-brewing --check potion-brewing-no-heat \
+  --check basin-lifecycle --check spout-lan-feed-collect --check spout-reopen
+```
+
 ## Freestanding paired doors
 
 The [pinned GameTest](tools/java-world-paired-doors.patch) recorded 24
