@@ -3459,6 +3459,18 @@ name = "create_peculiar_bell"
 source = "peculiar_bell.rs"
 
 [[injection]]
+id = "peculiar_bell_attack"
+hook = "left_click_block"
+hook_version = 1
+kind = "HEAD"
+helper = "peculiar_bell_attack.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "self" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
+]
+
+[[injection]]
 id = "peculiar_bell_placement"
 hook = "state_for_placement"
 hook_version = 1

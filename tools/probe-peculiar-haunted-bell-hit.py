@@ -26,6 +26,8 @@ def main():
         world.call("mouse", "left", "click")
         world.call("wait", 2)
         after = world.call("block", *pos)
+        if after["block"] != "create:haunted_bell" or "powered=false" not in after["state"]:
+            raise RuntimeError(f"Bell hit changed state unexpectedly: {before['state']} -> {after['state']} ({after['block']})")
         log = world.socket.parent / "ctl.log"
         sounds = [line for line in log.read_text().splitlines() if "bell" in line.lower()] if log.exists() else []
         print(f"before={before['state']} after={after['state']} block={after['block']} sound_or_event_lines={len(sounds)}")

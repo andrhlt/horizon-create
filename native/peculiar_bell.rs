@@ -1,10 +1,38 @@
 use horizon_core::{geometry::Direction, position::BlockPos};
 use horizon_world::{level::PlacementContext, registry::BlockStateId};
 
-use super::GameLevel;
+use super::{Game, GameLevel};
 
 const PECULIAR: &str = "create:peculiar_bell";
 const HAUNTED: &str = "create:haunted_bell";
+
+fn can_ring_from(game: &Game<'_>, pos: [i32; 3]) -> bool {
+    let Some((_, hit)) = game.native_view_hit() else { return false; };
+    let face = [
+        if hit.x - f64::from(pos[0]) < 0.001 { -1 } else if hit.x - f64::from(pos[0]) > 0.999 { 1 } else { 0 },
+        if hit.y - f64::from(pos[1]) < 0.001 { -1 } else if hit.y - f64::from(pos[1]) > 0.999 { 1 } else { 0 },
+        if hit.z - f64::from(pos[2]) < 0.001 { -1 } else if hit.z - f64::from(pos[2]) > 0.999 { 1 } else { 0 },
+    ];
+    if [hit.block_x, hit.block_y, hit.block_z] != pos || face[1] != 0 || hit.y - f64::from(pos[1]) > 0.8124 { return false; }
+    let id = game.world.block(pos[0], pos[1], pos[2]);
+    let Some(state) = game.pack.assets.registry.state(id) else { return false; };
+    let axis = state.properties.get("facing").map(|f| if matches!(f.as_str(), "east" | "west") { 0 } else { 2 });
+    let Some(axis) = axis else { return false; };
+    let hit_axis = if face[0] != 0 { 0 } else { 2 };
+    match state.properties.get("attachment").map(String::as_str) {
+        Some("floor") | Some("ceiling") => axis == hit_axis,
+        Some("wall") | Some("single_wall") | Some("double_wall") => axis != hit_axis,
+        _ => false,
+    }
+}
+
+pub(super) fn attack(game: &mut Game<'_>, pos: [i32; 3], canceled: &mut bool) {
+    if *canceled || !game.native_authoritative() || !matches!(game.native_block(pos).as_str(), PECULIAR | HAUNTED) || !can_ring_from(game, pos) { return; }
+    let (sound, volume, pitch) = if game.native_block(pos) == PECULIAR { ("create:peculiar_bell_use", 2, 0.94) } else { ("create:haunted_bell_use", 4, 1.0) };
+    game.native_play_sound_in_place(sound, pos.map(|v| f64::from(v) + 0.5), volume, pitch, 1.0);
+    game.swing_arm();
+    *canceled = true;
+}
 
 fn convert(level: &GameLevel<'_>, state: BlockStateId) -> Option<BlockStateId> {
     let info = level.registry.state(state)?;
