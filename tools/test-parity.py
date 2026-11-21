@@ -1128,6 +1128,8 @@ CHECKS = (
     ("tree-fertilizer-last-item", "test-tree-fertilizer-last-item"),
     ("tree-fertilizer-reopen-lan", "test-tree-fertilizer-reopen"),
     ("tree-fertilizer-nonsapling", "test-tree-fertilizer-nonsapling"),
+    ("worldshaper-baseline", "test-worldshaper-baseline"),
+    ("worldshaper-baseline-lan", "test-worldshaper-baseline", "--lan"),
     ("worldshaper-selection", "test-worldshaper-selection"),
     ("worldshaper-selection-lan", "test-worldshaper-selection", "--lan"),
     ("worldshaper-selection-creative", "test-worldshaper-selection", "--creative"),
