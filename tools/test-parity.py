@@ -1360,6 +1360,7 @@ CHECKS = (
     ("world-paired-sliding-doors-outline-lan", "test-world-paired-doors", "--sliding", "--outline", "--lan"),
     ("world-paired-sliding-doors-render", "test-world-paired-doors", "--sliding", "--render"),
     ("world-paired-sliding-doors-render-lan", "test-world-paired-doors", "--sliding", "--render", "--lan"),
+    ("sliding-door-placement", "test-sliding-door-placement"),
     ("world-paired-doors-cold-open", "test-world-door-cold-open"),
     ("world-paired-doors-cold-open-lan", "test-world-door-cold-open", "--lan"),
     ("world-paired-doors-power", "test-world-door-power-post"),

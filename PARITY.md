@@ -305,6 +305,51 @@ authority also recorded both closures on tick 21. The identical
 fixed-tick observation now applies in either mode. Both isolated
 replays passed all their synchronized panel, state and cue samples.
 
+## APP-2057 Sliding Doors gameplay baseline
+
+The bounded acceptance matrix reuses the Java comparisons above for manual
+open/close, paired leaves, material coverage, redstone source handoff, sound,
+and solo/LAN interaction. The elevator walkthrough also verifies that the
+physical doors block the players while closed and allow both host and guest to
+cross after opening. Mounted train-platform scheduling and controls remain in
+their Train Doors issue and are not counted as new APP-2057 coverage.
+
+The new [survival placement check](tools/test-sliding-door-placement.py)
+performs real player clicks in Survival for Andesite folding doors facing
+north/east and Brass sliding doors facing south/west. All four placements
+created the expected Java lower/upper block states, consumed one item, and
+matched at the same frozen tick. Its reopen extension retained both halves of
+an open Andesite pair and a closed Brass pair. The existing cold-open replay
+also saved Brass and Copper pairs during active opening, then matched Java's
+fully open first pose after host reopen and guest rejoin. This is Horizon
+save/reopen evidence, not a Java reload-parity claim.
+
+The placement and static-reopen cases passed with the pinned Horizon Nightly
+9f42064 client build `native-9f42064-d6dc2ad18d3f` and prepared Minecraft 26.3
+resources. The client SHA-256 was
+`006bfe15a198b29d6af7633d353dcadaa07039121ae66c2081927299835a8811`, the
+control client SHA-256 was
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`, and the
+Create pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The comparison reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+Run the new cases with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client \
+  /path/to/prepared/26.3 --check sliding-door-placement
+```
+
+The gameplay baseline is bounded to the four placement cases plus the existing
+five-material manual state/cue checks, representative two-material redstone
+handoff, paired host/guest interaction, closed-door obstruction and open-door
+passage, and idle/active save/reopen. Other placement/property cross-products,
+moving assemblies outside the existing Train Doors evidence, frame-level
+network arrival, and cosmetic equivalence remain open follow-ups. Full 1:1
+parity remains Open.
+
 ## Creative search gear attribution
 
 Pinned Java registers Gearbox, Gearshift and Sequenced Gearshift in
