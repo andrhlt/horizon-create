@@ -7834,6 +7834,23 @@ next to a lit Soul Campfire. Both bells passed floor placement and
 the powered state cycle. The original fan timing, direct soul-fire
 conversion, animation, sounds, shapes and Haunting effects remain open.
 
+APP-2038 adds source-aligned direct conversion when a Peculiar Bell is
+placed over Soul Fire or a lit Soul Campfire, and when either catalyst
+appears below an existing Peculiar Bell. The callback carries facing,
+attachment and power into the Haunted Bell state. The rebuilt-client
+[bounded replay](tools/test-peculiar-haunted-bells.py) passed Soul Fire,
+lit Soul Campfire and unlit Soul Campfire rejection, while retaining the
+survival craft, 153-tick Depot fan conversion and both bells' floor
+placement/power checks. The [hit probe](tools/probe-peculiar-haunted-bell-hit.py)
+kept the Haunted Bell intact after a valid creative left-click. The pinned
+control log exposed no sound/event lines, so event delivery remains
+unverified. The [LAN lifecycle replay](tools/test-peculiar-haunted-bells-lifecycle.py)
+passed host/guest power convergence and active/idle save/reopen. These
+runs used pinned Java source
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and compatible client build
+`native-9f42064-55bc0a64ce79`. Exact Java hit geometry, swing/audio timing
+and Haunting effects remain open.
+
 ## Sticker
 
 See the [complete Sticker behavior checklist](STICKER-PARITY.md) for the subsequent
