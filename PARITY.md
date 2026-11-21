@@ -604,6 +604,43 @@ the sampled block states and inventory counts in solo and live LAN.
 Each player also matched the Java climb height and vertical velocity on
 every sampled player tick, including the grounded starting state.
 
+### APP-2067 bounded gameplay baseline — November 21, 2026
+
+The seven registered `metal-ladder*` checks passed (7/7) on Horizon
+`native-9f42064-6bdf8691aa42`, pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, using the prepared 26.3 resources
+and Create pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The build metadata reports mixin hash
+`5a64af938ec86b00d53d16a408aabc0038fb3e57` and Create mod hash
+`4e77322220d09ddbeedcbc87fccdf409833d07367e4b943423494e3f4871526b`.
+Command: `python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared/26.3> --jobs 2 --check 'metal-ladder*'`.
+Logs are in `.local/parity/metal-ladder*.log`.
+
+This reuses Java Create `ac0c444d9828da3453ae8cc65338e8de063286fb` and the
+bounded cases: each metal's Stonecutter recipe, vertical placement assist,
+backing and hanging support, waterlogging, support loss, Wrench rotation/reject
+and pickup, climb movement, and idle cold reopen. The existing Java fixture
+contains 84 placement/support/water samples, 15 Wrench cases and 39 climb
+samples across the three materials. Capture patch SHA-256 values are
+`370911f983d578c2192e892bac9a99527da804b9804ab2cf9ed2701f65e2c93a`
+(`java-metal-ladder-trace.patch`) and
+`9a7ae1085f18c52206a738a8cf41c56e5448a3b3d47a80c0d91a57cb51246681`
+(`java-metal-ladder-controls.patch`). Existing placement, Wrench and climb
+replays passed in solo and LAN, including guest inventory/state convergence.
+The new cold-reopen replay retained all three variants, north/east/south
+facings, the matching-ladder support chain, waterlogging and each player's
+inventory stack. Removing the copper column's only wall support removed its
+upper ladder, restored water in the lower cell and preserved item counts.
+Metal ladders are static, so active-operation reopen is not applicable.
+
+A fresh native rebuild was attempted with a private copy of the launcher
+cache. It stopped before compilation because that cache's Horizon source
+already contains part of the repository patch set and rejects
+`horizon-advancement-initial-inventory.patch`. No native code changed in this
+ticket; the focused checks above used the identified existing pinned client.
+Exact rendering and remaining collision/neighbor combinations remain open.
+
 ## Andesite and Brass Tunnel gameplay baseline (APP-2013)
 
 APP-2013 reuses the pinned Create GameTests and fixtures at

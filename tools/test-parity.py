@@ -532,6 +532,7 @@ CHECKS = (
     ("metal-ladder-wrench-lan", "test-metal-ladder-wrench", "--lan"),
     ("metal-ladder-climb", "test-metal-ladder-wrench", "--climb"),
     ("metal-ladder-climb-lan", "test-metal-ladder-wrench", "--climb", "--lan"),
+    ("metal-ladder-reopen", "test-metal-ladder-persistence"),
     ("window-palettes", "test-window-palettes"),
     ("window-palettes-lan", "test-multiplayer-window-palettes"),
     ("window-recycling", "test-window-recycling"),
