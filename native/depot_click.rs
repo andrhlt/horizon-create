@@ -93,10 +93,20 @@ fn depot_click(
         *canceled = true;
         return;
     }
+    // Cannon loading must run before the container block opens its menu.
+    if !*canceled
+        && game.native_block(pos) == crate::game::create_schematicannon::CANNON
+        && let Some(stack) = game.held().cloned()
+        && crate::game::create_schematicannon::use_item(game, pos, face, &stack)
+    {
+        *canceled = true;
+        return;
+    }
     if !*canceled
         && (crate::game::create_station::open(game, pos)
             || crate::game::create_display_link::open(game, pos)
             || crate::game::create_chain_conveyor_packages::open_port(game, pos)
+            || crate::game::create_schematicannon::open(game, pos)
             || crate::game::create_schematic_table::open(game, pos)
             || crate::game::create_brass_tunnel::click(game, pos, face))
     {

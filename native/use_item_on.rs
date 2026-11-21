@@ -40,6 +40,7 @@ fn use_item_on(
         || crate::game::create_bracket::apply(game, stack, pos, face)
         || crate::game::create_burner::use_item(game, pos, face, stack)
         || crate::game::create_schematicannon::use_item(game, pos, face, stack)
+        || crate::game::create_schematicannon::open(game, pos)
         || crate::game::create_track::use_track(game, pos, face, stack)
         || crate::game::create_display_link::use_item(game, pos, face, stack)
         || crate::game::create_station::use_item(game, pos, face, stack)

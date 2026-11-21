@@ -687,8 +687,12 @@ Use an Empty Schematic on a named structure block with a saved template.
 Use the filled schematic on the face beside the desired output origin,
 then on the cannon to load and start it. A neighboring Creative Crate
 supplies unlimited blocks and fuel. The cannon also draws supplies from
-adjacent inventories and accepts gunpowder by hand. The original cannon
-interface, Schematic Table, and entity printing remain in development.
+adjacent inventories and accepts gunpowder by hand. Right-click with an empty
+hand to open the controls for starting, pausing, stopping and replacement options.
+The screen shows ammo and the missing material/count. Double slabs require two
+items; identical blocks, unbreakable targets and protected containers are skipped.
+Printed containers do not copy their source inventories. The original checklist,
+entity printing and full screen presentation remain open.
 
 ### Deployer mining
 

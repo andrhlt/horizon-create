@@ -12471,6 +12471,108 @@ positions are checked against the authoritative server. This is scoped gameplay
 collision evidence; exact Java player motion and packet arrival are unverified.
 APP-2051 and APP-2057 are completed prerequisites. Full 1:1 remains Open.
 
+## APP-2093 — Schematicannon survival baseline
+
+This pass preserves the existing 233-tick Java flight fixture and cites the Done
+APP-2092 acquisition/capture/import pass as its schematic prerequisite. It adds
+player controls and repairs target eligibility, atomic multi-item extraction and
+unsafe source-container copying. Full 1:1 remains Open.
+
+Pinned Java source reviewed: `SchematicannonBlockEntity.tickPrinter`,
+`shouldPlace`, `shouldIgnoreBlockState`, `refillFuelIfPossible`,
+`ConfigureSchematicannonPacket.handle`, `SchematicPrinter.shouldPlaceBlock`,
+`ItemRequirement.defaultOf`, and `BlockHelper.prepareBlockEntityData`, at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`. Important source expectations are:
+matching target states and unbreakable targets are skipped; protected block
+entities are retained; double slabs require two items; all requirements must be
+available before extraction; one gunpowder supplies 400 shots. Printing prepares
+safe block-entity data instead of cloning saved container inventories.
+
+Pre-fix live probes on `native-9f42064-de4782e18b5b` reproduced one consumed stone
+and shot for an already-present block. The six-cell probe consumed one slab for
+a double slab, replaced bedrock with stone, and cloned seven source diamonds.
+Logs: `/private/tmp/horizon-app-2093/.local/probe-before-socket.log` and
+`probe-safety-before.log`. Earlier missing-resource and sandbox-socket attempts
+in `probe-before.log` are invalid setup runs, not gameplay evidence.
+
+The finite acceptance fixture uses one six-cell existing schematic: existing
+stone, missing double slab, a newly printed chest, bedrock, a stocked target
+chest, and one ordinary stone target. It exercises real survival schematic and
+fuel insertion; missing-material pause with one slab; exact two-slab resupply;
+manual pause while a block is in flight; resume and completion; ammo exhaustion
+and adjacent-gunpowder resupply; and an exact 256-block invalid anchor. The main
+build must spend two slabs, one chest, one stone and three of 400 shots, retain
+the stocked chest's five copper ingots, leave bedrock intact, and never clone the
+seven source diamonds. Idle, active and completed reopen checks retain the plan, settings and
+exact item/ammo conservation. Idle and completed snapshots compare saved fields
+exactly. The active printer may legitimately advance during startup before the
+control tool freezes ticks; it must retain its queue or finish with the exact
+expected output and costs. This does not claim exact Java reload timing. LAN repeats guest actions and observes host/guest block convergence;
+it does not establish Java packet arrival timing.
+
+The new screen exposes Start, Pause, Stop, skip-missing, replace mode and
+container replacement, plus ammo, status and the current missing stack/count.
+Original Java checklist/book printing, entity printing, full safe-NBT writers,
+configured-block merges, multi-block/optional-mod planning, transforms and exact
+presentation remain unverified follow-ups, not exhaustive parity claims.
+
+### Final verification
+
+The reference capture patch SHA256 is
+`9a7f1551a40113b15e2227795ff7af0806740d0b5ee8368c42aaa0c7bb30db90`;
+the unchanged 233-row Java CSV SHA256 is
+`f14bc77a711f17775848150dce7feba0470c871a2d8043cf0946f9a02d824da1`.
+The prepared pack SHA256 is
+`00d37a5973ed7a104433f59ceb7744d7a9fffafeaf8a9bd92024af7587bef3bb`,
+created with `python3 tools/prepare.py /path/to/pinned/Create` and the added
+five-slot `create:schematicannon` menu registration. The resource directory is
+Minecraft 26.3, and the native source pin remains `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`.
+
+Build `native-9f42064-f172164a2087` passed the survival/reopen and LAN checks,
+the original 233-tick Java replay, and the Schematic Table regression. The Java
+import regression also passed on the prior `native-9f42064-fd19c1af93b8` build;
+the final five-check batch and combined-main verification are recorded below.
+The survival fixture explicitly steps 194 ticks and the LAN fixture 169, besides
+measured startup ticks. The original Java comparison covers ticks 0–232 with
+zero differences in its discrete fields, six-decimal progress and flight counters.
+Guest checks establish convergence, not exact Java packet arrival/interpolation.
+
+Failed diagnostic results remain under `/private/tmp/horizon-app-2093/.local/`:
+`baseline-first.log` and the labeled `baseline-*-sneak.log`/`baseline-mouse.log`
+loading diagnostics; `baseline-memory-only-template.log` for the invalid
+memory-only Structure Block persistence fixture; and `baseline-startup-ticks.log`
+/`baseline-active-queue.log` for overstrict assumptions about startup aging.
+The corrected fixture uses the APP-2092 production capture/export backend to seed
+an actual saved file and checks conservation while normal startup ticks run.
+Visual QA found a clipped title, stale status/ammo and a missing visible required
+count; the final screen fits the viewport and synchronizes only its relevant NBT
+fields and flying blocks, without broadcasting the full queued structure.
+
+Builds used the compatible official launcher 0.2.67 and a private APFS-cloned
+compiler cache in the ticket worktree. The original successful build took 447 s;
+intermediate builds took 208 s and 129 s, and the synchronized-screen build 296 s.
+Source/fixture authoring and debugging overlapped those builds. Setup/reference
+review and pre-fix captures occupied about 5 minutes; authoring/debugging about
+25 minutes; final integration/CI took about 10 minutes. After rebasing onto
+`2b929215292973f625d55248cbc1940435557da3`, the PR-head build
+`native-9f42064-edcfe16aa867` completed in 321 s using the same pinned launcher,
+pack hash and isolated worktree cache. Its three directly affected checks all
+passed: `schematicannon-baseline`, `schematicannon-baseline-lan`, and
+`schematicannon`. The preceding synchronized-screen build passed the five-check
+batch (`schematicannon`, both baselines, `schematic-table`, and
+`schematic-java-import`); the small follow-up UI change only adds the visible
+required count, and the three directly affected checks were rerun on the final
+build. `python3 tools/check-source.py` and `git diff --check` passed. The
+original Java replay covers ticks 0–232 with zero differences in its discrete
+fields, six-decimal progress and flight counters. No full-suite or desktop-game
+run was used. After main advanced to `16696be` (APP-2086 symmetry-wand
+implementation and APP-2052/2055 documentation), the PR merged that source and
+rebuilt as `native-9f42064-352ad233a46a` in 193 s. All ten selected checks
+passed together: `schematicannon`, both Schematicannon baselines, and all seven
+`symmetry-wand-*` checks. Source checks passed with 489 JSON, 45 JSONL, 893
+Python, two shell and three TOML files. This is the combined-source integration
+result; it does not expand APP-2093's bounded gameplay claim.
+
 ## APP-2086 Wand of Symmetry gameplay baseline
 
 The bounded pass retains the earlier powered-crafter acquisition, XY/YZ plane,
