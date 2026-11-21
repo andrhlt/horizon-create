@@ -5704,3 +5704,77 @@ bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
   { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
 ]
+
+[[module]]
+id = "symmetry_screen"
+file = "crates/horizon-client/src/game.rs"
+name = "create_symmetry_screen"
+source = "symmetry_screen.rs"
+
+[[injection]]
+id = "symmetry_screen_receive"
+target = "horizon_client::game::native_hooks::Game<'_>::native_net_from_server"
+kind = "HEAD"
+helper = "symmetry_screen_receive.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "self" },
+  { name = "channel", ty = "&str", value = "channel" },
+  { name = "data", ty = "&[u8]", value = "data" },
+]
+
+[[injection]]
+id = "symmetry_screen_save"
+target = "horizon_client::game::native_hooks::Game<'_>::native_net_from_client"
+kind = "HEAD"
+helper = "symmetry_screen_save.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "self" },
+  { name = "player", ty = "u128", value = "player" },
+  { name = "channel", ty = "&str", value = "channel" },
+  { name = "data", ty = "&[u8]", value = "data" },
+]
+
+[[injection]]
+id = "symmetry_screen_draw"
+target = "horizon_client::game::native_hooks::Game<'_>::native_screen_render_post"
+kind = "HEAD"
+helper = "symmetry_screen_draw.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "self" },
+  { name = "screen", ty = "&NativeScreenView<'_>", value = "screen" },
+  { name = "batch", ty = "&mut HudBatch", value = "batch" },
+]
+
+[[injection]]
+id = "symmetry_screen_mouse"
+target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_button_pressed_pre"
+kind = "HEAD"
+helper = "symmetry_screen_mouse.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "self" },
+  { name = "screen", ty = "&NativeScreenView<'_>", value = "screen" },
+  { name = "button", ty = "i32", value = "button" },
+  { name = "canceled", ty = "&mut bool", value = "canceled" },
+]
+
+[[injection]]
+id = "symmetry_screen_scroll"
+target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_scrolled_pre_v2"
+kind = "HEAD"
+helper = "symmetry_screen_scroll.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "self" },
+  { name = "mouse", ty = "[f32; 2]", value = "mouse" },
+  { name = "scroll", ty = "[f64; 2]", value = "scroll" },
+  { name = "modifiers", ty = "u32", value = "modifiers" },
+  { name = "canceled", ty = "&mut bool", value = "canceled" },
+]
+
+[[injection]]
+id = "symmetry_screen_tick"
+target = "horizon_client::game::native_hooks::Game<'_>::native_client_tick_post"
+kind = "HEAD"
+helper = "symmetry_screen_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "self" },
+]
