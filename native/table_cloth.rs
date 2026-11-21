@@ -85,6 +85,9 @@ pub(super) fn click(game: &mut Game<'_>, pos: [i32; 3], face: [i32; 3]) -> bool 
     if face == [0, -1, 0] || !is_cloth(&game.native_block(pos)) || !game.may_build() {
         return false;
     }
+    if super::create_shopping_list::shop_click(game, pos) {
+        return true;
+    }
     let held = game.held().cloned();
     if held.as_ref().is_some_and(|stack| is_cloth(stack.item.as_ref())) {
         return false;

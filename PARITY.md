@@ -7637,6 +7637,14 @@ sneak-used it in air or on a block. The item is absent from the Create
 creative tab, matching the original. List creation, entries, pricing,
 tooltip summaries, purchases and LAN remain open.
 
+The APP-2031 branch adds an initial Table Cloth transaction path that reads
+Create's saved request, owner, target address and Stock Ticker frequency and
+stores purchases in the original `create:shopping_list` component shape. This
+source change has only passed `rustfmt --check` and `git diff --check`; it has
+not been built or replayed. Stock availability/pricing, fulfillment, readable
+entry summaries, host/guest interaction and save/reopen still require the
+bounded APP-2031 checks before this is gameplay evidence.
+
 ## Elevator Contact item
 
 The [item replay](tools/test-elevator-contact-item.py) on
