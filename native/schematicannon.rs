@@ -859,6 +859,13 @@ pub(super) fn draw_screen(
                 [x + 116.0, y + 128.0],
                 16.0,
             );
+            game.native_text(
+                draw,
+                &format!("{} needed", int(&entity.nbt, "MissingCount").unwrap_or(1)),
+                [x + 140.0, y + 134.0],
+                0xFFFFFF,
+                false,
+            );
         }
     }
 }
