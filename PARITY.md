@@ -12199,9 +12199,26 @@ python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1 \
   --check contraption-controls
 ```
 
-The deployed actor effect and host input are covered by the replay. APP-2005's
-Deployer case and successful guest input convergence were not verified in this
-pass; the local LAN fixture did not reliably produce a guest click on the moving
-control, so no LAN pass is claimed. Keep the issue in progress until those
-checks pass. Full 1:1 remains Open; other actor types, effects and packet timing
-remain follow-ups.
+The deployed actor effect and host input are covered by the replay. The related
+Deployer regressions also pass on the same build and pack: the six-lane
+application replay passes in solo and LAN, including item applications over 25
+ticks, and the Deployer baseline verifies Wrench mode changes, hand exchange,
+filter replacement, and exact 65-item conservation. The LAN baseline has the
+guest perform those actions and confirms host/guest inventory convergence. The
+idle and active Deployer save/reopen cases retain filters and held items and
+resume one application with a single consumed item.
+
+```sh
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1 \
+  --check deployer-applications --check deployer-applications-lan
+python3 tools/test-deployer-baseline.py "$CTL" "$CLIENT" "$RESOURCES" \
+  --pack .local/create.hmod --persistence
+python3 tools/test-deployer-baseline.py "$CTL" "$CLIENT" "$RESOURCES" \
+  --pack .local/create.hmod --lan
+```
+
+These checks use `native-9f42064-5c89103ca2f5`, prepared 26.3 resources and
+pack SHA-256 `825e822d982dc624a691f0cced1ca2db370d030bea0899f46432021c7036642b`.
+The Deployer behavior remains shared with APP-1966; this ticket adds no
+duplicate Deployer implementation. Full 1:1 remains Open for broader actor
+types, settings, effects and packet timing.
