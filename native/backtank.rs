@@ -28,6 +28,7 @@ const CAPACITY_ENCHANTMENT: &str = "create:capacity";
 const MAX_BASE: i32 = 900;
 const EXTRA_CAPACITY: i32 = 300;
 const COPPER_DIVING_BOOTS: &str = "create:copper_diving_boots";
+const NETHERITE_DIVING_BOOTS: &str = "create:netherite_diving_boots";
 
 thread_local! {
     static LAST_PLAYER_AIR: RefCell<BTreeMap<u128, i32>> = RefCell::default();
@@ -102,7 +103,9 @@ pub(super) fn player_tick(game: &mut Game<'_>) {
 pub(super) fn diving_movement_tick(game: &mut Game<'_>) {
     if game.armor[3]
         .as_ref()
-        .is_none_or(|boots| boots.item.as_ref() != COPPER_DIVING_BOOTS)
+        .is_none_or(|boots| {
+            !matches!(boots.item.as_ref(), COPPER_DIVING_BOOTS | NETHERITE_DIVING_BOOTS)
+        })
     {
         return;
     }
