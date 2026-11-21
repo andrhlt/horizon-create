@@ -399,6 +399,7 @@ CHECKS = (
     ("stock-ticker-summary-lan", "test-stock-ticker-summary", "--lan"),
     ("stock-ticker-order", "test-stock-ticker-order"),
     ("stock-ticker-order-lan", "test-stock-ticker-order", "--lan"),
+    ("stock-ticker-ownership-reopen", "test-stock-ticker-ownership"),
     ("stock-ticker-categories", "test-stock-ticker-categories"),
     ("stock-ticker-categories-lan", "test-stock-ticker-categories", "--lan"),
     ("postbox", "test-postbox"),
