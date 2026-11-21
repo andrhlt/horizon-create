@@ -7344,6 +7344,68 @@ solo and LAN on `native-9f42064-46eefb85bfea`. The south-facing tank consumed
 the hand item on placement and went into the chest slot on pickup, preserving
 its name and 284 air. Pickup restored source water.
 
+## APP-2082 Netherite Backtank and diving gear baseline
+
+The finite acceptance cases were: six Netherite smithing upgrades with custom
+name retention; charged named Netherite Backtank placement and pickup in solo
+and LAN; the original full-suit mob air/lava trace; Netherite diving boot
+underwater movement in solo and LAN; player fire immunity for a complete
+charged suit with a missing-helmet control; charged and partially depleted
+player air across save/reopen; and the completed Copper prerequisite's breathing,
+movement and reopen regressions.
+
+The source review covered `DivingBootsItem.accelerateDescentUnderwater`,
+`BacktankUtil`, `DivingHelmetItem`, `NetheriteDivingHandler`,
+`BacktankBlock`/`BacktankBlockEntity`, and the six registered smithing recipes.
+This exposed two player gaps: Netherite boots were absent from the shared
+underwater movement hook, and the player's fire damage path did not apply the
+four-piece Netherite diving protection rule. The movement hook now accepts both
+diving boot items. Fire damage is blocked only when the player has the
+Netherite Diving Helmet, a charged Netherite Backtank, Netherite Leggings, and
+Netherite Diving Boots or vanilla Netherite Boots. The Netherite Java mob
+trace covers the suit's lava movement, fire immunity and tank consumption.
+
+On Horizon build `native-9f42064-caec674f121a` from source pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, using Create pack SHA-256
+`f110417f6cc906f60d6a4113c0e7038f1448ec428c52128800a8b24ce355addb`, all
+13 focused checks passed. The original Netherite fixture matched all 181
+observations (ticks 0–180, including air, fire immunity, health, and lava
+movement). Netherite movement produced the Java callback's -0.05 per-tick
+downward effect and 1.3 forward acceleration; the observed eight-tick vertical
+velocity change was -0.805887 versus -0.019712 bare, with three-tick forward
+speed 0.151677 versus 0.077265 bare. LAN host and guest both sank with the
+Netherite boots. The fire immunity check held health at 20 with the full suit;
+removing the helmet restored lava damage (health fell to 18.569). Charged
+900-air and partially depleted 899-air Backtanks both survived reopen, and
+breathing resumed after reload. The six smithing recipes retained the base
+custom name. Netherite placement/pickup matched the dedicated Java fixture in
+both modes with 284 air, restored water and the item name intact. All 98
+Copper mob breathing samples, both Copper movement modes, and Copper charged /
+partially depleted reopen passed as neighboring regressions.
+
+Reproduce the bounded suite with the exact client and prepared 26.3 resources:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 \
+  --jobs 2 --check netherite-backtank --check netherite-backtank-pickup \
+  --check netherite-backtank-pickup-lan --check diving-smithing \
+  --check netherite-diving-movement --check netherite-diving-movement-lan \
+  --check netherite-diving-reopen --check netherite-diving-fire-immunity \
+  --check copper-diving-breath --check copper-diving-breath-lan \
+  --check copper-diving-movement --check copper-diving-movement-lan \
+  --check copper-diving-reopen
+```
+
+The player fire check is a source-aligned damage test rather than an exact Java
+player trace. Charged and partially depleted ordinary persistence was checked
+in Horizon; Java save-format equivalence, exact warning/animation presentation,
+and exhaustive placements, charge boundaries and movement samples remain open.
+The first isolated build took 392 seconds and the incremental final build took
+119 seconds. The suite passed across the final build in a 12-check batch plus
+the isolated fire-immunity check; the initial fire-check failure was a fixture
+setup issue (the test had not actually equipped the Backtank) and was corrected
+before the passing run.
+
 ## Crafter Slot Cover
 
 The [survival replay](tools/test-crafter-slot-cover.py) on
