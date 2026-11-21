@@ -439,6 +439,7 @@ CHECKS = (
     ("toolbox-tagged-dye", "test-toolbox-crafting", "--tag-dye"),
     ("train-trapdoors", "test-train-trapdoors"),
     ("train-trapdoors-lan", "test-train-trapdoors", "--lan"),
+    ("train-trapdoors-reopen", "test-train-trapdoors-reopen"),
     ("train-trapdoors-sound", "test-train-trapdoors", "--transitions-only", "--sound"),
     ("train-trapdoors-sound-lan", "test-train-trapdoors", "--lan", "--transitions-only", "--sound"),
     ("item-hatch", "test-item-hatch"),

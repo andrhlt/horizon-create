@@ -6606,6 +6606,41 @@ open or close events and two silent steps. Connected face culling,
 Framed Glass connected textures and use on other contraption types
 remain open; mounted-train interactions are covered below.
 
+### APP-2064 gameplay baseline
+
+Completed November 21, 2026.
+
+The finite baseline passed on Horizon `native-9f42064-6bdf8691aa42` (pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, Minecraft 26.3; client SHA-256
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`) with
+Create pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`.
+The Java reference remains Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+The five checks were `train-trapdoors`, `train-trapdoors-lan`,
+`train-trapdoors-reopen`, `train-trapdoors-sound`, and
+`train-trapdoors-sound-lan`. The existing Java comparisons covered 12
+placement states, ten ordered state snapshots per block, and 44 survival
+crafts across 11 wooden trapdoors and both ingredient orders. Host/guest
+placements and state transitions converged; each variant's seven iron sound
+events and two silent transitions matched. The placement replay also removed
+the clicked floor block and verified each trapdoor stayed in place, matching
+the pinned `TrainTrapdoorBlock` inheritance of vanilla `TrapDoorBlock`.
+The new cold reopen replay saved a closed Train Trapdoor and open Framed Glass
+Trapdoor, verified their states after relaunch, then toggled both by hand.
+Both content definitions use the vanilla oak trapdoor template for standard
+state geometry and collision behavior.
+
+Run the five checks with the corresponding pinned build and prepared resources:
+
+```sh
+python3 tools/test-parity.py BUILD/horizon-ctl BUILD/horizon-client BUILD/.local/horizon-client/26.3 --jobs 1 --check train-trapdoors --check train-trapdoors-lan --check train-trapdoors-reopen --check train-trapdoors-sound --check train-trapdoors-sound-lan
+```
+
+Exact connected face culling, Framed Glass connected textures, other states
+and orientations, and additional collision layouts remain follow-ups.
+
 
 ## Experience Block and Experience Nugget
 
