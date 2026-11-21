@@ -13057,23 +13057,19 @@ The four focused host-side checks were repeated on the source-compatible
 outside the gauge/readout paths. The pack remains SHA-256
 `6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`.
 
-The attempted direct LAN gauge inspection is invalid evidence: the dedicated
-server placed the actual four-mill rig and reached the setup commands, but the
-guest exited before opening its control socket with `No space left on device`.
-Its captured zero readout is therefore not a dynamic network observation.
-After reclaiming one verified-inactive 15 GiB native target cache, the volume
-had 7.1 GiB free and the four host-side checks passed. The multiplayer gate
-remains In Progress until a live guest observes the host's idle and loaded
-gauge changes; no `/data merge` result is claimed.
+The repeatable `multiplayer-gauges` run now passes on the same client after
+reclaiming verified-inactive generated caches. The actual four-mill source
+network reached 8 RPM and 128 SU on the host; a live guest joined with Create
+content and Goggles, targeted the stressometer block, captured its loaded
+readout, and then observed a changed readout after the host removed three
+millstones. This is real network propagation; no `/data merge` result is
+claimed. Earlier disk-full and camera-target failures are preserved in the
+`.local/multiplayer-gauges-*` logs and are not counted as evidence.
 
 The repeatable live harness is registered as `multiplayer-gauges` in
 `tools/test-parity.py`. Its corrected rig force-loads chunk `[0,-1]`, uses the
-actual four-mill source network (host stress 128 SU at 8 RPM), joins a live
-guest, captures the guest's Goggles trace, removes three mills on the host, and
-requires the guest readout to change. The bounded retries reached the host rig
-and, on the final attempt, the guest control socket opened; however, guest
-content-cache creation failed with `No space left on device`, so the server
-reported the secondary `Missing: create 0.1.0` mismatch. With 3.3 GiB free at
-launch, the failed guest consumed roughly 1.1 GiB before that error. A safe
-retry therefore needs at least 1.5 GiB additional free space (4 GiB free before
-launch is the practical minimum). No guest readout is claimed.
+actual four-mill source network, joins a live guest, captures the guest's
+Goggles trace, removes three mills on the host, and requires the guest readout
+to change. The successful run used 9 GiB free after safe cache recovery; the
+earlier disk-full retries and the camera self-hit retry remain preserved as
+diagnostic logs.
