@@ -5440,12 +5440,38 @@ alone. A purple tube dropped the original orange item when mined. The
 and power-off ticks with the other tube retaining its text. The existing
 Display Link fixture still matched all 146 Java ticks.
 
+The existing dye replay was rerun in solo and LAN on the same client and pack;
+both runs matched all 16 Java dye cases, retained text and held dye count,
+preserved the differently mounted neighbor, matched four redstone samples, and
+produced the original orange drop.
+
+The Nixie persistence replay (`tools/test-nixie-persistence.py`) checks
+adjacent purple floor-mounted tubes: one retains custom text and one publishes
+numeric redstone strength. Idle save/reopen retained both colors, mounts, and
+text. Powered save/reopen retained the output strength; removing power after
+the active reopen returned it to zero. This is a Horizon gameplay persistence
+check, not a Java reload parity claim.
+
+The replay passed on the pinned Horizon Nightly 9f42064 client with
+`horizon-client` SHA-256 `63d4babf8091fe41f7712bc92d85b7467beecc4721dc54e0dfc50da7a5c97887`,
+`horizon-ctl` SHA-256 `1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`,
+prepared Minecraft 26.3 resources, and the Create pack SHA-256
+`6e169b2d4918f54d31d19ee9539b19b6de3d9b4d5464d62c78c9c7a52f51e509`.
+Command: `python3 tools/test-nixie-persistence.py <horizon-ctl> <horizon-client> <prepared-26.3> --pack <create.hmod>`.
+The successful control log is retained as `.local/horizon-nixiepersistence.log`.
+The dye replays used the same arguments with `tools/test-nixie-colors.py`,
+adding `--lan` for the guest run; their successful logs are
+`.local/horizon-nixiecolors.log` and `.local/horizon-nixiecolorslan.log`.
+Initial harness attempts were invalid: one used the fixture's one-tick step
+helper as a two-tick jump, and another combined custom text with the numeric
+output tube. The final fixture uses the Java reference's separate tube roles.
+
 All 16 original blockstate definitions and their direct models match by
 file bytes. The declared geometry matches the
 [16 Java mount/facing combinations](fixtures/nixie-shapes-java.csv), and
 the muted offscreen client emitted the original
 [base palettes](fixtures/nixie-colors-java.csv). Per-frame flicker,
-pixel parity, all placement paths, and save/reopen still need checks.
+pixel parity, all placement paths and exact Java reload parity remain open.
 
 ## Chain Conveyor Java reference
 
