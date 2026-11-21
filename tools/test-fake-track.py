@@ -43,6 +43,10 @@ def main():
         placed = markers(control)
         if not placed:
             raise RuntimeError("Creating the curve did not place any Fake Track markers")
+        control.command("/save-all flush")
+        control.restart()
+        if markers(control) != placed:
+            raise RuntimeError("Saved curve did not retain its Fake Track markers after reopen")
         step(control, 120)
         if markers(control) != placed:
             raise RuntimeError("The live curve did not keep its markers alive")
