@@ -7361,14 +7361,36 @@ interoperability, and Table upload remain open.
 
 ## Track Observer
 
-On `native-9f42064-673f99e57bfa` with `create-track-observer.hmod`,
-[the crafting and placement replay](tools/test-track-observer.py)
-crafted two observers from each of the five original pressure plates and
-placed it linked to a selected track. The [moving-train replay](tools/test-track-observer-train.py)
-recorded a rail observer and adjacent wire going from unpowered to
-powered at tick 38 and clearing at tick 60. This is the Horizon trace
-for a straight, assembled train. Java timing, LAN, curves, diagonal
-track and cargo filters remain open.
+### APP-2048 gameplay baseline
+
+Built the native client as `native-9f42064-a7485cf0edab` from the pinned
+Java Create source `ac0c444d9828da3453ae8cc65338e8de063286fb` and the local
+`create.hmod` pack (SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`).
+The recovered launcher used a private copy-on-write compiler cache.
+
+`python3 tools/test-parity.py <ctl> <client> <resources> --jobs 2 --check 'track-observer*'`
+ran the focused Track Observer cases. On the identified build:
+
+- `track-observer` passed crafting both original recipes across all five
+  pressure plates, player targeting and attachment on straight and diagonal
+  track.
+- `track-observer-train` passed train entry/passage/exit detection and drove
+  an adjacent wire to strength 15, then back to 0 after the train left.
+- `track-observer-filter-accept` passed for one matching item in carriage
+  cargo. Active and idle save/reopen retained the target and filter and
+  restored the corresponding powered state.
+- `track-observer-filter-reject` passed for nonmatching cargo; the Observer
+  stayed idle and its target and filter survived idle save/reopen.
+- `observer-lifecycle-lan` passed as an adjacent regression. The new
+  `track-observer-lan` guest-edit case did not pass: its guest client timed out
+  before joining the host, so guest filter editing and multiplayer state
+  convergence remain unverified for this ticket.
+
+Pinned Java `TrackObserverBlockEntity.tick()` keeps the powered state for
+eight ticks after `keepAlive(train)`. The source-based timeout is implemented;
+exact Java arrival timing has not been independently traced. Curved-rail
+attachment and broader train layouts also remain open. Keep Full 1:1 Open.
 
 ## Linked Controller
 

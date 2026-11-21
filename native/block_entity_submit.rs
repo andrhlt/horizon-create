@@ -56,7 +56,9 @@ fn block_entity_submit(
     ) {
         crate::game::create_tank_visual::render(game, pos, entity, draw);
     } else if matches!(block,
-        crate::game::create_threshold_switch::THRESHOLD_SWITCH | crate::game::create_smart_observer::OBSERVER
+        crate::game::create_threshold_switch::THRESHOLD_SWITCH
+            | crate::game::create_smart_observer::OBSERVER
+            | crate::game::create_track_observer::OBSERVER
     ) {
         crate::game::create_threshold_switch::render_filter(game, pos, state, entity, draw);
     } else if block == crate::game::create_drill::DRILL {

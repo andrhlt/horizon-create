@@ -84,6 +84,7 @@ fn block_entity_update_tag(
         entity.id.as_str(),
         crate::game::create_threshold_switch::THRESHOLD_SWITCH
             | crate::game::create_smart_observer::OBSERVER
+            | crate::game::create_track_observer::OBSERVER
     ) && let Some(filter) = entity.nbt.get(&"Filter".into())
     {
         tag.get_or_insert_with(Default::default)
