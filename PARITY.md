@@ -7167,12 +7167,20 @@ pinned Netherite diving upgrades and retained the base name.
 
 ## Cuckoo Clocks
 
-The [survival replay](tools/test-cuckoo-clock.py) on
-`native-9f42064-633fa4658824` and `create-clock-whistle-grip.hmod`
-placed both original variants, consumed their block items, and
-transmitted 16 RPM from each rear shaft. The clocks share the original
-block entity type. The timed display, recipes in survival, audio,
-Display Link source and the mysterious trigger remain open.
+APP-1998's [bounded survival replay](tools/test-cuckoo-clock.py) passed on
+`native-9f42064-3413df617042` with `create.hmod` SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The replay crafted the regular clock from planks, andesite casing and a clock,
+then crafted the mysterious variant with four gunpowder. It placed both in
+survival, consumed each item, and read 16 RPM from each rear-shaft network.
+Idle reopen retained both powered clocks. At noon, the regular clock selected
+PIG and the mysterious clock selected SURPRISE; active reopen retained the
+surprise and progress. The guest placed a regular clock in survival with the
+same facing/state as the host. After the synchronized 50-tick event boundary,
+the mysterious clock disappeared on both clients while the separate regular
+clock survived. The block-only blast's exact shape, other speeds/orientations,
+Display Link output, and exact animation/audio timing remain open; this is the
+gameplay baseline, not exhaustive Java parity.
 
 ## Extendo Grip placement and terrain recipes
 
