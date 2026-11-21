@@ -42,13 +42,18 @@ def run(args):
             multiplayer.until("the guest to see the idle Haunted Bell", lambda: "powered=false" in state(guest))
             host.command(f"/setblock {POWER[0]} {POWER[1]} {POWER[2]} minecraft:redstone_block")
             multiplayer.until("the guest to converge on powered state", lambda: "powered=true" in state(guest))
+            host.command("/save-all flush")
+            host.restart()
+            if "powered=true" not in state(host):
+                raise RuntimeError(f"Host Haunted Bell lost powered state across active reopen: {state(host)}")
             host.command(f"/setblock {POWER[0]} {POWER[1]} {POWER[2]} minecraft:air")
-            multiplayer.until("the guest to converge on unpowered state", lambda: "powered=false" in state(guest))
+            if "powered=false" not in state(host):
+                raise RuntimeError(f"Host Haunted Bell did not clear after active reopen: {state(host)}")
             host.command("/save-all flush")
             host.restart()
             if "powered=false" not in state(host):
                 raise RuntimeError(f"Host Haunted Bell changed across reopen: {state(host)}")
-    print("Haunted Bell host/guest redstone convergence and host idle save/reopen passed; guest disconnect on host restart is outside this bounded case.")
+    print("Haunted Bell host/guest redstone convergence, active powered save/reopen, and idle host save/reopen passed; guest disconnect on host restart is outside this bounded case.")
 
 
 def main():
