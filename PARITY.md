@@ -8364,6 +8364,27 @@ placement, refresh, physical and command cleanup, standalone expiry
 and water restoration. It covers one flat curve. Shared markers
 and an exact raster trace remain open.
 
+### APP-2046 gameplay baseline
+
+The finite owner/lifecycle pass was rerun on 2026-11-21 with
+`native-9f42064-6bde2ea90cf2`, Minecraft 26.3 resources from that build,
+and `create.hmod` SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+`tools/test-fake-track.py` passed its one flat primary-curve case: the
+owner created markers, they remained after 120 ticks, physical break and
+command replacement removed them, and standalone dry/waterlogged markers
+expired with the expected air/water result. `tools/test-track-curve.py`
+passed all 10 pinned-Java placement cases on the same build. These checks
+exercise host-side marker creation, refresh, cleanup and the curve owner.
+
+This does not establish APP-2046's guest convergence or save/reopen gates.
+The tests above use a single local client and their world lifetime ends with
+the fixture; they do not test shared-marker ownership across two surviving
+curves. Keep the gameplay baseline Partial until a guest observes marker
+creation/removal and a saved curve is reopened with its marker lifecycle
+intact. The exact raster comparison, shared-marker layouts and visual parity
+remain open follow-ups; Full 1:1 remains Open.
+
 ## Tree Fertilizer
 
 APP-2088 preserves the existing family evidence, which
