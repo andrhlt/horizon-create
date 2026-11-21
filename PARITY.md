@@ -7958,6 +7958,23 @@ passed the entire flow from tuning through the Nixie result.
 Promises, restocking,
 multiple rows, and exact Display Board sections remain open.
 
+### APP-2026 idle persistence pass
+
+On `native-9f42064-ffe4b00e329a` (Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`), all eight existing `factory-gauge-*` checks passed. The client SHA-256 was `07a4122cea6aca83ee27239677f8e8707fc600f6e117377fc189ba57ecb2c2e4`; the Create pack SHA-256 was `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+
+The new [idle reopen check](tools/test-factory-gauge-item.py) performs one cold world save/reopen after placing a tuned Factory Gauge, setting an Iron Ingot filter, connecting the panel to a Display Link, and displaying the 12 ingots in a matching Stock Link network. After reopening, the panel retained its filter and frequency, the Display Link retained the panel connection, and the Nixie again showed `12   Iron Ingot `. This checks Horizon save persistence; it is not a Java reload comparison.
+
+Run the bounded checks with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 --check 'factory-gauge-*'
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check factory-gauge-reopen
+```
+
+The bounded pass remains incomplete: this port has no player-facing panel target/threshold configuration or panel request/replenishment loop corresponding to the pinned Java `FactoryPanelScreen` and `FactoryPanelBehaviour`. Consequently absent-source/full-target controls and requesting-state persistence remain blockers to the gameplay baseline. Other orientations, exact timing, and more complex panel networks remain follow-ups.
+
+An isolated build attempt with a private copy of the launcher cache stopped before compilation: `horizon-advancement-initial-inventory.patch` did not apply to the cached pinned source at `crates/horizon-client/src/game/advancements.rs:1154`. The compatible client used for the cases above is the recorded existing build, not a rebuild of this worktree. Initial fixture attempts also failed before gameplay due to missing prepared resources and then sandbox-denied control sockets; those invalid attempts are recorded in `.local/app-2026-evidence/attempts.md`, and the cases passed after preparation and approved socket access.
+
 
 ## Portable Minecart Contraption pickup
 

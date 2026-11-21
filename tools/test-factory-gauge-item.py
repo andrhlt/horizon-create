@@ -76,10 +76,13 @@ def main():
     parser.add_argument("--filter", action="store_true", help="set a panel filter with a held item")
     parser.add_argument("--connection", action="store_true", help="connect the configured panel to a Display Link")
     parser.add_argument("--stock-display", action="store_true", help="display real linked network stock")
+    parser.add_argument("--reopen", action="store_true", help="verify configured panel and stock display after an idle save/reopen")
     parser.add_argument("--support-removal", action="store_true", help="check multi-panel support loss and drops")
     parser.add_argument("--panel-break", action="store_true", help="check survival removal of one panel")
     parser.add_argument("--placement-screenshot", type=Path)
     args = parser.parse_args()
+    if args.reopen:
+        args.stock_display = True
     if args.stock_display:
         args.connection = True
     if args.connection:
@@ -197,6 +200,17 @@ def main():
                         text = mp.until("the Display Link to publish the network's twelve iron ingots", displayed)
                         print(f"Linked Gauge published stock to the Nixie: {text}")
                         world.call("close")
+                    if args.reopen:
+                        world.call("save")
+                        world.restart()
+                        panel = world.command("/data get block 14 171 23 bottom_right")
+                        assert all(value in panel for value in ("minecraft:iron_ingot", FREQUENCY)), panel
+                        linked = world.command("/data get block 13 171 23 LinkedGauges")
+                        assert "bottom_right" in linked and "14, 171, 23" in linked, linked
+                        world.step_to(world.clock() + 1)
+                        output = world.command("/data get block 13 172 23 CustomText")
+                        assert "12" in output and "Iron Ingot" in output, output
+                        print("Idle save/reopen retained the filtered panel and Display Link connection, and republished twelve stocked ingots.")
                     world.call("key", "1", "tap")
             next_frequency = SECOND_FREQUENCY if args.panels else FREQUENCY
             world.command(f"/data merge block 10 170 24 {{{next_frequency}}}")
