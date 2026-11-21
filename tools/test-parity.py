@@ -409,6 +409,8 @@ CHECKS = (
     ("experience-nugget", "test-experience"),
     ("experience-nugget-lan", "test-experience", "--lan"),
     ("experience-crafting-and-placement", "test-experience", "--craft-and-place"),
+    ("experience-harvest", "test-experience", "--harvest"),
+    ("experience-multiplayer-lifecycle", "test-experience", "--lifecycle"),
     ("nozzle", "test-nozzle"),
     ("nozzle-lan", "test-nozzle", "--lan"),
     ("turntable-crafting-and-placement", "test-turntable", "--craft-and-place"),
