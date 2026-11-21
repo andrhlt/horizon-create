@@ -12479,6 +12479,47 @@ trace ticks and passed the active mid-entry persistence/no-duplicate-dispatch
 case. The client and fixture bundle were provisioned outside Git under the
 worktree `.local` directory.
 
+## APP-2053 scheduled routing and arrival
+
+This bounded pass covers the compact two-station route, one branch choice,
+arrival/departure/wait, missing and unreachable destinations, canceled-route
+recovery, host/guest state, and en-route/dwelling reopen. It reuses the APP-2052
+active and parked reverse-trip reopen evidence; those cases were not rerun for
+this ticket. Full 1:1 remains Open for broader route selection, network size,
+cross-dimension movement and interactions.
+
+The pinned references are Create `ac0c444d9828da3453ae8cc65338e8de063286fb`
+and Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. The runtime was
+`native-9f42064-6bdf8691aa42` (client SHA-256
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe3`,
+pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`;
+prepared 26.3 resources). Existing `scheduled-station-approach` and
+`scheduled-station-approach-lan` each matched 123 Java samples for arrival,
+departure and dwell. `scheduled-wildcard-route-red-lan` matched 198 Java
+samples for a guest-assigned wildcard timetable selecting the farther route
+with the short branch forced red. `scheduled-reverse-trip-reopen` passed in
+APP-2052 on build `native-9f42064-6bde2ea90cf2`, including parked wait and
+active mid-entry reopen without duplicate dispatch.
+
+The new `scheduled-route-recovery` integration check passed on the identified
+runtime. It verified that an unavailable named destination leaves the train
+parked and the schedule unpaused, restoring the station causes a retry and
+arrival, taking Train Controls cancels the route and clears transit state, and
+resuming the conductor timetable redispatches and arrives. The source-aligned
+Java paths are `ScheduleRuntime`, `DestinationInstruction`,
+`Navigation.cancelNavigation`, `CarriageContraptionEntity.startControlling`,
+and `ScheduleItemEntityInteraction`.
+
+The matching LAN recovery check remains unverified: the isolated guest launch
+could not open its control socket because `/private/tmp` ran out of space. The
+failed setup log is `.local/parity/scheduled-route-recovery-lan.log`; earlier
+sandbox-denied socket attempts are also invalid setup, not gameplay failures.
+The separate station-approach and forced-red branch LAN checks passed, so host
+and guest route state is covered for the accepted arrival and branch cases, but
+not yet for canceled-route recovery. No exhaustive route or packet-timing claim
+is made.
+
 ## APP-2059 train display, prompts and arrival audio
 
 On `native-9f42064-76138ca65acb`, the [bounded feedback pass](TRAIN-FEEDBACK-PARITY.md)
