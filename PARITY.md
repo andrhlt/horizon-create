@@ -12721,3 +12721,45 @@ source review, implementation and fixture authoring 9 minutes; Java captures
 74 seconds; complete native builds 586 + 379 + 242 seconds; syntax checks a few
 seconds per pass; integration and fixture debugging about 18 minutes, plus the
 combined run above. These categories overlap and are not an elapsed-time sum.
+
+## APP-2100 Localization and UI gameplay baseline
+
+The finite acceptance set reuses existing Java-backed fixtures for English UI,
+one supported secondary locale (`de_de`), settings and text entry, a text-length
+boundary, keyboard close/back behavior, guest interaction, and saved settings.
+The reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; Horizon is
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`.
+
+| Case | Check and result |
+| --- | --- |
+| English/German settings labels and guest interaction | `clockwork-settings` passed. English and German option names matched, including `Stundenzeiger zuerst`, `Minutenzeiger zuerst`, and `24-Stunden-Zeiger zuerst`; option spacing and six-tick hold/release behavior matched Java. The host cycled settings and a Survival LAN guest changed the authoritative mode twice. |
+| Text entry, keyboard close, overflow and persistence | `track-station-name` and `track-station-name-lan` passed all five Java rows: default name, regular name, whitespace-only rejection, padded Unicode, and the 25-unit maximum with excess input ignored. Enter committed edits and Escape closed the editor. The host's final name survived world restart; guest edits reached the host. |
+| Menu text input, guest use and saved settings | `train-schedule-entry` passed. A host and LAN guest entered `Main Platform *`, confirmed the five-second delay action, reopened the card, and retained the exact Java item component. The host's component survived world restart. |
+| Selected-item and gauge text | `goggles-gauges` matched all 78 Java readout samples across ten gauge cases, including text, colors and strikethrough. |
+
+All five checks passed on the identified client
+`native-9f42064-6ce68a31b125` with the matching prepared pack. Horizon client
+SHA-256 is `bdbafe5289f2c05ef76009c17070e0320a7c606e042dd5202b142e0e6d123fc9`;
+Create pack SHA-256 is
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The first two station-name attempts stopped before launching because the fresh
+worktree lacked the ignored local Java structure fixture; after that single
+817-byte fixture was copied into the isolated worktree, both station checks
+passed. Raw final logs are in `.local/parity/` in the APP-2100 worktree.
+
+The batch command was `HORIZON_NO_AUDIO=1 python3 tools/test-parity.py
+<horizon-ctl> <horizon-client> <prepared-26.3> --jobs 2 --check
+clockwork-settings --check track-station-name --check track-station-name-lan
+--check train-schedule-entry --check goggles-gauges`. Station checks were also
+rerun together with `--jobs 1` after staging the missing ignored fixture.
+
+This establishes the bounded gameplay baseline only. Other locales, additional
+text fields and overflow limits, accessibility, broad menu coverage, and exact
+typographic/pixel parity remain unverified; Full 1:1 stays Open.
+
+
+No production defect appeared in this bounded pass, so no native/UI code or Java
+capture changed. Approximate effort: setup and source/evidence review 8 minutes;
+documentation 4 minutes; Java capture and native build 0 minutes; targeted
+integration checks 1 minute elapsed; fixture setup/debugging 3 minutes.
