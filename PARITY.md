@@ -305,6 +305,51 @@ authority also recorded both closures on tick 21. The identical
 fixed-tick observation now applies in either mode. Both isolated
 replays passed all their synchronized panel, state and cue samples.
 
+## APP-2057 Sliding Doors gameplay baseline
+
+The bounded acceptance matrix reuses the Java comparisons above for manual
+open/close, paired leaves, material coverage, redstone source handoff, sound,
+and solo/LAN interaction. The elevator walkthrough also verifies that the
+physical doors block the players while closed and allow both host and guest to
+cross after opening. Mounted train-platform scheduling and controls remain in
+their Train Doors issue and are not counted as new APP-2057 coverage.
+
+The new [survival placement check](tools/test-sliding-door-placement.py)
+performs real player clicks in Survival for Andesite folding doors facing
+north/east and Brass sliding doors facing south/west. All four placements
+created the expected Java lower/upper block states, consumed one item, and
+matched at the same frozen tick. Its reopen extension retained both halves of
+an open Andesite pair and a closed Brass pair. The existing cold-open replay
+also saved Brass and Copper pairs during active opening, then matched Java's
+fully open first pose after host reopen and guest rejoin. This is Horizon
+save/reopen evidence, not a Java reload-parity claim.
+
+The placement and static-reopen cases passed with the pinned Horizon Nightly
+9f42064 client build `native-9f42064-d6dc2ad18d3f` and prepared Minecraft 26.3
+resources. The client SHA-256 was
+`006bfe15a198b29d6af7633d353dcadaa07039121ae66c2081927299835a8811`, the
+control client SHA-256 was
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`, and the
+Create pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The comparison reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+Run the new cases with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client \
+  /path/to/prepared/26.3 --check sliding-door-placement
+```
+
+The gameplay baseline is bounded to the four placement cases plus the existing
+five-material manual state/cue checks, representative two-material redstone
+handoff, paired host/guest interaction, closed-door obstruction and open-door
+passage, and idle/active save/reopen. Other placement/property cross-products,
+moving assemblies outside the existing Train Doors evidence, frame-level
+network arrival, and cosmetic equivalence remain open follow-ups. Full 1:1
+parity remains Open.
+
 ## Creative search gear attribution
 
 Pinned Java registers Gearbox, Gearshift and Sequenced Gearshift in
@@ -548,6 +593,44 @@ positions when the surrounding chunks were generated before a sequential
 scan. Further seeds and load sequences remain open. Build with `prepare.py
 --disable-worldgen` to omit the ore features. The original runtime setting
 still needs a Horizon equivalent.
+
+### APP-2060 bounded gameplay baseline
+
+On Horizon build `native-9f42064-6bdf8691aa42` with pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`, the
+bounded acceptance cases passed against Java Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`:
+
+- Seed `810102`, 4×4 Overworld chunks, forced before view and fully generated:
+  all 4,157 positions/materials matched the Java reference and remained the
+  same after save/reopen. This includes 2,676 Striated blocks across Asurine
+  (2,391) and Veridium (285), alongside Zinc and vanilla Gold.
+- Seed `810102`, 6×6 Nether chunks with a two-chunk halo:
+  all 4,787 positions/materials matched and remained the same after
+  save/reopen, including ten Scoria blocks. The disabled Java reference
+  contains the same 4,777 vanilla ore positions.
+- Disabled Create worldgen pack, seed `810102`, 4×4 Overworld chunks:
+  all 422 vanilla Gold positions matched Java and remained unchanged after
+  save/reopen. The pack omitted the nine Create worldgen/biome-modifier data
+  entries, matching the supported `prepare.py --disable-worldgen` mode.
+- A LAN guest mined each of the seven Java-defined Striated stone blocks with
+  an iron pickaxe. Every drop matched its Java block loot table (one matching
+  block item); host and guest agreed on the mined state, and all seven guest
+  drops and mined positions persisted after host reopen and guest rejoin.
+
+The LAN check is registered as `striated-ore-mining-lan` in
+`tools/test-parity.py` and uses the portable Java loot reference
+`fixtures/striated-ore-drops-java.csv`. The headless worldgen replays used
+`tools/test-zinc-worldgen.py` with `--force-before-view --reopen`; Overworld
+and Nether used `fixtures/zinc-worldgen-16-enabled-java.csv` and
+`fixtures/layered-nether-36-forced-java.csv`, respectively. The disabled
+worldgen run used `fixtures/zinc-worldgen-16-disabled-java.csv`.
+
+The nine-entry omission is a pack-build control. Horizon still has no
+in-game/runtime equivalent for Java's `create-common.toml` setting
+`worldgen.disableWorldGen`; that config UI/runtime behavior and further seed
+and load-order sweeps remain open follow-ups. Exact runtime-setting parity is
+not claimed here.
 
 ## Metal bars
 
