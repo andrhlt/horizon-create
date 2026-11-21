@@ -556,6 +556,8 @@ CHECKS = (
     ("copycat-assist", "test-copycat-assist"),
     ("copycat-assist-lan", "test-copycat-assist", "--lan"),
     ("copycat-buckets", "test-copycat-buckets"),
+    ("copycat-persistence", "test-copycat-window-joins", "--copycat-persistence"),
+    ("copycat-bars-wrench", "test-copycat-window-joins", "--copycat-bars-wrench"),
     ("waterlogged-blocks", "test-waterlogged-blocks"),
     ("waterlogged-supported", "test-waterlogged-blocks", "--supported"),
     ("waterlogged-belts", "test-waterlogged-blocks", "--belts"),

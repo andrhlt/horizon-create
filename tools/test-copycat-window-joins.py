@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 
 from fixture_world import ROOT, fixture_world
 
+copycat = import_module("test-copycat")
 window = import_module("test-window-ctm")
 multiplayer = import_module("test-multiplayer")
 X, Y, Z = 8, 111, -10
@@ -110,6 +111,65 @@ def save_reload(args):
     print("The copycat join survived world reload and cleared when the Panel was replaced.")
 
 
+def copycat_persistence(args):
+    with fixture_world(args, "CopycatMaterialSave", pack=args.pack) as control:
+        panel = (8, 111, -10)
+        step = (9, 111, -10)
+        base = (10, 111, -10)
+        control.commands((
+            "/fill 7 110 -11 11 110 -9 minecraft:stone",
+            f"/setblock {panel[0]} {panel[1]} {panel[2]} create:copycat_panel[facing=north,waterlogged=false]",
+            f'/data merge block {panel[0]} {panel[1]} {panel[2]} {{Material:{{Name:"create:oak_window"}},Item:{{id:"create:oak_window",count:1}}}}',
+            f"/setblock {step[0]} {step[1]} {step[2]} create:copycat_step[facing=east,half=top,waterlogged=false]",
+            f'/data merge block {step[0]} {step[1]} {step[2]} {{Material:{{Name:"minecraft:oak_log",Properties:{{axis:"x"}}}},Item:{{id:"minecraft:oak_log",count:1}}}}',
+            f"/setblock {base[0]} {base[1]} {base[2]} create:copycat_panel[facing=south,waterlogged=false]",
+        ))
+        expected = {
+            panel: ("create:copycat_panel", {"facing": "north", "waterlogged": "false"}, ("create:oak_window", {})),
+            step: ("create:copycat_step", {"facing": "east", "half": "top", "waterlogged": "false"}, ("minecraft:oak_log", {"axis": "x"})),
+            base: ("create:copycat_panel", {"facing": "south", "waterlogged": "false"}, ("create:copycat_base", {})),
+        }
+
+        def verify():
+            for pos, (block, properties, material) in expected.items():
+                state = control.call("block", *pos)["state"]
+                name, bracket, encoded = state.partition("[")
+                observed = dict(pair.split("=", 1) for pair in encoded[:-1].split(",")) if bracket else {}
+                if (name, observed) != (block, properties) or copycat.material_tag(control, pos) != material:
+                    return False
+            return True
+
+        multiplayer.until("Copycat material and shape before save", verify)
+        control.stop()
+        control.open()
+        multiplayer.until("Copycat material and shape after save reload", verify)
+    print("Copycat Panel, Step and base material/shape identities survived an idle save and reopen.")
+
+
+def copycat_bars_wrench(args):
+    with fixture_world(args, "CopycatBarsWrench", pack=args.pack) as control:
+        pos = (8, 111, -10)
+        control.commands((
+            "/fill 7 110 -11 9 110 -9 minecraft:stone",
+            "/gamemode survival",
+            f"/setblock {pos[0]} 113 {pos[2]} create:copycat_bars[facing=up]",
+        ))
+        copycat.put(control, "create:wrench")
+        control.call("tp", 8.5, 111.5, -7.5)
+        control.call("look-at", 8.5, 113.1, -9.5)
+        hit = control.call("looking-at").get("block")
+        if not hit or hit["pos"] != [pos[0], 113, pos[2]] or hit["face"] != "south":
+            raise RuntimeError(f"Copycat Bars Wrench missed the south face: {hit}")
+        tick = control.clock()
+        control.call("mouse", "right", "click")
+        multiplayer.until("Copycat Bars Wrench rotation", lambda: (
+            control.call("block", pos[0], 113, pos[2])["state"] == "create:copycat_bars[facing=east]"
+        ))
+        if control.clock() != tick:
+            raise RuntimeError("Copycat Bars rotation advanced the frozen world")
+    print("Copycat Bars rotated up to east from a south-face Wrench hit, matching WrenchableDirectionalBlock.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for attribute in ("ctl", "client", "resources"):
@@ -118,5 +178,8 @@ if __name__ == "__main__":
     parser.add_argument("--reference", type=Path, default=ROOT / "fixtures/copycat-window-joins-java.csv")
     parser.add_argument("--ffmpeg", default="ffmpeg")
     parser.add_argument("--save-reload", action="store_true")
+    parser.add_argument("--copycat-persistence", action="store_true")
+    parser.add_argument("--copycat-bars-wrench", action="store_true")
     args = parser.parse_args()
-    (save_reload if args.save_reload else run)(args)
+    action = copycat_bars_wrench if args.copycat_bars_wrench else copycat_persistence if args.copycat_persistence else save_reload if args.save_reload else run
+    action(args)

@@ -1296,6 +1296,49 @@ Steps per Zinc Ingot. [Java GameTests](tools/java-copycat-material.patch),
 [material trace](fixtures/copycat-material-java.csv), and
 [lifecycle trace](fixtures/copycat-lifecycle-java.csv).
 
+APP-2065's bounded gameplay baseline reuses these Java captures: opaque
+stone/log and transparent glass/window materials; Panel and Step application,
+same/different material interactions, Wrench reset and removal; off-hand
+material return and survival/Creative drops; Bars/trapdoor special materials;
+blocked placement and source/flowing water placement. Existing bucket cases
+cover filling and draining both forms. The 90 material observations include
+the `copycat_base` reset result and Bars as a copied material; the eight
+lifecycle observations cover both wrapper drops. The focused
+`copycat-persistence` check additionally saves and reopens a Panel with a
+transparent Oak Window, a top/east Step with an axis-X Oak Log, and a base
+material Panel, then verifies exact stored materials and shape states. Static
+Copycats have no active operation state to preserve. Full 1:1 remains Open for
+other material/lighting combinations and third-party rendering.
+
+Six related checks passed on `native-9f42064-6bdf8691aa42` with Horizon
+pin `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, Minecraft 26.3 resources, and
+Create pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. It
+passed material/Wrench (90 Java observations), lifecycle (8 observations and
+both Stonecutter recipes), placement assist (12 Java outcomes), placement
+assist on LAN (3 Java outcomes), bucket interactions (8 Java outcomes), and
+idle persistence (Panel, Step and base identities). The LAN result establishes
+host/guest state convergence. A separate Copycat Bars Wrench case reproduced
+that Bars rotation was not dispatched: an upward-facing block remained up
+after a verified south-face Wrench hit. Java's
+`WrenchableDirectionalBlock.getRotatedBlockState` rotates it to east. The
+native Wrench dispatch was updated to route Bars through its existing
+directional rotation rule. The rebuilt candidate could not be verified: the
+available launcher source already contains a different engine-patch set, so
+the documented build stopped when the advancement patch did not apply. The
+Bars rotation check and rebuilt regression suite remain required before this
+baseline is complete.
+
+Reproduce the six passing pre-fix checks with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check copycat-material --check copycat-lifecycle --check copycat-assist --check copycat-assist-lan --check copycat-buckets --check copycat-persistence
+```
+
+Approximate effort: source/evidence review 10 minutes, harness and evidence
+updates 20 minutes, build attempt 15 minutes, static checks under one minute,
+integration about 4 minutes. All tests used isolated temporary worlds.
+
 The standalone FFmpeg replays check applied materials on both original
 shapes and the host and guest framebuffers during material application
 and removal. The LAN replay observes both changes on the action tick.

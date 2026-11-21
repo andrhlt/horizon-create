@@ -155,7 +155,8 @@ pub(super) fn change_pose(
             };
             ("facing", name(rotate(direction, face)), prior)
         }
-        "create:sticker" | "create:creative_motor" | "create:encased_fan" | CLOCKWORK | FLUID_PORT | ITEM_PORT => {
+        "create:copycat_bars" | "create:sticker" | "create:creative_motor" | "create:encased_fan"
+        | CLOCKWORK | FLUID_PORT | ITEM_PORT => {
             let Some(prior) = game.native_block_property(pos, "facing") else {
                 return false;
             };
@@ -305,7 +306,7 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> boo
             | super::create_controller_rail::RAIL
             | super::create_rose_lamp::LAMP
             | super::create_encased_fluid_pipe::BLOCK
-            | PIPE | GLASS_PIPE | SMART_PIPE | PUMP | "create:deployer"
+            | PIPE | GLASS_PIPE | SMART_PIPE | PUMP | "create:deployer" | "create:copycat_bars"
     ) || encased_size(&block).is_some() || ladder;
     let sneaking = game.native_sneaking();
     if !sneaking && matches!(block.as_str(), super::create_fluid_tank::TANK | super::create_fluid_tank::CREATIVE) {
