@@ -152,6 +152,8 @@ def main():
         parser.add_argument(field, type=Path)
     parser.add_argument("--pack", type=Path)
     parser.add_argument("--lan", action="store_true")
+    parser.add_argument("--reopen", action="store_true",
+                        help="save and reopen the bell before host/guest interaction")
     placement_mode = parser.add_mutually_exclusive_group()
     placement_mode.add_argument("--placement", action="store_true")
     placement_mode.add_argument("--wet-placement", action="store_true")
@@ -175,6 +177,14 @@ def main():
         ))
         if args.placement or args.wet_placement:
             host.command("/fill 4 170 17 36 170 23 minecraft:stone")
+        if args.reopen:
+            persisted_before = (state(host, AT), state(host, DIRECT_WIRE), state(host, WEAK_WIRE))
+            host.restart()
+            persisted = (state(host, AT), state(host, DIRECT_WIRE), state(host, WEAK_WIRE))
+            if host.call("block", *AT)["block"] != BELL or persisted != persisted_before:
+                raise RuntimeError(
+                    f"Desk Bell setup did not survive save/reopen: {persisted_before} -> {persisted}"
+                )
         if args.lan:
             port = host.call("lan", "open", 0, "commands", "force")["port"]
             with TemporaryDirectory(prefix="hc-desk-bell-") as scratch, multiplayer.joined_client(
@@ -185,7 +195,7 @@ def main():
                     player["name"] == GUEST and player["placed"]
                     for player in host.call("lan", "status")["guests"]
                 ))
-                host.command(f"/gamemode survival {GUEST}")
+                host.call("command", f"/gamemode survival {GUEST}")
                 if args.placement or args.wet_placement:
                     return placement(host, guest, GUEST, args.wet_placement)
                 exercise(host, guest, GUEST, expected, sounds)
@@ -198,7 +208,8 @@ def main():
                 "output": BELL, "count": "1", "remainder": "",
             })
             exercise(host, host, "@s", expected, sounds)
-    print(f"Desk Bell and both circuits matched {len(expected)} original Java ticks and three cues.")
+    reopen = " after save/reopen" if args.reopen else ""
+    print(f"Desk Bell and both circuits matched {len(expected)} original Java ticks and three cues{reopen}.")
 
 
 if __name__ == "__main__":

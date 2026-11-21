@@ -1736,6 +1736,8 @@ CHECKS = (
     ("redstone-latches-persistence", "test-create-latches-persistence"),
     ("desk-bell-pulse", "test-desk-bell"),
     ("desk-bell-pulse-lan", "test-desk-bell", "--lan"),
+    ("desk-bell-pulse-reopen", "test-desk-bell", "--reopen"),
+    ("desk-bell-pulse-reopen-lan", "test-desk-bell", "--lan", "--reopen"),
     ("desk-bell-placement", "test-desk-bell", "--placement"),
     ("desk-bell-placement-lan", "test-desk-bell", "--placement", "--lan"),
     ("desk-bell-wet-placement", "test-desk-bell", "--wet-placement"),
