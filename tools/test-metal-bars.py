@@ -4,6 +4,7 @@
 import argparse
 import csv
 from importlib import import_module
+import json
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory
@@ -90,6 +91,72 @@ def check_neighbors(control, actor, player, position, rows):
         multiplayer.until(f"the guest to see Java's {material} bars state at tick {tick}",
                           lambda: actor.call("block", *position)["state"] == actual["state"])
 
+    # Create registers all three variants as IronBarsBlock. Leaves are the
+    # unsupported-neighbor control: they must not create a connection arm.
+    control.command(f"/setblock {x} {y} {z - 1} minecraft:oak_leaves")
+    control.step_to(control.clock() + 1)
+    actual = control.call("block", *position)
+    fields = dict(re.findall(r"(\w+)=(\w+)", actual["state"]))
+    if fields.get("north") != "false":
+        raise RuntimeError(f"Unsupported oak-leaf neighbor connected {block}: {actual}")
+    multiplayer.until(f"the guest to see the unsupported-neighbor state for {material} bars",
+                      lambda: actor.call("block", *position)["state"] == actual["state"])
+    control.command(f"/setblock {x} {y} {z - 1} minecraft:air")
+    control.step_to(control.clock() + 1)
+
+
+def check_collision_templates():
+    for material in MATERIALS:
+        path = ROOT / f"content/data/create/horizon/block/{material}_bars.json"
+        declaration = json.loads(path.read_text(encoding="utf-8"))
+        if declaration.get("template") != "minecraft:iron_bars":
+            raise RuntimeError(f"{path} must inherit Iron Bars collision and shape behavior.")
+
+
+def check_drop(control, actor, player, block):
+    position = (27, 171, 24)
+    x, y, z = position
+    if actor.call("state")["gamemode"] != "survival":
+        raise RuntimeError("The bar placement and mining check requires survival mode.")
+    control.command(f"/setblock {x} {y - 1} {z} minecraft:stone")
+    control.command("/gamerule minecraft:block_drops true")
+    control.command(f"/item replace entity {player} hotbar.0 with {block} 2")
+    multiplayer.until(f"two {block} to reach the player", lambda:
+                      actor.call("inventory")["counts"].get(block, 0) == 2)
+    control.command(f"/tp {player} {x + 0.5} {y} {z + 2.5}")
+    actor.call("wait", 5)
+    actor.call("select", block)
+    placed = actor.call("place", *position)
+    if placed.get("placed") != block and control.call("block", *position)["block"] != block:
+        raise RuntimeError(f"The survival player could not place {block}: {placed}")
+    if actor.call("inventory")["counts"].get(block, 0) != 1:
+        raise RuntimeError(f"Placing {block} did not consume exactly one item.")
+    control.command(f"/item replace entity {player} hotbar.1 with minecraft:iron_pickaxe")
+    multiplayer.until("the iron pickaxe to reach the miner", lambda:
+                      actor.call("inventory")["counts"].get("minecraft:iron_pickaxe", 0) == 1)
+    actor.call("select", "minecraft:iron_pickaxe")
+    control.command(f"/tp {player} {x + 0.5} {y + 2} {z + 0.5}")
+    actor.call("look-at", x + 0.5, y + 0.5, z + 0.5)
+    control.command("/tick unfreeze")
+    broken = actor.call("break", *position)
+    control.command("/tick freeze")
+    if control.call("block", *position)["block"] != "minecraft:air":
+        raise RuntimeError(f"Mining {block} did not remove the placed block: {broken}")
+    if actor.call("inventory")["counts"].get(block, 0) != 2:
+        raise RuntimeError(f"Mining {block} did not return exactly one bar: {broken}")
+
+
+def verify_saved_states(control, states):
+    for index, material in enumerate(MATERIALS):
+        position = (7 + 5 * index, 171, 21)
+        actual = control.call("block", *position)
+        fields = dict(re.findall(r"(\w+)=(\w+)", actual["state"]))
+        row = next(row for row in states if row["material"] == material and row["tick"] == "8")
+        if actual["block"] != f"create:{material}_bars" or any(
+            fields.get(name) != row[name] for name in PROPERTIES
+        ):
+            raise RuntimeError(f"Saved {material} bars changed after reopen: Java {row}, Horizon {actual}.")
+
 
 
 def exercise_lan(args, host, recipes, states):
@@ -110,6 +177,8 @@ def exercise_lan(args, host, recipes, states):
         for index, material in enumerate(MATERIALS):
             check_neighbors(host, guest, GUEST, (7 + 5 * index, 171, 21),
                             [row for row in states if row["material"] == material])
+        check_drop(host, guest, GUEST, recipes[0]["block"])
+        host.call("save")
 
 
 def main():
@@ -119,6 +188,7 @@ def main():
     parser.add_argument("--pack", type=Path)
     parser.add_argument("--lan", action="store_true")
     args = parser.parse_args()
+    check_collision_templates()
     recipes, states = read("recipe"), read("state")
     with fixture_world(args, "Metal-bars", render=True, pack=args.pack) as control:
         control.commands((
@@ -135,8 +205,13 @@ def main():
             for i, material in enumerate(MATERIALS):
                 check_neighbors(control, control, "@s", (7 + 5 * i, 171, 21),
                                 [row for row in states if row["material"] == material])
-    print("All 24 connection and waterlogging states match Java." if args.lan else
-          "All three Stonecutter recipes and 24 connection and waterlogging states match Java.")
+            check_drop(control, control, "@s", recipes[0]["block"])
+            control.call("save")
+        control.restart()
+        verify_saved_states(control, states)
+    print("LAN guest placement, drops, and saved bars passed; all 24 connection and waterlogging states match Java."
+          if args.lan else
+          "All three Stonecutter recipes, survival drops, saved states, and 24 connection/waterlogging states passed.")
 
 
 if __name__ == "__main__":
