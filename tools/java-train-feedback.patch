@@ -1,0 +1,68 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..6a18868 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(t -> t.testName().equals("TestMisc.trainFeedback")).toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..fcc4ea9 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,51 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++    @GameTest(template = "shearing", timeoutTicks = 80)
++    public static void trainFeedback(CreateGameTestHelper helper) {
++        helper.runAtTickTime(4, () -> {
++            var level = helper.getLevel();
++            var train = new com.simibubi.create.content.trains.entity.Train(java.util.UUID.randomUUID(), null, null, java.util.List.of(), java.util.List.of(), false,
++                net.minecraft.network.chat.Component.literal("Feedback Express"), com.simibubi.create.content.trains.entity.TrainIconType.getDefault(), 0);
++            var station = new com.simibubi.create.content.trains.station.GlobalStation() {
++                @Override public com.simibubi.create.content.trains.entity.Train getPresentTrain() { return train; }
++            };
++            var be = new com.simibubi.create.content.trains.station.StationBlockEntity(
++                com.simibubi.create.AllBlockEntityTypes.TRACK_STATION.get(), BlockPos.ZERO, com.simibubi.create.AllBlocks.TRACK_STATION.getDefaultState()) {
++                @Override public com.simibubi.create.content.trains.station.GlobalStation getStation() { return station; }
++            };
++            var context = new com.simibubi.create.content.redstone.displayLink.DisplayLinkContext(level, null) {
++                @Override public net.minecraft.world.level.block.entity.BlockEntity getSourceBlockEntity() { return be; }
++            };
++            var source = new com.simibubi.create.content.redstone.displayLink.source.TrainStatusDisplaySource();
++            var stats = new com.simibubi.create.content.redstone.displayLink.target.DisplayTargetStats(1, 64, null);
++            var schedule = new com.simibubi.create.content.trains.schedule.Schedule();
++            var entry = new com.simibubi.create.content.trains.schedule.ScheduleEntry();
++            var delay = new com.simibubi.create.content.trains.schedule.condition.ScheduledDelay();
++            var config = new net.minecraft.nbt.CompoundTag();
++            config.putInt("Value", 2400); config.putInt("TimeUnit", 0); delay.setData(level.registryAccess(), config);
++            entry.conditions.add(java.util.List.of(delay)); schedule.entries.add(entry); schedule.entries.add(entry);
++            schedule.cyclic = false;
++            var runtime = train.runtime;
++            runtime.schedule = schedule; runtime.paused = false; runtime.currentEntry = 0;
++            runtime.state = com.simibubi.create.content.trains.schedule.ScheduleRuntime.State.POST_TRANSIT;
++            runtime.conditionProgress.add(0); var time = new net.minecraft.nbt.CompoundTag(); runtime.conditionContext.add(time);
++            for (int elapsed : new int[]{0, 1, 1200, 1201, 2301, 2400}) {
++                time.putInt("Time", elapsed);
++                System.out.println("CREATE_TRAIN_FEEDBACK " + elapsed + "|" + source.provideText(context, stats).get(0).getString());
++            }
++            for (int negative = 0; negative < 4; negative++) {
++                runtime.paused = negative == 0;
++                runtime.state = negative == 1 ? com.simibubi.create.content.trains.schedule.ScheduleRuntime.State.IN_TRANSIT : com.simibubi.create.content.trains.schedule.ScheduleRuntime.State.POST_TRANSIT;
++                runtime.currentEntry = negative == 2 ? 1 : 0;
++                if (negative == 3) runtime.schedule = null;
++                System.out.println("CREATE_TRAIN_FEEDBACK negative" + negative + "|" + source.provideText(context, stats).get(0).getString());
++            }
++            var queue = new com.simibubi.create.content.trains.entity.ArrivalSoundQueue();
++            for (int x : new int[]{1,2,3}) queue.add(x, new BlockPos(x,2,0));
++            System.out.println("CREATE_TRAIN_FEEDBACK queue|" + queue.firstTick() + "," + queue.lastTick());
++            helper.succeed();
++        });
++    }
+ }

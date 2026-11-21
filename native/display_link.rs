@@ -17,6 +17,8 @@ pub(super) const SELECTION: &str = "create:click_to_link_data";
 const COUNT: &str = "create:content_observer_source_count_items";
 const ITEM_NAMES: &str = "create:depot_source_combine_item_names";
 const GAUGE_STATUS: &str = "create:gauge_status";
+const TRAIN_STATUS: &str = "create:train_status";
+const TRAIN_STATUS_LABEL: &str = "Train Schedule Status";
 const OBSERVED_TRAIN: &str = "create:observed_train_name";
 const COUNT_LABEL: &str = "Amount of matching Items";
 const ITEM_NAMES_LABEL: &str = "Combine Item Names";
@@ -201,6 +203,7 @@ fn active(data: &Compound) -> Option<&'static str> {
         Some(ITEM_NAMES) => Some(ITEM_NAMES),
         Some(GAUGE_STATUS) => Some(GAUGE_STATUS),
         Some(OBSERVED_TRAIN) => Some(OBSERVED_TRAIN),
+        Some(TRAIN_STATUS) => Some(TRAIN_STATUS),
         _ => None,
     }
 }
@@ -246,6 +249,7 @@ fn source_at(game: &Game<'_>, pos: [i32; 3], data: &Compound) -> Option<&'static
         .as_str()
     {
         OBSERVER => Some(COUNT),
+        super::create_station::STATION => Some(TRAIN_STATUS),
         DEPOT => Some(ITEM_NAMES),
         super::create_factory_gauge::BLOCK => Some(GAUGE_STATUS),
         super::create_track_observer::OBSERVER => Some(OBSERVED_TRAIN),
@@ -387,6 +391,10 @@ fn refresh(game: &mut Game<'_>, pos: [i32; 3], data: &Compound) {
         return;
     }
     let value = match active(data) {
+        Some(TRAIN_STATUS) => (game.native_block(source_pos) == super::create_station::STATION)
+            .then(|| super::create_train::at_station(game, source_pos)).flatten()
+            .and_then(|id| super::create_train::carriage(game, id))
+            .map_or_else(String::new, |train| super::create_train_schedule_runtime::waiting_status(game, train)),
         Some(COUNT) => {
             let Some(source) = mod_entity(game, source_pos).filter(|entity| entity.id == OBSERVER)
             else {
@@ -421,6 +429,7 @@ fn screen_data(game: &Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity) {
         Some(ITEM_NAMES) => 2,
         Some(GAUGE_STATUS) => 3,
         Some(OBSERVED_TRAIN) => 4,
+        Some(TRAIN_STATUS) => 5,
         _ => 0,
     };
     entity.data[3] = int(&entity.nbt, "TargetLine").unwrap_or(0);
@@ -440,7 +449,7 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
         return;
     }
     entity.data[1] += 1;
-    let refresh_ticks = if entity.data[2] == 4 { 400 } else { 100 };
+    let refresh_ticks = match entity.data[2] { 4 => 400, 5 => 1, _ => 100 };
     if previous && !is_powered || entity.data[1] >= refresh_ticks {
         entity.data[1] = 0;
         if !is_powered {
@@ -577,6 +586,7 @@ pub(super) fn draw_screen(
         Some(2) => ITEM_NAMES_LABEL,
         Some(3) => GAUGE_STATUS_LABEL,
         Some(4) => OBSERVED_TRAIN_LABEL,
+        Some(5) => TRAIN_STATUS_LABEL,
         _ => "No Display Source",
     };
     let [left, top, width, height] = SOURCE_BUTTON;
@@ -604,7 +614,10 @@ pub(super) fn draw_screen(
             );
         }
     }
-    if data.first() == Some(&1) {
+    if rows == 0 {
+        let message = game.translate("create.display_link.no_target", "Not a Display Target");
+        centered(batch, &message, 112.0, 0xD3D3D3);
+    } else if data.first() == Some(&1) {
         centered(batch, "Active", 112.0, 0xC5F398);
     }
 }

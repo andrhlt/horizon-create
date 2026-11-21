@@ -17,6 +17,7 @@ multiplayer = import_module("test-multiplayer")
 fire = import_module("test-cardboard-fire")
 PLAIN = "create:cardboard_block"
 BOUND = "create:bound_cardboard_block"
+CARDBOARD = "create:cardboard"
 STRING = "minecraft:string"
 ITEMS = (PLAIN, BOUND)
 AT = "8 105 -12"
@@ -53,13 +54,53 @@ def craft(world, actor, name):
     multiplayer.until("the Block of Cardboard and String to reach the player", lambda:
         multiplayer.count(actor, PLAIN) == 1 and multiplayer.count(actor, STRING) == 1)
     actor.call("open-inventory")
-    for slot in (0, 1):
-        actor.call("click-slot", slot)
-        actor.call("click-slot", 100 + slot)
+    actor.call("click-slot", crafting.inventory_slot(actor, PLAIN))
+    actor.call("click-slot", 100)
+    assert_result(actor, CARDBOARD, 4, "a Cardboard Block without String")
+    crafting.craft(actor, CARDBOARD, 4)
+
+    # Three sheets must not consume inputs or expose a block; the fourth
+    # completes the original 2x2 construction recipe.
+    source = crafting.inventory_slot(actor, CARDBOARD)
+    crafting.distribute(actor, source, (100, 101, 102))
+    assert_no_result(actor, "three-of-four Cardboard Block inputs")
+    actor.call("click-slot", 103)
+    crafting.craft(actor, PLAIN, 1)
+
+    # With no String, the block conversion remains available, but binding
+    # must wait until the String ingredient is added.
+    actor.call("click-slot", crafting.inventory_slot(actor, PLAIN))
+    actor.call("click-slot", 100)
+    assert_result(actor, CARDBOARD, 4, "a Cardboard Block without String")
+    actor.call("click-slot", 1)
+    actor.call("click-slot", 101)
     crafting.craft(actor, BOUND, 1)
+    counts = actor.call("inventory")["counts"]
+    assert counts.get(BOUND) == 1 and counts.get(PLAIN, 0) == 0 and counts.get(STRING, 0) == 0, counts
+
+    crafting.distribute(actor, crafting.inventory_slot(actor, BOUND), (100,))
+    crafting.craft(actor, CARDBOARD, 4)
+    counts = actor.call("inventory")["counts"]
+    assert counts.get(CARDBOARD) == 4 and counts.get(BOUND, 0) == 0, counts
     actor.call("close")
-    multiplayer.until("one bound block and both binding inputs consumed", lambda:
-        multiplayer.count(actor, BOUND) == 1 and not any(multiplayer.count(actor, item) for item in (PLAIN, STRING)))
+    multiplayer.until("Cardboard recipes to conserve exact inputs and outputs", lambda:
+        multiplayer.count(actor, CARDBOARD) == 4 and not any(
+            multiplayer.count(actor, item) for item in (PLAIN, STRING, BOUND)))
+
+
+def assert_no_result(actor, case):
+    result = next((entry.get("stack") for entry in actor.call("menu")["slots"]
+                   if entry["slot"] == 200), None)
+    if result:
+        raise AssertionError(f"{case} unexpectedly exposed a crafting result: {result}")
+
+
+def assert_result(actor, item, count, case):
+    result = next((entry.get("stack") for entry in actor.call("menu")["slots"]
+                   if entry["slot"] == 200), None)
+    actual = (result["item"], result["count"]) if result else None
+    if actual != (item, count):
+        raise AssertionError(f"{case} expected {(item, count)}, got {actual}")
 
 
 def set_up(world, commands):

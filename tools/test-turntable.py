@@ -177,6 +177,62 @@ def ride(args):
         print("The guest received the Turntable block and observed the pig at the matching settled height.")
 
 
+def persistence(args):
+    """Check disconnected and driven Turntables across world save/reopen."""
+    with fixture_world(args, "TurntablePersistence", pack=args.pack) as host:
+        host.commands((
+            "/fill 7 169 18 16 169 25 minecraft:stone",
+            f"/setblock {nbt.coords(TABLE)} {BLOCK}",
+            f"/setblock {nbt.coords((TABLE[0], TABLE[1] - 1, TABLE[2]))} create:shaft[axis=y]",
+            f"/setblock {nbt.coords(SIDE)} {BLOCK}",
+        ))
+        host.call("save")
+        host.env["HORIZON_STILL"] = "1"
+        host.restart()
+        idle = tuple(host.call("block", *pos)["state"] for pos in (
+            TABLE, (TABLE[0], TABLE[1] - 1, TABLE[2]), SIDE,
+        ))
+        if idle[0] != BLOCK or not idle[1].startswith("create:shaft[axis=y") or idle[2] != BLOCK:
+            raise RuntimeError(f"Idle Turntable/shaft setup changed across save/reopen: {idle}")
+
+        host.commands((
+            f"/setblock {nbt.coords((TABLE[0], TABLE[1] - 1, TABLE[2]))} create:creative_motor[facing=up]",
+            "/gamerule spawn_mobs false",
+            f'/summon minecraft:pig {TABLE[0] + 0.5} {TABLE[1] + 1.25} {TABLE[2] + 0.5} {{Tags:["TurntablePersistPig"],Rotation:[90f,0f]}}',
+            '/attribute @e[type=minecraft:pig,tag=TurntablePersistPig,limit=1] minecraft:movement_speed base set 0',
+            f'/summon minecraft:item {TABLE[0] + 0.5} {TABLE[1] + 1.25} {TABLE[2] + 0.5} {{Tags:["TurntablePersistItem"],Item:{{id:"minecraft:iron_ingot",count:1}},PickupDelay:32767s,Motion:[0d,0d,0d]}}',
+        ))
+        for _ in range(3):
+            host.step_to(host.clock() + 1)
+        before_data = host.command(f"/data get block {nbt.coords(TABLE)}")
+        before_speed = nbt.tag(before_data, "Speed", float)
+        if before_speed == 0:
+            raise RuntimeError(f"Active Turntable did not receive motor power before save: {before_data}")
+        before_yaw = entity_data.vector(host.command(
+            "/data get entity @e[type=minecraft:pig,tag=TurntablePersistPig,limit=1]"
+        ), "Rotation")[0]
+        host.call("save")
+        host.restart()
+        after_data = host.command(f"/data get block {nbt.coords(TABLE)}")
+        after_speed = nbt.tag(after_data, "Speed", float)
+        if before_speed != after_speed:
+            raise RuntimeError(f"Turntable speed changed across active save/reopen: {before_speed} -> {after_speed}")
+        for _ in range(8):
+            host.step_to(host.clock() + 1)
+            pig_data = host.command("/data get entity @e[type=minecraft:pig,tag=TurntablePersistPig,limit=1]")
+            after_yaw = entity_data.vector(pig_data, "Rotation")[0]
+            if after_yaw != before_yaw:
+                break
+        if after_yaw == before_yaw:
+            raise RuntimeError(f"Active Turntable did not resume mob contact after reopen: {pig_data}")
+        item = host.command(
+            '/data get entity @e[type=minecraft:item,tag=TurntablePersistItem,limit=1] Item.count'
+        )
+        if not item.endswith("1"):
+            raise RuntimeError(f"Iron ingot was lost or changed during Turntable contact: {item}")
+    print("Idle placement and active shaft drive survived save/reopen; mob contact resumed.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for arg in ("ctl", "client", "resources"):
@@ -185,10 +241,13 @@ def main():
     parser.add_argument("--output", type=Path, default=ROOT / ".local/turntable-horizon.csv")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--craft-and-place", action="store_true")
+    mode.add_argument("--persistence", action="store_true")
     mode.add_argument("--lan", action="store_true")
     args = parser.parse_args()
     if args.craft_and_place:
         craft_and_place(args)
+    elif args.persistence:
+        persistence(args)
     else:
         ride(args)
 

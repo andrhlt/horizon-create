@@ -1,5 +1,5 @@
 use horizon_core::geometry::Direction;
-use horizon_world::level::{LevelAccess, PlacementContext, flags};
+use horizon_world::level::{LevelAccess, PlacementContext, PushReaction, flags};
 use horizon_world::nbt::{Compound, Tag};
 use horizon_world::registry::BlockStateId;
 
@@ -92,10 +92,14 @@ fn has_clearance(
     blocks: &[Compound],
     piston: [i32; 3],
     sources: &[[i32; 3]],
+    motion: [i32; 3],
 ) -> bool {
     blocks.iter().all(|block| {
         let at = offset(anchor, relative(block));
-        at == piston || sources.contains(&at) || game.native_block_collision(at).is_empty()
+        at == piston
+            || sources.contains(&at)
+            || game.native_block_collision(at).is_empty()
+            || super::create_drill::allows_obstruction(game, blocks, anchor, at, motion)
     })
 }
 
@@ -147,7 +151,20 @@ fn assemble(
             if game.native_block_collision(at).is_empty() {
                 break;
             }
-            saved_block(game, at, start)?;
+            if speed < 0.0 {
+                let state = game.world.block(at[0], at[1], at[2]);
+                if game.res.behaviours().facts(state).push == PushReaction::Push {
+                    break;
+                }
+            }
+            if saved_block(game, at, start).is_none() {
+                // Java PistonContraption.addToInitialFrontier leaves an immovable
+                // pull target in place while retracting the piston apparatus.
+                if speed < 0.0 {
+                    break;
+                }
+                return None;
+            }
             seeds.push(at);
         }
     }
@@ -174,7 +191,14 @@ fn assemble(
     ));
     let sources: Vec<_> = sources.into_iter().chain(extensions).collect();
     let next = position(start, normal, if speed > 0.0 { 1 } else { -1 });
-    if !has_clearance(game, next, &blocks, pos, &sources) {
+    if !has_clearance(
+        game,
+        next,
+        &blocks,
+        pos,
+        &sources,
+        normal.map(|step| step * if speed > 0.0 { 1 } else { -1 }),
+    ) {
         return None;
     }
     let air = game.native_default_state("minecraft:air")?;
@@ -275,7 +299,13 @@ fn disassemble(
     true
 }
 
-pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity, rpm: f32) {
+pub(super) fn tick(
+    game: &mut Game<'_>,
+    pos: [i32; 3],
+    entity: &mut ModBlockEntity,
+    rpm: f32,
+    distance_limit: Option<f32>,
+) {
     let Some(side) = read_face(game, pos) else {
         return;
     };
@@ -294,6 +324,21 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
         _ => Vec::new(),
     };
     let previous_speed = float(&entity.nbt, "PistonSpeed").unwrap_or(f32::NAN);
+    let previous_ratio = float(&entity.nbt, "SequencedDistanceRatio");
+    let ratio = distance_limit.map(|limit| {
+        if rpm == 0.0 { 0.0 } else { limit / rpm.abs() }
+    });
+    if previous_speed != speed || previous_ratio != ratio {
+        if let Some(limit) = distance_limit {
+            set_float(&mut entity.nbt, "SequencedOffsetLimit", limit);
+            if let Some(ratio) = ratio {
+                set_float(&mut entity.nbt, "SequencedDistanceRatio", ratio);
+            }
+        } else {
+            entity.nbt.remove(&"SequencedOffsetLimit".into());
+            entity.nbt.remove(&"SequencedDistanceRatio".into());
+        }
+    }
     set_float(&mut entity.nbt, "PistonSpeed", speed);
     if blocks.is_empty() {
         if speed != 0.0 && previous_speed != speed {
@@ -311,7 +356,13 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
         let old = float(&entity.nbt, "Offset").unwrap_or_default();
         let range = int(&entity.nbt, "Range").unwrap_or(0) as f32;
         let old_previous = float(&entity.nbt, "PreviousOffset").unwrap_or(old);
-        let mut next = (old + speed).clamp(0.0, range);
+        let limit = float(&entity.nbt, "SequencedOffsetLimit");
+        let step = match limit {
+            Some(remaining) if remaining <= 0.0 => 0.0,
+            Some(remaining) => speed.clamp(-remaining, remaining),
+            None => speed,
+        };
+        let mut next = (old + step).clamp(0.0, range);
         let ahead = position(
             anchor,
             normal,
@@ -322,16 +373,43 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
             },
         );
         let mut stopping = speed == 0.0 || next == 0.0 || next == range;
-        if !has_clearance(game, ahead, &blocks, pos, &[]) {
+        if !has_clearance(
+            game,
+            ahead,
+            &blocks,
+            pos,
+            &[],
+            normal.map(|step| step * if speed > 0.0 { 1 } else { -1 }),
+        ) {
             next = old.round();
             stopping = true;
+        }
+        if let Some(remaining) = limit.filter(|remaining| *remaining > 0.0) {
+            set_float(
+                &mut entity.nbt,
+                "SequencedOffsetLimit",
+                (remaining - (next - old).abs()).max(0.0),
+            );
         }
         let from = std::array::from_fn(|i| {
             f64::from(anchor[i]) + f64::from(normal[i]) * f64::from(old_previous)
         });
         let at =
             std::array::from_fn(|i| f64::from(anchor[i]) + f64::from(normal[i]) * f64::from(old));
-        let motion = normal.map(|step| f64::from(step) * f64::from(speed));
+        let drill_at = std::array::from_fn(|i| {
+            f64::from(anchor[i]) + f64::from(normal[i]) * f64::from(next)
+        });
+        let drill_from = std::array::from_fn(|i| {
+            f64::from(anchor[i]) + f64::from(normal[i]) * f64::from(old)
+        });
+        let motion = normal.map(|step| f64::from(step) * f64::from(next - old));
+        let drill_stalled = super::create_drill::translate(
+            game,
+            &mut blocks,
+            drill_from,
+            drill_at,
+            1.0 / 128.0,
+        );
         for block in &blocks {
             let Some(state) = compound(block, "BlockState") else {
                 continue;
@@ -346,7 +424,11 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
             }
         }
         set_float(&mut entity.nbt, "PreviousOffset", old);
-        set_float(&mut entity.nbt, "Offset", next);
+        if drill_stalled {
+            set_float(&mut entity.nbt, "Offset", old);
+        } else {
+            set_float(&mut entity.nbt, "Offset", next);
+        }
         if stopping {
             let target = position(anchor, normal, next.round() as i32);
             let initial = int(&entity.nbt, "CreatePistonInitialOffset").unwrap_or(0);

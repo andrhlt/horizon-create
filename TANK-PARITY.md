@@ -40,6 +40,38 @@ Every record compares its logical tick and requested fields without offsets or r
 | [windows-boiler](fixtures/tank-scripts/windows-boiler.json) | 8 | Integration only | Pass |
 | [windows](fixtures/tank-scripts/windows.json) | 84 | Integration only | Pass |
 
+## APP-1987 tank fluid rendering and client replication (November 20, 2026)
+
+The bounded renderer and synchronization gate passed on integrated build
+`native-9f42064-5079f533f884`. The loaded client includes the staged tank visual
+module, block-entity dispatch and update-tag changes; the Create pack SHA256 is
+`6e2347ac8d0a2d31c5091917565a988ad6ab138fab91c670e1eb0a7916101137`.
+
+The diagnostic separated fixture setup from a gameplay synchronization defect.
+Server `/data get` showed the intended `TankContent` after direct NBT writes,
+while render-hook input on the client held `TankContent: {}`. Real bucket fills
+also remained invisible: tank writes mutated saved NBT without sending a block
+entity update, and the tank update-tag hook omitted its fluid and controller
+data. Tank writes now mark the controller block entity updated, and the update
+tag includes its NBT. This covers both fluid changes and chunk delivery on load.
+
+The [offscreen render fixture](tools/test-tank-render.py) uses real bucket
+interactions and checks authoritative host values plus client-submitted fluid
+geometry for a 1x1 ordinary tank (3,000/8,000 after a drain), a full 1x1
+creative lava tank (8,000/8,000), and a half-full joined 2x2 tank
+(16,000/32,000). It observes the ordinary tank at 4,000 and 3,000 mB on the
+live host, then verifies the persisted final levels after a cold reopen and on
+a joining LAN guest. Host and guest screenshots show visible water and lava in
+their tank windows. These representative cases establish functional geometry
+and replication, not pixel-exact Java rendering or interpolation parity.
+
+The new renderer fixture and the affected tank, bucket, pump, fluid-pipe,
+encased-pipe guest and lifecycle checks passed (38/38 checks across the grouped
+run and the separately rerun cached core gate). The grouped run initially
+could not compile its offline core runner because the isolated Cargo cache was
+missing locked `serde_json`; after fetching the locked crate, `tank-script-core`
+passed. Formatting and whitespace checks also passed.
+
 ## Closed gaps and regressions
 
 - Tall-column and wider-group removal share the production split algorithm. The reproduced middle-column bug retained 24,000 mB in an 8,000 mB survivor; Java's 8,000 mB behavior now matches.
@@ -58,7 +90,7 @@ Muted real-player sound tests compare 24 successful/rejected water/lava/potion/b
 
 | Surface | Status |
 | --- | --- |
-| Tank fluid volume rendering, interpolation, gauges, occlusion and client presentation | Open; storage and source-light observations do not prove the renderer |
+| Tank fluid interpolation, gauges, occlusion and exact client presentation | Open; representative visible-fluid geometry and host/guest replication now pass, but exact Java rendering and interpolation remain unverified |
 | Java client light propagation and particle feedback | Open; Java's headless server reports propagated light 0 even after 40 ticks despite source emission 12, and particles are client-side |
 | Audio category/volume and seeded pitch verification | Source implementation present; independent runtime comparison open |
 | Actual Java partial chunk unload/reload timing | Horizon regression passes; paired Java trace open |

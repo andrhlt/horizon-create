@@ -40,3 +40,23 @@ if __name__ == '__main__':
         nbt = world.command('/data get block 9 112 -5')
         print('Placed:', state, nbt, flush=True)
         assert state.startswith('create:track_observer') and 'TargetTrack: [I; 0, 0, -3]' in nbt, (state, nbt)
+
+        # Exercise the same two-click targeting flow on a diagonal rail.
+        world.commands(('/setblock 16 112 -8 create:track[shape=pd]',
+                        '/setblock 17 112 -7 create:track[shape=pd]',
+                        '/item replace entity @s hotbar.0 with create:track_observer'))
+        world.command('/tp @s 16.5 113 -4.5 180 20')
+        world.call('wait', 2)
+        world.call('select', 'create:track_observer')
+        world.call('look-at', 16.5, 112.06, -7.5)
+        world.call('mouse', 'right', 'click')
+        world.call('wait', 3)
+        assert 'create:track_targeting_item_selected_pos' in world.command('/data get entity @s SelectedItem')
+        world.command('/tp @s 16.5 112 -2.5 180 20')
+        world.call('wait', 2)
+        world.call('interact', 16, 111, -5, 'up')
+        world.call('wait', 3)
+        diagonal = world.call('block', 16, 112, -5)['state']
+        diagonal_nbt = world.command('/data get block 16 112 -5')
+        print('Diagonal placement:', diagonal, diagonal_nbt, flush=True)
+        assert diagonal.startswith('create:track_observer') and 'TargetTrack: [I; 0, 0, -3]' in diagonal_nbt, (diagonal, diagonal_nbt)

@@ -82,13 +82,67 @@ def compare(name, head, reference, actual, lan):
     return not differences
 
 
+def reopen_active(args):
+    with fixture_world(args, "CardboardProductionReopen", pack=args.pack) as world:
+        setup(world)
+        for _ in range(2):
+            world.step_to(world.clock() + 1)
+        start = world.clock()
+        for tick in range(5):
+            if tick:
+                world.step_to(start + tick)
+            if tick == 4:
+                feed(world)
+        for tick in range(5, 16):
+            world.step_to(start + tick)
+
+        before_pulp, before_press = observe(world, 15)
+        world.command("/save-all flush")
+        world.restart()
+        after_pulp, after_press = observe(world, 0)
+        assert all(int(row[3]) == 1 for row in before_pulp[:3]), before_pulp
+        assert all(
+            (int(row[6]), int(row[8])) in {(4, 0), (0, 1)}
+            for row in after_pulp[:3]
+        ), (before_pulp, after_pulp)
+        assert int(after_pulp[3][6]) == 4 and int(after_pulp[3][8]) == 0, after_pulp[3]
+        assert int(after_press[1]) + int(after_press[2]) == 1, (before_press, after_press)
+
+        # Finish the same in-flight batches after reload and confirm each
+        # eligible input produces once, while the 249 mB control remains idle.
+        for _ in range(35):
+            world.step_to(world.clock() + 1)
+        rows, press = observe(world, 50)
+        assert [int(row[-1]) for row in rows] == [1, 1, 1, 0], rows
+        assert [int(row[-3]) for row in rows] == [0, 0, 0, 4], rows
+        assert int(press[-1]) == 1, press
+
+        # Once idle, preserve finished outputs and both block orientations.
+        world.commands((
+            "/setblock 7 104 -5 create:cardboard_block[axis=x]",
+            "/setblock 10 104 -5 create:bound_cardboard_block[axis=z]",
+            "/save-all flush",
+        ))
+        world.restart()
+        rows, press = observe(world, 50)
+        assert [int(row[-1]) for row in rows] == [1, 1, 1, 0], rows
+        assert int(press[-1]) == 1, press
+        assert world.call("block", 7, 104, -5)["state"] == "create:cardboard_block[axis=x]"
+        assert world.call("block", 10, 104, -5)["state"] == "create:bound_cardboard_block[axis=z]"
+    print("Active Pulp mixing and pressing survived reopen; three eligible batches and one press completed once.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("ctl", "client", "resources"):
         parser.add_argument(name, type=Path)
     parser.add_argument("--pack", type=Path)
     parser.add_argument("--lan", action="store_true")
+    parser.add_argument("--reopen", action="store_true")
     args = parser.parse_args()
+    if args.reopen:
+        reopen_active(args)
+        return
     pulp_head, pulp_reference = read("cardboard-pulp")
     press_head, press_reference = read("cardboard-press")
     pulp, pressed = [], []

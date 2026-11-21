@@ -82,6 +82,13 @@ def run(args):
                     guest.call("wait", 3)
             guest.call("key", "w", "up")
             guest.call("key", "d", "up")
+            guest.call("key", "shift", "down")
+            guest.call("wait", 3)
+            host.step_to(host.clock() + 1)
+            guest.call("key", "shift", "up")
+            data = host.command(f"/data get entity {train.ENTITY} CreateTrain")
+            if "Driver:" in data:
+                raise RuntimeError(f"Guest sneak did not release Train Controls: {data}")
     print(f"A real guest drove through the right turn. The host matched Java wheel positions and speed on all {len(rows)} ticks.")
 
 

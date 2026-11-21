@@ -1,0 +1,296 @@
+{
+  "rotations": [
+    {
+      "initial_axis": "x",
+      "face": "down",
+      "axis": "z",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "x",
+      "face": "up",
+      "axis": "z",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "x",
+      "face": "north",
+      "axis": "y",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "x",
+      "face": "south",
+      "axis": "y",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "x",
+      "face": "west",
+      "axis": "x",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "x",
+      "face": "east",
+      "axis": "x",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "y",
+      "face": "down",
+      "axis": "y",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "y",
+      "face": "up",
+      "axis": "y",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "y",
+      "face": "north",
+      "axis": "x",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "y",
+      "face": "south",
+      "axis": "x",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "y",
+      "face": "west",
+      "axis": "z",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "y",
+      "face": "east",
+      "axis": "z",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "z",
+      "face": "down",
+      "axis": "x",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "z",
+      "face": "up",
+      "axis": "x",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "z",
+      "face": "north",
+      "axis": "z",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "z",
+      "face": "south",
+      "axis": "z",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:vertical_gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "z",
+      "face": "west",
+      "axis": "y",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:gearbox": 1
+      }
+    },
+    {
+      "initial_axis": "z",
+      "face": "east",
+      "axis": "y",
+      "block_after_pickup": "minecraft:air",
+      "inventory": {
+        "create:wrench": 1,
+        "create:gearbox": 1
+      }
+    }
+  ],
+  "powered": [
+    {
+      "tick": 0,
+      "phase": "end_tick",
+      "axis": "y",
+      "input": "north",
+      "gearbox_rpm": 32.0,
+      "south_rpm": -32.0,
+      "east_rpm": 32.0,
+      "up_rpm": 0.0
+    },
+    {
+      "tick": 0,
+      "phase": "after_use",
+      "axis": "z",
+      "input": "none",
+      "gearbox_rpm": 0.0,
+      "south_rpm": 0.0,
+      "east_rpm": 0.0,
+      "up_rpm": 0.0
+    },
+    {
+      "tick": 1,
+      "phase": "end_tick",
+      "axis": "z",
+      "input": "none",
+      "gearbox_rpm": 0.0,
+      "south_rpm": 0.0,
+      "east_rpm": 0.0,
+      "up_rpm": 0.0
+    },
+    {
+      "tick": 2,
+      "phase": "end_tick",
+      "axis": "z",
+      "input": "none",
+      "gearbox_rpm": 0.0,
+      "south_rpm": 0.0,
+      "east_rpm": 0.0,
+      "up_rpm": 0.0
+    },
+    {
+      "tick": 3,
+      "phase": "end_tick",
+      "axis": "z",
+      "input": "none",
+      "gearbox_rpm": 0.0,
+      "south_rpm": 0.0,
+      "east_rpm": 0.0,
+      "up_rpm": 0.0
+    },
+    {
+      "tick": 4,
+      "phase": "end_tick",
+      "axis": "z",
+      "input": "none",
+      "gearbox_rpm": 0.0,
+      "south_rpm": 0.0,
+      "east_rpm": 0.0,
+      "up_rpm": 0.0
+    },
+    {
+      "tick": 4,
+      "phase": "after_use",
+      "axis": "y",
+      "input": "none",
+      "gearbox_rpm": 0.0,
+      "south_rpm": 0.0,
+      "east_rpm": 0.0,
+      "up_rpm": 0.0
+    },
+    {
+      "tick": 5,
+      "phase": "end_tick",
+      "axis": "y",
+      "input": "north",
+      "gearbox_rpm": 32.0,
+      "south_rpm": -32.0,
+      "east_rpm": 32.0,
+      "up_rpm": 0.0
+    },
+    {
+      "tick": 6,
+      "phase": "end_tick",
+      "axis": "y",
+      "input": "north",
+      "gearbox_rpm": 32.0,
+      "south_rpm": -32.0,
+      "east_rpm": 32.0,
+      "up_rpm": 0.0
+    },
+    {
+      "tick": 7,
+      "phase": "end_tick",
+      "axis": "y",
+      "input": "north",
+      "gearbox_rpm": 32.0,
+      "south_rpm": -32.0,
+      "east_rpm": 32.0,
+      "up_rpm": 0.0
+    },
+    {
+      "tick": 8,
+      "phase": "end_tick",
+      "axis": "y",
+      "input": "north",
+      "gearbox_rpm": 32.0,
+      "south_rpm": -32.0,
+      "east_rpm": 32.0,
+      "up_rpm": 0.0
+    }
+  ]
+}

@@ -53,6 +53,14 @@ def run(args):
                 control.step_to(start + tick)
             actual.append(sample(control, tick))
         if actual == expected:
+            active_before_reload = sample(control, len(expected) - 1)[2:]
+            control.restart()
+            active_after_reload = sample(control, len(expected) - 1)[2:]
+            if active_after_reload[1] != active_before_reload[1] or not active_after_reload[0]:
+                raise RuntimeError(f"Active plough state was not retained across save/reopen: {active_before_reload} -> {active_after_reload}")
+            # Restart advances the server clock while the client reconnects;
+            # align the legacy extension loop's tick-10 origin to that clock.
+            start = control.clock() - len(expected) + 1
             # The original fixture uses "place when returned". The extra
             # Horizon-only extension/retraction checks below exercise mode 0.
             control.command("/data merge block 27 98 -11 {ScrollValue:0}")
@@ -64,6 +72,9 @@ def run(args):
                 control.step_to(start + tick)
             check_blocks(control, ((26, "create:piston_extension_pole"),
                                    (28, "create:mechanical_plough"), (29, "minecraft:air")))
+            control.restart()
+            check_blocks(control, ((26, "create:piston_extension_pole"),
+                                   (28, "create:mechanical_plough"), (29, "minecraft:air")))
     with (ROOT / ".local/ploughing-horizon.csv").open("w", newline="") as out:
         writer = csv.writer(out, lineterminator="\n")
         writer.writerow(header[:2] + header[3:])
@@ -71,7 +82,29 @@ def run(args):
     if actual != expected:
         diffs = [(want, got) for want, got in zip(expected, actual) if want != got]
         raise SystemExit(f"Ploughing differed (Java, Horizon): {diffs}")
-    print(f"Ploughing matched all {len(actual)} Java ticks. Full extension and sticky retraction passed.")
+    check_invalid_soil(args, expected[0][1])
+    print(f"Ploughing matched all {len(actual)} Java ticks. Full extension, sticky retraction, and invalid-soil boundary passed.")
+
+
+def check_invalid_soil(args, first_world_time):
+    with fixture_world(args, "ploughing_invalid_soil", TEMPLATE) as control:
+        control.command("/gamerule random_tick_speed 0")
+        while control.clock() % 20 != int(first_world_time):
+            control.step_to(control.clock() + 1)
+        control.commands((
+            "/place template create:gametest/contraptions/ploughing 25 96 -12",
+            "/setblock 28 98 -10 minecraft:lever[face=floor,facing=west,powered=false]",
+            "/setblock 29 97 -11 minecraft:stone",
+        ))
+        start = control.clock()
+        for tick in range(1, 9):
+            control.step_to(start + tick)
+        trace = sample(control, 8)
+        if not trace[2]:
+            raise RuntimeError("Invalid-soil fixture never assembled a moving plough")
+        result = control.command("/execute if block 29 97 -11 minecraft:stone")
+        if "Test passed" not in result:
+            raise RuntimeError(f"Plough changed invalid stone soil: {result}")
 
 
 if __name__ == "__main__":

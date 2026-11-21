@@ -3,6 +3,7 @@ use std::collections::{BTreeSet, VecDeque};
 use horizon_core::geometry::Direction;
 use horizon_world::level::flags;
 use horizon_world::nbt::{JavaString, Tag};
+use horizon_world::registry::BlockStateId;
 
 use crate::containers::ModBlockEntity;
 use crate::items::ItemStack;
@@ -94,7 +95,7 @@ pub(super) fn transfer_restarting(entity: &ModBlockEntity, now: i64) -> bool {
     matches!(entity.nbt.get(&TRANSFER_RESTART.into()), Some(Tag::Long(restart)) if now < *restart)
 }
 
-fn reset_network(game: &mut Game<'_>, origin: [i32; 3], first: [bool; 6]) {
+pub(super) fn reset_network(game: &mut Game<'_>, origin: [i32; 3], first: [bool; 6]) {
     // Preserve loaded fluid, but restart pressure propagation on the next tick.
     // Port readiness and FluidNetwork's two pre-propagation ticks delay transfer.
     let restart = game.world.game_time + 5;
@@ -168,6 +169,16 @@ fn replace(
     }) else {
         return false;
     };
+    replace_with_flow(game, pos, state, prior, open)
+}
+
+pub(super) fn replace_with_flow(
+    game: &mut Game<'_>,
+    pos: [i32; 3],
+    state: BlockStateId,
+    prior: [bool; 6],
+    open: [bool; 6],
+) -> bool {
     let ports: Vec<_> = Direction::ALL
         .into_iter()
         .filter_map(|face| {

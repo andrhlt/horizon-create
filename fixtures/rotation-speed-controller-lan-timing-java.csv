@@ -1,0 +1,5 @@
+actor,recipient,setting,frozen_tick,release_client_tick,accept_server_tick,server_output_theoretical_rpm,replica_tick,replica_effective_rpm,next_submitted_frame_tick,next_submitted_frame_fraction,next_submitted_frame_time,next_submitted_frame_effective_rpm
+host,host,64,283,283,283,64.0000,283,0.0000,283,1.00000000,597.00000000,0.000000
+host,guest,64,283,283,283,64.0000,283,0.0000,283,1.00000000,363.00000000,0.000000
+guest,host,-32,283,283,283,-32.0000,283,0.0000,283,1.00000000,796.00000000,0.000000
+guest,guest,-32,283,283,283,-32.0000,283,0.0000,283,1.00000000,561.00000000,0.000000

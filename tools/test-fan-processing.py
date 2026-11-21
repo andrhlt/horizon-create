@@ -15,17 +15,15 @@ COUNT = re.compile(r'\b(?:Count|count): (\d+)')
 
 
 def sample(control, tick):
-    responses = control.commands([
-        command
-        for x, lamp_x in LANES
-        for command in (
+    responses = []
+    for x, lamp_x in LANES:
+        responses.extend(control.commands((
             f"/data get block {x} 101 -9 Items",
             f"/data get block {x} 100 -9 Items",
             f"/data get block {x} 98 -9 Items",
             f"/data get block {x} 97 -9 Items",
             f"/execute if block {lamp_x} 97 -11 minecraft:redstone_lamp[lit=true]",
-        )
-    ])
+        )))
     values = iter(responses)
     records = []
     for lane in range(len(LANES)):

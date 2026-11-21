@@ -416,9 +416,9 @@ pub(super) fn draw_still_fluid(
     fluid: &Fluid,
     at: [f32; 3],
     size: [f32; 3],
-) {
+) -> bool {
     let (liquid, tint) = liquid_style(fluid);
-    draw_liquid(game, draw, LIQUID_MODELS[liquid], tint, at, size);
+    draw_liquid(game, draw, LIQUID_MODELS[liquid], tint, at, size)
 }
 
 fn draw_liquid(
@@ -428,12 +428,13 @@ fn draw_liquid(
     tint: u32,
     at: [f32; 3],
     size: [f32; 3],
-) {
+) -> bool {
     draw.push();
     draw.translate(at.map(|n| n / 16.0));
     draw.scale(size.map(|n| n / 16.0));
-    game.native_draw_model(draw, model, tint);
+    let drawn = game.native_draw_model(draw, model, tint);
     draw.pop();
+    drawn
 }
 
 fn potion_color(fluid: &Fluid) -> u32 {

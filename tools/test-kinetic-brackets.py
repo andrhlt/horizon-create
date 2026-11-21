@@ -12,6 +12,9 @@ from fixture_world import ROOT, fixture_world
 SHAFT = (8, 101, -10)
 COG = (14, 101, -10)
 INVALID = (18, 101, -10)
+PIPE = (20, 101, -10)
+GLASS_PIPE = (22, 101, -10)
+BENT_PIPE = (24, 101, -10)
 WOOD, METAL, WRENCH = "create:wooden_bracket", "create:metal_bracket", "create:wrench"
 
 
@@ -21,11 +24,14 @@ def coords(pos):
 
 def setup(control):
     control.commands((
-        "/fill 4 100 -15 20 100 -5 minecraft:smooth_stone",
+        "/fill 4 100 -15 26 100 -5 minecraft:smooth_stone",
         "/fill 4 101 -15 20 103 -5 minecraft:air",
         f"/setblock {coords(SHAFT)} create:shaft[axis=x]",
         f"/setblock {coords(COG)} create:cogwheel[axis=y]",
         f"/setblock {coords(INVALID)} minecraft:stone",
+        f"/setblock {coords(PIPE)} create:fluid_pipe[east=true,west=true]",
+        f"/setblock {coords(GLASS_PIPE)} create:glass_fluid_pipe[axis=z]",
+        f"/setblock {coords(BENT_PIPE)} create:fluid_pipe[north=true,east=true]",
         "/gamemode survival",
         f"/item replace entity @s hotbar.0 with {WOOD} 2",
         f"/item replace entity @s hotbar.1 with {METAL} 2",
@@ -90,11 +96,27 @@ def verify(args):
             if tick == 10:
                 control.command(f"/setblock {coords(COG)} minecraft:air destroy")
                 control.call("wait", 2)
-    wanted = list(map(tuple, expected))
-    if actual != wanted:
-        diffs = [(want, got) for want, got in zip(wanted, actual, strict=True) if want != got]
-        raise RuntimeError(f"{len(diffs)} bracket differences. First six: {diffs[:6]}")
-    print(f"Bracket attachment, replacement, wrench return, and cog drops matched Java across {len(actual)} simulated ticks.")
+        wanted = list(map(tuple, expected))
+        if actual != wanted:
+            diffs = [(want, got) for want, got in zip(wanted, actual, strict=True) if want != got]
+            raise RuntimeError(f"{len(diffs)} bracket differences. First six: {diffs[:6]}")
+        press(control, WOOD, PIPE, "up")
+        pipe_bracket = attached(control.command(f"/data get block {coords(PIPE)} Bracket"))
+        if pipe_bracket != ("wood", "pipe", "up", "true"):
+            raise RuntimeError(f"Straight fluid pipe rejected or misoriented wooden bracket: {pipe_bracket}")
+        press(control, METAL, GLASS_PIPE, "up")
+        glass_bracket = attached(control.command(f"/data get block {coords(GLASS_PIPE)} Bracket"))
+        if glass_bracket != ("metal", "pipe", "up", "false"):
+            raise RuntimeError(f"Glass pipe rejected or misoriented metal bracket: {glass_bracket}")
+        press(control, METAL, BENT_PIPE, "up")
+        if attached(control.command(f"/data get block {coords(BENT_PIPE)} Bracket"))[0] != "none":
+            raise RuntimeError("A bent fluid pipe incorrectly accepted a bracket.")
+        control.restart()
+        if attached(control.command(f"/data get block {coords(PIPE)} Bracket")) != pipe_bracket:
+            raise RuntimeError("Wooden bracket state on a straight pipe did not survive save and reopen.")
+        if attached(control.command(f"/data get block {coords(GLASS_PIPE)} Bracket")) != glass_bracket:
+            raise RuntimeError("Metal bracket state on a glass pipe did not survive save and reopen.")
+    print(f"Shaft and cog attachment, replacement, wrench return, and drops matched Java across {len(actual)} ticks; wooden and metal brackets attached to straight fluid pipes with Java orientation and survived reopen, while a bent pipe was rejected.")
 
 
 def craft(args):

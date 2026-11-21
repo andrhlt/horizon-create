@@ -10,4 +10,5 @@ fn speed_controller_placement_redirect(
     crate::game::create_metal_ladder::redirect_placement(game, context);
     crate::game::create_speed_controller::redirect_cog_placement(game, context);
     crate::game::create_press::redirect_placement(game, context);
+    crate::game::create_roller::redirect_placement(game, context);
 }

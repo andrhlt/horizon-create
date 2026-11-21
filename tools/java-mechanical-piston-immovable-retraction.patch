@@ -1,0 +1,54 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,6 @@
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream().filter(t -> t.testName().startsWith("TestContraptions.mechanicalImmovableRetraction")).toList();
+ 	}
+ }
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestContraptions.java
+@@ -278,4 +278,41 @@
+ 			helper.assertBlockProperty(vaultLamp, RedstoneLampBlock.LIT, true);
+ 		});
+ 	}
++
++    @GameTest(template = "ploughing", timeoutTicks = 80)
++    public static void mechanicalImmovableRetraction(CreateGameTestHelper helper) {
++        var level = helper.getLevel();
++        var piston = helper.absolutePos(new BlockPos(2,10,1));
++        var face = net.minecraft.core.Direction.EAST;
++        var axis = com.simibubi.create.content.kinetics.base.DirectionalAxisKineticBlock.AXIS_ALONG_FIRST_COORDINATE;
++        level.setBlock(piston, com.simibubi.create.AllBlocks.STICKY_MECHANICAL_PISTON.getDefaultState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING,face).setValue(axis,false),3);
++        level.setBlock(piston.west(),com.simibubi.create.AllBlocks.PISTON_EXTENSION_POLE.getDefaultState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING,face),3);
++        level.setBlock(piston.north(),com.simibubi.create.AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING,net.minecraft.core.Direction.SOUTH),3);
++        var motor=(com.simibubi.create.foundation.blockEntity.SmartBlockEntity)level.getBlockEntity(piston.north());
++        var setting=motor.getBehaviour(com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour.TYPE);
++        setting.setValue(-64);
++        for(int tick=0;tick<24;tick++) {
++            final int t=tick;
++            helper.runAtTickTime(tick+2,()-> {
++                if(t==10) {
++                    helper.assertTrue(level.getBlockState(piston).getValue(com.simibubi.create.content.contraptions.piston.MechanicalPistonBlock.STATE)==com.simibubi.create.content.contraptions.piston.MechanicalPistonBlock.PistonState.EXTENDED,"rig did not extend before obstruction");
++                    level.setBlock(piston.east(2),Blocks.BEDROCK.defaultBlockState(),3);
++                    setting.setValue(64);
++                }
++                var be=(com.simibubi.create.content.contraptions.piston.LinearActuatorBlockEntity)level.getBlockEntity(piston);
++                var row=new com.google.gson.JsonObject();
++                row.addProperty("tick",t);row.addProperty("offset",be.offset);row.addProperty("speed",be.getSpeed());
++                row.addProperty("state",level.getBlockState(piston).getValue(com.simibubi.create.content.contraptions.piston.MechanicalPistonBlock.STATE).getSerializedName());
++                var cells=new com.google.gson.JsonArray();
++                for(int d=-1;d<=3;d++)cells.add(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(piston.relative(face,d)).getBlock()).toString());
++                row.add("cells",cells);
++                System.out.println("CREATE_PISTON_IMMOVABLE "+row);
++                if(t==23) {
++                    helper.assertTrue(row.get("state").getAsString().equals("retracted"),"bedrock prevented apparatus retraction");
++                    helper.assertTrue(level.getBlockState(piston.east(2)).is(Blocks.BEDROCK),"bedrock changed");
++                    helper.succeed();
++                }
++            });
++        }
++    }
+ }

@@ -29,6 +29,50 @@ pub(super) fn disabled(data: &Compound, actor: &str) -> bool {
         |value| matches!(value, Tag::String(id) if id.0.is_empty() || id.to_string_lossy() == actor)))
 }
 
+/// Copy the saved controls' disabled settings into the moving contraption.
+/// Create runs this from `Contraption.startMoving` for every controls actor.
+pub(super) fn start(blocks: &[Compound], bearing: &mut Compound) {
+    let mut filters: Vec<Tag> = Vec::new();
+    for block in blocks {
+        if compound(block, "BlockState").and_then(|state| string(state, "Name")).as_deref()
+            != Some(CONTROLS)
+        {
+            continue;
+        }
+        let Some(entity) = compound(block, "Entity") else { continue };
+        if int(entity, "Disabled") != Some(1) {
+            continue;
+        }
+        let filter = compound(entity, "Filter")
+            .and_then(|stack| string(stack, "id"))
+            .unwrap_or_default();
+        if !filters.iter().any(|value: &Tag| {
+            matches!(value, Tag::String(id) if id.to_string_lossy() == filter)
+        }) {
+            filters.push(Tag::String(filter.as_str().into()));
+        }
+    }
+    bearing.insert(DISABLED.into(), Tag::List(filters));
+}
+
+/// Save actor toggles back to each moving controls block before disassembly.
+/// This mirrors `ContraptionControlsMovement.stopMoving` in the Java source.
+pub(super) fn stop(blocks: &mut [Compound], bearing: &Compound) {
+    for block in blocks {
+        if compound(block, "BlockState").and_then(|state| string(state, "Name")).as_deref()
+            != Some(CONTROLS)
+        {
+            continue;
+        }
+        let Some(Tag::Compound(entity)) = block.get_mut(&"Entity".into()) else { continue };
+        let filter = compound(entity, "Filter")
+            .and_then(|stack| string(stack, "id"))
+            .unwrap_or_default();
+        let is_disabled = disabled(bearing, &filter);
+        entity.insert("Disabled".into(), Tag::Byte(i8::from(is_disabled)));
+    }
+}
+
 pub(super) fn position(
     game: &mut Game<'_>,
     bearing: [i32; 3],

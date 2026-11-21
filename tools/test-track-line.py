@@ -52,6 +52,10 @@ def run(args):
             control.call("select", "create:track")
             control.call("look-at", x + 0.5, y + 0.06, z + 0.5)
             control.call("mouse", "right", "click")
+            control.call("wait", 3)
+            selected = control.command("/data get entity @s SelectedItem")
+            if "create:track_connecting_from" not in selected:
+                raise RuntimeError(f"Case {row['case']} did not select the first endpoint: {selected}")
 
             target = end if existing else (end[0], y - 1, end[2])
             control.command(

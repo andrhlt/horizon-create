@@ -15,9 +15,9 @@ use super::create_chassis_range;
 use super::create_clockwork::{self, CLOCKWORK};
 use super::create_ejector::{self, EJECTOR};
 use super::create_latches;
+use super::create_machines::{axis_index, mod_entity};
 use super::create_mechanical_piston;
 use super::create_linear_chassis::{self, RADIAL_CHASSIS};
-use super::create_machines::{axis_index, mod_entity};
 use super::create_speed_controller::{self, CONTROLLER, ValueBoard};
 use super::create_valve;
 use super::create_windmill_settings::{self, IconBoard};
@@ -27,6 +27,7 @@ const CHASSIS_SCREEN: &str = "create:chassis_range";
 const WINDMILL_SCREEN: &str = "create:windmill_direction";
 const CLOCKWORK_SCREEN: &str = "create:clockwork_arrangement";
 const PISTON_SCREEN: &str = "create:mechanical_piston_movement_mode";
+const ROLLER_SCREEN: &str = "create:mechanical_roller_movement_mode";
 const VALVE_SCREEN: &str = "create:valve_handle_angle";
 const EJECTOR_SCREEN: &str = "create:ejector_stack_size";
 const PULSE_SCREEN: &str = "create:brass_diode_interval";
@@ -42,6 +43,7 @@ pub(super) enum ValueBlock {
     Windmill,
     Clockwork,
     Piston,
+    Roller,
     Valve,
     Ejector,
     PulseDiode,
@@ -58,6 +60,7 @@ impl ValueBlock {
             WINDMILL => Some(Self::Windmill),
             CLOCKWORK => Some(Self::Clockwork),
             create_mechanical_piston::PISTON | create_mechanical_piston::STICKY => Some(Self::Piston),
+            super::create_roller::ROLLER => Some(Self::Roller),
             RADIAL_CHASSIS => Some(Self::RadialChassis),
             name if create_linear_chassis::linear(name) => Some(Self::LinearChassis),
             _ => None,
@@ -73,6 +76,7 @@ impl ValueBlock {
             Self::Windmill => Some(IconBoard::Windmill),
             Self::Clockwork => Some(IconBoard::Clockwork),
             Self::Piston => Some(IconBoard::Piston),
+            Self::Roller => Some(IconBoard::Roller),
             _ => None,
         }
     }
@@ -116,6 +120,7 @@ impl ValueBlock {
             Self::Windmill => create_windmill_settings::TITLE,
             Self::Clockwork => "Clock Hand Arrangement",
             Self::Piston => "Movement Mode",
+            Self::Roller => "Rolling Mode",
             Self::LinearChassis => "Range of Sticky Sides",
             Self::RadialChassis => "Radius when Sticky",
         }
@@ -129,6 +134,7 @@ impl ValueBlock {
             Self::PulseDiode => PULSE_SCREEN,
             Self::Clockwork => CLOCKWORK_SCREEN,
             Self::Piston => PISTON_SCREEN,
+            Self::Roller => ROLLER_SCREEN,
             Self::LinearChassis | Self::RadialChassis => CHASSIS_SCREEN,
             Self::Controller | Self::Motor => SPEED_SCREEN,
         }
@@ -139,6 +145,7 @@ impl ValueBlock {
             Self::Windmill => IconBoard::Windmill.maximum(),
             Self::Clockwork => IconBoard::Clockwork.maximum(),
             Self::Piston => IconBoard::Piston.maximum(),
+            Self::Roller => IconBoard::Roller.maximum(),
             Self::LinearChassis | Self::RadialChassis => create_chassis_range::MAX - 1,
             Self::Controller | Self::Motor | Self::Valve | Self::Ejector | Self::PulseDiode => {
                 self.value_board().maximum()
@@ -146,7 +153,7 @@ impl ValueBlock {
         }
     }
 
-    fn selection(self, game: &Game<'_>, pos: [i32; 3]) -> Selection {
+    pub(super) fn selection(self, game: &Game<'_>, pos: [i32; 3]) -> Selection {
         if let Some(board) = self.icon_board() {
             let value = mod_entity(game, pos)
                 .and_then(|entity| super::create_machines::int(&entity.nbt, "ScrollValue"))
@@ -190,6 +197,8 @@ impl ValueBlock {
             create_clockwork::set_mode(game, at, setting.selection.value);
         } else if self == Self::Piston {
             create_mechanical_piston::set_mode(game, at, setting.selection.value);
+        } else if self == Self::Roller {
+            super::create_roller::set_mode(game, at, setting.selection.value);
         } else if self == Self::Valve {
             if setting.short {
                 create_valve::click(game, at, &mut false);
@@ -273,10 +282,40 @@ impl ValueBlock {
                     0.5 + f64::from(side[i]) * 0.46875 - f64::from(direction[i]) / 8.0
                 }))
             }
+            Self::Roller => {
+                if side != [0, 1, 0] {
+                    return None;
+                }
+                let (x, z) = match game.native_block_property(pos, "facing")?.as_str() {
+                    "north" => (5.0 / 16.0, 15.5 / 16.0),
+                    "south" => (11.0 / 16.0, 0.5 / 16.0),
+                    "west" => (15.5 / 16.0, 5.0 / 16.0),
+                    "east" => (0.5 / 16.0, 11.0 / 16.0),
+                    _ => return None,
+                };
+                Some([x, 15.5 / 16.0, z])
+            }
             Self::LinearChassis | Self::RadialChassis => create_chassis_range::has_wrench(game)
                 .then(|| side.map(|component| 0.5 + f64::from(component) * 0.46875)),
         }
     }
+}
+
+pub(super) fn apply_clipboard_setting(
+    game: &mut Game<'_>,
+    pos: [i32; 3],
+    block: ValueBlock,
+    selection: Selection,
+) {
+    block.apply(
+        game,
+        Setting {
+            target: Target { pos, block },
+            selection,
+            bulk: false,
+            short: false,
+        },
+    );
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -408,6 +447,7 @@ fn board_visible(game: &Game<'_>) -> bool {
                 | WINDMILL_SCREEN
                 | CLOCKWORK_SCREEN
                 | PISTON_SCREEN
+                | ROLLER_SCREEN
                 | VALVE_SCREEN
                 | EJECTOR_SCREEN
                 | PULSE_SCREEN

@@ -1,10 +1,12 @@
 use horizon_core::geometry::{Direction, Vec3, trig};
+use horizon_core::position::BlockPos;
+use horizon_core::random::RandomSource;
 use horizon_world::attachments::AttachmentType;
-use horizon_world::level::{PlacementContext, flags};
+use horizon_world::level::{PlacementContext, Ticks, flags};
 use horizon_world::nbt::{Compound, Tag};
 use horizon_world::registry::BlockStateId;
 
-use crate::containers::ModBlockEntity;
+use crate::containers::{BlockEntity, ModBlockEntity};
 use crate::items::ItemStack;
 use horizon_client::actions::Action;
 
@@ -96,6 +98,7 @@ pub(super) fn place(
 const CONNECTING: &str = "create:track_connecting_from";
 
 const CONNECTIONS: &str = "Connections";
+const CANCEL_DROPS: &str = "CancelCurveDrops";
 const EXTENDED: &str = "create:track_extend_curve";
 const SPRINT_INPUT: AttachmentType<bool> = AttachmentType {
     namespace: "create",
@@ -438,11 +441,118 @@ fn absolute_curve(mut curve: Curve, pos: [i32; 3]) -> Curve {
     curve
 }
 
-pub(super) fn entity_curves(entity: &ModBlockEntity, pos: [i32; 3]) -> Vec<Curve> {
-    connections(entity)
-        .filter_map(curve)
-        .map(|curve| absolute_curve(curve, pos))
-        .collect()
+pub(super) fn prepare_break(game: &mut Game<'_>, pos: [i32; 3]) {
+    let creative = game.creative;
+    game.native_with_mod_block_entity(pos, |entity| {
+        if entity.id != TRACK {
+            return;
+        }
+        if creative {
+            entity.runtime.insert(CANCEL_DROPS.into(), Tag::Byte(1));
+        } else {
+            entity.runtime.remove(&CANCEL_DROPS.into());
+        }
+    });
+}
+
+pub(super) fn remove_endpoint(level: &mut GameLevel<'_>, ticks: &mut Ticks, pos: BlockPos) {
+    if !level.native_authoritative {
+        return;
+    }
+    let owner = [pos.x, pos.y, pos.z];
+    let Some(BlockEntity::Mod(entity)) = level.world.block_entities.get(&(pos.x, pos.y, pos.z))
+    else {
+        return;
+    };
+    if entity.id != TRACK {
+        return;
+    }
+    let drop = level.rules.block_drops && entity.runtime.get(&CANCEL_DROPS.into()).is_none();
+    let removed: Vec<_> = connections(entity)
+        .filter_map(|data| {
+            Some((
+                absolute_curve(curve(data)?, owner),
+                int(data, "Girder") == Some(1),
+            ))
+        })
+        .collect();
+    for (curve, girder) in removed {
+        let unlinked = remove_inbound(level, ticks, curve.ends[1].pos, owner);
+        super::create_fake_track::remove_markers(level, ticks, curve);
+        if drop && unlinked {
+            drop_curve_items(level, curve, girder);
+        }
+    }
+}
+
+fn remove_inbound(
+    level: &mut GameLevel<'_>,
+    ticks: &mut Ticks,
+    pos: [i32; 3],
+    owner: [i32; 3],
+) -> bool {
+    let [x, y, z] = pos;
+    let key = (x, y, z);
+    let Some(BlockEntity::Mod(entity)) = level.world.block_entities.get_mut(&key) else {
+        return false;
+    };
+    if entity.id != TRACK {
+        return false;
+    }
+    let Some(Tag::List(saved)) = entity.nbt.get_mut(&CONNECTIONS.into()) else {
+        return false;
+    };
+    let count = saved.len();
+    saved.retain(
+        |tag| !matches!(tag, Tag::Compound(data) if connection_target(data, pos) == Some(owner)),
+    );
+    if count == saved.len() {
+        return false;
+    }
+    if saved.is_empty() {
+        level.native_set_block_property(ticks, pos, "turn", "false", flags::UPDATE_ALL);
+    }
+    // Send the empty Connections tag too so clients discard their cached curve.
+    level.world.modified.insert((x >> 4, z >> 4));
+    if let Some(log) = level.world.block_log.as_mut() {
+        log.push(key);
+    }
+    true
+}
+
+fn drop_curve_items(level: &mut GameLevel<'_>, curve: Curve, girder: bool) {
+    use super::spill::Spawn;
+    let segments = curve.segments as f32;
+    for (index, factor) in curve
+        .step_lut()
+        .into_iter()
+        .take(curve.segments as usize)
+        .enumerate()
+        .step_by(2)
+    {
+        let t = f64::from(index as f32 * factor / segments);
+        let mut pos = curve.point(t).components();
+        pos[1] += 3.0 / 16.0;
+        for axis in &mut pos {
+            *axis += f64::from((level.world.random.next_float() - 0.5) * 0.25);
+        }
+        level.spill.spawns.push(Spawn {
+            stack: ItemStack::new(TRACK, 1),
+            pos,
+            motion: None,
+            delay: 10,
+        });
+        if girder {
+            for _ in 0..2 {
+                level.spill.spawns.push(Spawn {
+                    stack: ItemStack::new("create:metal_girder", 1),
+                    pos,
+                    motion: None,
+                    delay: 10,
+                });
+            }
+        }
+    }
 }
 
 pub(super) fn curves_at(game: &Game<'_>, pos: [i32; 3]) -> Vec<Curve> {

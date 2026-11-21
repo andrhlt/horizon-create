@@ -1,0 +1,135 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..c794ca0 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.gearboxBearingQuarterTurn"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..150b11d 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -2,18 +2,26 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ 
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
++import com.google.gson.JsonObject;
+ import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
++import com.simibubi.create.content.contraptions.glue.SuperGlueEntity;
++import com.simibubi.create.content.kinetics.gearbox.GearboxBlockEntity;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+ import com.simibubi.create.content.schematics.SchematicItem;
+ import com.simibubi.create.content.schematics.cannon.SchematicannonBlockEntity;
+ import com.simibubi.create.content.schematics.cannon.SchematicannonBlockEntity.State;
+ import com.simibubi.create.foundation.utility.CreatePaths;
++import com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour;
+ import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
+ import com.simibubi.create.infrastructure.gametest.GameTestGroup;
+ 
+ import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.core.registries.BuiltInRegistries;
+ import net.minecraft.gametest.framework.GameTest;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.sounds.SoundSource;
+@@ -26,6 +34,8 @@ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.item.Items;
+ import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.RedstoneLampBlock;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++import net.minecraft.world.phys.AABB;
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
+@@ -115,4 +125,80 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 40)
++	public static void gearboxBearingQuarterTurn(CreateGameTestHelper helper) {
++		BlockPos bearing = new BlockPos(12, 7, 5);
++		BlockPos anchor = bearing.above();
++		helper.setBlock(bearing, AllBlocks.MECHANICAL_BEARING.getDefaultState()
++			.setValue(BlockStateProperties.FACING, Direction.UP));
++		helper.getBlockEntity(AllBlockEntityTypes.MECHANICAL_BEARING.get(), bearing)
++			.getBehaviour(ScrollValueBehaviour.TYPE).setValue(0);
++		helper.setBlock(anchor, AllBlocks.GEARBOX.getDefaultState().setValue(BlockStateProperties.AXIS, Direction.Axis.X));
++		helper.setBlock(anchor.east(), AllBlocks.GEARBOX.getDefaultState().setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
++		var level = helper.getLevel();
++		level.addFreshEntity(new SuperGlueEntity(level, new AABB(helper.absolutePos(anchor)).expandTowards(1, 0, 0)));
++		helper.setBlock(anchor.above(), AllBlocks.CREATIVE_MOTOR.getDefaultState()
++			.setValue(BlockStateProperties.FACING, Direction.DOWN));
++		helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), anchor.above()).generatedSpeed.setValue(32);
++		helper.setBlock(bearing.below(), AllBlocks.CREATIVE_MOTOR.getDefaultState()
++			.setValue(BlockStateProperties.FACING, Direction.UP));
++		var motor = helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), bearing.below());
++		motor.generatedSpeed.setValue(0);
++		var be = helper.getBlockEntity(AllBlockEntityTypes.MECHANICAL_BEARING.get(), bearing);
++		int[] stopTick = {-1};
++		for (int tick = 0; tick <= 20; tick++) {
++			int sample = tick;
++			helper.runAtTickTime(8 + tick, () -> {
++				if (sample == 0) {
++					gearboxBearingSample(helper, anchor, be, "before");
++					motor.generatedSpeed.setValue(60);
++					return;
++				}
++				float angle = be.saveWithoutMetadata(level.registryAccess()).getFloat("Angle");
++				if (stopTick[0] == -1 && be.isRunning() && Math.abs(Math.abs(angle) - 90) < 0.001) {
++					gearboxBearingSample(helper, anchor, be, "quarter_turn");
++					stopTick[0] = sample;
++					motor.generatedSpeed.setValue(0);
++				} else if (stopTick[0] >= 0 && sample == stopTick[0] + 1) {
++					helper.assertTrue(!be.isRunning(), "The bearing must restore the payload at the quarter-turn");
++					gearboxBearingSample(helper, anchor, be, "restored");
++				} else if (stopTick[0] >= 0 && sample == stopTick[0] + 4) {
++					gearboxBearingSample(helper, anchor, be, "settled");
++					helper.succeed();
++				} else if (sample == 20) {
++					helper.fail("The bearing never reached the quarter-turn or restored the payload");
++				}
++			});
++		}
++	}
++
++	private static void gearboxBearingSample(CreateGameTestHelper helper, BlockPos anchor,
++		MechanicalBearingBlockEntity bearing, String phase) {
++		var level = helper.getLevel();
++		var row = new JsonObject();
++		row.addProperty("phase", phase);
++		row.addProperty("running", bearing.isRunning());
++		row.addProperty("angle", bearing.saveWithoutMetadata(level.registryAccess()).getFloat("Angle"));
++		var points = new JsonObject();
++		BlockPos absolute = helper.absolutePos(anchor);
++		points.add("center", gearboxBearingReading(level, absolute));
++		points.add("east", gearboxBearingReading(level, absolute.east()));
++		points.add("north", gearboxBearingReading(level, absolute.north()));
++		points.add("south", gearboxBearingReading(level, absolute.south()));
++		row.add("points", points);
++		System.out.println("CREATE_GEARBOX_BEARING " + row);
++	}
++
++	private static JsonObject gearboxBearingReading(ServerLevel level, BlockPos pos) {
++		var state = level.getBlockState(pos);
++		var reading = new JsonObject();
++		reading.addProperty("block", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
++		if (level.getBlockEntity(pos) instanceof GearboxBlockEntity box) {
++			reading.addProperty("axis", state.getValue(BlockStateProperties.AXIS).getSerializedName());
++			reading.addProperty("rpm", box.getSpeed());
++			reading.addProperty("source", box.hasSource() ? box.getSourceFacing().getSerializedName() : "none");
++		}
++		return reading;
++	}
+ }

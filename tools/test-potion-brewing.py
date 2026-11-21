@@ -68,7 +68,35 @@ def main():
     for name in ("ctl", "client", "resources"):
         parser.add_argument(name, type=lambda value: Path(value).resolve())
     parser.add_argument("--ticks", type=int)
+    parser.add_argument("--no-heat", action="store_true",
+                        help="Reject the heated recipe without consuming inputs or fluid.")
     args = parser.parse_args()
+    if args.no_heat:
+        with fixture_world(args, "Potion-brewing-no-heat", STRUCTURE) as control:
+            control.command("/place template create:gametest/processing/potion_brewing 3 96 -12")
+            # Remove every burner in the isolated fixture, including the one
+            # embedded in the upstream structure, before the mixer can run.
+            control.command(
+                "/fill 3 96 -12 14 110 -5 create:blaze_burner[blaze=none] replace create:blaze_burner"
+            )
+            before = sample(control, 0)
+            start = control.clock()
+            for tick in range(1, 121):
+                control.step_to(start + tick)
+            after = sample(control, 120)
+        if int(after[2]) != 0 or int(after[3]) != 0 or int(after[4]) != 0:
+            raise SystemExit(f"Unheated potion recipe started processing: {after}")
+        if before[6:] and after[6:]:
+            before_amount = sum(int(before[index]) for index in (7, 9, 11, 13, 15))
+            after_amount = sum(int(after[index]) for index in (7, 9, 11, 13, 15))
+            if before_amount != after_amount:
+                raise SystemExit(
+                    f"Unheated potion recipe consumed fluid: before={before_amount}, after={after_amount}"
+                )
+        if before[16:18] != after[16:18] or after[18] != "0":
+            raise SystemExit(f"Unheated potion recipe changed ingredients/output: before={before}, after={after}")
+        print("Unheated potion recipe stayed idle and conserved ingredients and fluid.")
+        return
     with (ROOT / "fixtures/potion_brewing-java.csv").open() as file:
         reader = csv.reader(file)
         header, expected = next(reader), list(reader)[:args.ticks]

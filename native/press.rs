@@ -253,7 +253,11 @@ fn apply_world(game: &mut Game<'_>, pos: [i32; 3], data: &mut Vec<i32>) -> bool 
     let Some(index) = game
         .dropped
         .iter()
-        .position(|item| item.on_ground && item.bounds().intersects(area))
+        .position(|item| {
+            item.on_ground
+                && item.bounds().intersects(area)
+                && pressing_result(game, &item.stack).is_some()
+        })
     else {
         return false;
     };

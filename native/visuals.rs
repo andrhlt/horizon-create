@@ -187,6 +187,14 @@ pub(super) fn update_tag(entity: &ModBlockEntity) -> Option<Compound> {
             tag.insert("ShaftOutputModifier".into(), Tag::Int(modifier));
         }
         super::create_turntable::BLOCK => set_float(&mut tag, "VisualSpeed", reading(entity, 0)),
+        "create:motor" => set_float(&mut tag, "VisualSpeed", reading(entity, 0)),
+        "create:cuckoo_clock" => {
+            for key in ["ClockHour", "ClockMinute", "ClockAnimation", "ClockAnimationProgress", "ClockAnimationStart"] {
+                if let Some(value) = entity.nbt.get(&key.into()) {
+                    tag.insert(key.into(), value.clone());
+                }
+            }
+        }
         WHEEL | LARGE_WHEEL => {
             set_float(&mut tag, "VisualSpeed", reading(entity, 0));
             if let Some(material) = entity.nbt.get(&JavaString::from("Material")) {
@@ -369,6 +377,45 @@ fn draw_shaft_half(
     }
     game.native_draw_model(draw, SHAFT_HALF_MODEL, 0xFFFFFF);
     draw.pop();
+}
+
+/// The original `CreativeMotorRenderer` draws a single `SHAFT_HALF` partial
+/// facing the motor's `facing`, rotating about that axis at the standard kinetic
+/// angle. The half-shaft always protrudes toward `facing`, matching
+/// `CreativeMotorBlock.hasShaftTowards`.
+fn render_motor(
+    game: &Game<'_>,
+    pos: [i32; 3],
+    state: BlockStateId,
+    entity: &ModBlockEntity,
+    draw: &mut BlockEntityDraw,
+) {
+    let Some(facing) = game.native_block_state_property(state, "facing") else {
+        return;
+    };
+    let Some(direction) = super::machines::dir_from_name(&facing) else {
+        return;
+    };
+    let Some(axis) = facing_axis(&facing) else {
+        return;
+    };
+    let end = usize::from(direction.normal()[axis] > 0);
+    let rpm = float(&entity.nbt, "VisualSpeed").unwrap_or(0.0);
+    let parity = pos[(axis + 1) % 3].wrapping_add(pos[(axis + 2) % 3]);
+    let phase = if parity % 2 == 0 { 22.5 } else { 0.0 };
+    let angle = wheel_angle(draw.game_time, draw.partial, rpm, phase);
+    let first = draw.vertices_mut().len();
+    draw_shaft_half(game, draw, axis, end, angle);
+    static TRACE: OnceLock<bool> = OnceLock::new();
+    if *TRACE.get_or_init(|| std::env::var_os("CREATE_MOTOR_RENDER").is_some()) {
+        let [x, y, z] = pos;
+        let vertices = draw.vertices_mut().len() - first;
+        let sign = if end == 1 { 1 } else { -1 };
+        println!(
+            "CREATE_MOTOR_FRAME {x},{y},{z},{facing},{axis},{sign},{},{:.8},{phase:.4},{rpm:.6},{angle:.8},{vertices}",
+            draw.game_time, draw.partial
+        );
+    }
 }
 
 fn visual_transmission_rpm(entity: &ModBlockEntity) -> f32 {
@@ -666,6 +713,10 @@ pub(super) fn submit(
                 pos[0], pos[1], pos[2], axis, game_time, partial, rpm, phase, angle, vertices
             );
         }
+        return;
+    }
+    if block == "create:creative_motor" && entity.id == "create:motor" {
+        render_motor(game, pos, state, entity, draw);
         return;
     }
     if !matches!(block, WHEEL | LARGE_WHEEL | SPEEDOMETER | STRESSOMETER) || entity.id != block {

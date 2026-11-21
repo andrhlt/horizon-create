@@ -1,0 +1,135 @@
+diff --git a/build.gradle b/build.gradle
+index 3d15f98..218ffcf 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -165,7 +165,7 @@ dependencies {
+     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
+     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+ 
+-    implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
++    compileOnly("maven.modrinth:journeymap:1.21.1-6.0.0-beta.54+neoforge")
+     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-20260205.200232-15") {
+         exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
+     }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..70de038 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,9 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.creativeMotorRenderFrames")
++				|| test.testName().equals("TestMisc.creativeMotorCompetition"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..ce0d124 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -115,4 +115,102 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 16)
++	public static void creativeMotorRenderFrames(CreateGameTestHelper helper) {
++		var motor = com.simibubi.create.AllBlocks.CREATIVE_MOTOR;
++		var shaft = com.simibubi.create.AllBlocks.SHAFT;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var directions = net.minecraft.core.Direction.values();
++		var positions = new java.util.ArrayList<BlockPos>();
++		for (int index = 0; index < directions.length; index++) {
++			var direction = directions[index];
++			var pos = new BlockPos(12 + 4 * index, 3, 2);
++			positions.add(pos);
++			helper.setBlock(pos, motor.getDefaultState().setValue(facing, direction));
++			helper.setBlock(pos.relative(direction), shaft.getDefaultState().setValue(axis, direction.getAxis()));
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var world = helper.getLevel();
++			for (int index = 0; index < positions.size(); index++) {
++				var pos = positions.get(index);
++				var motorEntity = (com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity)
++					helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), pos);
++				if (tick == 0)
++					motorEntity.generatedSpeed.setValue(32);
++				if (tick == 8)
++					motorEntity.generatedSpeed.setValue(-48);
++				var state = motorEntity.getBlockState();
++				var direction = state.getValue(facing);
++				var rotationAxis = direction.getAxis();
++				var absolute = helper.absolutePos(pos);
++				int parity = (rotationAxis == net.minecraft.core.Direction.Axis.X ? 0 : absolute.getX())
++					+ (rotationAxis == net.minecraft.core.Direction.Axis.Y ? 0 : absolute.getY())
++					+ (rotationAxis == net.minecraft.core.Direction.Axis.Z ? 0 : absolute.getZ());
++				float phase = parity % 2 == 0 ? 22.5f : 0f;
++				float speed = motorEntity.getSpeed();
++				long gameTime = world.getGameTime();
++				System.out.printf(java.util.Locale.ROOT, "CREATE_MOTOR_RENDER,%d,%d,%s,%s,%s,%.4f,%.1f,%.8f%n",
++					index, tick, direction, rotationAxis, direction.getAxisDirection(), speed, phase,
++					((gameTime + .5f) * speed * 3f / 10) % 360 + phase);
++			}
++			if (tick < 11)
++				helper.fail("Waiting for creative motor render frames");
++		});
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 26)
++	public static void creativeMotorCompetition(CreateGameTestHelper helper) {
++		var motor = com.simibubi.create.AllBlocks.CREATIVE_MOTOR;
++		var shaft = com.simibubi.create.AllBlocks.SHAFT;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var east = net.minecraft.core.Direction.EAST;
++		var west = net.minecraft.core.Direction.WEST;
++		var x = net.minecraft.core.Direction.Axis.X;
++		int[] bases = { 10, 16 };
++		for (int index = 0; index < bases.length; index++) {
++			int base = bases[index];
++			helper.setBlock(new BlockPos(base, 3, 2), motor.getDefaultState().setValue(facing, east));
++			helper.setBlock(new BlockPos(base + 1, 3, 2), shaft.getDefaultState().setValue(axis, x));
++			helper.setBlock(new BlockPos(base + 2, 3, 2), motor.getDefaultState().setValue(facing, west));
++			((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity)
++				helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), new BlockPos(base, 3, 2))).generatedSpeed.setValue(16);
++			((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity)
++				helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), new BlockPos(base + 2, 3, 2)))
++					.generatedSpeed.setValue(index == 0 ? 16 : -16);
++		}
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			var world = helper.getLevel();
++			for (int index = 0; index < bases.length; index++) {
++				int base = bases[index];
++				for (int offset = 0; offset < 3; offset++) {
++					var pos = new BlockPos(base + offset, 3, 2);
++					var be = world.getBlockEntity(helper.absolutePos(pos));
++					boolean present = be != null;
++					float speed = present && be instanceof com.simibubi.create.content.kinetics.base.KineticBlockEntity kinetic
++						? kinetic.getSpeed() : 0f;
++					System.out.printf(java.util.Locale.ROOT, "CREATE_MOTOR_COMPETE,%d,%d,%d,%d,%.4f%n",
++						tick, index, offset, present ? 1 : 0, speed);
++				}
++				if (tick == 5) {
++					var second = world.getBlockEntity(helper.absolutePos(new BlockPos(base + 2, 3, 2)));
++					if (second instanceof com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity added)
++						added.generatedSpeed.setValue(index == 0 ? -16 : 16);
++				}
++				if (tick == 12)
++					helper.setBlock(new BlockPos(base, 3, 2), Blocks.AIR);
++				if (tick == 18) {
++					helper.setBlock(new BlockPos(base, 3, 2), motor.getDefaultState().setValue(facing, east));
++					((com.simibubi.create.content.kinetics.motor.CreativeMotorBlockEntity)
++						helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), new BlockPos(base, 3, 2))).generatedSpeed.setValue(16);
++				}
++			}
++			if (tick < 23)
++				helper.fail("Waiting for competing creative motor observations");
++		});
++	}
+ }

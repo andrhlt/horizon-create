@@ -16,6 +16,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 GAUGE = "6 102 -10"
+SPEEDOMETER = (6, 103, -10)
 LOAD_CHANGES = {
     0: (-6, "create:millstone"),
     12: (-6, "minecraft:air"),
@@ -114,6 +115,39 @@ def run(args, scratch, expected):
         raise RuntimeError(f"tick {tick:g}: Java needle {previous:.9f} → {current:.9f}, "
                            f"Horizon frame {last} (partial, previous, current, angle, vertices, target)")
 
+    def boundary_state(mill_count, expected_stress, expected_speed):
+        end_z = -9 + mill_count - 1
+        command(f"/fill 6 101 -9 6 101 {end_z} create:millstone")
+        step(2)
+        positions = [(6, 100, -10), (6, 101, -10), (6, 102, -10), SPEEDOMETER]
+        positions.extend((6, 101, z) for z in range(-9, end_z - 1, -1))
+        for pos in positions:
+            tag = command(f"/data get block {pos[0]} {pos[1]} {pos[2]}")["chat"][-1]
+            actual = tuple(float(re.search(rf"\b{key}: (-?[\d.]+)f", tag)[1])
+                           for key in ("Speed", "Capacity", "Stress"))
+            if pos[1] == 101 and pos != (6, 101, -10):
+                member_speed = 8.0 * (-1 if (pos[2] + 9) % 2 == 0 else 1)
+            else:
+                member_speed = 8.0
+            expected = (member_speed, 256.0, expected_stress)
+            if actual != expected:
+                raise RuntimeError(f"stress boundary {mill_count} mills at {pos}: "
+                                   f"expected Java state {expected}, got {actual}")
+            if pos == SPEEDOMETER:
+                value = float(re.search(r"\bValue: (-?[\d.]+)f", tag)[1])
+                if (expected_speed == 0.0 and value != 0.0) or (expected_speed != 0.0 and value == 0.0):
+                    raise RuntimeError(f"stress boundary {mill_count} mills: Java effective speed "
+                                       f"{expected_speed} should put the connected speedometer at "
+                                       f"{'zero' if expected_speed == 0.0 else 'a moving'} value, got {value}")
+            if pos == (6, 102, -10):
+                value = float(re.search(r"\bValue: (-?[\d.]+)f", tag)[1])
+                expected_value = 1.125 if expected_stress > 256.0 else expected_stress / 256.0
+                if value != expected_value:
+                    raise RuntimeError(f"Java stressometer value at {mill_count} mills: "
+                                       f"expected {expected_value}, got {value}")
+        print(f"Stress boundary: {mill_count} mills, capacity 256, stress {expected_stress}, "
+              f"raw connected RPM ±8, effective source speed {expected_speed} — matched Java.")
+
     ctl("launch", "--offscreen", "--game", args.client, "--resources", args.resources,
         "--world", "LoadedGauge", "--creative", "--wait", "--game-dir", game,
         "--home", game, "--test-terrain", "--render-distance", 4)
@@ -130,6 +164,7 @@ def run(args, scratch, expected):
             "/setblock 6 100 -10 create:water_wheel[facing=up]",
             "/setblock 6 101 -10 create:cogwheel[axis=y]",
             f"/setblock {GAUGE} create:stressometer[facing=east,axis_along_first=true]",
+            f"/setblock {SPEEDOMETER[0]} {SPEEDOMETER[1]} {SPEEDOMETER[2]} create:speedometer[facing=east,axis_along_first=true]",
             "/setblock 7 100 -9 minecraft:water",
         ):
             command(setup)
@@ -147,6 +182,35 @@ def run(args, scratch, expected):
             if tick in LOAD_CHANGES:
                 end_z, block = LOAD_CHANGES[tick]
                 command(f"/fill 6 101 -9 6 101 {end_z} {block}")
+
+        # Java KineticNetwork applies |speed| to each mill's 4 SU/RPM impact.
+        # The small wheel supplies 8 RPM and 256 SU; KineticBlockEntity uses
+        # capacity < stress, so equality remains active and only 288 SU overloads.
+        boundary_state(7, 224.0, 8.0)
+        boundary_state(8, 256.0, 8.0)
+        boundary_state(9, 288.0, 0.0)
+        command("/fill 6 101 -9 6 101 -1 minecraft:air")
+        step(2)
+        for pos in ((6, 100, -10), (6, 101, -10), (6, 102, -10), SPEEDOMETER):
+            tag = command(f"/data get block {pos[0]} {pos[1]} {pos[2]}")["chat"][-1]
+            state_values = tuple(float(re.search(rf"\b{key}: (-?[\d.]+)f", tag)[1])
+                                 for key in ("Speed", "Capacity", "Stress"))
+            if state_values != (8.0, 256.0, 0.0):
+                raise RuntimeError(f"Java recovery state at {pos}: expected (8, 256, 0), got {state_values}")
+        recovered_value = float(re.search(
+            r"\bValue: (-?[\d.]+)f", command(
+                f"/data get block {SPEEDOMETER[0]} {SPEEDOMETER[1]} {SPEEDOMETER[2]}"
+            )["chat"][-1]
+        )[1])
+        if recovered_value == 0.0:
+            raise RuntimeError("Java recovery should restore a moving speedometer value")
+        recovered_stress = float(re.search(
+            r"\bValue: (-?[\d.]+)f", command(f"/data get block {GAUGE}")["chat"][-1]
+        )[1])
+        if recovered_stress != 0.0:
+            raise RuntimeError(f"Java recovery stressometer value should be zero, got {recovered_stress}")
+        print("Stress boundary recovery: capacity 256, stress 0, raw connected RPM ±8, "
+              "effective speed 8 — matched Java.")
     finally:
         ctl("quit")
         deadline = time.monotonic() + 10

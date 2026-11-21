@@ -9,6 +9,7 @@ use super::create_fan::facing;
 use super::{Game, GameLevel};
 
 pub(super) const CONTACT: &str = "create:redstone_contact";
+const ELEVATOR_CONTACT: &str = "create:elevator_contact";
 
 fn direction(name: &str) -> Direction {
     match name {
@@ -23,7 +24,7 @@ fn direction(name: &str) -> Direction {
 
 fn face(level: &GameLevel<'_>, state: BlockStateId) -> Option<Direction> {
     let info = level.registry.state(state)?;
-    (info.name == CONTACT)
+    (info.name == CONTACT || info.name == ELEVATOR_CONTACT)
         .then(|| direction(info.properties.get("facing").map_or("up", String::as_str)))
 }
 

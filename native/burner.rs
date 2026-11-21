@@ -84,7 +84,9 @@ pub(super) fn capture(
     {
         return false;
     }
-    game.consume_held();
+    if !game.creative {
+        game.consume_held();
+    }
     let at = game.player.as_ref().map_or([0; 3], |player| {
         [player.position.x, player.position.y, player.position.z].map(|value| value.floor() as i32)
     });

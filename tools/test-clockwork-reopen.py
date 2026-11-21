@@ -49,6 +49,17 @@ def run(args):
     with fixture_world(args, "Clockwork-reopen", render=True, pack=args.pack) as control:
         clockwork.setup(control)
         pos, motor, _ = clockwork.parts("east")
+        at = windmill.coords(pos)
+        control.command(f"/data merge block {at} {{ScrollValue:1}}")
+        control.command("/save-all flush")
+        control.restart()
+        idle_mode = control.command(f"/data get block {at} ScrollValue")
+        if not idle_mode.endswith("1"):
+            raise RuntimeError(f"Idle Clockwork mode did not survive reopening: {idle_mode}.")
+        running = control.command(f"/execute if data block {at} {{Running:1b}}")
+        if running.startswith("Test passed") or count_displays(control):
+            raise RuntimeError("Idle Clockwork reopening started the Bearing or created hand displays.")
+        control.command(f"/data merge block {at} {{ScrollValue:0}}")
         control.command(f"/setblock {windmill.coords(motor)} create:creative_motor[facing=east]")
         start = control.clock()
         for tick in (1, 2):

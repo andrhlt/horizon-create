@@ -369,3 +369,67 @@ pub(super) fn matching_name(filter: &str, name: &str) -> bool {
     }
     true
 }
+
+// TrainStatusDisplaySource / ScheduleRuntime.getWaitingStatus: only the first
+// alternative group contributes a status, and the final noncyclic stop is blank.
+pub(super) fn waiting_status(game: &Game<'_>, train: &Compound) -> String {
+    let read = || -> Option<String> {
+        if int(train, "SchedulePaused") == Some(1) {
+            return None;
+        }
+        let schedule = compound(train, "Schedule")?;
+        let state = compound(train, RUNTIME)?;
+        if int(state, "Stage") != Some(AT_DESTINATION) {
+            return None;
+        }
+        let entries = list(schedule, "Entries")?;
+        let index = int(state, "Entry").unwrap_or(0) as usize;
+        if index + 1 == entries.len() && int(schedule, "Cyclic") != Some(1) {
+            return None;
+        }
+        let Tag::Compound(entry) = entries.get(index)? else {
+            return None;
+        };
+        let Tag::List(group) = list(entry, "Conditions")?.first()? else {
+            return None;
+        };
+        let progress = match state.get(&"Wait".into()) {
+            Some(Tag::IntArray(progress)) => progress.as_slice(),
+            _ => return None,
+        };
+        let Tag::Compound(condition) = group.get(*progress.first()? as usize)? else {
+            return None;
+        };
+        let id = text(condition, "Id")?.to_string_lossy();
+        let key = format!(
+            "create.schedule.condition.{}.status",
+            id.strip_prefix("create:")?
+        );
+        let template = game.translate(&key, "Waiting for schedule condition");
+        if matches!(id.as_str(), "create:delay" | "create:idle") {
+            let remaining = wait_duration(compound(condition, "Data")?) - *progress.get(1)?;
+            let minutes = remaining >= 1200;
+            let value = if minutes {
+                remaining / 1200
+            } else {
+                ((remaining as f32 / 100.0).ceil() as i32) * 5
+            };
+            let unit = game.translate(
+                if minutes && value == 1 {
+                    "create.generic.daytime.minute"
+                } else if minutes {
+                    "create.generic.unit.minutes"
+                } else {
+                    "create.generic.unit.seconds"
+                },
+                if minutes { "minutes" } else { "seconds" },
+            );
+            Some(template.replace("%1$s", &format!("{value} {unit}")))
+        } else if template.contains("%") {
+            Some("Waiting for schedule condition".into())
+        } else {
+            Some(template)
+        }
+    };
+    read().unwrap_or_default()
+}

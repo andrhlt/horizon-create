@@ -11,7 +11,9 @@ use crate::items::ItemStack;
 use super::Game;
 use super::create_depot::{compound, encode};
 use super::create_fan::facing;
-use super::create_machines::{float, int, mod_entity, offset, set_float};
+use super::create_machines::{
+    GEARBOX, axis_index, float, int, mod_entity, offset, reset_moved_gearbox, set_float,
+};
 use super::native_entities::NativeDisplay;
 
 struct GlueBox {
@@ -213,7 +215,11 @@ pub(super) fn saved_block(game: &Game<'_>, world: [i32; 3], anchor: [i32; 3]) ->
 }
 
 pub(super) fn capture(game: &Game<'_>, bearing: [i32; 3], anchor: [i32; 3]) -> Vec<Compound> {
-    capture_attached(game, bearing, anchor, None)
+    let mut blocks = capture_attached(game, bearing, anchor, None);
+    // The same saved shapes drive the shared moving-payload collision path
+    // used by elevators. Capture them before the source blocks are removed.
+    super::create_elevator_collision::capture(game, &mut blocks, anchor);
+    blocks
 }
 
 pub(super) fn capture_attached(
@@ -506,6 +512,24 @@ fn rotated_state(
     if let Some(rotated) = super::create_linear_chassis::rotated(game, state, axis, angle) {
         return rotated;
     }
+    if game
+        .pack
+        .assets
+        .registry
+        .state(state)
+        .is_some_and(|block| block.name == GEARBOX)
+        && let Some(original) = game.native_block_state_property(state, "axis").and_then(axis_index)
+    {
+        let mut normal = [0.0; 3];
+        normal[original] = 1.0;
+        let rotated = rotate(normal, axis, angle);
+        if let Some(along) = rotated.iter().position(|coordinate| coordinate.abs() > 0.5) {
+            let name = ["x", "y", "z"][along];
+            return game
+                .with_level(|_, level, _| level.native_state_with_property(state, "axis", name))
+                .unwrap_or(state);
+        }
+    }
     let Some(face) = facing(game, state) else {
         return state;
     };
@@ -573,7 +597,8 @@ pub(super) fn restore(
             })
             .unwrap_or(state);
         if game.native_set_block(dimension, pos, state, flags::UPDATE_ALL) {
-            game.native_with_mod_block_entity(pos, |target| {
+            let tick = game.world.game_time;
+            let restored_gearbox = game.native_with_mod_block_entity(pos, |target| {
                 if let Some(data) = compound(block, "Entity") {
                     target.nbt = data.clone();
                 }
@@ -587,7 +612,16 @@ pub(super) fn restore(
                         }
                     }
                 }
+                if target.id == GEARBOX {
+                    reset_moved_gearbox(target, tick);
+                    true
+                } else {
+                    false
+                }
             });
+            if restored_gearbox == Some(true) {
+                game.native_block_entity_sync(pos);
+            }
             if let Some(data) = block.get(&"VanillaEntity".into()) {
                 game.set_block_entity_checked(pos, data.clone());
             }
@@ -878,6 +912,7 @@ pub(super) fn tick(
     }
     if blocks.is_empty() && rpm != 0.0 && scheduled {
         blocks = capture(game, pos, anchor);
+        super::create_contraption_controls::start(&blocks, &mut entity.nbt);
         let attached: Vec<_> = blocks
             .iter()
             .map(|block| offset(anchor, relative(block)))
@@ -910,7 +945,11 @@ pub(super) fn tick(
         if stopping {
             unmount_items(&mut blocks, &entity.items);
         }
-        if stopping && restore(game, anchor, &blocks, axis, physical_angle) {
+        let mut stopped_blocks = blocks.clone();
+        if stopping {
+            super::create_contraption_controls::stop(&mut stopped_blocks, &entity.nbt);
+        }
+        if stopping && restore(game, anchor, &stopped_blocks, axis, physical_angle) {
             super::create_portable_interface::bearing_stopped(game, pos, &blocks);
             if let Some(Tag::List(glue)) = entity.nbt.remove(&"AttachedGlue".into()) {
                 rotate_glue(game, &glue, anchor, axis, physical_angle);
@@ -923,6 +962,7 @@ pub(super) fn tick(
             entity.nbt.remove(&"AssembleNextTick".into());
             angle = 0.0;
         } else {
+            let mut actor_stalled = false;
             if was_running && rpm != 0.0 {
                 let previous = float(&entity.nbt, "ActorAngle").unwrap_or(0.0);
                 super::create_mounted_dispenser::rotate_actors(
@@ -936,6 +976,15 @@ pub(super) fn tick(
                     angle,
                 );
                 farm(game, &blocks, entity, anchor, axis, previous, angle);
+                actor_stalled = super::create_saw::move_actors(
+                    game,
+                    &mut blocks,
+                    entity,
+                    anchor,
+                    axis,
+                    previous,
+                    angle,
+                );
                 set_float(&mut entity.nbt, "ActorAngle", angle);
             }
             for block in &mut blocks {
@@ -957,15 +1006,16 @@ pub(super) fn tick(
                 }
                 angle = (angle + speed) % 360.0;
             }
-            let stalled = super::create_portable_interface::update_bearing(
-                game,
-                pos,
-                anchor,
-                &mut blocks,
-                axis,
-                physical_angle,
-                f64::from(angle).to_radians(),
-            );
+            let stalled = actor_stalled
+                || super::create_portable_interface::update_bearing(
+                    game,
+                    pos,
+                    anchor,
+                    &mut blocks,
+                    axis,
+                    physical_angle,
+                    f64::from(angle).to_radians(),
+                );
             entity
                 .nbt
                 .insert("Stalled".into(), Tag::Byte(i8::from(stalled)));

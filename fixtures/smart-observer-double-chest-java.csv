@@ -1,0 +1,5 @@
+tick,filter_count,far_count,turn_off,powered,lit
+0,3,0,0,false,false
+2,3,1,6,true,true
+14,3,0,0,false,false
+16,3,1,6,true,true

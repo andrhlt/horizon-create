@@ -79,6 +79,12 @@ def main():
         actor.call("mouse", "right", "click")
         mp.until("the guest's panel configuration", lambda:
                  any(b.get("label") == "Add new connection" for b in actor.call("screen").get("buttons", [])))
+        actor.call("click-button", "Increase target")
+        actor.call("click-button", "Toggle target units")
+        actor.call("click-button", "Toggle target units")
+        mp.until("the guest's threshold and units to synchronize", lambda:
+                 "TargetAmount: 1" in host.command("/data get block 14 171 23 bottom_right") and
+                 "UpTo: 1" in host.command("/data get block 14 171 23 bottom_right"))
         actor.call("click-button", "Add new connection")
         mp.until("the panel configuration to close", lambda: actor.call("state")["screen"] == "playing")
         target(actor, (13.5, 171.5, 23.875), (13, 171, 23))
@@ -99,6 +105,19 @@ def main():
             return data if "12" in data and "Iron Ingot" in data else None
         result = mp.until("the host Nixie to show twelve network iron", displayed)
         print(f"LAN guest configured Gauge stock output: {result}")
+        host.commands(("/setblock 14 171 24 create:packager[facing=north]",
+                       "/setblock 14 171 25 minecraft:barrel"))
+        for _ in range(100):
+            host.step_to(host.clock() + 1)
+        destination = host.command("/data get block 14 171 25 Items")
+        source = host.command("/data get block 17 170 24 Items")
+        assert "count: 1" in destination and "minecraft:iron_ingot" in destination, destination
+        assert "count: 11" in source and "minecraft:iron_ingot" in source, source
+        for _ in range(100):
+            host.step_to(host.clock() + 1)
+        assert "count: 1" in host.command("/data get block 14 171 25 Items")
+        assert "count: 11" in host.command("/data get block 17 170 24 Items")
+        print("LAN guest setting requested and replenished one iron ingot exactly once.", flush=True)
 
 
 if __name__ == "__main__":
