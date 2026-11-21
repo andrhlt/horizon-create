@@ -5380,6 +5380,23 @@ tested travel, docking, guest, disassembly and reopen transitions. Broader
 storage layouts, additional materials and exact Java reload/network timing
 remain follow-ups; Full 1:1 stays Open.
 
+#### APP-2055 final compatible-client regression
+
+The bounded checks were rerun in an isolated checkout against compatible
+client `native-9f42064-d6dc2ad18d3f` (launcher 0.2.67, prepared 26.3
+resources, pack generated from the pinned Create revision). `mounted-item-
+extract` matched 253 Java ticks and `mounted-fluid-drain` matched 65. The
+scheduled mounted Barrel travel check matched 123 ticks in solo and 123 in
+LAN. The scheduled fluid-port drain generated 199 rows in solo and LAN; both
+normalized to zero differences against `fixtures/scheduled_train_fluid_port-
+java.csv`, including train movement, contact, pump flow, disconnect and
+conservation fields. The paired-bearing item/fluid replay reached both docks
+after 66 ticks, filled the moving tank after 30 ticks, extracted at both fixed
+receivers after nine ticks, and conserved 16 paper, eight emeralds and
+13,000 mB water. Its LAN client launched and converged; the long-running
+offscreen wrapper did not emit a final summary before timeout, so exact LAN
+paired-bearing timing remains unclaimed.
+
 ## Train conductor Schedule handoff
 
 The [pinned Java GameTest](tools/java-train-conductor-trace.patch) assembles
