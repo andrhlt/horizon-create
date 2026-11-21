@@ -14,6 +14,8 @@ fn machine_menu_button(
         crate::game::create_brass_tunnel::menu_button(game, pos, entity, id);
     } else if entity.id == crate::game::create_display_link::LINK {
         crate::game::create_display_link::menu_button(game, pos, entity, id);
+    } else if entity.id == crate::game::create_schematicannon::CANNON {
+        crate::game::create_schematicannon::menu_button(game, pos, entity, id);
     } else if entity.id == crate::game::create_schematic_table::BLOCK {
         crate::game::create_schematic_table::menu_button(game, pos, entity, id);
     }

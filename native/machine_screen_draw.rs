@@ -15,6 +15,8 @@ fn machine_screen_draw(
         crate::game::create_brass_tunnel::draw_screen(game, data, batch, origin);
     } else if block == crate::game::create_display_link::LINK {
         crate::game::create_display_link::draw_screen(game, data, batch, origin);
+    } else if block == crate::game::create_schematicannon::CANNON {
+        crate::game::create_schematicannon::draw_screen(game, batch, origin);
     } else if block == crate::game::create_schematic_table::BLOCK {
         crate::game::create_schematic_table::draw(game, batch, origin);
     } else if block == crate::game::create_machines::FROGPORT

@@ -478,6 +478,8 @@ pub(super) fn block_entity_container(block: &str, container: &mut Option<ModCont
         outputs,
         menu: if super::create_postbox::block(block) {
             Some(FROGPORT.to_owned())
+        } else if block == CANNON {
+            Some(CANNON.to_owned())
         } else if block == SCHEMATIC_TABLE {
             Some(SCHEMATIC_TABLE.to_owned())
         } else {

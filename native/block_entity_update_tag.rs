@@ -24,6 +24,17 @@ fn block_entity_update_tag(
         let item = entity.nbt.get(&"Item".into()).cloned().unwrap_or_else(|| Tag::Compound(Compound::new()));
         tag.get_or_insert_with(Default::default).insert("Item".into(), item);
     }
+    if entity.id == crate::game::create_schematicannon::CANNON {
+        use horizon_world::nbt::{Compound, Tag};
+        let update = tag.get_or_insert_with(Compound::new);
+        for key in ["State", "Status", "RemainingFuel", "Options", "FlyingBlocks", "AmountPlaced", "AmountToPlace", "Progress"] {
+            if let Some(value) = entity.nbt.get(&key.into()) {
+                update.insert(key.into(), value.clone());
+            }
+        }
+        update.insert("MissingItem".into(), entity.nbt.get(&"MissingItem".into()).cloned().unwrap_or_else(|| Tag::String("".into())));
+        update.insert("MissingCount".into(), entity.nbt.get(&"MissingCount".into()).cloned().unwrap_or(Tag::Int(0)));
+    }
     crate::game::create_bracket::update_tag(entity, tag);
     crate::game::create_toolbox_menu::update_tag(entity, tag);
     if crate::game::create_packager::is_packager(&entity.id) {

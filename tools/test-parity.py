@@ -589,6 +589,8 @@ CHECKS = (
     ("standalone-deploying", "test-standalone-deploying"),
     ("efficient-deployers", "test-efficient-deployers"),
     ("schematicannon", "test-schematicannon"),
+    ("schematicannon-baseline", "test-schematicannon-baseline"),
+    ("schematicannon-baseline-lan", "test-schematicannon-baseline", "--lan"),
     ("mounted-item-extract", "test-mounted-storage", "mounted_item_extract"),
     ("mounted-fluid-drain", "test-mounted-storage", "mounted_fluid_drain"),
     ("dual-port-bearing", "test-dual-port-bearing"),
