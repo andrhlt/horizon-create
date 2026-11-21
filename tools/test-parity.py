@@ -145,6 +145,8 @@ CHECKS = (
     ("large-magma-wheel-award-lan", "test-waterwheel-advancement", "--large", "--lava", "--multiplayer"),
     ("large-waterwheel", "test-small-waterwheel", "--large", "--visual"),
     ("loaded-stressometer", "test-loaded-stressometer", "--goggles"),
+    ("gauges-reopen", "test-gauges-reopen"),
+    ("multiplayer-gauges", "test-multiplayer-gauges"),
     ("kinetic-network-sources", "test-kinetic-network-sources"),
     ("goggles", "test-goggles"),
     ("goggles-gauges", "test-goggles-gauges"),
