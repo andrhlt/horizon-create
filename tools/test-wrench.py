@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import math
 from pathlib import Path
 
 from fixture_world import ROOT, fixture_world
@@ -27,6 +28,7 @@ APPROACH = {
 
 
 def sneak_click(control, aim):
+    target = tuple(math.floor(value) for value in aim)
     control.call("key", "shift", "down")
     control.call("wait", 4)
     try:
@@ -34,8 +36,8 @@ def sneak_click(control, aim):
         control.call("wait", 1)
         looking = control.call("looking-at")
         hit = looking.get("block") or {}
-        if looking.get("kind") != "block" or hit.get("pos") != list(POSITION):
-            raise RuntimeError(f"Wrench pickup aim missed {POSITION}: {looking}")
+        if looking.get("kind") != "block" or hit.get("pos") != list(target):
+            raise RuntimeError(f"Wrench pickup aim missed {target}: {looking}")
         control.call("mouse", "right", "click")
         control.call("wait", 3)
     finally:

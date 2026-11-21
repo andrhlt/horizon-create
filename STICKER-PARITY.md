@@ -94,6 +94,50 @@ records and are not another 960 scenarios.
 Finished: **2026-11-19T16:19:25Z**, total **38m18s**, including source review, fixtures,
 failed builds, final verification and documentation.
 
+## APP-2011 gameplay baseline
+
+The Mechanical Piston prerequisite is integrated by APP-1982 (PR #68). On its
+identified build, `native-9f42064-7dd44073fdc4`, the APP-2011 worktree reran all
+8 registered `sticker*` checks against the pinned Create pack
+(`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`):
+the 7/8 initial batch exposed a shared Wrench test-helper coordinate bug, then
+the corrected survival crafting check passed independently. The other seven
+checks, including all 18 host/guest lifecycle cases, passed in the initial
+batch. The fix makes the helper validate the block under its supplied aim point.
+
+Integrated payload checks on that same build passed `mechanical-piston-actors-lan`
+and `mechanical-piston-reload`. The LAN guest retained the extended Sticker in
+the moving multi-actor payload and converged on its state for all 24 Java
+reference ticks. The moving save/reopen case retained the payload and extension
+state and matched the uninterrupted Java trace at the sampled ticks. This is a
+Horizon persistence check; it does not claim Java reload or packet-arrival timing
+parity.
+
+Commands (run from the APP-2011 worktree):
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 --jobs 2 --check 'sticker*'
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 --jobs 1 --check mechanical-piston-actors-lan --check mechanical-piston-reload
+python3 tools/test-sticker-callback-core.py
+```
+
+The Sticker implementation files and pack match the cited candidate; the
+APP-2011 code change adjusts the shared Wrench test helper and evidence. The
+candidate predates later `origin/main` changes for mounted-drill handling in
+Mechanical Pistons (APP-1971) and Mechanical Saw actors on Bearings (APP-1981).
+The recorded piston fixture contains no drill or saw actor, but a current-tip
+combined build has not been verified. A private
+`sh tools/build-native.sh /path/to/horizon-launcher /path/to/private-launcher-data`
+attempt stopped before compilation: the copied Horizon source already contained
+applied patches and rejected reapplication of `horizon-advancement-initial-inventory.patch`.
+Resolve the local source-cache state and rerun the focused checks before closing
+the ticket.
+
+Full 1:1 remains Open: current-tip combined-build verification, inherited
+structure transforms, wider connected-face/player-item combinations, exact
+Java packet timing, pixels, sound and seeded particle equivalence, and the
+optional ComputerCraft peripheral remain open.
+
 Six native build attempts were made: two failed compilation and four
 succeeded (108,102,100 and100 seconds). The total timer includes those failures,
 fixture fixes, independent review, Java captures, native integration and
