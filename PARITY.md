@@ -7966,6 +7966,22 @@ passed the entire flow from tuning through the Nixie result.
 Promises, restocking,
 multiple rows, and exact Display Board sections remain open.
 
+### APP-2026 Factory Gauge configuration and replenishment
+
+The prerequisite Redstone Requester issue APP-2024 is Done. This work extends the existing Factory Gauge port with player-facing target amount/unit controls and a periodic panel restock path. Matching Stock Link sources are discovered through the existing stock network code; inventory insertion is preflighted before source withdrawal, both sides commit together, and packager notifications refresh the affected inventories. Factory Panels are now included in native block-entity ticking.
+
+The [item replay](tools/test-factory-gauge-item.py) first filled the destination barrel with unrelated items and verified the source stayed at 12. It then removed the matching Stock Link frequency and verified the target stayed at two iron and the source stayed at 12. Restoring the matching frequency let five-item mode move exactly five iron ingots (source 12 → 9, target 2 → 5). It then switched the same panel to stack mode and verified the remaining nine move (source 9 → 0, target 5 → 14), with no additional transfer through two further 100-tick windows. The target amount, unit setting (`UpTo: 0b`), target inventory, and source inventory survived cold save/reopen. The [LAN replay](tools/test-factory-gauge-lan.py) had a guest set the target to one item and toggle units, then confirmed host state synchronization, one-item replenishment (source 12 → 11), and no duplicate after another 100 ticks. Existing filter, Display Link stock output, and idle reopen checks also passed.
+
+The checks ran against Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, build `native-9f42064-63b75493cc50` (client SHA-256 `e5efb1b4d79c04352a2894694a9fcefb61d01b3c0d794944099f4bd593db30f7`) and Create pack SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. The five final checks were `factory-gauge-filter`, `factory-gauge-stock-display`, `factory-gauge-reopen`, `factory-gauge-restock`, and `factory-gauge-stock-display-lan`; all passed. Run them with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check factory-gauge-filter --check factory-gauge-stock-display --check factory-gauge-reopen --check factory-gauge-restock --check factory-gauge-stock-display-lan
+```
+
+For reproducibility, the initial isolated build attempt hit the patch mismatch at `horizon-advancement-initial-inventory.patch`; resolving the mismatch in this APP-2026 private source/cache enabled the actual build without changing other workers' caches. The first regression attempt also hit OS socket denial before gameplay; rerunning fixtures with the authorized socket access produced the results above. These invalid attempts are summarized in `.local/app-2026-evidence/attempts.md`.
+
+The bounded gameplay path is implemented and verified. Broader Java logistics-manager package/address/promise semantics and remaining orientations/timing are follow-ups; this evidence does not claim exhaustive 1:1 parity. Restocking here is synchronous into the target packager's attached inventory, so there is no in-flight request state to persist or reopen.
+
 
 ## Portable Minecart Contraption pickup
 
