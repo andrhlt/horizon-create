@@ -517,6 +517,8 @@ CHECKS = (
     ("zinc-heating", "test-zinc-progression", "--heating"),
     ("zinc-crafting", "test-machine-crafting", "--reference", "fixtures/zinc-crafting-java.csv"),
     ("stone-palettes", "test-stone-palettes"),
+    ("stone-palettes-lan", "test-stone-palettes", "--lan"),
+    ("stone-palettes-reopen", "test-stone-palettes-persistence"),
     ("vanilla-stone-palettes", "test-stone-palettes", "--vanilla"),
     ("vanilla-stone-palettes-lan", "test-stone-palettes", "--vanilla", "--lan"),
     ("palette-mining", "test-palette-mining"),
