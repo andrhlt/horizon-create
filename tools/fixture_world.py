@@ -109,10 +109,10 @@ class FixtureWorld:
             self._launch = tuple(launch)
         self.open()
 
-    def call(self, *args, script=None):
+    def call(self, *args, script=None, timeout=45):
         result = subprocess.run(
             [str(self.ctl), "--socket", str(self.socket), *map(str, args)],
-            input=script, text=True, env=self.env, capture_output=True, timeout=45,
+            input=script, text=True, env=self.env, capture_output=True, timeout=timeout,
         )
         if result.returncode:
             raise RuntimeError(f"{args} failed: {result.stdout} {result.stderr}")
