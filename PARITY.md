@@ -604,6 +604,43 @@ the sampled block states and inventory counts in solo and live LAN.
 Each player also matched the Java climb height and vertical velocity on
 every sampled player tick, including the grounded starting state.
 
+### APP-2067 bounded gameplay baseline — November 21, 2026
+
+The seven registered `metal-ladder*` checks passed (7/7) on Horizon
+`native-9f42064-6bdf8691aa42`, pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, using the prepared 26.3 resources
+and Create pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The build metadata reports mixin hash
+`5a64af938ec86b00d53d16a408aabc0038fb3e57` and Create mod hash
+`4e77322220d09ddbeedcbc87fccdf409833d07367e4b943423494e3f4871526b`.
+Command: `python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared/26.3> --jobs 2 --check 'metal-ladder*'`.
+Logs are in `.local/parity/metal-ladder*.log`.
+
+This reuses Java Create `ac0c444d9828da3453ae8cc65338e8de063286fb` and the
+bounded cases: each metal's Stonecutter recipe, vertical placement assist,
+backing and hanging support, waterlogging, support loss, Wrench rotation/reject
+and pickup, climb movement, and idle cold reopen. The existing Java fixture
+contains 84 placement/support/water samples, 15 Wrench cases and 39 climb
+samples across the three materials. Capture patch SHA-256 values are
+`370911f983d578c2192e892bac9a99527da804b9804ab2cf9ed2701f65e2c93a`
+(`java-metal-ladder-trace.patch`) and
+`9a7ae1085f18c52206a738a8cf41c56e5448a3b3d47a80c0d91a57cb51246681`
+(`java-metal-ladder-controls.patch`). Existing placement, Wrench and climb
+replays passed in solo and LAN, including guest inventory/state convergence.
+The new cold-reopen replay retained all three variants, north/east/south
+facings, the matching-ladder support chain, waterlogging and each player's
+inventory stack. Removing the copper column's only wall support removed its
+upper ladder, restored water in the lower cell and preserved item counts.
+Metal ladders are static, so active-operation reopen is not applicable.
+
+A fresh native rebuild was attempted with a private copy of the launcher
+cache. It stopped before compilation because that cache's Horizon source
+already contains part of the repository patch set and rejects
+`horizon-advancement-initial-inventory.patch`. No native code changed in this
+ticket; the focused checks above used the identified existing pinned client.
+Exact rendering and remaining collision/neighbor combinations remain open.
+
 ## Andesite and Brass Tunnel gameplay baseline (APP-2013)
 
 APP-2013 reuses the pinned Create GameTests and fixtures at
@@ -768,6 +805,48 @@ Quartz follows the clicked face axis. Both tile sizes place as full
 blocks. The three [Stonecutter checks](fixtures/rose-quartz-cutting-java.csv)
 matched the original ingredient and two-block output in survival.
 
+### APP-2062 gameplay baseline
+
+The finite cases are survival acquisition of Rose Quartz from quartz and
+redstone, Sand Paper polishing to Polished Rose Quartz, both original
+reciprocal 1:1 shapeless tile conversions; all three full-block palette items
+and their Java placement axes; all three pickaxe drops; survival Stonecutter
+outputs; and solo/LAN save behavior. Existing Java-captured
+[intermediate crafts](fixtures/intermediate-crafting-java.csv) and the
+[Sand Paper checks](tools/test-sandpaper.py) cover material acquisition and
+polishing, with a guest polishing and retaining inventory through rejoin in
+[LAN](tools/test-sandpaper-lan.py). The solo lifecycle replay converted both
+tile sizes, placed the three palette shapes, mined one of each with a wooden
+pickaxe, then reopened the world with all placed block states and two polished
+Rose Quartz retained. The LAN replay placed all three shapes as a guest,
+retained the guest's two polished Rose Quartz, reopened the host world, and
+confirmed the guest inventory and all three block states after rejoin. The
+existing placement and Stonecutter Java traces also passed in solo and LAN.
+The Java classes are full blocks, so slab merging and wall joining do not
+apply to these three items.
+
+The checks ran on the pinned Horizon 9f42064 engine client
+`native-9f42064-6bdf8691aa42` (client SHA-256
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`, built
+from main baseline `781c0ef`) with pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b` and
+prepared Minecraft 26.3 resources. Commands:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check 'intermediate-crafting' --check 'sandpaper-lan' --check 'rose-quartz-palettes*' --check 'rose-quartz-lifecycle*'
+```
+
+All six selected checks passed. The standalone `sandpaper` check was also
+attempted, but this cached client was built from `781c0ef`, before the
+Sand Paper runtime hooks present on current main; that run reached the old
+seven-use boundary and did not complete its eight-use durability case. It is
+preserved in `.local/parity/sandpaper.log` and is not treated as evidence
+against the already-Done APP-1964 prerequisite. The Java reference remains
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; palette definitions, reciprocal
+recipes and block loot tables were reviewed at that revision. This is a
+gameplay baseline, not exhaustive visual or full 1:1 parity. Exact appearance,
+additional placement combinations, and other tool tiers remain open.
+
 The [three-lamp Java fixture](fixtures/rose-quartz-lamp-java.csv) matched
 39 ticks in solo and LAN on `a52e5e190a8d`. It covers a rising pulse on
 each lamp, the one-tick activation, held latching after power is removed,
@@ -778,6 +857,33 @@ survival recipe and six byte-identical blockstate, model and texture
 files are included.
 
 ## Window palettes
+
+### APP-2063 glass windows and panes
+
+The bounded gameplay baseline reuses the existing 36-state Java palette and
+eight-neighbor traces, placement/waterlogging/crafting/Stonecutter replay,
+eight-recipe recycling trace and six live loot cases. The LAN replay covers
+host and guest survival placement, shared pane connections and guest
+waterlogging. The family is static, so active-operation persistence does not
+apply; `window-reopen` saves and cold-reopens a connected pane beside a
+waterlogged pane and confirms both complete block states are retained.
+The source review covered `ConnectedGlassBlock`, `WindowBlock`,
+`GlassPaneBlock` and `WindowGen`: windows inherit glass behavior and disable
+spawn, redstone-conductor, suffocation and view-blocking checks; panes inherit
+vanilla iron-bar behavior. The original asset audit retains alpha, and the
+272-case directed face-visibility replay matched Java for full blocks and
+stacked/connected panes. Representative oak windows and birch panes were
+rendered with the original assets. On Horizon build
+`native-9f42064-6bdf8691aa42` with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`, the
+five targeted checks passed; the separate window face-visibility check also
+passed. Full 1:1 remains open for remaining shape and connected-texture
+combinations and exhaustive pixel comparisons.
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 --check 'window-palettes' --check 'window-palettes-lan' --check 'window-recycling' --check 'window-silk-touch' --check 'window-reopen'
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --window-culling --check 'window-culling'
+```
 
 The pinned [Java GameTest](tools/java-window-palettes-trace.patch) records
 [36 default window and pane states](fixtures/window-palettes-java.csv)
@@ -7767,19 +7873,52 @@ and an exact raster trace remain open.
 
 ## Tree Fertilizer
 
-The [survival replay](tools/test-tree-fertilizer.py) crafted two,
-rejected stone without consumption, and grew oak with one fertilizer.
-The pinned [Java obstruction probe](tools/java-tree-fertilizer-obstructions-trace.patch)
-called the original item twice with identical scoped outcomes.
-Its [recorded results](fixtures/tree_fertilizer_obstructions-java.csv)
-show one item consumed, oak replacing stone in the trunk path while
-bedrock stays, and all four base spruce logs from a 2×2 cluster with
-no podzol. The Horizon replay passed those same two cases on
-`native-9f42064-2bf765040d26` with `create-ponder-assets.hmod`.
-A [survival LAN guest](tools/test-multiplayer-tree-fertilizer.py)
-passed both cases on the same build, and the host verified the
-original consumption and block outcomes. Other saplings, exact
-random geometry and particles remain open.
+APP-2088 preserves the existing family evidence, which
+covers the ordinary survival recipe, valid and rejected use, one-item and
+last-item consumption, main/offhand priority, drops, representative saplings,
+obstructions and seeded full-volume Java comparisons. The pinned Java
+implementation is `TreeFertilizerItem` at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; its use is immediate, so an active
+operation reload is not applicable.
+
+The finite delivery checks on `native-9f42064-6ce68a31b125` passed:
+
+- `tree-fertilizer`: crafted two, rejected stone without consuming fertilizer,
+  and grew oak with one use.
+- `tree-fertilizer-obstructions`: matched the pinned Java obstruction cases for
+  oak through stone with bedrock retained, plus all four giant spruce base logs
+  and no podzol.
+- `tree-fertilizer-obstructions-lan`: a survival guest grew those trees; the
+  host observed the matching blocks and consumption.
+- `tree-fertilizer-reopen-lan`: a guest grew oak, then its complete captured
+  block volume and remaining inventory survived host save/reopen and guest
+  rejoin. Coordinates, block IDs and non-derived properties matched. Vanilla
+  leaf `distance` values recalculated on load and were treated as derived state.
+
+The new replay compares the resulting state before and after Horizon reload; it
+does not claim Java-equivalent reload timing. Host and guest convergence is
+verified, not packet-arrival timing. Commands:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \
+  --check tree-fertilizer --check tree-fertilizer-obstructions \
+  --check tree-fertilizer-obstructions-lan --check tree-fertilizer-reopen-lan
+```
+
+Java obstruction fixture SHA-256:
+`1dae2c95763427ee7b1b29878e4ca2879b54518720065e0720aa0b4c90d72970`;
+capture patch SHA-256:
+`d341b499cb0b357784aba5398737092af6292ce241fb298f6eea3a6caeb9438c`.
+Runtime Horizon pin is `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`; client
+SHA-256 is `bdbafe5289f2c05ef76009c17070e0320a7c606e042dd5202b142e0e6d123fc9`,
+control tool SHA-256 is
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`, and
+pack SHA-256 is
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The leaf-distance reload refresh is the only newly observed state variation.
+Other seeds and environments, additional sapling geometry, Java map tree-bin
+cases, other overlay drops, item trajectories/pickup and particles remain
+nonblocking follow-up coverage; Full 1:1 remains Open.
 
 ## Factory Gauge item
 
@@ -9905,6 +10044,44 @@ The [Java Tea probe](tools/java-tea-pipe-trace.patch) filled the source tank
 through its fluid capability. All 11,000 mB reached the destinations by tick 99.
 The virtual fluid can be stored and pumped through the network.
 
+## APP-2090 Create foods and Builder’s Tea gameplay baseline
+
+The bounded acceptance cases reuse completed source-derived evidence for the
+three processed foods and Tea. The pinned Java source is Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; `BuildersTeaItem` uses a 42-tick
+drink and returns a glass bottle in survival, while its registered food
+properties apply hidden Haste for 3,600 ticks.
+
+| Acceptance case | Evidence and result |
+| --- | --- |
+| Survival acquisition and use | Existing spout replay produces Sweet Roll, Chocolate Glazed Berries and Honeyed Apple from their representative ingredient/fluid pair. Three 36-tick Java comparisons match item, hunger and saturation; each is consumed on tick 32. Basin Dough and Bread cooking are covered by the Basin and recipe checks. |
+| Important food interactions | Existing guest replay matches 108 Java player-tick samples for the three foods. Release and hotbar-swap interruption, replacement, creative/full-hunger controls, death/respawn and disconnect/rejoin retain the recorded outcomes. Bar of Chocolate and other Tea variants remain broader follow-ups. |
+| Tea use and return | Existing 45-tick authority replay matches the Java Tea use, nutrition, glass bottle and hidden Haste (3,600 ticks on tick 42). The survival brewing/bottling replay verifies 500 mB Tea, 250 mB bottling and bottle return. |
+| Guest ownership after reconnect | New [`test-builders-tea-rejoin-lan.py`](tools/test-builders-tea-rejoin-lan.py) makes a survival LAN guest drink Tea, disconnect, and reconnect with one glass bottle, no Tea, and hidden Haste. It observed 3,589 Haste ticks after reconnect. The initial harness attempt used the optional forced LAN mode and did not restore survival on reconnect; the accepted run uses the same LAN mode as the existing food rejoin harness. |
+| Persistence dependency | Basin idle/active save and reopen are covered by [`test-basin-lifecycle.py`](tools/test-basin-lifecycle.py). APP-1992’s Tea network reopen preserved its fluid identity and amount and resumed transfer after reopen. Food use itself has no machine settings or connections to retain; player inventory/effect ownership is covered by the guest reconnect case above. |
+
+The new check and focused regressions passed with the available compatible
+client `native-9f42064-d6dc2ad18d3f` (SHA-256
+`006bfe15a198b29d6af7633d353dcadaa07039121ae66c2081927299835a8811`) and
+`create.hmod` SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+This pass reused that binary and did not compile a new native build; treat its
+runtime results as candidate evidence. The captured Java comparisons remain
+separate and pinned to the reference revision above.
+
+The focused registered command was:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 \
+  --jobs 2 --check create-foods --check food-use --check food-use-lan \
+  --check food-rejoin-lan --check food-mode-lan --check builders-tea \
+  --check builders-tea-drink --check builders-tea-rejoin-lan
+```
+
+All eight selected checks passed on the candidate runtime. Exact eating poses,
+other food/Tea mode and interruption combinations, other fluid networks and
+Full 1:1 remain open; these are not blockers to this finite gameplay baseline.
+
 ## APP-1992 Honey, Chocolate and Tea gameplay baseline
 
 The finite recipe paths come directly from the pinned Create generators:
@@ -11391,3 +11568,88 @@ Reused Java capture patch SHA-256 values:
 | tools/java-potato-cannon-cure.patch | 4c9678d92f0bd9cf7cd77432fea0db0c8696905141fa1f7f0729832273c2610e |
 | tools/java-potato-cannon-honey-player.patch | 6c1d67e4d2a19d1154828058a89b220f55ef4ba79446a44382c0df3c5230fa21 |
 | tools/java-potato-projectile-save.patch | 532c819b8da18f3b7ba03e03cf9a1894d533915c8362ca412be803765786acca |
+
+## APP-2007 Mechanical Roller gameplay baseline
+The finite checks completed on the pinned Create reference
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`:
+
+- Existing Java comparisons `roller_filling` and `roller_paving_and_clearing`
+  passed on the final combined client. Together they compare 262 captured ticks for
+  fill, paving and clearing behavior, including the recorded material cases.
+- `roller-mode-ui` crafted a Roller from its pinned survival recipe, placed it
+  on a full floor, and confirmed the crafted item was consumed. It selected
+  Tunnel Pave, Straight Fill and Wide Fill as host; a LAN guest selected Wide
+  Fill and the host observed the server value. The selected mode persisted
+  through `/save-all flush` and fixture restart. This
+  proves guest convergence and idle mode persistence, not packet-arrival timing
+  parity.
+- Gantry Shaft/Carriage is already Done; its existing integrated regressions
+  include the Roller. APP-2007's latest candidate build is
+  `native-9f42064-7f8245fcd225` (rebuilt after updating from current main);
+  client SHA-256
+  `eaf18600f300ee82c2454820c57ac44ee8cc274c7242ef09f88ea0d97b231b8b`; prepared
+  Create pack SHA-256
+  `921c10ce6a435a3c4e7d45a6651001e1b77bd321cf621d896b348a471c701bbe`.
+  Cursor fix `16af87f` is included in the client.
+- Exact scoped command:
+
+  ```sh
+  python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \\
+    --check roller-filling --check roller-paving-and-clearing \\
+    --check roller-mode-ui
+  ```
+
+The new `native/roller.rs` work adds the mode setter, Roller placement redirect,
+full-block filter validation, and the Java slab-to-double-block filter state.
+`native/speed_controller_controls.rs` exposes the three mode choices through the
+existing Roller value board. `tools/test-roller-mode-ui.py` is the LAN/mode and
+idle-reopen check registered by the parity runner.
+
+The bounded `roller-filling-reopen` fixture matched all 80 Java ticks, saved
+and reopened at tick 40, compared the Gantry carriage position, material stock
+and world blocks at the boundary, then confirmed subsequent ticks resumed with
+no duplicate or skipped work. Shared `gantry-lan-reload` and
+`mounted-drill-gantry-lan-reload` checks additionally cover guest motion,
+active save/reopen, and conserved payload output; these are shared Gantry
+transport evidence rather than a claim of exact packet-timing parity for every
+Roller actor case.
+
+This pass is partial. The current checks do not establish invalid-filter
+rejection and no-loss consumed-material boundaries. That bounded gate remains open;
+we do not claim the whole APP-2007 baseline complete. The placement redirect and filter boundary code still need focused integration
+coverage before calling those paths verified. Additional terrain patterns, drum visuals, animation and exact
+network timing remain follow-ups; Full 1:1 stays Open.
+## Creative Crate gameplay baseline — APP-2016
+
+The finite baseline reuses the supply, filter refund, Hopper, Dropper, Funnel,
+and Chute Java comparisons above and in the feature matrix. `creative-tabs`
+checks creative availability. The persistence replay configures a tagged filter
+through the crate's value box, saves and reopens the world, then verifies the
+unchanged filter and continued bottomless Hopper extraction with item components
+intact. The crate is a static source, so persistence is checked before and after
+reopen rather than requiring an internal active-processing state. Host/guest
+configuration and extraction evidence is supplied by the existing LAN cases;
+guest convergence is not claimed as Java packet-timing parity. Other filter
+variants, automation targets, and cosmetic/visual fidelity remain open.
+
+On `native-9f42064-6bdf8691aa42`, the APP-2016 persistence replay and
+`create-creative-tabs` passed. The persistence case used the APP-2017 evidence
+pack (`create.hmod`, SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`) and
+prepared 26.3 resources. It configures the filter with an actual player click,
+reopens the saved world, and checks extraction for 40 ticks. Focused LAN
+regressions for supply, Hopper extraction, Dropper insertion, and Funnel
+insertion also passed on that build. Command:
+
+```sh
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 2 \
+  --check creative-crate-persistence --check create-creative-tabs \
+  --check creative-crate-supply-lan --check creative-crate-hopper-lan \
+  --check creative-crate-dropper-lan --check creative-crate-funnel-insert-lan
+```
+
+The Java behavior references remain pinned to Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; earlier per-family sections record
+their capture patches and sampled counts. The persistence case checks ordinary
+Horizon save/reopen and does not claim Java reload parity.
