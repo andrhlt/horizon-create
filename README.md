@@ -228,8 +228,9 @@ Both wheels accept planks by hand and through a rotating deployer. The
 fixture uses an original clutch and gearbox to power two deployers fed by
 straight chutes. It checks the ordered 11 Java plank species, both wheel
 materials, and both deployers' state, timer, and RPM through tick 126.
-Deployer item interactions currently cover wheel recoloring. The client
-draws the original rotors with the selected wood textures.
+Deployer item interactions cover wheel recoloring and the APP-1966 player
+baseline for Wrench mode/orientation, held-stack exchange, and filter behavior.
+The client draws the original rotors with the selected wood textures.
 
 Apply `tools/java-waterwheel-materials-trace.patch` to the pinned Java
 checkout and run `./gradlew runGameTestServer`. The `CREATE_MATERIAL_ORDER`

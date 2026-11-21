@@ -2,6 +2,7 @@ use horizon_core::geometry::Direction;
 use horizon_core::position::BlockPos;
 use horizon_core::random::RandomSource;
 use horizon_world::level::flags;
+use horizon_world::nbt::Tag;
 
 use crate::items::ItemStack;
 
@@ -83,7 +84,32 @@ fn change_cased_cog(game: &mut Game<'_>, pos: [i32; 3], face: Direction) -> bool
     })
 }
 
-pub(super) fn change_pose(game: &mut Game<'_>, pos: [i32; 3], face: Direction, block: &str) -> bool {
+pub(super) fn change_pose(
+    game: &mut Game<'_>,
+    pos: [i32; 3],
+    face: Direction,
+    block: &str,
+) -> bool {
+    if block == "create:deployer" {
+        let Some(prior) = game.native_block_property(pos, "facing").and_then(|name| {
+            Direction::ALL
+                .into_iter()
+                .find(|&side| create_fluids::name(side) == name)
+        }) else {
+            return false;
+        };
+        let turned = rotate(prior, face);
+        if !game.native_set_block_property_with(pos, "facing", create_fluids::name(turned), flags::UPDATE_ALL) {
+            return false;
+        }
+        if axis(face) == "y"
+            && let Some(along_first) = game.native_block_property(pos, "axis_along_first")
+        {
+            let next = if along_first == "true" { "false" } else { "true" };
+            game.native_set_block_property_with(pos, "axis_along_first", next, flags::UPDATE_ALL);
+        }
+        return true;
+    }
     let update = match block {
         super::create_rose_lamp::LAMP => return super::create_rose_lamp::wrench(game, pos),
         super::create_threshold_switch::THRESHOLD_SWITCH | super::create_smart_observer::OBSERVER => {
@@ -221,7 +247,36 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> boo
     {
         return false;
     }
+    let Some(face) = Direction::ALL
+        .into_iter()
+        .find(|side| side.normal() == normal)
+    else {
+        return false;
+    };
     let block = game.native_block(pos);
+    if block == "create:deployer" {
+        let Some(facing) = game.native_block_property(pos, "facing").and_then(|name| {
+            Direction::ALL
+                .into_iter()
+                .find(|&side| create_fluids::name(side) == name)
+        }) else {
+            return false;
+        };
+        if face == facing {
+            game.native_with_mod_block_entity(pos, |entity| {
+                let next =
+                    if create_machines::string(&entity.nbt, "Mode").as_deref() == Some("PUNCH") {
+                        "USE"
+                    } else {
+                        "PUNCH"
+                    };
+                entity.nbt.insert("Mode".into(), Tag::String(next.into()));
+            });
+            game.native_block_entity_sync(pos);
+            game.swing_arm();
+            return true;
+        }
+    }
     if block == super::create_belt::BELT && wrench_belt(game, pos) {
         game.swing_arm();
         return true;
@@ -250,7 +305,7 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> boo
             | super::create_controller_rail::RAIL
             | super::create_rose_lamp::LAMP
             | super::create_encased_fluid_pipe::BLOCK
-            | PIPE | GLASS_PIPE | SMART_PIPE | PUMP
+            | PIPE | GLASS_PIPE | SMART_PIPE | PUMP | "create:deployer"
     ) || encased_size(&block).is_some() || ladder;
     let sneaking = game.native_sneaking();
     if !sneaking && matches!(block.as_str(), super::create_fluid_tank::TANK | super::create_fluid_tank::CREATIVE) {
@@ -304,12 +359,6 @@ pub(super) fn apply(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> boo
     if !supported && !tagged {
         return false;
     }
-    let Some(face) = Direction::ALL
-        .into_iter()
-        .find(|side| side.normal() == normal)
-    else {
-        return false;
-    };
     if !sneaking && matches!(block.as_str(), PIPE | GLASS_PIPE) {
         if create_fluids::wrench_pipe(game, pos, face, &block) {
             game.swing_arm();

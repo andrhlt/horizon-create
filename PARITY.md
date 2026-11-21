@@ -146,6 +146,57 @@ The zero-RPM timing gate intentionally distinguishes the Spout machine tick
 from belt-held-item processing: timer completion alone does not fill the bottle
 until belt movement resumes.
 
+## APP-1991 Potion fluids and heated brewing
+
+The finite acceptance set is: (1) the original water → Healing potion recipe
+with Nether Wart and Glistering Melon Slice, including basin tank identity and
+amounts, mixer state, filtered pipe, Spout timer and final bottle; (2) a
+no-heat rejection control; (3) potion fill/empty and container remainder; (4)
+guest insertion/result convergence; and (5) idle and active save/reopen of the
+basin and Spout path. The original replay at
+[`tools/test-potion-brewing.py`](tools/test-potion-brewing.py) compares all 394
+Java observations in [`fixtures/potion_brewing-java.csv`](fixtures/potion_brewing-java.csv),
+including both basin tank pairs and the Spout tank, through delivery of Healing
+potion to the chest. Its reference is the pinned Create 6.0.10 GameTest and
+`tools/java-potion-brewing-trace.patch`.
+
+The pinned source audit covered `PotionMixingRecipes.createRecipe` and
+`PotionFluidHandler`: vanilla potion recipes preserve bottle type and potion
+contents, consume 1,000 mB, and require heat; emptying an ordinary water potion
+uses water while other potion contents retain the `create:potion` identity;
+filling consumes the matching amount and returns the appropriate container.
+The existing [Basin lifecycle](tools/test-basin-lifecycle.py) covers real guest
+insertion/collection and active/idle reopen. APP-1990's [Spout baseline](tools/test-spout-gameplay.py)
+covers guest feed/collection and idle/partway reopen. These neighboring gates
+apply to the same authoritative basin inventory and Spout transfer paths; they
+do not claim packet-timing parity for a guest-triggered potion brew.
+
+The replay was rerun from the isolated ticket worktree on client build
+`native-9f42064-6bdf8691aa42` with pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`; all 394
+Java rows matched exactly. Horizon output is in the worktree's
+`.local/potion_brewing-horizon.csv`, and the runner log is
+`.local/horizon-potion-brewing.log`. The no-heat rule is source-aligned in both
+Java (`PotionMixingRecipes.createRecipe` requires `HEATED`) and Horizon
+(`native/mixer.rs::recipe` blocks heat-required recipes and `brew` requires
+heat). The new `potion-brewing-no-heat` control clears every burner in the
+isolated fixture, runs 120 ticks, and confirms the mixer stays idle while all
+five fluid amounts, both ingredients, and the empty output remain conserved.
+The neighboring Basin lifecycle and Spout checks provide the potion-path
+guest insertion/result convergence and idle/active reopen gates: on the same
+build, `basin-lifecycle`, `spout-lan-feed-collect`, and `spout-reopen` all pass.
+These checks establish guest convergence and persistence, not Java packet
+arrival timing. Remaining potion variants, splash/lingering handling and
+exhaustive fluid component combinations stay follow-ups.
+
+Reproduce the Java trace comparison with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 \
+  --check potion-brewing --check potion-brewing-no-heat \
+  --check basin-lifecycle --check spout-lan-feed-collect --check spout-reopen
+```
+
 ## Freestanding paired doors
 
 The [pinned GameTest](tools/java-world-paired-doors.patch) recorded 24
@@ -1268,6 +1319,37 @@ table under `.local/flywheel-lan/`. Java screenshot comparison remains open.
 ```sh
 python3 tools/test-multiplayer-flywheel.py --java-source /path/to/java/create /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 ```
+
+APP-1976 adds removal/reconnection and idle/active save/reopen of a powered
+Flywheel/shaft/cogwheel assembly. The packaged survival recipe is checked
+against Create's 3×3 brass-ingot and shaft pattern, and the player placement
+replay consumes four Flywheels in survival. Interactive crafting-table output
+is exercised by `flywheel-crafting`: eight brass ingots surround one shaft,
+producing exactly one usable Flywheel with no ingredient loss or duplication
+before survival placement. The Flywheel
+transmits axial rotation and does not generate power. The lifecycle check
+verifies that the powered source drives the shaft at +64 RPM while the adjacent
+cogwheel remains stopped, removal stops the assembly, and a reconnected -32 RPM
+source and its driven shaft survive active world reopen.
+
+```sh
+python3 tools/test-flywheel-reopen.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
+```
+
+Verification used build `native-9f42064-d6dc2ad18d3f` and pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. The
+pinned Java checkout is `ac0c444d9828da3453ae8cc65338e8de063286fb`; capture
+patch `tools/java-flywheel-trace.patch` SHA-256 is
+`6ea13e7bed95335e68327439f72711447e44f6563da7644bae32ce7b40c31570`.
+References `fixtures/flywheel-java.csv` and
+`fixtures/flywheel-placement-java.csv` have SHA-256 values
+`c224b1482dc58c3bb88109db00f45eb9890dc35fae5a6962c1af8efd5bd7384c` and
+`246074d4db1610ce71543f1e5f960062978ce5742966b6829b650b942b928a8f`.
+Solo replay matched 96 Java ticks and four placements; LAN replay matched 96
+Java network/rotor samples with at least 99.94% host/guest rotor-mask overlap
+at 12 frozen checkpoints. Lifecycle replay passed idle +64 RPM, stopped, and
+reconnected -32 RPM before and after active reopen. Exact Java screenshot,
+packet arrival, interactive crafting and other assembly layouts remain open.
 
 ## Adjustable Chain Gearshift
 
@@ -10469,6 +10551,44 @@ python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 2 \
 
 Full 1:1 remains Open, including broader target and filter combinations and
 Java-equivalent packet timing.
+
+# APP-2021 Packager gameplay baseline
+
+The finite APP-2021 baseline covers survival placement beside a stocked Barrel,
+addressed package dispatch on a redstone pulse, unpacking, full-target handling,
+and idle and in-flight save/reopen. The Java replay covers package creation,
+cargo and address retention, pickup, unpacking and a second pulse in solo and
+LAN. Stock Link dispatch is covered by the linked Packager checks below. Full
+1:1 remains Open for other inventory capabilities, multi-source ordering,
+effects, and exact Java packet and reload timing.
+
+The focused Packager checks passed on pinned Horizon
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` in client build
+`native-9f42064-99eb016dfcb1`. The Packager pack SHA-256 was
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+
+| Check | Evidence |
+| --- | --- |
+| `packager-placement` | Survival placement faced the stocked Barrel; a pulse sent five iron and two redstone with the sign address. |
+| `packager-lifecycle` | Orientation and stock persisted through idle reopen; an addressed in-flight package resumed after reopen and was retrievable; a full 27-slot Barrel rejected dispatch without changing the held package and accepted it after capacity opened. |
+| `packager`, `packager-lan` | Both roles matched all 67 Java Packager state and wire samples; visual pose sampling covered 11 poses in each role. Guest convergence was observed. |
+| `stock-link-packager`, `stock-link-packager-lan` | Solo and LAN each matched 26 Java Stock Link snapshots. |
+
+Run the focused gameplay checks with the compatible launcher and prepared
+resources. `test-parity.py` uses the repository's `.local/create.hmod`; place
+the verified Packager HMOD there (SHA-256 above) before invoking this batch.
+The two new checks also accept `--pack` when run directly:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 2 \
+  --check packager-placement --check packager-lifecycle \
+  --check packager --check packager-lan \
+  --check stock-link-packager --check stock-link-packager-lan
+```
+
+The isolated lifecycle cases verify Horizon reopen behavior; they do not claim
+exact Java save/reload parity. Guest convergence does not establish exact
+packet-arrival or interpolation parity.
 # APP-1971 Chute and Smart Chute gameplay baseline
 
 The finite APP-1971 baseline covers survival acquisition, representative

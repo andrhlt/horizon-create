@@ -17,7 +17,7 @@ use super::create_belt::{BELT, Part};
 use super::create_belt_funnel::{self, ANDESITE, BRASS, CRATE, FUNNEL};
 use super::create_crafter::{self, CRAFTER};
 use super::create_crushing::{self, CASED_SHAFT, CONTROLLER, WHEEL as CRUSHING_WHEEL};
-use super::create_depot::{DEPOT, NIXIE};
+use super::create_depot::{DEPOT, NIXIE, encode};
 use super::create_ejector::{self, EJECTOR};
 use super::create_fan::FAN;
 use super::create_fluid_tank::{self, CREATIVE, TANK};
@@ -70,6 +70,23 @@ use super::create_valve::{self, HANDLE_ENTITY, VALVE};
 const DEPLOYER: &str = "create:deployer";
 const SCHEMATIC_TABLE: &str = "create:schematic_table";
 
+fn deployer_axis(direction: Direction) -> u8 {
+    match direction {
+        Direction::East | Direction::West => 0,
+        Direction::Up | Direction::Down => 1,
+        Direction::North | Direction::South => 2,
+    }
+}
+
+fn deployer_rotation_axis(facing: Direction, along_first: bool) -> u8 {
+    match (deployer_axis(facing), along_first) {
+        (0, true) | (2, false) => 1,
+        (0, false) | (1, false) => 2,
+        (1, true) | (2, true) => 0,
+        _ => unreachable!(),
+    }
+}
+
 pub(super) const DIRECTIONS: [[i32; 3]; 6] = [
     [1, 0, 0],
     [-1, 0, 0],
@@ -78,6 +95,119 @@ pub(super) const DIRECTIONS: [[i32; 3]; 6] = [
     [0, 0, 1],
     [0, 0, -1],
 ];
+
+pub(super) fn deployer_interact(game: &mut Game<'_>, pos: [i32; 3], face: [i32; 3]) -> bool {
+    if !game.may_build() || game.native_block(pos) != DEPLOYER {
+        return false;
+    }
+    let Some(facing) = game.native_block_property(pos, "facing").and_then(|name| {
+        Direction::ALL
+            .into_iter()
+            .find(|&side| create_fluids::name(side) == name)
+    }) else {
+        return false;
+    };
+    let Some(clicked_face) = Direction::ALL
+        .into_iter()
+        .find(|side| side.normal() == face)
+    else {
+        return false;
+    };
+    if clicked_face == facing {
+        let Some(machine_item) =
+            mod_entity(game, pos).map(|entity| entity.items.first().cloned().flatten())
+        else {
+            return false;
+        };
+        let mut player_item = game.held_mut().take();
+        if player_item.is_none() && machine_item.is_none() {
+            return false;
+        }
+        let changed = game
+            .native_with_mod_block_entity(pos, |entity| {
+                if entity.items.is_empty() {
+                    entity.items.push(None);
+                }
+                let slot = entity.items.first_mut()?;
+                std::mem::swap(slot, &mut player_item);
+                Some(())
+            })
+            .flatten()
+            .is_some();
+        *game.held_mut() = player_item;
+        if !changed {
+            return false;
+        }
+        game.native_block_entity_sync(pos);
+        game.guest_inventory_resend |= game.lan_acting.is_some();
+        game.swing_arm();
+        return true;
+    }
+
+    if game.native_sneaking()
+        || deployer_axis(clicked_face) == deployer_axis(facing)
+        || deployer_axis(clicked_face)
+            == deployer_rotation_axis(
+                facing,
+                game.native_block_property(pos, "axis_along_first")
+                    .as_deref()
+                    == Some("true"),
+            )
+        || game.held().is_none_or(|stack| {
+            matches!(
+                stack.item.as_ref(),
+                "create:wrench" | "create:mechanical_arm"
+            )
+        })
+    {
+        return false;
+    }
+    let Some(stack) = game.held().cloned() else {
+        return false;
+    };
+    let mut sample = ItemStack {
+        count: 1,
+        ..stack.clone()
+    };
+    if sample.item.as_ref() == "create:filter"
+        || sample.item.as_ref() == "create:attribute_filter"
+        || sample.item.as_ref() == "create:package_filter"
+    {
+        sample.count = 1;
+    }
+    let previous = mod_entity(game, pos)
+        .and_then(|entity| super::create_depot::compound(&entity.nbt, "Filter"))
+        .and_then(ItemStack::from_nbt);
+    let filter = encode(&sample);
+    let changed = game
+        .native_with_mod_block_entity(pos, |entity| {
+            entity.nbt.insert("Filter".into(), filter);
+        })
+        .is_some();
+    if !changed {
+        return false;
+    }
+    if let Some(previous) = previous.filter(|filter| {
+        matches!(
+            filter.item.as_ref(),
+            "create:filter" | "create:attribute_filter" | "create:package_filter"
+        )
+    }) {
+        if let Some(leftover) = game.give(previous) {
+            game.pop_resource(pos, leftover);
+        }
+    }
+    if matches!(
+        stack.item.as_ref(),
+        "create:filter" | "create:attribute_filter" | "create:package_filter"
+    ) {
+        game.consume_held();
+        game.guest_inventory_resend |= game.lan_acting.is_some();
+    }
+    game.native_block_entity_sync(pos);
+    game.swing_arm();
+    true
+}
 
 // Create walks added kinetic networks in Direction.values() order. Gearbox
 // joins can see an existing source and a local motor at the same speed, so
@@ -2579,9 +2709,14 @@ fn tick_chute(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity) {
     let deployer_full = game.native_block(below) == DEPLOYER
         && entity.items[0].as_ref().is_some_and(|item| {
             let limit = game.native_max_stack_size(&item.item).unwrap_or(64);
-            mod_entity(game, below)
-                .and_then(|target| target.items.first()?.as_ref())
-                .is_some_and(|tool| tool.count >= limit || !same_stack(tool, item))
+            mod_entity(game, below).is_some_and(|target| {
+                !super::create_item_filters::accepts(game.items(), &target.nbt, item)
+                    || target
+                        .items
+                        .first()
+                        .and_then(Option::as_ref)
+                        .is_some_and(|tool| tool.count >= limit || !same_stack(tool, item))
+            })
         });
     let crafter_full = into_crafter && create_crafter::room(game, below) == 0;
     if next < 0.5 && (powered || blocked || deployer_full || crafter_full) {

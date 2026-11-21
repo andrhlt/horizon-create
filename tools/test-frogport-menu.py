@@ -228,6 +228,12 @@ def run(args):
             "/setblock 12 100 -9 " + FROGPORT,
             "/item replace block 12 100 -9 container.17 with " + PACKAGE,
         ))
+        if not (args.settings or args.goggles or args.clipboard or args.lan):
+            host.commands((
+                "/setblock 10 102 -9 create:chain_conveyor",
+                '/data merge block 12 100 -9 {AddressFilter:"Idle",Target:{RelativePos:[I;-2,2,0],ChainPosition:150f}}',
+                "/data merge block 10 102 -9 {PackagePorts:[{Port:[I;2,-2,0],ChainPosition:150f}]}",
+            ))
         actor, name = host, "@s"
         if args.lan:
             port = host.call("lan", "open", "0", "commands", "force")["port"]
@@ -280,13 +286,29 @@ def run(args):
         multiplayer.until("the reopened Frogport to retain the package", lambda:
                           stack_item(actor, 317) == PACKAGE)
         print(f"{mode}: Frogport slot 18 extracted, rejected stone, accepted and retained the package")
+        if not args.lan:
+            host.call("save")
+            host.env["HORIZON_STILL"] = "1"
+            host.restart()
+            saved_items = host.command("/data get block 12 100 -9 Items")
+            saved_port = host.command("/data get block 12 100 -9")
+            saved_chain = host.command("/data get block 10 102 -9 PackagePorts")
+            saved_port = re.sub(r"\s+", "", saved_port)
+            saved_chain = re.sub(r"\s+", "", saved_chain)
+            assert PACKAGE in saved_items, saved_items
+            assert 'AddressFilter:"Idle"' in saved_port and "RelativePos:[I;-2,2,0]" in saved_port, saved_port
+            assert "Port:[I;2,-2,0]" in saved_chain, saved_chain
+            print("Solo: idle save/reopen retained Frogport address, conveyor binding, and package inventory")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for arg in ("ctl", "client", "resources"):
         parser.add_argument(arg, type=lambda path: Path(path).resolve(strict=True))
-    parser.add_argument("--pack", type=Path, required=True)
+    parser.add_argument(
+        "--pack", type=Path,
+        default=Path(__file__).resolve().parents[1] / ".local/create.hmod",
+    )
     parser.add_argument("--lan", action="store_true")
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument("--settings", action="store_true")
