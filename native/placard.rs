@@ -109,7 +109,7 @@ pub(super) fn update_shape(
         || level
             .behaviours
             .collision_shape(neighbour)
-            .is_none_or(|shape| shape.is_empty())
+            .is_some_and(|shape| !shape.is_empty())
     {
         return None;
     }

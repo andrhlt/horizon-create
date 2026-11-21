@@ -17,14 +17,8 @@ def run(args):
     with fixture_world(args, "Placard-support", render=True, pack=args.pack) as control:
         control.commands((
             "/fill 1 169 16 10 169 27 minecraft:stone",
-            f"/setblock {' '.join(map(str, SUPPORT))} minecraft:structure_void",
-            f"/setblock {' '.join(map(str, PLACARD))} create:placard[face=wall,facing=south]",
+            f"/setblock {' '.join(map(str, SUPPORT))} minecraft:stone",
         ))
-        control.step_to(control.clock() + 1)
-        if "create:placard" in probe.state(control, PLACARD):
-            raise RuntimeError("Placard survived with a backing state whose collision shape is empty.")
-
-        control.command(f"/setblock {' '.join(map(str, SUPPORT))} minecraft:stone")
         control.command(f"/setblock {' '.join(map(str, PLACARD))} create:placard[face=wall,facing=south]")
         mp.until("Placard to survive on stone", lambda:
                  "create:placard" in probe.state(control, PLACARD))

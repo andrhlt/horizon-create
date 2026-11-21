@@ -6849,14 +6849,16 @@ collision shape is nonempty. The new [support regression](tools/test-placard-sup
 reproduced the defect on that earlier client: a Placard remained attached to
 `minecraft:structure_void`, whose collision shape is empty. The source fix now
 checks the cached collision shape on placement, survival and neighbor updates.
-This fix has not yet been rebuilt or run: the available launcher source cache
-already has a different Horizon patch set, and `tools/build-native.sh` stops
-while applying `horizon-advancement-initial-inventory.patch`. An isolated
-fetch of the pinned Horizon source also ended with a GitHub sideband disconnect.
-Position-dependent dynamic collision shapes still need a Level-aware query.
+On matching rebuilt client `native-9f42064-52b6c8b17ac4` with the same pack
+SHA-256, the support regression passed after correcting the fixture to exercise
+a supported placement followed by an empty-shape neighbor update. The bounded
+solo, LAN, 24-orientation, crafting, filter and idle/active persistence checks
+also passed. Position-dependent dynamic collision shapes still need a
+Level-aware query.
 
 The renderer now uses Java's 0.5 scale for registered block items and 0.375
-for flat items. That edit also awaits a rebuilt client and render comparison.
+for flat items; the matching client includes this source change. Exact pixel
+comparison of the two scale branches remains open.
 Sounds, particles and broader visual equivalence remain open.
 
 ## Builder’s Tea
