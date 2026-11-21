@@ -27,6 +27,16 @@ def value_box(control):
     }[facing]
     return (POS[0] + offset[0], POS[1] + 15.5 / 16, POS[2] + offset[1])
 
+def filter_box(control):
+    facing = control.call("block", *POS)["state"].split("facing=", 1)[1].split(",", 1)[0].split("]", 1)[0]
+    offset = {
+        "north": (11 / 16, 11 / 16),
+        "south": (5 / 16, 5 / 16),
+        "west": (15.5 / 16, 11 / 16),
+        "east": (0.5 / 16, 5 / 16),
+    }[facing]
+    return (POS[0] + offset[0], POS[1] + 15.5 / 16, POS[2] + offset[1])
+
 
 def choose(control, value):
     control.call("look-at", *value_box(control))
@@ -82,6 +92,103 @@ def craft_and_place(control):
     # Normalize the heading so the rendered control target is deterministic.
     control.command(f"/setblock {' '.join(map(str, POS))} create:mechanical_roller[facing=north]")
 
+def reject_invalid_filter(control):
+    control.command("/item replace entity @s hotbar.0 with minecraft:chest")
+    control.call("select", 1)
+    before = control.call("inventory")
+    control.call("look-at", *filter_box(control))
+    control.call("wait", 2)
+    target = control.call("looking-at")
+    hit = target.get("block", target)
+    if before["hotbar"][0].get("item") != "minecraft:chest" or before["hotbar"][0].get("count") != 1:
+        raise RuntimeError(f"Invalid-filter setup did not hold one chest: {before}")
+    if hit.get("pos") != list(POS) or hit.get("block") != "create:mechanical_roller":
+        raise RuntimeError(f"Invalid-filter click is not aimed at Roller {POS}: {target}")
+    control.call("mouse", "right", "down")
+    control.call("wait", 2)
+    control.call("mouse", "right", "up")
+    control.call("wait", 2)
+    after = control.call("inventory")
+    filt = control.command(f"/data get block {' '.join(map(str, POS))} Filter")
+    blocks = control.call("blocks", POS[0] - 1, POS[1] - 1, POS[2] - 1, POS[0] + 1, POS[1] + 2, POS[2] + 1)["blocks"]
+    placed = [block for block in blocks if block[3].split("[", 1)[0] == "minecraft:chest"]
+    if after["hotbar"][0].get("item") != "minecraft:chest" or after["hotbar"][0].get("count") != 1:
+        raise RuntimeError(f"Invalid Roller filter consumed chest: target={target}; before={before}; after={after}; Filter={filt}; placed={placed}")
+    if placed or "minecraft:chest" in filt:
+        raise RuntimeError(f"Invalid Roller filter changed world/filter: Filter={filt}, blocks={placed}")
+
+    control.command("/item replace entity @s hotbar.0 with minecraft:stone")
+    control.call("select", 1)
+    control.call("look-at", *filter_box(control))
+    control.call("wait", 2)
+    supported_target = control.call("looking-at")
+    control.call("mouse", "right", "down")
+    control.call("wait", 2)
+    control.call("mouse", "right", "up")
+    control.call("wait", 2)
+    supported_after = control.call("inventory")
+    supported_filter = control.command(f"/data get block {' '.join(map(str, POS))} Filter")
+    if supported_target.get("block", supported_target).get("pos") != list(POS):
+        raise RuntimeError(f"Supported filter target missed Roller: {supported_target}")
+    if supported_after["hotbar"][0].get("item") != "minecraft:stone" or supported_after["hotbar"][0].get("count") != 1:
+        raise RuntimeError(f"Supported plain-block filter consumed stone: {supported_after}; Filter={supported_filter}")
+    if "minecraft:stone" not in supported_filter:
+        raise RuntimeError(f"Supported plain-block filter was not stored: {supported_filter}")
+
+
+def check_guest_filter(host, guest, until):
+    expected_filter = host.command(f"/data get block {' '.join(map(str, POS))} Filter")
+    for item in ("minecraft:chest", "minecraft:stone"):
+        host.command(f"/item replace entity RollerGuest hotbar.0 with {item}")
+        until(f"guest to receive one {item}", lambda:
+              (guest.call("inventory")["hotbar"][0].get("item") == item
+               and guest.call("inventory")["hotbar"][0].get("count") == 1))
+        guest.call("select", 1)
+        guest.call("look-at", *filter_box(guest))
+        guest.call("wait", 2)
+        target = guest.call("looking-at")
+        if target.get("block", target).get("pos") != list(POS):
+            raise RuntimeError(f"LAN {item} filter click missed the Roller: {target}")
+        guest.call("mouse", "right", "down")
+        guest.call("wait", 2)
+        guest.call("mouse", "right", "up")
+
+        def authoritative_inventory():
+            return host.command(
+                "/data get entity RollerGuest Inventory[{Slot:0b}]"
+            )
+
+        inventory = None
+        for _ in range(40):
+            guest.call("wait", 1)
+            inventory = authoritative_inventory()
+            if item in inventory:
+                break
+        guest_inventory = guest.call("inventory")
+        filt = host.command(f"/data get block {' '.join(map(str, POS))} Filter")
+        if item not in inventory or "count: 1" not in inventory:
+            raise RuntimeError(
+                f"LAN Roller filter changed authoritative {item} count: "
+                f"server={inventory}; guest={guest_inventory}; Filter={filt}"
+            )
+        if guest_inventory["hotbar"][0].get("item") != item or guest_inventory["hotbar"][0].get("count") != 1:
+            raise RuntimeError(
+                f"LAN Roller filter changed guest {item} count: "
+                f"guest={guest_inventory}; server={inventory}; Filter={filt}"
+            )
+        if item == "minecraft:chest":
+            blocks = host.call("blocks", POS[0] - 1, POS[1] - 1, POS[2] - 1,
+                               POS[0] + 1, POS[1] + 2, POS[2] + 1)["blocks"]
+            placed = [block for block in blocks if block[3].split("[", 1)[0] == item]
+            if placed or item in filt or filt != expected_filter:
+                raise RuntimeError(
+                    f"LAN unsupported filter changed world/filter: "
+                    f"before={expected_filter}; after={filt}; blocks={placed}"
+                )
+        elif item not in filt:
+            raise RuntimeError(f"LAN supported stone filter was not stored: {filt}")
+        print(f"LAN {item}: guest count 1, server count 1, Roller Filter={filt}")
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -101,6 +208,7 @@ def main():
         ))
         host.step_to(host.clock() + 1)
         craft_and_place(host)
+        reject_invalid_filter(host)
         for selected in (1, 2, 0):
             choose(host, selected)
             if mode(host) != selected:
@@ -124,11 +232,18 @@ def main():
                   guest.call("block", *POS)["block"] == "create:mechanical_roller")
             choose(guest, 2)
             until("guest mode to reach server", lambda: mode(host) == 2)
+            check_guest_filter(host, guest, until)
 
         host.command("/save-all flush")
         host.restart()
         if mode(host) != 2:
             raise RuntimeError(f"Roller mode did not persist across reopen: {mode(host)}")
+        reopened_filter = host.command(f"/data get block {' '.join(map(str, POS))} Filter")
+        reopened_inventory = host.call("inventory")
+        if "minecraft:stone" not in reopened_filter:
+            raise RuntimeError(f"Roller filter did not persist across reopen: {reopened_filter}")
+        if reopened_inventory["hotbar"][0].get("item") != "minecraft:stone" or reopened_inventory["hotbar"][0].get("count") != 1:
+            raise RuntimeError(f"Plain-block filter inventory changed across reopen: {reopened_inventory}")
 
     print("Host selected all three Roller modes; LAN guest selected Wide Fill; mode persisted across reopen.")
 
