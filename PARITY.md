@@ -805,6 +805,48 @@ Quartz follows the clicked face axis. Both tile sizes place as full
 blocks. The three [Stonecutter checks](fixtures/rose-quartz-cutting-java.csv)
 matched the original ingredient and two-block output in survival.
 
+### APP-2062 gameplay baseline
+
+The finite cases are survival acquisition of Rose Quartz from quartz and
+redstone, Sand Paper polishing to Polished Rose Quartz, both original
+reciprocal 1:1 shapeless tile conversions; all three full-block palette items
+and their Java placement axes; all three pickaxe drops; survival Stonecutter
+outputs; and solo/LAN save behavior. Existing Java-captured
+[intermediate crafts](fixtures/intermediate-crafting-java.csv) and the
+[Sand Paper checks](tools/test-sandpaper.py) cover material acquisition and
+polishing, with a guest polishing and retaining inventory through rejoin in
+[LAN](tools/test-sandpaper-lan.py). The solo lifecycle replay converted both
+tile sizes, placed the three palette shapes, mined one of each with a wooden
+pickaxe, then reopened the world with all placed block states and two polished
+Rose Quartz retained. The LAN replay placed all three shapes as a guest,
+retained the guest's two polished Rose Quartz, reopened the host world, and
+confirmed the guest inventory and all three block states after rejoin. The
+existing placement and Stonecutter Java traces also passed in solo and LAN.
+The Java classes are full blocks, so slab merging and wall joining do not
+apply to these three items.
+
+The checks ran on the pinned Horizon 9f42064 engine client
+`native-9f42064-6bdf8691aa42` (client SHA-256
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe`, built
+from main baseline `781c0ef`) with pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b` and
+prepared Minecraft 26.3 resources. Commands:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check 'intermediate-crafting' --check 'sandpaper-lan' --check 'rose-quartz-palettes*' --check 'rose-quartz-lifecycle*'
+```
+
+All six selected checks passed. The standalone `sandpaper` check was also
+attempted, but this cached client was built from `781c0ef`, before the
+Sand Paper runtime hooks present on current main; that run reached the old
+seven-use boundary and did not complete its eight-use durability case. It is
+preserved in `.local/parity/sandpaper.log` and is not treated as evidence
+against the already-Done APP-1964 prerequisite. The Java reference remains
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; palette definitions, reciprocal
+recipes and block loot tables were reviewed at that revision. This is a
+gameplay baseline, not exhaustive visual or full 1:1 parity. Exact appearance,
+additional placement combinations, and other tool tiers remain open.
+
 The [three-lamp Java fixture](fixtures/rose-quartz-lamp-java.csv) matched
 39 ticks in solo and LAN on `a52e5e190a8d`. It covers a rising pulse on
 each lamp, the one-tick activation, held latching after power is removed,
