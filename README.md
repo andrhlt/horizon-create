@@ -55,6 +55,9 @@ Casing, using the original small and large bogey models. Glue a single
 carriage to one or two bogeys, add forward-facing Train Controls, and
 assemble it at the station. The original controls and rotating bogeys
 are visible during manual travel on straight rails and through bends.
+Station Display Links can show a waiting train's schedule countdown. Train
+Controls show its name, speed, throttle and manual station prompts. Mounted
+bells, note blocks and whistles play an arrival sequence during approach.
 Routing, schedules, conductors, seats, mounted doors, and selected
 contraption actors have playable paths and repeatable comparisons. The
 feature matrix records the remaining layouts, interactions, presentation,

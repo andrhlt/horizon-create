@@ -12305,3 +12305,21 @@ pack SHA-256 `825e822d982dc624a691f0cced1ca2db370d030bea0899f46432021c7036642b`.
 The Deployer behavior remains shared with APP-1966; this ticket adds no
 duplicate Deployer implementation. Full 1:1 remains Open for broader actor
 types, settings, effects and packet timing.
+
+## APP-2059 train display, prompts and arrival audio
+
+On `native-9f42064-76138ca65acb`, the [bounded feedback pass](TRAIN-FEEDBACK-PARITY.md)
+adds station Train Schedule Status, the named driving HUD, manual station
+prompts and a mounted bell/note/whistle arrival queue. Six controlled Java delay
+strings and blank-status boundaries pass. Solo and LAN drivers see the HUD and
+receive the three muted playback events; configured idle links/countdowns and
+active named trains retain state through reopen. Seven neighboring checks pass,
+including 198 Java manual-approach samples and 183 title/throttle samples in each
+role. The initial LAN fixture used an unsupported synchronous remote chat API;
+the corrected full LAN replay passes, and its failed log is retained.
+
+This preserves the earlier observed-name and schedule evidence. It does not
+establish exact Java moving-audio, packet, physical speaker, waveform or reload
+phase equivalence. Station Summary predictions, broader status conditions,
+manual honking, continuous carriage mixing and exact HUD art/animation remain
+follow-ups; the feature matrix's Full 1:1 stays Open.

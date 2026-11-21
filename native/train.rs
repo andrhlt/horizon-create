@@ -1635,6 +1635,8 @@ pub(super) fn tick(game: &mut Game<'_>, phase: TickPhase) {
                 .filter(|&station| at_station(game, station) == Some(id));
             doors_changed = doors::tick_train(game, &mut data, station, speed, before);
         }
+        let feedback_dock = coords(&data, "ArrivedStation").or_else(|| coords(&data, "Station"))
+            .filter(|&station| at_station(game, station) == Some(id));
         let input = controls(game, &data, before.controls(control));
         if input.is_none() {
             data.remove(&"Driver".into());
@@ -1680,6 +1682,7 @@ pub(super) fn tick(game: &mut Game<'_>, phase: TickPhase) {
                 None
             }
         });
+        arrival_audio(game, &mut data, axis, before, approach.as_ref(), backwards);
         let throttle = match data.get(&"Throttle".into()) {
             Some(Tag::Double(bits)) => f64::from_bits(*bits),
             _ => 1.0,
@@ -1844,6 +1847,7 @@ pub(super) fn tick(game: &mut Game<'_>, phase: TickPhase) {
         }
         let next = distance + moved;
         number(&mut data, "Speed", next_speed);
+        super::create_train_feedback::update(game, &data, feedback_dock, drive, space);
         number(&mut data, "Distance", next);
         wheels(&mut data, origin, axis, &points);
         let pose = Pose::new(axis, &points);
@@ -1895,5 +1899,117 @@ pub(super) fn tick(game: &mut Game<'_>, phase: TickPhase) {
         if let Some(Tag::Compound(tag)) = game.persist.raw.get_mut(&id) {
             tag.insert(CARRIAGE.into(), Tag::Compound(data));
         }
+    }
+}
+
+// ArrivalSoundQueue: longitudinal block positions play at half the tick rate,
+// reversed when the train approaches backwards. Keep progress in the train save.
+fn arrival_audio(
+    game: &mut Game<'_>,
+    data: &mut Compound,
+    axis: [i32; 3],
+    pose: Pose,
+    approach: Option<&Approach>,
+    backwards: bool,
+) {
+    let sources: Vec<_> = match data.get(&"Blocks".into()) {
+        Some(Tag::List(blocks)) => blocks
+            .iter()
+            .filter_map(|block| {
+                let Tag::Compound(block) = block else {
+                    return None;
+                };
+                let name = state_name(block)?;
+                if !matches!(
+                    name.as_str(),
+                    "minecraft:bell"
+                        | "create:peculiar_bell"
+                        | "create:haunted_bell"
+                        | "minecraft:note_block"
+                        | "create:steam_whistle"
+                ) {
+                    return None;
+                }
+                let pos = relative(block);
+                let tick = (0..3).map(|i| pos[i] * axis[i]).sum::<i32>();
+                Some((tick, block.clone()))
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    if let Some(goal) = approach {
+        if goal.remaining.abs() < 60.0 && coords(data, "AnnouncedStation") != Some(goal.station) {
+            data.insert(
+                "AnnouncedStation".into(),
+                Tag::IntArray(goal.station.to_vec()),
+            );
+            if let Some(first) = sources
+                .iter()
+                .map(|(tick, _)| *tick)
+                .reduce(|a, b| if backwards { a.max(b) } else { a.min(b) })
+            {
+                data.insert("ArrivalSoundTick".into(), Tag::Int(first));
+                data.insert(
+                    "ArrivalSoundReversed".into(),
+                    Tag::Byte(i8::from(backwards)),
+                );
+            }
+        }
+    } else {
+        data.remove(&"AnnouncedStation".into());
+    }
+    let age = int(data, "ArrivalSoundAge").unwrap_or(0) + 1;
+    data.insert("ArrivalSoundAge".into(), Tag::Int(age));
+    if age % 2 == 0 {
+        return;
+    }
+    let Some(tick) = int(data, "ArrivalSoundTick") else {
+        return;
+    };
+    for (_, block) in sources.iter().filter(|(at, _)| *at == tick) {
+        let props = compound(block, "BlockState").and_then(|state| compound(state, "Properties"));
+        let property = |key: &str| props.and_then(|props| string(props, key));
+        let (sound, pitch) = match state_name(block).as_deref() {
+            Some("create:haunted_bell") => ("create:haunted_bell_use".to_owned(), 1.0),
+            Some("minecraft:note_block") => {
+                let note = property("note")
+                    .and_then(|note| note.parse::<i32>().ok())
+                    .unwrap_or(0);
+                let instrument = property("instrument").unwrap_or_else(|| "harp".into());
+                (
+                    format!("minecraft:block.note_block.{instrument}"),
+                    2.0_f32.powf((note - 12) as f32 / 12.0),
+                )
+            }
+            Some("create:steam_whistle") => {
+                let size = property("size").unwrap_or_else(|| "medium".into());
+                let pitch = compound(block, "Entity")
+                    .and_then(|entity| int(entity, "Pitch"))
+                    .unwrap_or(0);
+                (
+                    if size == "large" {
+                        "create:whistle_train_low"
+                    } else {
+                        "create:whistle_train"
+                    }
+                    .to_owned(),
+                    2.0_f32.powf(((if size == "small" { 12 } else { 0 }) - pitch) as f32 / 12.0),
+                )
+            }
+            _ => ("minecraft:block.bell.use".to_owned(), 1.0),
+        };
+        game.native_play_sound_in_place(&sound, pose.controls([0, 0, 0]), 6, 5.0, pitch);
+    }
+    let reverse = int(data, "ArrivalSoundReversed") == Some(1);
+    let remains = sources
+        .iter()
+        .any(|(at, _)| if reverse { *at < tick } else { *at > tick });
+    if remains {
+        data.insert(
+            "ArrivalSoundTick".into(),
+            Tag::Int(tick + if reverse { -1 } else { 1 }),
+        );
+    } else {
+        data.remove(&"ArrivalSoundTick".into());
     }
 }

@@ -5688,3 +5688,19 @@ bindings = [
  { name = "state", ty = "horizon_world::registry::BlockStateId", value = "state" },
  { name = "options", ty = "&mut (bool,bool)", value = "&mut *options" },
 ]
+
+[[module]]
+id = "train_feedback"
+file = "crates/horizon-client/src/game.rs"
+name = "create_train_feedback"
+source = "train_feedback.rs"
+
+[[injection]]
+id = "train_feedback_hud"
+target = "horizon_client::game::native_hooks::Game<'_>::native_hud"
+kind = "HEAD"
+helper = "train_feedback_hud.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+]
