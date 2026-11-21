@@ -13065,3 +13065,15 @@ After reclaiming one verified-inactive 15 GiB native target cache, the volume
 had 7.1 GiB free and the four host-side checks passed. The multiplayer gate
 remains In Progress until a live guest observes the host's idle and loaded
 gauge changes; no `/data merge` result is claimed.
+
+The repeatable live harness is registered as `multiplayer-gauges` in
+`tools/test-parity.py`. Its corrected rig force-loads chunk `[0,-1]`, uses the
+actual four-mill source network (host stress 128 SU at 8 RPM), joins a live
+guest, captures the guest's Goggles trace, removes three mills on the host, and
+requires the guest readout to change. The bounded retries reached the host rig
+and, on the final attempt, the guest control socket opened; however, guest
+content-cache creation failed with `No space left on device`, so the server
+reported the secondary `Missing: create 0.1.0` mismatch. With 3.3 GiB free at
+launch, the failed guest consumed roughly 1.1 GiB before that error. A safe
+retry therefore needs at least 1.5 GiB additional free space (4 GiB free before
+launch is the practical minimum). No guest readout is claimed.
