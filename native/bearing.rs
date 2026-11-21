@@ -912,6 +912,7 @@ pub(super) fn tick(
     }
     if blocks.is_empty() && rpm != 0.0 && scheduled {
         blocks = capture(game, pos, anchor);
+        super::create_contraption_controls::start(&blocks, &mut entity.nbt);
         let attached: Vec<_> = blocks
             .iter()
             .map(|block| offset(anchor, relative(block)))
@@ -944,7 +945,11 @@ pub(super) fn tick(
         if stopping {
             unmount_items(&mut blocks, &entity.items);
         }
-        if stopping && restore(game, anchor, &blocks, axis, physical_angle) {
+        let mut stopped_blocks = blocks.clone();
+        if stopping {
+            super::create_contraption_controls::stop(&mut stopped_blocks, &entity.nbt);
+        }
+        if stopping && restore(game, anchor, &stopped_blocks, axis, physical_angle) {
             super::create_portable_interface::bearing_stopped(game, pos, &blocks);
             if let Some(Tag::List(glue)) = entity.nbt.remove(&"AttachedGlue".into()) {
                 rotate_glue(game, &glue, anchor, axis, physical_angle);

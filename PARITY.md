@@ -12177,3 +12177,48 @@ Horizon save/reopen and does not claim Java reload parity.
 The existing Java-backed checks remain valid starting evidence: `precision-mechanism` compares 108 ticks in the four-belt, three-deployer factory; `track-crafting` compares 190 samples of the three-stage track recipe; and `sturdy-sheet` compares 67 ticks through fluid filling and two press strokes. The Precision Mechanism fixture seeds only its weighted-result roll. These checks preserve concrete item IDs, counts, assembly steps, progress-bearing belt cargo, deployer state, and final outputs where applicable.
 
 The Mechanical Press prerequisite (APP-1960) and Deployer prerequisite (APP-1966) are Done. The APP-1967 completion gates still need a player-driven survival chain using legitimate ingredients, a wrong-step and blocked-output recovery case, representative host/guest agreement, and idle plus partway sequence save/reopen. The Java checkout and compatible Horizon runtime are not present in this worktree, so no fresh replay or resulting build identity is claimed here. Keep Full 1:1 Open; broader recipe combinations and unseeded weighted-roll coverage remain follow-ups.
+
+## APP-2005 Contraption Controls
+
+The existing `contraption-controls` check compares all 105 Java ticks for the
+representative rotating harvester and plough fixture. It also toggles both
+moving controls, checks their disabled settings after disassembly and a world
+save/reopen, then reassembles and confirms the disabled actor filters return
+without changing the sampled crop or soil state. The native bearing now copies
+saved control settings into the moving assembly at start and writes the moving
+settings back to each control block before disassembly, following
+`Contraption.startMoving` and `ContraptionControlsMovement.stopMoving` in the
+pinned Java source.
+
+This passed on `native-9f42064-5c89103ca2f5` with `create.hmod` SHA-256
+`825e822d982dc624a691f0cced1ca2db370d030bea0899f46432021c7036642b` and
+prepared 26.3 resources:
+
+```sh
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1 \
+  --check contraption-controls
+```
+
+The deployed actor effect and host input are covered by the replay. The related
+Deployer regressions also pass on the same build and pack: the six-lane
+application replay passes in solo and LAN, including item applications over 25
+ticks, and the Deployer baseline verifies Wrench mode changes, hand exchange,
+filter replacement, and exact 65-item conservation. The LAN baseline has the
+guest perform those actions and confirms host/guest inventory convergence. The
+idle and active Deployer save/reopen cases retain filters and held items and
+resume one application with a single consumed item.
+
+```sh
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1 \
+  --check deployer-applications --check deployer-applications-lan
+python3 tools/test-deployer-baseline.py "$CTL" "$CLIENT" "$RESOURCES" \
+  --pack .local/create.hmod --persistence
+python3 tools/test-deployer-baseline.py "$CTL" "$CLIENT" "$RESOURCES" \
+  --pack .local/create.hmod --lan
+```
+
+These checks use `native-9f42064-5c89103ca2f5`, prepared 26.3 resources and
+pack SHA-256 `825e822d982dc624a691f0cced1ca2db370d030bea0899f46432021c7036642b`.
+The Deployer behavior remains shared with APP-1966; this ticket adds no
+duplicate Deployer implementation. Full 1:1 remains Open for broader actor
+types, settings, effects and packet timing.
