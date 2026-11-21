@@ -43,6 +43,26 @@ def main():
         placed = markers(control)
         if not placed:
             raise RuntimeError("Creating the curve did not place any Fake Track markers")
+        first = set(placed)
+        second_case = dict(case, remaining="15")
+        track_curve.test_case(control, second_case, offset=(-1, 0, -1), reset=False)
+        second = set(markers(control))
+        shared = first & second
+        if not shared:
+            raise RuntimeError(f"Offset curve pair had no shared markers: first={sorted(first)}, second={sorted(second)}")
+        control.command("/setblock 6 112 -9 minecraft:air")
+        step(control, 1)
+        remaining = markers(control)
+        if not shared <= remaining:
+            raise RuntimeError(f"Removing one curve deleted shared markers: {sorted(shared - remaining)}")
+        control.command("/setblock 7 112 -8 minecraft:air")
+        step(control, 1)
+        if markers(control):
+            raise RuntimeError("Removing the final curve owner left Fake Track markers")
+        track_curve.test_case(control, case)
+        placed = markers(control)
+        if not placed:
+            raise RuntimeError("Recreating the curve did not place markers")
         control.command("/save-all flush")
         control.restart()
         if markers(control) != placed:
