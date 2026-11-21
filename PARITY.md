@@ -4624,6 +4624,35 @@ all 208 ticks and disassembly in that layout too. Run the local replay
 with `--short-curve`. Station prompts, route ordering with signal
 penalties, and automatic dispatch remain under comparison.
 
+## APP-2049 Train Station gameplay baseline
+
+The bounded acceptance pass used Java Create `ac0c444d9828da3453ae8cc65338e8de063286fb`, Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, build `native-9f42064-340cbe866fa7`, and Create pack SHA256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. The existing client contains cursor fix `16af87f`. This ticket changes test coverage and evidence only; it does not modify production behavior.
+
+The finite case list and results are:
+
+- `track-station`: all six Java cases passed, covering selection and placement from either approach, wrong or missing targets, junction rejection, range boundary, saved relative target, and item count.
+- `track-station-controls`: passed. A valid idle station offers Create New Train; its empty assembly screen enables Back and disables Assemble Train; a station without a target exposes no train or schedule controls. The placed station retained the selected target. This is a Horizon control-state check, not a Java trace comparison.
+- `track-station-name` and `track-station-name-lan`: all five Java rename cases passed for default, blank, Unicode with surrounding spaces, and the 25-character boundary. The host's world reopen retained the last name; guest edits converged on the server.
+- `train-bogeys`: all six Java assembly and casing-consumption cases passed.
+- `track-station-schedule` and `track-station-schedule-lan`: passed. Retrieval covered an empty hand and an occupied hand, preserving the progressed two-stop Schedule and returning it to inventory or the station center as Java does.
+- `scheduled-station-approach-lan`: all 123 Java ticks passed for guest-assigned timetable, departure, arrival, waits, and completion.
+- `scheduled-reverse-trip-lan`: all 263 Java ticks passed for departure and return with guest assignment.
+- `scheduled-reverse-trip-reopen`: 237 Java ticks passed; parked and moving states reopened at trace ticks 114 and 157, retaining train occupants and timetable.
+
+Reproduce these cases with `tools/test-parity.py` using the matching `horizon-ctl`, client, and prepared 26.3 resources. Raw logs are under `.local/parity/` with the check names above. No Java recapture or native rebuild was needed for this test-only pass. Java capture patch SHA256 values:
+
+The combined gameplay command was `python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 2 --check track-station --check track-station-name --check track-station-name-lan --check track-station-controls --check train-bogeys --check scheduled-station-approach-lan --check scheduled-reverse-trip-lan --check scheduled-reverse-trip-reopen`; schedule retrieval was run separately with `--check track-station-schedule --check track-station-schedule-lan`. Early control-fixture failures were invalid setup only (missing ignored template, wrong target offset, and an omitted world tick); the fixture was corrected and the final control replay passed.
+
+| Capture | SHA256 |
+| --- | --- |
+| `java-track-station-trace.patch` | `fd4ccacf41752686ef1b81123d1bb9e78fe8ea1c9342042a360f749bc7f605d6` |
+| `java-track-station-name.patch` | `1a1dc564faa8c8583463719155242d9e58d5b26d34bc2b6e218f5210b16a44d5` |
+| `java-train-bogeys-trace.patch` | `363d7029b49782f38bb56390029ef93cd61a566140acaf60499701399b284927` |
+| `java-scheduled-station-approach-trace.patch` | `6c9822cc8a392583cac42ff4a553cd69801259cfb33ea892505fd8c70afa6c8f` |
+| `java-reverse-station-approach-trace.patch` | `ef4cf6d63f826d7d882f06e3684239065447626a6ddb584ac0897c0f310806f1` |
+
+Other station layouts, route choices, exact visual behavior, and exhaustive cross-products remain open under Full 1:1.
+
 ## Scheduled station travel
 
 In the [original conductor GameTest](tools/java-scheduled-station-approach-trace.patch),
