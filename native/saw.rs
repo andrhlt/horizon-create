@@ -4,6 +4,7 @@ use horizon_world::{
     nbt::{Compound, Tag},
     registry::BlockStateId,
 };
+use std::collections::BTreeSet;
 
 use crate::containers::ModBlockEntity;
 
@@ -270,6 +271,191 @@ fn sawable(game: &Game<'_>, block: &str) -> bool {
                     | "minecraft:mangrove_roots"
                     | "minecraft:muddy_mangrove_roots"
             ))
+}
+
+fn actor_position(actor: &Compound, key: &str) -> Option<[i32; 3]> {
+    match actor.get(&key.into()) {
+        Some(Tag::IntArray(pos)) => pos.as_slice().try_into().ok(),
+        _ => None,
+    }
+}
+
+fn cut_actor_block(game: &mut Game<'_>, pos: [i32; 3]) -> Vec<ItemStack> {
+    let block = game.native_block(pos);
+    let mut logs = vec![pos];
+    if log(game, &block) {
+        let mut above = offset(pos, [0, 1, 0]);
+        while log(game, &game.native_block(above)) {
+            logs.push(above);
+            above[1] += 1;
+        }
+    }
+    let mut leaves = BTreeSet::new();
+    if log(game, &block) {
+        for &[x, y, z] in &logs {
+            for dx in -4..=4 {
+                for dy in -4..=4 {
+                    for dz in -4..=4 {
+                        let leaf = [x + dx, y + dy, z + dz];
+                        if game.block_in_tag("minecraft:leaves", &game.native_block(leaf)) {
+                            leaves.insert(leaf);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let mut drops = game
+        .native_machine_destroy_block(pos, None, true)
+        .unwrap_or_default();
+    if !log(game, &block) {
+        return drops;
+    }
+    for above in logs.into_iter().skip(1) {
+        drops.extend(
+            game.native_machine_destroy_block(above, None, true)
+                .unwrap_or_default(),
+        );
+    }
+    for leaf in leaves {
+        drops.extend(
+            game.native_machine_destroy_block(leaf, None, true)
+                .unwrap_or_default(),
+        );
+    }
+    drops
+}
+
+fn tick_moving_saw(
+    game: &mut Game<'_>,
+    actor: &mut Compound,
+    anchor: [i32; 3],
+    axis: usize,
+    previous: f32,
+    angle: f32,
+) -> (bool, Vec<([i32; 3], Vec<ItemStack>)>) {
+    let mut completed = Vec::new();
+    let Some(state) = actor
+        .get(&"BlockState".into())
+        .and_then(|tag| game.state_from_nbt(tag))
+    else {
+        return (false, completed);
+    };
+    if game.native_state_block(state) != Some(SAW) {
+        return (false, completed);
+    }
+    let Some((facing, _)) = geometry(game, state) else {
+        return (false, completed);
+    };
+    if !matches!(
+        facing,
+        Direction::North | Direction::South | Direction::East | Direction::West
+    ) {
+        return (false, completed);
+    }
+
+    let normal = facing.normal().map(f64::from);
+    let local = super::create_bearing::relative(actor);
+    let point = |at: f32| {
+        let relative = std::array::from_fn::<_, 3, _>(|i| f64::from(local[i]) + normal[i] * 0.65);
+        let rotated = super::create_bearing::rotate(relative, axis, f64::from(at).to_radians());
+        std::array::from_fn::<_, 3, _>(|i| f64::from(anchor[i]) + 0.5 + rotated[i])
+    };
+    let (before, current) = (point(previous), point(angle));
+    let cell = current.map(|v| v.floor() as i32);
+    let motion = (0..3)
+        .map(|i| (current[i] - before[i]).powi(2))
+        .sum::<f64>()
+        .sqrt() as f32;
+
+    if let Some(target) = actor_position(actor, "BreakingPos") {
+        let state = state_at(game, target);
+        let block = game.native_block(target);
+        let hardness = game.res.behaviours().facts(state).hardness;
+        if !sawable(game, &block) || hardness < 0.0 {
+            for key in ["BreakingPos", "Progress", "NextTick", "BreakSpeed"] {
+                actor.remove(&key.into());
+            }
+            return (false, completed);
+        }
+        let delay = int(actor, "NextTick").unwrap_or(0);
+        if delay > 0 {
+            actor.insert("NextTick".into(), Tag::Int(delay - 1));
+            return (true, completed);
+        }
+        let speed = float(actor, "BreakSpeed").unwrap_or(1.0 / 128.0);
+        let progress = int(actor, "Progress").unwrap_or(0)
+            + ((speed / hardness.max(0.01) * 10.0) as i32).max(1);
+        if progress < 10 {
+            actor.insert("Progress".into(), Tag::Int(progress));
+            actor.insert(
+                "NextTick".into(),
+                Tag::Int((hardness.max(0.01) / speed) as i32),
+            );
+            return (true, completed);
+        }
+        completed.push((target, cut_actor_block(game, target)));
+        for key in ["BreakingPos", "Progress", "NextTick", "BreakSpeed"] {
+            actor.remove(&key.into());
+        }
+    }
+
+    let previous_cell = actor_position(actor, "LastSawCell");
+    actor.insert("LastSawCell".into(), Tag::IntArray(cell.to_vec()));
+    if previous_cell == Some(cell) {
+        return (false, completed);
+    }
+    let state = state_at(game, cell);
+    let block = game.native_block(cell);
+    let hardness = game.res.behaviours().facts(state).hardness;
+    if !sawable(game, &block) || hardness < 0.0 {
+        return (false, completed);
+    }
+    actor.insert("BreakingPos".into(), Tag::IntArray(cell.to_vec()));
+    actor.insert("Progress".into(), Tag::Int(0));
+    actor.insert("NextTick".into(), Tag::Int(0));
+    actor.insert(
+        "BreakSpeed".into(),
+        Tag::Float(motion.max(1.0 / 128.0).to_bits()),
+    );
+    (true, completed)
+}
+
+pub(super) fn move_actors(
+    game: &mut Game<'_>,
+    blocks: &mut [Compound],
+    entity: &mut ModBlockEntity,
+    anchor: [i32; 3],
+    axis: usize,
+    previous: f32,
+    angle: f32,
+) -> bool {
+    let mut stalled = false;
+    for index in 0..blocks.len() {
+        let (before, rest) = blocks.split_at_mut(index);
+        let Some((actor, after)) = rest.split_first_mut() else {
+            continue;
+        };
+        let (actor_stalled, drops) = tick_moving_saw(game, actor, anchor, axis, previous, angle);
+        stalled |= actor_stalled;
+        for (pos, stacks) in drops {
+            for stack in stacks {
+                let max = game
+                    .items()
+                    .get(&stack.item)
+                    .map_or(64, |item| item.max_stack);
+                if let Some(rest) = super::create_bearing::deposit(before, stack, max)
+                    .and_then(|stack| super::create_bearing::deposit(after, stack, max))
+                    .and_then(|stack| {
+                        super::create_harvester::store(game, &mut entity.items, stack)
+                    })
+                {
+                    game.pop_resource(pos, rest);
+                }
+            }
+        }
+    }
+    stalled
 }
 
 fn break_tick(
