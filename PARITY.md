@@ -556,8 +556,35 @@ Andesite, Brass, and Copper Bars' Stonecutter recipes and 24 connection
 states. Each ingredient yields four bars. The [Horizon replay](tools/test-metal-bars.py)
 places the bars in survival, compares their connections to stone, iron
 bars, glass panes and oak fences, then waterlogs them. The host and a live
-LAN guest matched all 24 states. The models and textures use the original
-Create assets.
+LAN guest matched all 24 states. The same focused replay now also checks an
+unsupported oak-leaf neighbor, survival placement and pickup after mining,
+and the three variants' saved connection/waterlogged states after reopen.
+The block declarations all inherit `minecraft:iron_bars`, which supplies the
+vanilla collision shape and neighbor behavior. The models and textures use
+the original Create assets. Neighbor arrangements beyond the recorded
+equivalence classes and pixel-level rendering remain open.
+
+The bounded APP-2066 replay passed both registered checks, solo and LAN, on
+`native-9f42064-d6dc2ad18d3f` with pack SHA-256
+`4b974e9e8a5ebe8ff97975148ee5670dd10a500c0ca03d6af59f946457a5f584`.
+The Java capture at Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb` contributes three Stonecutter
+recipes (four bars per input) and 24 exact discrete state samples at ticks
+1–8 for three materials. The replay adds one unsupported-leaf control per
+material, and survival placement/mining returns the placed bar. LAN guest
+placement, state convergence, mining pickup, and host save/reopen passed; all
+three configured states remained equal to the Java tick-8 state. Collision
+behavior is source-aligned through the `minecraft:iron_bars` template, not an
+independent voxel-box measurement. Since bars are static, an active-operation
+save case does not apply. The run exposed that metal-decoration loot tables
+were not converting Java's legacy condition field; `prepare.py` now converts
+the full decoration family, including bars and ladders. Raw run logs are in
+`.local/parity/metal-bars.log`
+and `.local/parity/metal-bars-lan.log`. The related Metal Ladder solo and
+LAN checks also passed after the shared loot conversion, with logs in
+`.local/parity/metal-ladders.log` and `.local/parity/metal-ladders-lan.log`.
+Full 1:1 remains Open for other neighbor combinations and pixel-level
+rendering.
 
 ## Metal Ladders
 
