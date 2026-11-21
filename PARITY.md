@@ -8290,6 +8290,28 @@ on `native-9f42064-18472b3bb96b` with
 Crafting Table ingredients into one Crafting Blueprint. Display
 placement, result programming and recipe handling remain open.
 
+APP-2091 uses a finite gameplay scope: acquire the item, place a hanging
+display, program and view one recipe, use it, break and recover it, then check
+guest interaction and save/reopen identity. The existing survival replay is
+the only passing case. The family has no native Blueprint entity or menu
+implementation yet; inventory audits show the Blueprint entity type and menu
+ID are not loaded by the pack. Consequently the placement, section selection,
+recipe programming, recipe use, break/drop, guest edit/use and persistence
+cases are blocked by missing functionality, rather than untested variants.
+
+The pinned Java reference (`ac0c444d9828da3453ae8cc65338e8de063286fb`)
+defines the behavior in `BlueprintItem`, `BlueprintEntity`, `BlueprintMenu`
+and `BlueprintAssignCompleteRecipePacket`. Placement tries display sizes 3,
+2, then 1, saving the chosen size and facing. Each section stores nine
+ingredient filters, a result icon and an output slot under persistent entity
+data. Ordinary use crafts from matching player inventory items (repeating
+while shift is held); a wrench opens the section editor. Breaking drops one
+Blueprint unless entity drops are disabled or the player is creative. The
+menu derives a result from the current crafting recipe manager and supports
+assigning a complete recipe by recipe ID. These are source findings, not
+Horizon runtime equivalence claims. Exact rendering and additional recipe
+forms remain follow-ups after the bounded gameplay path works.
+
 ## Lit Blaze Burner
 
 The [survival interaction replay](tools/test-lit-blaze-burner.py) on
