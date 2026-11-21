@@ -7493,16 +7493,17 @@ On `native-9f42064-a55af2b6a899` with `create-steam-whistle-audio.hmod`,
 passive boiler, silence without heat, records-category loop onset,
 1/12-octave pitch steps, fading and high-octave redstone retrigger.
 The original Steam Engine replay passed all 13 samples on that build.
-APP-1994's bounded gameplay gates also call for idle and active save/reopen
-and a guest action. Candidate runners are registered as
-[persistence](tools/test-steam-whistle-persistence.py) and
-[LAN](tools/test-steam-whistle-lan.py): the former checks a cold idle reopen
-and a boiler-powered reopen with a two-part extension, while the latter checks
-guest extension growth and wrench octave propagation with host/guest state
-convergence. These checks have not yet run on an identified current build;
-prepared Minecraft 26.3 resources are absent from this environment, so they do
-not add evidence to the Pass status above. Chiff waveform, exact audio timing,
-full-height layouts and cosmetic effects remain follow-ups.
+APP-1994's [bounded evidence record](fixtures/steam-whistle-app-1994.md) adds
+passing idle/active cold reopen and dedicated-server LAN gates on
+`native-9f42064-d6dc2ad18d3f`, using a pack prepared from the pinned Java
+checkout (SHA-256 `979e715441e3771b25a819364075894133e689d271348e7a5fc5f7e8e7ffaa79`).
+Both LAN clients observed the guest's extension and octave changes and recorded
+muted boiler onset, pitch change, redstone fade/retrigger, boiler heat loss fade
+and heat restoration. Idle and active reopen retained pitch 3, the double+single
+extension, large octave and expected power state; the active setup resumed its
+sound request, then faded fully after redstone was removed. Chiff waveform and
+actual backend playback, exact Java reload equivalence, full-height layouts,
+cosmetic phases and packet timing remain open.
 
 ## Table Cloth display and reset
 

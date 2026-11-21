@@ -7,6 +7,7 @@ from fixture_world import ROOT, fixture_world
 
 WHISTLE = (9, 171, 20)
 EXTENSIONS = ((9, 172, 20), (9, 173, 20))
+TRACE_ENV = {"HORIZON_NO_AUDIO": "1", "HORIZON_CREATE_WHISTLE_TRACE": "1"}
 
 
 def state(control, pos):
@@ -21,6 +22,20 @@ def data(control, path):
 def step(control, count):
     control.command(f"/tick step {count}")
     control.call("wait", count + 4)
+
+
+def sound_rows(control):
+    log = control.socket.parent / "ctl.log"
+    if not log.exists():
+        return []
+    rows = []
+    for line in log.read_text(errors="replace").splitlines():
+        if "CREATE_WHISTLE_REQUEST " not in line:
+            continue
+        fields = line.split("CREATE_WHISTLE_REQUEST ", 1)[1].split(",")
+        if len(fields) == 8:
+            rows.append((fields[0], int(fields[1]), float(fields[5]), float(fields[6]), fields[7] == "true"))
+    return rows
 
 
 def assert_setup(control, *, powered, steam):
@@ -52,7 +67,7 @@ def install(control, *, active):
 def run(args):
     for active in (False, True):
         label = "Active" if active else "Idle"
-        with fixture_world(args, f"Whistle{label}Reopen", pack=args.pack,
+        with fixture_world(args, f"Whistle{label}Reopen", render=True, env=TRACE_ENV, pack=args.pack,
                            artifact_dir=ROOT / ".local/app-1994") as control:
             install(control, active=active)
             step(control, 24)
@@ -65,6 +80,16 @@ def run(args):
             control.restart()
             step(control, 4)
             assert_setup(control, powered=active, steam=active)
+            if active:
+                event = "create:whistle_low"
+                if not any(row[0] == event and row[4] for row in sound_rows(control)):
+                    raise RuntimeError(f"Boiler-powered audio cue did not restore after reopen: {sound_rows(control)}")
+                control.command("/setblock 10 171 20 minecraft:air")
+                step(control, 6)
+                if "powered=false" not in state(control, WHISTLE):
+                    raise RuntimeError("Powered whistle state did not deactivate after reopen.")
+                if not any(row[0] == event and not row[4] and row[2] == 0 for row in sound_rows(control)):
+                    raise RuntimeError(f"Restored whistle loop remained active after redstone deactivation: {sound_rows(control)}")
     print("Idle and boiler-powered Steam Whistles retained pitch, extension shape, octave and power across cold reopen.")
 
 
