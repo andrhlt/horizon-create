@@ -1845,6 +1845,73 @@ python3 tools/test-multiplayer-shaft-casing.py /path/to/horizon-ctl /path/to/hor
 
 ## Copper Valve Handle
 
+### APP-1974 Copper Valve Handle gameplay baseline
+
+The bounded gameplay case list is ordinary attachment and six-face placement,
+angle selection and manual stroke, both output directions, rear-support removal
+and drop, one dyed conversion, guest interaction, and idle/active save and
+reopen. Existing Java evidence below already covers the first six cases; the
+multiplayer traces cover guest operation and state convergence. The table below
+records the repeatable Horizon commands for final-build verification. Full 1:1
+remains Open for broader attachment and renderer coverage.
+
+| Gate | Existing evidence | Status |
+| --- | --- | --- |
+| Placement and attachment | `copper-valve-handle-placement-java.csv`: nine Java cases, including all six mount faces, waterlogging, shaft preference, sneaking override, and player hit planes; replay with `--placement` | Existing integration evidence |
+| Angle and manual stroke | `copper-valve-handle-angle-java.csv`: 93 samples at +95°, −137° and +1°, including settings-board hold/release, activation, cooldown, and shaft RPM; `copper-valve-handle` replay | Existing integration evidence |
+| Output direction and support drop | `valve-action-ticks-java.csv`: 48 samples in both directions with large/small cog outputs; `valve-support-removal-java.csv`: three dry/wet copper/dyed cases, immediate single drop and source-water restoration | Existing integration evidence |
+| Dyed conversion | `dyed-valve-handle-dye-java.csv` and `dyed-valve-handle-state-java.csv`: all 16 colors; survival crafting covers all 16 recolors and dyed-to-copper | Existing integration evidence |
+| Guest interaction | Copper guest angle/stroke and dyed guest recolor/power checks; guest state converged with host | Existing integration evidence; arrival timing not compared |
+| Persistence | Idle dyed state and active copper stroke with retained setting, support, direction and resumed output | Passed on compatible existing client |
+
+Pinned reference: Create `ac0c444d9828da3453ae8cc65338e8de063286fb` (6.0.10),
+Minecraft 1.21.1 / NeoForge 21.1.219. Horizon pin: `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`
+on Minecraft 26.3. The regenerated pack was loaded successfully by the
+source-compatible existing client `native-9f42064-a5156e57df79`; no rebuild or
+shared-cache reclamation was needed. The isolated save/reopen check and all
+eight affected valve checks passed (9/9 total). Client SHA-256 is
+`576fdd13e4822abce20c85d3c78add24bc199405bce6c742c126fcb2a6064c72`, control
+SHA-256 is `1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`,
+and regenerated Create pack SHA-256 is
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`.
+The first candidate client `native-9f42064-6ce68a31b125` loaded the pack but
+failed the idle reopen check (the dyed handle reopened as air); this was
+isolated to client compatibility by the successful `a5156e57df79` run and a
+known-good prior pack comparison. Java trace patch SHA-256 values are
+`8cd1070aa1e48ca5c71e46300a6e6b142aa685ad0f56c3ef52100e177e4193d6` for
+angle/placement, `5c05f867387874c561dd4bb3ff328d016b0baf9fc088d5c6787d482c24ed0a18`
+for dye state/render, and `8a5b97d4a8517ea7b64b01de8a20a83ec9bd77d2c4339c5886d13800dd846f19`
+for release/support removal. Capture CSV SHA-256 values: angle
+`5b55bb9d1c79bb78f9d4131bfed2f21cbe9fb774fb72029d4774c47a4a0ccb7c`, placement
+`ad663773692f13e7c30d14070a8c57cca4ef9e8665c0df4931532ed635a91ad5`, dye table
+`5ff894dbd47909fb5c2daa63e7eaa07b90ff31f2e88e922c0b2e236bb86d6d76`, release
+`5b3120874cc9a853fcfc062d7aed02cb2d4f47570dbc1bc9df5c5e401a31ab26`, support
+removal `dc0a3f8303db05c00bcbd4419a16d3d3c44e2d6867dddb6f126b2641c52a07f8`.
+
+Focused commands for the remaining gate and affected behavior:
+
+```sh
+python3 tools/test-valve-handle-persistence.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-copper-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --placement --pack /path/to/create.hmod
+python3 tools/test-copper-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-multiplayer-copper-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-dyed-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-dyed-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --craft --pack /path/to/create.hmod
+python3 tools/test-multiplayer-dyed-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-valve-action-ticks.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-valve-support-removal.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+```
+
+Final verification used the compatible existing client and regenerated pack:
+
+```sh
+HORIZON_NO_AUDIO=1 python3 tools/test-parity.py <horizon-ctl-a5156e57df79> <horizon-client-a5156e57df79> <prepared-26.3> --jobs 1 --check copper-valve-handle --check copper-valve-handle-placement --check copper-valve-handle-lan --check dyed-valve-handle --check valve-dye-crafting --check dyed-valve-handle-lan --check valve-action-ticks --check valve-support-removal --check valve-handle-persistence
+```
+
+All 9/9 checks passed, including host/guest operation and idle/active
+save/reopen. The temporary pack copy used by the runner was removed after the
+run; no runtime artifacts are part of the PR.
+
 The [Java angle trace](fixtures/copper-valve-handle-angle-java.csv) contains
 93 samples at +95°, −137° and +1°. The replay checks the 180° settings board
 with 45° milestones, opening on the sixth held input tick and committing the
