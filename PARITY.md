@@ -704,8 +704,38 @@ Palettes tab.
 
 A host and live LAN guest each recolored all 16 waterlogged seats, keeping
 the waterlogged state and the original dye count. Each player boarded and
-dismounted with normal input. The existing white-seat elevator and train
-replays passed on the same build.
+dismounted with normal input. In the APP-2010 replay, the host then attempted
+to take the guest's occupied Seat; the host stayed unmounted and the guest
+remained seated. The existing white-seat elevator and train replays passed
+on the same build.
+
+The finite APP-2010 lifecycle check, [seat-lifecycle](tools/test-seat-lifecycle.py),
+mounted a survival player, removed that occupied Seat and confirmed the rider
+was ejected. It then saved and reopened an idle blue waterlogged Seat, checking
+the exact block state and that no rider remained. The check is registered in
+`tools/test-parity.py` and passed on build `native-9f42064-6bdf8691aa42` with
+pack SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The same build passed `colored-seats`, `colored-seats-crafting`,
+`colored-seats-lan`, `seat-player-fall`, `seat-player-fall-lan`, and the
+APP-1979 prerequisite check `bearing-player-collision`. The new train-seat and
+elevator fixtures could not be replayed in this worktree because their ignored
+`.local/fixtures` structure files were not available; their existing Java
+comparisons and recorded passes remain the train/elevator evidence. Exact pose,
+renderer combinations, and exhaustive passenger equivalence remain open.
+
+The reused Java capture is `fixtures/colored-seats-java.csv` from Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; capture patch SHA-256 is
+`2a03d661b35acb840b77440b793c8ea0754f29f1bdd552bac08a8841c5d44590` and
+trace SHA-256 is `76dae02001d89635ee67ac489cab1977e7ff6410f6244eda10952a7ee61e7272`.
+The bounded commands were the `colored-seats`, `colored-seats-crafting`,
+`colored-seats-lan`, `seat-player-fall`, `seat-player-fall-lan`,
+`seat-lifecycle`, and `bearing-player-collision` patterns in
+`tools/test-parity.py`, using the build and pack identity above. Six passed in
+the first batch; after adding the occupied-seat assertion, `colored-seats-lan`
+passed again, and `seat-lifecycle` passed independently. No Java capture or
+native rebuild was needed. Approximate effort: 5 minutes runtime/setup, 12
+minutes implementation and evidence updates, 2 minutes fast checks, 3 minutes
+integration runtime, and 8 minutes fixture/startup diagnosis.
 
 Changing the Java train's three seats to red, blue and green reproduced
 all [246 rider samples](fixtures/scheduled_player_seats-java.csv) and both
