@@ -4652,6 +4652,60 @@ The combined gameplay command was `python3 tools/test-parity.py <horizon-ctl> <h
 | `java-reverse-station-approach-trace.patch` | `ef4cf6d63f826d7d882f06e3684239065447626a6ddb584ac0897c0f310806f1` |
 
 Other station layouts, route choices, exact visual behavior, and exhaustive cross-products remain open under Full 1:1.
+### APP-2051 Manual driving and Train Controls — November 21, 2026
+
+This finite baseline reuses the pinned Java references rather than capturing
+new expected values. Source review covered `Train.tick`,
+`CarriageContraptionEntity.startControlling` and `.control`, and
+`Navigation` at Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+The Java capture patch hashes are:
+
+| Reference | SHA-256 |
+| --- | --- |
+| `java-manual-train-trace.patch` | `1c5dab4780a8bb49420fcd54ab3eda1e3e383a0cabe11cb464a77a6d7ec50699` |
+| `java-train-steer-right-trace.patch` | `7adf8ab985b049702331f3d7d8cd4ed9958dcf8f6cdd699c52a3405590bb6919` |
+| `java-train-steer-left-trace.patch` | `8c295c1787a20e9f4f0101c568a5049260a10e0e4fd255f719008fb8ccd6ef99` |
+| `java-manual-station-approach-trace.patch` | `062c3d47f697003f0fe3bc7662adf645558d28b0e1d54154e7dbc872bfaf7cb6` |
+| `java-reverse-station-approach-trace.patch` | `ef4cf6d63f826d7d882f06e3684239065447626a6ddb584ac0897c0f310806f1` |
+
+The isolated build used Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`,
+launcher `0.2.67`, and private copy-on-write compiler data. It produced
+`native-9f42064-84eb353ebb27` in 579 seconds. The client SHA-256 is
+`123733fa66ee41c3a6d9ed95c741b159bfa80c557cbe0e5e398e7d53a4781683`.
+All fixture worlds used pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+
+The recorded cases passed on that build:
+
+| Check | Case and outcome |
+| --- | --- |
+| `manual-train` | 125 Java samples, ticks 13–137. Forward acceleration/coast, reverse acceleration/coast, speed, four wheel positions and spacing matched within `1.2e-6`. |
+| `train-steer-right`, `train-steer-left` | 160 Java samples per direction through a curved junction; wheel positions matched within `7e-6` and `1e-5` blocks respectively. |
+| `manual-station-approach`, `reverse-station-approach` | 198 Java samples each; braking, stop/arrival, reverse control and disassembly matched the existing traces. |
+| `train-steer-lan` | Guest UUID held authoritative controls while driving; host observations matched 84 Java samples. Guest Sneak released the `Driver` field. |
+| `manual-train-reopen` | Stopped train state matched before/after reopen. A saved moving train resumed, retained the four bogey-point gaps, and accepted reverse input. Java reload timing is not claimed: normal startup ticks occur before the harness freezes time. |
+| `train-multi-carriage` | APP-2047 regression: two carriages/four bogeys assembled, moved, reopened, converged to the LAN guest, and restored both cargo inventories on disassembly. |
+
+The initial run of the augmented LAN check had a test-only `NameError` in a
+post-drive host reacquire assertion after its Java-matching route. That assertion
+was removed as outside this ticket's acceptance list; the corrected guest
+driving and release check passed on rerun. No gameplay mismatch was observed.
+
+The build and focused commands were:
+
+```sh
+sh tools/build-native.sh .local/toolchains/launcher-0.2.67/horizon-launcher .local/app-2051-launcher-data
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-84eb353ebb27/horizon-ctl .local/patched-launcher/versions/native-9f42064-84eb353ebb27/horizon-client .local/patched-launcher/versions/native-9f42064-84eb353ebb27/.local/horizon-client/26.3 --jobs 2 --check manual-train --check manual-train-reopen --check train-steer-right --check train-steer-left --check train-steer-lan --check manual-station-approach --check reverse-station-approach --check reverse-station-approach-lan --check train-multi-carriage
+python3 tools/test-parity.py .local/patched-launcher/versions/native-9f42064-84eb353ebb27/horizon-ctl .local/patched-launcher/versions/native-9f42064-84eb353ebb27/horizon-client .local/patched-launcher/versions/native-9f42064-84eb353ebb27/.local/horizon-client/26.3 --jobs 1 --check train-steer-lan
+```
+
+The first batch passed eight checks; after the test-only correction, the LAN
+rerun passed, for all nine cases passing. Existing Java traces were reused;
+capture time was zero. The first full build took 579 seconds, and the focused
+integration batch took about five minutes plus a one-minute LAN rerun. Stopped
+and moving reopen are source-aligned gameplay checks, not exact Java reload
+comparisons. Other slopes/layouts, exhaustive kinematics, interpolation and
+visual effects remain open; Full 1:1 stays Open.
 
 ## Scheduled station travel
 
