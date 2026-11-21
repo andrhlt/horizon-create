@@ -168,6 +168,7 @@ CHECKS = (
     ("dyed-valve-handle-lan", "test-multiplayer-dyed-valve-handle"),
     ("valve-action-ticks", "test-valve-action-ticks"),
     ("valve-support-removal", "test-valve-support-removal"),
+    ("valve-handle-persistence", "test-valve-handle-persistence"),
     ("sequenced-gearshift-editor", "test-sequenced-gearshift-editor"),
     ("sequenced-gearshift-lan", "test-multiplayer-sequenced-gearshift"),
     ("sequenced-gearshift-comparator", "test-sequenced-gearshift-comparator"),
