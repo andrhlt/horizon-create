@@ -5370,6 +5370,27 @@ fresh-to-oxidized sequence for full blocks, slabs, and stairs. Waxed variants
 stayed unchanged and the vanilla copper control weathered. Elapsed random
 tick timing, connected textures, and Deployer recipes remain open.
 
+The focused [save/reopen check](tools/test-copper-roof-persistence.py) covers
+six representative age, wax, slab/stair shape, and waterlogging states while
+random ticks are disabled; all six survived an idle save/reopen. The registered
+check is `copper-roof-persistence`. The bounded six-check batch passed on
+`native-9f42064-6ce68a31b125` with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`:
+`copper-roofs`, `copper-roofs-lan`, `copper-roof-actions`,
+`copper-roof-actions-lan`, `copper-roof-oxidation`, and
+`copper-roof-persistence`. The action checks each compared 72 Java transitions
+with zero differences; the weathering check observed the expected age order
+for full blocks, slabs and stairs over 83 world ticks.
+
+Reproduce with the documented `tools/test-parity.py` command, passing
+`--jobs 2` and each of the six names above as `--check`. The pack used was the
+prepared `.local/create.hmod`; Java reference is Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`. An active-machine case is not
+applicable to these static blocks with no stored process or inventory; natural
+aging is exercised separately. Exact Java reload timing and elapsed
+random-tick distributions,
+connected textures and Deployer recipes remain open.
+
 ## Chain Conveyor and Frogport
 
 Two headless runs of original Java Create produced identical
