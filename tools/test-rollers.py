@@ -69,7 +69,15 @@ def run(args):
         for tick in range(len(expected)):
             if tick:
                 control.step_to(start + tick)
-            actual.append([str(tick), str((start + tick) % 20), *sample(control, base, barrel)])
+            if args.reopen_at is not None and tick == args.reopen_at:
+                before = sample(control, base, barrel)
+                control.command("/save-all flush")
+                control.restart()
+                after = sample(control, base, barrel)
+                if before != after:
+                    raise RuntimeError(f"{scenario} save/reopen changed actor position, inventory or blocks at tick {tick}: {before} -> {after}")
+                start = control.clock() - tick
+            actual.append([str(tick), expected[tick][1], *sample(control, base, barrel)])
     dest = ROOT / f".local/{scenario}-horizon.csv"
     with dest.open("w", newline="") as out:
         writer = csv.writer(out, lineterminator="\n")
@@ -95,7 +103,10 @@ if __name__ == "__main__":
         parser.add_argument(key, type=lambda path: Path(path).resolve(strict=True))
     parser.add_argument("scenario", choices=tuple(SCENARIOS))
     parser.add_argument("--ticks", type=int)
+    parser.add_argument("--reopen-at", type=int, help="save/reopen once at this sampled tick")
     args = parser.parse_args()
     if args.ticks is not None and args.ticks < 1:
         parser.error("--ticks must be positive")
+    if args.reopen_at is not None and args.reopen_at < 1:
+        parser.error("--reopen-at must be positive")
     run(args)
