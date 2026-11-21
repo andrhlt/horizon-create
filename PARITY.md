@@ -7382,10 +7382,13 @@ ran the focused Track Observer cases. On the identified build:
   restored the corresponding powered state.
 - `track-observer-filter-reject` passed for nonmatching cargo; the Observer
   stayed idle and its target and filter survived idle save/reopen.
-- `observer-lifecycle-lan` passed as an adjacent regression. The new
-  `track-observer-lan` guest-edit case did not pass: its guest client timed out
-  before joining the host, so guest filter editing and multiplayer state
-  convergence remain unverified for this ticket.
+- `observer-lifecycle-lan` passed as an adjacent regression. The rendered guest
+  launcher now has an explicit 120-second startup allowance because this build
+  can spend more than 45 seconds loading the offscreen client and its Create
+  pack. A rerun reached the train fixture but hit the existing simple-train
+  assembly guard before the guest joined; guest filter editing and multiplayer
+  state convergence therefore remain unverified for this ticket. The focused
+  rerun command and preserved logs are recorded in the PR.
 
 Pinned Java `TrackObserverBlockEntity.tick()` keeps the powered state for
 eight ticks after `keepAlive(train)`. The source-based timeout is implemented;

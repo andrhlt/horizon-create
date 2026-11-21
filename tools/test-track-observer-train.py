@@ -55,6 +55,7 @@ with TemporaryDirectory(prefix='hc-track-observer-') as scratch, fixture_world(
         with multiplayer.joined_client(
             args, Path(scratch), address, 'TrackObserverGuest', render=True,
             scenario='track-observer-filter', pack=args.pack,
+            launch_timeout=120,
         ) as guest:
             guest_name = 'TrackObserverGuest'
             multiplayer.until('the Track Observer guest to join', lambda: any(

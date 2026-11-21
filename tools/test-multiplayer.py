@@ -85,14 +85,14 @@ def dedicated(args, scratch, *, scenario="multiplayer", overrides=None, pack=Non
 
 @contextmanager
 def joined_client(args, scratch, address, name, *, render=False, scenario="multiplayer", pack=None, env=None,
-                  artifact_dir=None):
+                  artifact_dir=None, launch_timeout=45):
     home = scratch / name
     install_pack(home, pack)
     ctl = FixtureWorld(args.ctl, home / "ctl.sock", env)
     try:
         ctl.call("launch", "--offscreen" if render else "--headless", "--game", args.client, "--resources", args.resources,
                  "--server", address, "--name", name, "--game-dir", home, "--home", home,
-                 "--render-distance", 4, "--wait")
+                 "--render-distance", 4, "--wait", timeout=launch_timeout)
         yield ctl
     finally:
         if ctl.socket.exists():
