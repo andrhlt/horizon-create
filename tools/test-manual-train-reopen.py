@@ -74,7 +74,7 @@ def run(args):
             world.call("look-at", x + 0.5, y + 0.45, z + 0.5)
             world.call("mouse", "right", "click")
             world.call("wait", 3)
-        drive(world, "s", 4)
+        drive(world, "s", 12)
         after = snapshot(world)
         if after[1] >= moving_after[1]:
             raise RuntimeError(f"Reopened train could not be driven in reverse: {moving_after} -> {after}")
