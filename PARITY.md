@@ -9957,6 +9957,44 @@ The [Java Tea probe](tools/java-tea-pipe-trace.patch) filled the source tank
 through its fluid capability. All 11,000 mB reached the destinations by tick 99.
 The virtual fluid can be stored and pumped through the network.
 
+## APP-2090 Create foods and Builder’s Tea gameplay baseline
+
+The bounded acceptance cases reuse completed source-derived evidence for the
+three processed foods and Tea. The pinned Java source is Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; `BuildersTeaItem` uses a 42-tick
+drink and returns a glass bottle in survival, while its registered food
+properties apply hidden Haste for 3,600 ticks.
+
+| Acceptance case | Evidence and result |
+| --- | --- |
+| Survival acquisition and use | Existing spout replay produces Sweet Roll, Chocolate Glazed Berries and Honeyed Apple from their representative ingredient/fluid pair. Three 36-tick Java comparisons match item, hunger and saturation; each is consumed on tick 32. Basin Dough and Bread cooking are covered by the Basin and recipe checks. |
+| Important food interactions | Existing guest replay matches 108 Java player-tick samples for the three foods. Release and hotbar-swap interruption, replacement, creative/full-hunger controls, death/respawn and disconnect/rejoin retain the recorded outcomes. Bar of Chocolate and other Tea variants remain broader follow-ups. |
+| Tea use and return | Existing 45-tick authority replay matches the Java Tea use, nutrition, glass bottle and hidden Haste (3,600 ticks on tick 42). The survival brewing/bottling replay verifies 500 mB Tea, 250 mB bottling and bottle return. |
+| Guest ownership after reconnect | New [`test-builders-tea-rejoin-lan.py`](tools/test-builders-tea-rejoin-lan.py) makes a survival LAN guest drink Tea, disconnect, and reconnect with one glass bottle, no Tea, and hidden Haste. It observed 3,589 Haste ticks after reconnect. The initial harness attempt used the optional forced LAN mode and did not restore survival on reconnect; the accepted run uses the same LAN mode as the existing food rejoin harness. |
+| Persistence dependency | Basin idle/active save and reopen are covered by [`test-basin-lifecycle.py`](tools/test-basin-lifecycle.py). APP-1992’s Tea network reopen preserved its fluid identity and amount and resumed transfer after reopen. Food use itself has no machine settings or connections to retain; player inventory/effect ownership is covered by the guest reconnect case above. |
+
+The new check and focused regressions passed with the available compatible
+client `native-9f42064-d6dc2ad18d3f` (SHA-256
+`006bfe15a198b29d6af7633d353dcadaa07039121ae66c2081927299835a8811`) and
+`create.hmod` SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+This pass reused that binary and did not compile a new native build; treat its
+runtime results as candidate evidence. The captured Java comparisons remain
+separate and pinned to the reference revision above.
+
+The focused registered command was:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/26.3 \
+  --jobs 2 --check create-foods --check food-use --check food-use-lan \
+  --check food-rejoin-lan --check food-mode-lan --check builders-tea \
+  --check builders-tea-drink --check builders-tea-rejoin-lan
+```
+
+All eight selected checks passed on the candidate runtime. Exact eating poses,
+other food/Tea mode and interruption combinations, other fluid networks and
+Full 1:1 remain open; these are not blockers to this finite gameplay baseline.
+
 ## APP-1992 Honey, Chocolate and Tea gameplay baseline
 
 The finite recipe paths come directly from the pinned Create generators:
