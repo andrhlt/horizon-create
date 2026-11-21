@@ -45,8 +45,13 @@ def run(args):
             def text():
                 return log.read_text(errors='replace') if log.exists() else ''
             mp.until('scene geometry', lambda: 'CREATE_PONDER render vertices ' in text())
+            mp.until('first scene event', lambda: 'CREATE_PONDER tick 5' in text())
+            world.call('key', 'space', 'tap')
+            world.call('wait', 8)
+            assert 'CREATE_PONDER tick 20' not in text(), 'paused scene advanced'
+            world.call('key', 'space', 'tap')
             world.call('wait', 75)
-            world.call('screenshot', ROOT / '.local/ponder-shaft.png')
+            world.call('screenshot', image)
             recorded = text()
             for event in ('open tick 0 blocks 32', 'tick 5', 'tick 20', 'tick 25',
                           'tick 30', 'tick 35', 'tick 45', 'tick 65'):

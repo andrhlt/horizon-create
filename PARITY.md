@@ -1845,6 +1845,73 @@ python3 tools/test-multiplayer-shaft-casing.py /path/to/horizon-ctl /path/to/hor
 
 ## Copper Valve Handle
 
+### APP-1974 Copper Valve Handle gameplay baseline
+
+The bounded gameplay case list is ordinary attachment and six-face placement,
+angle selection and manual stroke, both output directions, rear-support removal
+and drop, one dyed conversion, guest interaction, and idle/active save and
+reopen. Existing Java evidence below already covers the first six cases; the
+multiplayer traces cover guest operation and state convergence. The table below
+records the repeatable Horizon commands for final-build verification. Full 1:1
+remains Open for broader attachment and renderer coverage.
+
+| Gate | Existing evidence | Status |
+| --- | --- | --- |
+| Placement and attachment | `copper-valve-handle-placement-java.csv`: nine Java cases, including all six mount faces, waterlogging, shaft preference, sneaking override, and player hit planes; replay with `--placement` | Existing integration evidence |
+| Angle and manual stroke | `copper-valve-handle-angle-java.csv`: 93 samples at +95°, −137° and +1°, including settings-board hold/release, activation, cooldown, and shaft RPM; `copper-valve-handle` replay | Existing integration evidence |
+| Output direction and support drop | `valve-action-ticks-java.csv`: 48 samples in both directions with large/small cog outputs; `valve-support-removal-java.csv`: three dry/wet copper/dyed cases, immediate single drop and source-water restoration | Existing integration evidence |
+| Dyed conversion | `dyed-valve-handle-dye-java.csv` and `dyed-valve-handle-state-java.csv`: all 16 colors; survival crafting covers all 16 recolors and dyed-to-copper | Existing integration evidence |
+| Guest interaction | Copper guest angle/stroke and dyed guest recolor/power checks; guest state converged with host | Existing integration evidence; arrival timing not compared |
+| Persistence | Idle dyed state and active copper stroke with retained setting, support, direction and resumed output | Passed on compatible existing client |
+
+Pinned reference: Create `ac0c444d9828da3453ae8cc65338e8de063286fb` (6.0.10),
+Minecraft 1.21.1 / NeoForge 21.1.219. Horizon pin: `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`
+on Minecraft 26.3. The regenerated pack was loaded successfully by the
+source-compatible existing client `native-9f42064-a5156e57df79`; no rebuild or
+shared-cache reclamation was needed. The isolated save/reopen check and all
+eight affected valve checks passed (9/9 total). Client SHA-256 is
+`576fdd13e4822abce20c85d3c78add24bc199405bce6c742c126fcb2a6064c72`, control
+SHA-256 is `1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`,
+and regenerated Create pack SHA-256 is
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`.
+The first candidate client `native-9f42064-6ce68a31b125` loaded the pack but
+failed the idle reopen check (the dyed handle reopened as air); this was
+isolated to client compatibility by the successful `a5156e57df79` run and a
+known-good prior pack comparison. Java trace patch SHA-256 values are
+`8cd1070aa1e48ca5c71e46300a6e6b142aa685ad0f56c3ef52100e177e4193d6` for
+angle/placement, `5c05f867387874c561dd4bb3ff328d016b0baf9fc088d5c6787d482c24ed0a18`
+for dye state/render, and `8a5b97d4a8517ea7b64b01de8a20a83ec9bd77d2c4339c5886d13800dd846f19`
+for release/support removal. Capture CSV SHA-256 values: angle
+`5b55bb9d1c79bb78f9d4131bfed2f21cbe9fb774fb72029d4774c47a4a0ccb7c`, placement
+`ad663773692f13e7c30d14070a8c57cca4ef9e8665c0df4931532ed635a91ad5`, dye table
+`5ff894dbd47909fb5c2daa63e7eaa07b90ff31f2e88e922c0b2e236bb86d6d76`, release
+`5b3120874cc9a853fcfc062d7aed02cb2d4f47570dbc1bc9df5c5e401a31ab26`, support
+removal `dc0a3f8303db05c00bcbd4419a16d3d3c44e2d6867dddb6f126b2641c52a07f8`.
+
+Focused commands for the remaining gate and affected behavior:
+
+```sh
+python3 tools/test-valve-handle-persistence.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-copper-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --placement --pack /path/to/create.hmod
+python3 tools/test-copper-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-multiplayer-copper-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-dyed-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-dyed-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --craft --pack /path/to/create.hmod
+python3 tools/test-multiplayer-dyed-valve-handle.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-valve-action-ticks.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+python3 tools/test-valve-support-removal.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --pack /path/to/create.hmod
+```
+
+Final verification used the compatible existing client and regenerated pack:
+
+```sh
+HORIZON_NO_AUDIO=1 python3 tools/test-parity.py <horizon-ctl-a5156e57df79> <horizon-client-a5156e57df79> <prepared-26.3> --jobs 1 --check copper-valve-handle --check copper-valve-handle-placement --check copper-valve-handle-lan --check dyed-valve-handle --check valve-dye-crafting --check dyed-valve-handle-lan --check valve-action-ticks --check valve-support-removal --check valve-handle-persistence
+```
+
+All 9/9 checks passed, including host/guest operation and idle/active
+save/reopen. The temporary pack copy used by the runner was removed after the
+run; no runtime artifacts are part of the PR.
+
 The [Java angle trace](fixtures/copper-valve-handle-angle-java.csv) contains
 93 samples at +95°, −137° and +1°. The replay checks the 180° settings board
 with 45° milestones, opening on the sixth held input tick and committing the
@@ -8446,6 +8513,27 @@ placement, refresh, physical and command cleanup, standalone expiry
 and water restoration. It covers one flat curve. Shared markers
 and an exact raster trace remain open.
 
+### APP-2046 gameplay baseline
+
+The finite owner/lifecycle pass was rerun on 2026-11-21 with
+`native-9f42064-6bde2ea90cf2`, Minecraft 26.3 resources from that build,
+and `create.hmod` SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+`tools/test-fake-track.py` passed its one flat primary-curve case: the
+owner created markers, they remained after 120 ticks, physical break and
+command replacement removed them, and standalone dry/waterlogged markers
+expired with the expected air/water result. `tools/test-track-curve.py`
+passed all 10 pinned-Java placement cases on the same build. These checks
+exercise host-side marker creation, refresh, cleanup and the curve owner.
+
+This does not establish APP-2046's guest convergence or save/reopen gates.
+The tests above use a single local client and their world lifetime ends with
+the fixture; they do not test shared-marker ownership across two surviving
+curves. Keep the gameplay baseline Partial until a guest observes marker
+creation/removal and a saved curve is reopened with its marker lifecycle
+intact. The exact raster comparison, shared-marker layouts and visual parity
+remain open follow-ups; Full 1:1 remains Open.
+
 ## Tree Fertilizer
 
 APP-2088 preserves the existing family evidence, which
@@ -8696,6 +8784,44 @@ navigate through it in the original order and back to their relays.
 The screenshot shows the lifted, turned, and swapped gear
 configurations. Rotation-speed particles, exact movement
 interpolation, full catalog, and container return remain open.
+
+### APP-2101 bounded gameplay baseline
+
+The finite case set for this ticket reuses the Shaft relay and encasing,
+Small and Large Cogwheel relays, Gearshift navigation, survival Back/Escape,
+and Creative-tab return above. The [Shaft replay check](tools/test-ponder-shaft.py)
+now also pauses at tick 5, waits eight client ticks, confirms the tick-20 event
+has not fired, then resumes through the existing Java event markers to tick 65.
+It passed with nonempty scene geometry, replay, Escape, and unchanged inventory
+and world marker. The new [LAN check](tools/test-ponder-guest.py) passed with
+both host and guest opening Ponder from their survival inventories, returning
+to inventory, and retaining their Shaft counts; the guest UI did not change the
+host's state. Existing [Creative Back evidence](tools/test-ponder-creative-back.py)
+shows the selected Redstone Blocks tab and item grid restored byte-for-byte.
+The LAN fixture then stopped and reopened the dedicated world and rejoined both
+players; their Shaft inventories and the diamond-block world marker survived.
+Ponder itself is a read-only client presentation with no mutable scene save
+state, so this inventory/world save-reopen and the Creative selection across
+opening and closing are the applicable persistence checks.
+
+The two new focused replays ran against pack SHA-256
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`,
+prepared 26.3 resources from installed build `native-9f42064-68c7ab9c0826`,
+`horizon-ctl` SHA-256
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`, and
+the offscreen `native/target/fast/horizon-client` SHA-256
+`7de8fae06dd9f92a2ccb059e732120931f3f56e15396325fb5bf0fef4b185b96`.
+Commands from the repository root:
+
+```sh
+python3 tools/test-ponder-shaft.py "$CTL" "$CLIENT" "$RESOURCES" --pack /path/to/create.hmod
+python3 tools/test-ponder-guest.py "$CTL" "$CLIENT" "$RESOURCES" --pack /path/to/create.hmod
+```
+
+The guest test is registered as `ponder-guest` in `tools/test-parity.py`.
+These representative cases establish the gameplay baseline only; the full
+catalog, remaining storyboards, container return, exact pixels, and exact
+movement interpolation remain open in the matrix.
 
 
 The Depot replay on `native-9f42064-e1f836744b54` also matched all
@@ -11583,6 +11709,68 @@ actual-player old-world reopen/extension guard passed on the refactored build.
 
 The [tank evidence matrix](TANK-PARITY.md) records 31/31 scripts and 1,430 exact Java records passing through headless Horizon `92ef2557669b`. Its applicable shared production core also passes 19/19 scripts (1,093 records). The integrated build closes sampled split, component, creative, clone/move, window, boiler, comparator, source-light and real container inventory gaps. Original steam timing matches all 13 ticks. Physical local/reopen/LAN light, imported ownership through partial/full unload, vanilla clone inventory, solo/LAN bucket and muted sound-event guards pass. Java client rendering/particles, propagated-light and unload timing, audio pitch verification, mounted storage and remaining consumers are still open. Full-family parity was not promoted.
 
+
+## APP-2099 Sounds, particles and effects
+
+The bounded gameplay baseline reuses the existing pinned Java event traces and
+adds one registered save/reopen check. The Java reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+| Case | Evidence and outcome |
+| --- | --- |
+| Powered machine stop cues | `clockwork-audio` matched all six Java cues at tick 6, including source, position, gain and pitch on host and guest. |
+| Interaction cues and silent steps | `train-trapdoors-sound` and `train-trapdoors-sound-lan` matched seven toggles and two silent transitions in solo and LAN. `package-open` and `package-open-lan` passed. |
+| Processing and event boundaries | `desk-bell-pulse` and `desk-bell-pulse-lan` matched 27 Java state samples and all three cues. `desk-bell-pulse-reopen-lan` additionally saved and reopened the world, retained the bell and both redstone wires, then let a newly joined guest press it; host and guest observed the Java cues. |
+| Event validity, range and particles | `worldshaper-effect` and `worldshaper-effect-lan` delivered one shot, ten End Rods, ten Fireworks and the main-hand cue to each client. The Frogport package-effects replay hit Java catch/deposit starts at ticks 24/37. Nearby guests heard two cues per event; distant guests heard one in-range cue per event. All observers still received five seeded catch-rope particles outside sound range. |
+
+The repeatable test changes are in `tools/test-desk-bell.py` and
+`tools/test-parity.py`. The reopen check compares the saved block and wire
+states before and after `FixtureWorld.restart()`. Sound playback and particles
+are transient events, so they have no independent idle/active setting or
+contents to serialize; the persistent Desk Bell setup is the meaningful
+before/after state. The guest joins after reopening, and the subsequent cue is
+checked on both clients.
+
+Final focused Horizon checks passed on existing compatible candidate
+`native-9f42064-340cbe866fa7` (Minecraft 26.3 / Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`). Client and control tool were taken
+from `/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/`;
+the exact pack SHA-256 was
+`0dc4da44753fdf6dd94d1cdd8d26b82bc35446899a3ad1219a9990377e74b852`.
+Prepared 26.3 resource metadata SHA-256 was
+`c666426f77cadd1e8db01ad53e4900aa9e53930895c3f92243634e27e6ecf0ae`.
+No native runtime source changed between that candidate and this baseline;
+the ticket changes only the Desk Bell test path and evidence. The exact final
+commands were:
+
+```sh
+APP2099_CTL=/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/horizon-ctl
+APP2099_CLIENT=/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/horizon-client
+APP2099_RESOURCES=/Users/andrewholt/dev/horizon-create/.local/app-2017-evidence/native-9f42064-6bdf8691aa42/.local/horizon-client/26.3
+APP2099_PACK=/Users/andrewholt/dev/horizon-create/.local/app-2097-evidence/native-9f42064-340cbe866fa7/create.hmod
+
+TMPDIR=/private/tmp python3 tools/test-parity.py "$APP2099_CTL" "$APP2099_CLIENT" "$APP2099_RESOURCES" --jobs 2 \
+  --check clockwork-audio --check train-trapdoors-sound --check train-trapdoors-sound-lan \
+  --check desk-bell-pulse --check desk-bell-pulse-lan --check desk-bell-pulse-reopen-lan \
+  --check package-open --check package-open-lan --check worldshaper-effect --check worldshaper-effect-lan
+
+TMPDIR=/private/tmp python3 tools/test-frogport-package-effects.py "$APP2099_CTL" "$APP2099_CLIENT" "$APP2099_RESOURCES" \
+  --pack "$APP2099_PACK" --lan
+TMPDIR=/private/tmp python3 tools/test-frogport-package-effects.py "$APP2099_CTL" "$APP2099_CLIENT" "$APP2099_RESOURCES" \
+  --pack "$APP2099_PACK" --lan --remote
+```
+
+The ten registered checks and both Frogport range runs passed. The first
+unprivileged attempt was invalid because the sandbox denied Horizon's local
+control socket; the same checks passed with the required local socket access.
+An initial LAN-reopen attempt also exposed that the Desk Bell harness assumed
+every successful `/gamemode` command returned chat text. The helper now uses
+the command result directly, and the host/guest reopen case passes. Raw logs
+are preserved under this worktree's `.local/parity/` and `.local/` directories.
+No new Java capture or runtime build was needed. Reuse setup: 0; harness/docs
+changes: about 5 minutes; build: 0; focused runtime checks: about 5 minutes.
+Remaining follow-ups are the other registered sound IDs, actual waveform and
+mixing, exact audio output timing, and exact cosmetic/particle presentation.
 ## APP-1949 sequencer validation on latest main — November 19, 2026
 
 After rebasing onto `origin/main` at `9341ef5cb462c3bb3f13c028b54a38c6c7ce2853`,
@@ -12441,6 +12629,47 @@ trace ticks and passed the active mid-entry persistence/no-duplicate-dispatch
 case. The client and fixture bundle were provisioned outside Git under the
 worktree `.local` directory.
 
+## APP-2053 scheduled routing and arrival
+
+This bounded pass covers the compact two-station route, one branch choice,
+arrival/departure/wait, missing and unreachable destinations, canceled-route
+recovery, host/guest state, and en-route/dwelling reopen. It reuses the APP-2052
+active and parked reverse-trip reopen evidence; those cases were not rerun for
+this ticket. Full 1:1 remains Open for broader route selection, network size,
+cross-dimension movement and interactions.
+
+The pinned references are Create `ac0c444d9828da3453ae8cc65338e8de063286fb`
+and Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. The runtime was
+`native-9f42064-6bdf8691aa42` (client SHA-256
+`703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe3`,
+pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`;
+prepared 26.3 resources). Existing `scheduled-station-approach` and
+`scheduled-station-approach-lan` each matched 123 Java samples for arrival,
+departure and dwell. `scheduled-wildcard-route-red-lan` matched 198 Java
+samples for a guest-assigned wildcard timetable selecting the farther route
+with the short branch forced red. `scheduled-reverse-trip-reopen` passed in
+APP-2052 on build `native-9f42064-6bde2ea90cf2`, including parked wait and
+active mid-entry reopen without duplicate dispatch.
+
+The new `scheduled-route-recovery` integration check passed on the identified
+runtime. It verified that an unavailable named destination leaves the train
+parked and the schedule unpaused, restoring the station causes a retry and
+arrival, taking Train Controls cancels the route and clears transit state, and
+resuming the conductor timetable redispatches and arrives. The source-aligned
+Java paths are `ScheduleRuntime`, `DestinationInstruction`,
+`Navigation.cancelNavigation`, `CarriageContraptionEntity.startControlling`,
+and `ScheduleItemEntityInteraction`.
+
+The matching LAN recovery check remains unverified: the isolated guest launch
+could not open its control socket because `/private/tmp` ran out of space. The
+failed setup log is `.local/parity/scheduled-route-recovery-lan.log`; earlier
+sandbox-denied socket attempts are also invalid setup, not gameplay failures.
+The separate station-approach and forced-red branch LAN checks passed, so host
+and guest route state is covered for the accepted arrival and branch cases, but
+not yet for canceled-route recovery. No exhaustive route or packet-timing claim
+is made.
+
 ## APP-2059 train display, prompts and arrival audio
 
 On `native-9f42064-76138ca65acb`, the [bounded feedback pass](TRAIN-FEEDBACK-PARITY.md)
@@ -12470,6 +12699,108 @@ stops the player without changing the door states. Both host and LAN guest
 positions are checked against the authoritative server. This is scoped gameplay
 collision evidence; exact Java player motion and packet arrival are unverified.
 APP-2051 and APP-2057 are completed prerequisites. Full 1:1 remains Open.
+
+## APP-2093 — Schematicannon survival baseline
+
+This pass preserves the existing 233-tick Java flight fixture and cites the Done
+APP-2092 acquisition/capture/import pass as its schematic prerequisite. It adds
+player controls and repairs target eligibility, atomic multi-item extraction and
+unsafe source-container copying. Full 1:1 remains Open.
+
+Pinned Java source reviewed: `SchematicannonBlockEntity.tickPrinter`,
+`shouldPlace`, `shouldIgnoreBlockState`, `refillFuelIfPossible`,
+`ConfigureSchematicannonPacket.handle`, `SchematicPrinter.shouldPlaceBlock`,
+`ItemRequirement.defaultOf`, and `BlockHelper.prepareBlockEntityData`, at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`. Important source expectations are:
+matching target states and unbreakable targets are skipped; protected block
+entities are retained; double slabs require two items; all requirements must be
+available before extraction; one gunpowder supplies 400 shots. Printing prepares
+safe block-entity data instead of cloning saved container inventories.
+
+Pre-fix live probes on `native-9f42064-de4782e18b5b` reproduced one consumed stone
+and shot for an already-present block. The six-cell probe consumed one slab for
+a double slab, replaced bedrock with stone, and cloned seven source diamonds.
+Logs: `/private/tmp/horizon-app-2093/.local/probe-before-socket.log` and
+`probe-safety-before.log`. Earlier missing-resource and sandbox-socket attempts
+in `probe-before.log` are invalid setup runs, not gameplay evidence.
+
+The finite acceptance fixture uses one six-cell existing schematic: existing
+stone, missing double slab, a newly printed chest, bedrock, a stocked target
+chest, and one ordinary stone target. It exercises real survival schematic and
+fuel insertion; missing-material pause with one slab; exact two-slab resupply;
+manual pause while a block is in flight; resume and completion; ammo exhaustion
+and adjacent-gunpowder resupply; and an exact 256-block invalid anchor. The main
+build must spend two slabs, one chest, one stone and three of 400 shots, retain
+the stocked chest's five copper ingots, leave bedrock intact, and never clone the
+seven source diamonds. Idle, active and completed reopen checks retain the plan, settings and
+exact item/ammo conservation. Idle and completed snapshots compare saved fields
+exactly. The active printer may legitimately advance during startup before the
+control tool freezes ticks; it must retain its queue or finish with the exact
+expected output and costs. This does not claim exact Java reload timing. LAN repeats guest actions and observes host/guest block convergence;
+it does not establish Java packet arrival timing.
+
+The new screen exposes Start, Pause, Stop, skip-missing, replace mode and
+container replacement, plus ammo, status and the current missing stack/count.
+Original Java checklist/book printing, entity printing, full safe-NBT writers,
+configured-block merges, multi-block/optional-mod planning, transforms and exact
+presentation remain unverified follow-ups, not exhaustive parity claims.
+
+### Final verification
+
+The reference capture patch SHA256 is
+`9a7f1551a40113b15e2227795ff7af0806740d0b5ee8368c42aaa0c7bb30db90`;
+the unchanged 233-row Java CSV SHA256 is
+`f14bc77a711f17775848150dce7feba0470c871a2d8043cf0946f9a02d824da1`.
+The prepared pack SHA256 is
+`00d37a5973ed7a104433f59ceb7744d7a9fffafeaf8a9bd92024af7587bef3bb`,
+created with `python3 tools/prepare.py /path/to/pinned/Create` and the added
+five-slot `create:schematicannon` menu registration. The resource directory is
+Minecraft 26.3, and the native source pin remains `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`.
+
+Build `native-9f42064-f172164a2087` passed the survival/reopen and LAN checks,
+the original 233-tick Java replay, and the Schematic Table regression. The Java
+import regression also passed on the prior `native-9f42064-fd19c1af93b8` build;
+the final five-check batch and combined-main verification are recorded below.
+The survival fixture explicitly steps 194 ticks and the LAN fixture 169, besides
+measured startup ticks. The original Java comparison covers ticks 0–232 with
+zero differences in its discrete fields, six-decimal progress and flight counters.
+Guest checks establish convergence, not exact Java packet arrival/interpolation.
+
+Failed diagnostic results remain under `/private/tmp/horizon-app-2093/.local/`:
+`baseline-first.log` and the labeled `baseline-*-sneak.log`/`baseline-mouse.log`
+loading diagnostics; `baseline-memory-only-template.log` for the invalid
+memory-only Structure Block persistence fixture; and `baseline-startup-ticks.log`
+/`baseline-active-queue.log` for overstrict assumptions about startup aging.
+The corrected fixture uses the APP-2092 production capture/export backend to seed
+an actual saved file and checks conservation while normal startup ticks run.
+Visual QA found a clipped title, stale status/ammo and a missing visible required
+count; the final screen fits the viewport and synchronizes only its relevant NBT
+fields and flying blocks, without broadcasting the full queued structure.
+
+Builds used the compatible official launcher 0.2.67 and a private APFS-cloned
+compiler cache in the ticket worktree. The original successful build took 447 s;
+intermediate builds took 208 s and 129 s, and the synchronized-screen build 296 s.
+Source/fixture authoring and debugging overlapped those builds. Setup/reference
+review and pre-fix captures occupied about 5 minutes; authoring/debugging about
+25 minutes; final integration/CI took about 10 minutes. After rebasing onto
+`2b929215292973f625d55248cbc1940435557da3`, the PR-head build
+`native-9f42064-edcfe16aa867` completed in 321 s using the same pinned launcher,
+pack hash and isolated worktree cache. Its three directly affected checks all
+passed: `schematicannon-baseline`, `schematicannon-baseline-lan`, and
+`schematicannon`. The preceding synchronized-screen build passed the five-check
+batch (`schematicannon`, both baselines, `schematic-table`, and
+`schematic-java-import`); the small follow-up UI change only adds the visible
+required count, and the three directly affected checks were rerun on the final
+build. `python3 tools/check-source.py` and `git diff --check` passed. The
+original Java replay covers ticks 0–232 with zero differences in its discrete
+fields, six-decimal progress and flight counters. No full-suite or desktop-game
+run was used. After main advanced to `16696be` (APP-2086 symmetry-wand
+implementation and APP-2052/2055 documentation), the PR merged that source and
+rebuilt as `native-9f42064-352ad233a46a` in 193 s. All ten selected checks
+passed together: `schematicannon`, both Schematicannon baselines, and all seven
+`symmetry-wand-*` checks. Source checks passed with 489 JSON, 45 JSONL, 893
+Python, two shell and three TOML files. This is the combined-source integration
+result; it does not expand APP-2093's bounded gameplay claim.
 
 ## APP-2086 Wand of Symmetry gameplay baseline
 
@@ -12708,3 +13039,126 @@ Their initial setup failures are not counted as gameplay failures.
 
 Full 1:1 remains Open for the unexamined asset/model combinations, additional
 animation states, pixel comparisons, and renderer compatibility.
+
+## APP-2100 Localization and UI gameplay baseline
+
+The finite acceptance set reuses existing Java-backed fixtures for English UI,
+one supported secondary locale (`de_de`), settings and text entry, a text-length
+boundary, keyboard close/back behavior, guest interaction, and saved settings.
+The reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; Horizon is
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`.
+
+| Case | Check and result |
+| --- | --- |
+| English/German settings labels and guest interaction | `clockwork-settings` passed. English and German option names matched, including `Stundenzeiger zuerst`, `Minutenzeiger zuerst`, and `24-Stunden-Zeiger zuerst`; option spacing and six-tick hold/release behavior matched Java. The host cycled settings and a Survival LAN guest changed the authoritative mode twice. |
+| Text entry, keyboard close, overflow and persistence | `track-station-name` and `track-station-name-lan` passed all five Java rows: default name, regular name, whitespace-only rejection, padded Unicode, and the 25-unit maximum with excess input ignored. Enter committed edits and Escape closed the editor. The host's final name survived world restart; guest edits reached the host. |
+| Menu text input, guest use and saved settings | `train-schedule-entry` passed. A host and LAN guest entered `Main Platform *`, confirmed the five-second delay action, reopened the card, and retained the exact Java item component. The host's component survived world restart. |
+| Selected-item and gauge text | `goggles-gauges` matched all 78 Java readout samples across ten gauge cases, including text, colors and strikethrough. |
+
+All five checks passed on the identified client
+`native-9f42064-6ce68a31b125` with the matching prepared pack. Horizon client
+SHA-256 is `bdbafe5289f2c05ef76009c17070e0320a7c606e042dd5202b142e0e6d123fc9`;
+Create pack SHA-256 is
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The first two station-name attempts stopped before launching because the fresh
+worktree lacked the ignored local Java structure fixture; after that single
+817-byte fixture was copied into the isolated worktree, both station checks
+passed. Raw final logs are in `.local/parity/` in the APP-2100 worktree.
+
+The batch command was `HORIZON_NO_AUDIO=1 python3 tools/test-parity.py
+<horizon-ctl> <horizon-client> <prepared-26.3> --jobs 2 --check
+clockwork-settings --check track-station-name --check track-station-name-lan
+--check train-schedule-entry --check goggles-gauges`. Station checks were also
+rerun together with `--jobs 1` after staging the missing ignored fixture.
+
+This establishes the bounded gameplay baseline only. Other locales, additional
+text fields and overflow limits, accessibility, broad menu coverage, and exact
+typographic/pixel parity remain unverified; Full 1:1 stays Open.
+
+
+No production defect appeared in this bounded pass, so no native/UI code or Java
+capture changed. Approximate effort: setup and source/evidence review 8 minutes;
+documentation 4 minutes; Java capture and native build 0 minutes; targeted
+integration checks 1 minute elapsed; fixture setup/debugging 3 minutes.
+## Speedometer and Stressometer gameplay baseline (APP-1975)
+
+Pinned Java reference: Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+The bounded check set reuses the existing small/large wheel needle traces,
+`fixtures/loaded_stressometer-java.csv`, and the original Java Goggles fixtures.
+It covers running/stopped/reversed source behavior from the existing wheel and
+motor comparisons; stress below, exactly at, and above capacity plus recovery;
+readable RPM/stress output; and persistence of idle and active gauges.
+
+On Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, build
+`native-9f42064-d6dc2ad18d3f` (client SHA-256
+`006bfe15a198b29d6af7633d353dcadaa07039121ae66c2081927299835a8811`) with
+Create pack SHA-256
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`:
+
+- `small-waterwheel` passed its pinned fixture replay and rendered needle
+  comparison. The test samples the original gameplay ticks and checks the
+  wheel and both gauge needles against Java.
+- `loaded-stressometer` passed all 105 Java needle/Goggles samples. At 256 SU
+  capacity, loads of 224, 256, and 288 SU produced stress values 0.875, 1.0,
+  and 1.125. Equality remained active; 288 SU stopped effective speedometer
+  output, and removing the load restored 8 RPM and zero stress.
+- `goggles-gauges` matched the 10 Java cases (78 ordered readout lines),
+  including RPM/stress labels, values, colors, and overload strike-through.
+- `gauges-reopen` sampled idle speedometer/stressometer at zero and an active
+  four-member network at 8 RPM, 224/256 SU, saved and reopened the world, then
+  advanced three ticks. All connected readings and the idle readings matched
+  their pre-save values. The active setup warmed for 70 ticks and ran three
+  further ticks before saving.
+
+Commands, from a prepared worktree with the pinned upstream small-wheel NBT
+and Create pack in `.local/`, using the matching `horizon-ctl`, `horizon-client`
+and prepared 26.3 resources:
+
+```sh
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 1 --check small-waterwheel --check loaded-stressometer --check goggles-gauges --check gauges-reopen
+```
+
+The first grouped invocation could not find the ignored small-wheel NBT in the
+fresh worktree; after copying that exact fixture from the primary checkout, the
+small-wheel check passed independently. The grouped run then passed the other
+three checks. The dedicated `hand-crank-lan` guest reversal regression was also
+run on this client; see `.local/parity/hand-crank-lan.log` for its result.
+An initial lifecycle attempt sampled the wheel network after only three ticks
+and correctly rejected its not-yet-settled zero reading. The replay now uses the
+existing fixture's 70-tick warmup before sampling; the complete reopen check
+passed with that established setup.
+
+The APP-1943 kinetic network dependency is Done. Direct LAN guest inspection of
+a Speedometer/Stressometer Goggles readout was not exercised in this pass and
+remains a required follow-up before the APP-1975 multiplayer gate is claimed.
+No direct guest gauge readout or exhaustive visual parity is claimed; Full 1:1
+remains Open.
+
+## APP-1975 close audit — November 21, 2026
+
+The four focused host-side checks were repeated on the source-compatible
+`native-9f42064-76138ca65acb` client from the recorded app-2058 build:
+`small-waterwheel`, `loaded-stressometer`, `gauges-reopen`, and
+`goggles-gauges` passed 4/4. The client production-source hashes for
+`native/factory_gauge.rs`, `native/goggles.rs`, `native/goggles_hud.rs`, and
+`native/stock_network.rs` match this PR head; the differing `machines.rs` is
+outside the gauge/readout paths. The pack remains SHA-256
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`.
+
+The repeatable `multiplayer-gauges` run now passes on the same client after
+reclaiming verified-inactive generated caches. The actual four-mill source
+network reached 8 RPM and 128 SU on the host; a live guest joined with Create
+content and Goggles, targeted the stressometer block, captured its loaded
+readout, and then observed a changed readout after the host removed three
+millstones. This is real network propagation; no `/data merge` result is
+claimed. Earlier disk-full and camera-target failures are preserved in the
+`.local/multiplayer-gauges-*` logs and are not counted as evidence.
+
+The repeatable live harness is registered as `multiplayer-gauges` in
+`tools/test-parity.py`. Its corrected rig force-loads chunk `[0,-1]`, uses the
+actual four-mill source network, joins a live guest, captures the guest's
+Goggles trace, removes three mills on the host, and requires the guest readout
+to change. The successful run used 9 GiB free after safe cache recovery; the
+earlier disk-full retries and the camera self-hit retry remain preserved as
+diagnostic logs.
