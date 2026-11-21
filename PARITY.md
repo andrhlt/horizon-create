@@ -7786,19 +7786,52 @@ and an exact raster trace remain open.
 
 ## Tree Fertilizer
 
-The [survival replay](tools/test-tree-fertilizer.py) crafted two,
-rejected stone without consumption, and grew oak with one fertilizer.
-The pinned [Java obstruction probe](tools/java-tree-fertilizer-obstructions-trace.patch)
-called the original item twice with identical scoped outcomes.
-Its [recorded results](fixtures/tree_fertilizer_obstructions-java.csv)
-show one item consumed, oak replacing stone in the trunk path while
-bedrock stays, and all four base spruce logs from a 2×2 cluster with
-no podzol. The Horizon replay passed those same two cases on
-`native-9f42064-2bf765040d26` with `create-ponder-assets.hmod`.
-A [survival LAN guest](tools/test-multiplayer-tree-fertilizer.py)
-passed both cases on the same build, and the host verified the
-original consumption and block outcomes. Other saplings, exact
-random geometry and particles remain open.
+APP-2088 preserves the existing family evidence, which
+covers the ordinary survival recipe, valid and rejected use, one-item and
+last-item consumption, main/offhand priority, drops, representative saplings,
+obstructions and seeded full-volume Java comparisons. The pinned Java
+implementation is `TreeFertilizerItem` at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; its use is immediate, so an active
+operation reload is not applicable.
+
+The finite delivery checks on `native-9f42064-6ce68a31b125` passed:
+
+- `tree-fertilizer`: crafted two, rejected stone without consuming fertilizer,
+  and grew oak with one use.
+- `tree-fertilizer-obstructions`: matched the pinned Java obstruction cases for
+  oak through stone with bedrock retained, plus all four giant spruce base logs
+  and no podzol.
+- `tree-fertilizer-obstructions-lan`: a survival guest grew those trees; the
+  host observed the matching blocks and consumption.
+- `tree-fertilizer-reopen-lan`: a guest grew oak, then its complete captured
+  block volume and remaining inventory survived host save/reopen and guest
+  rejoin. Coordinates, block IDs and non-derived properties matched. Vanilla
+  leaf `distance` values recalculated on load and were treated as derived state.
+
+The new replay compares the resulting state before and after Horizon reload; it
+does not claim Java-equivalent reload timing. Host and guest convergence is
+verified, not packet-arrival timing. Commands:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \
+  --check tree-fertilizer --check tree-fertilizer-obstructions \
+  --check tree-fertilizer-obstructions-lan --check tree-fertilizer-reopen-lan
+```
+
+Java obstruction fixture SHA-256:
+`1dae2c95763427ee7b1b29878e4ca2879b54518720065e0720aa0b4c90d72970`;
+capture patch SHA-256:
+`d341b499cb0b357784aba5398737092af6292ce241fb298f6eea3a6caeb9438c`.
+Runtime Horizon pin is `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`; client
+SHA-256 is `bdbafe5289f2c05ef76009c17070e0320a7c606e042dd5202b142e0e6d123fc9`,
+control tool SHA-256 is
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`, and
+pack SHA-256 is
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The leaf-distance reload refresh is the only newly observed state variation.
+Other seeds and environments, additional sapling geometry, Java map tree-bin
+cases, other overlay drops, item trajectories/pickup and particles remain
+nonblocking follow-up coverage; Full 1:1 remains Open.
 
 ## Factory Gauge item
 

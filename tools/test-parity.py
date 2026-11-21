@@ -1108,6 +1108,7 @@ CHECKS = (
     ("tree-fertilizer-offhand", "test-tree-fertilizer-offhand"),
     ("tree-fertilizer-both-hands", "test-tree-fertilizer-both-hands"),
     ("tree-fertilizer-last-item", "test-tree-fertilizer-last-item"),
+    ("tree-fertilizer-reopen-lan", "test-tree-fertilizer-reopen"),
     ("tree-fertilizer-nonsapling", "test-tree-fertilizer-nonsapling"),
     ("worldshaper-selection", "test-worldshaper-selection"),
     ("worldshaper-selection-lan", "test-worldshaper-selection", "--lan"),
