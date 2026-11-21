@@ -11,13 +11,14 @@ fn convert(level: &GameLevel<'_>, state: BlockStateId) -> Option<BlockStateId> {
     if info.name != PECULIAR {
         return None;
     }
-    let mut haunted = level.native_default_state(HAUNTED)?;
+    let default = level.registry.default_state(HAUNTED)?;
+    let mut haunted_info = level.registry.state(default)?.clone();
     for property in ["facing", "attachment", "powered"] {
         if let Some(value) = info.properties.get(property) {
-            haunted = level.native_state_with_property(haunted, property, value)?;
+            haunted_info.properties.insert(property.to_owned(), value.clone());
         }
     }
-    Some(haunted)
+    level.registry.resolve(&haunted_info).ok()
 }
 
 fn soul_fire(level: &GameLevel<'_>, pos: BlockPos) -> bool {
