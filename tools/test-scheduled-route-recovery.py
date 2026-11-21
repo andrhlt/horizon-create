@@ -20,7 +20,20 @@ PROGRAM = ('{"create:train_schedule":{Cyclic:0b,Entries:[{Instruction:{Id:"creat
 def value(world, field, observer=None):
     """Read route state through the observing client when one is supplied."""
     observer = observer or world
-    reply = observer.command(f"/data get entity {train.ENTITY} CreateTrain.{field}")
+    command = f"/data get entity {train.ENTITY} CreateTrain.{field}"
+    if observer is world:
+        reply = observer.command(command)
+    else:
+        observer.call("chat", command)
+        observer.call("wait", 2)
+        messages = observer.call("messages")["chat"]
+        reply = next(
+            (item if isinstance(item, str) else item.get("message", "")
+             for item in reversed(messages) if "entity data:" in (item if isinstance(item, str) else item.get("message", ""))),
+            "",
+        )
+        if not reply:
+            raise RuntimeError(f"Guest did not return route state for {field}: {messages}")
     return reply.partition("entity data: ")[2]
 
 
@@ -81,7 +94,17 @@ def cancel_and_resume(world, actor, who, observer):
     actor.call("wait", 3)
     advance(world, 1)
     actor.call("key", "shift", "up")
-    if "entity data:" in observer.command(f"/data get entity {train.ENTITY} CreateTrain.Driver"):
+    driver_command = f"/data get entity {train.ENTITY} CreateTrain.Driver"
+    if observer is world:
+        driver_reply = observer.command(driver_command)
+    else:
+        observer.call("chat", driver_command)
+        observer.call("wait", 2)
+        driver_reply = "\n".join(
+            item if isinstance(item, str) else item.get("message", "")
+            for item in observer.call("messages")["chat"]
+        )
+    if "entity data:" in driver_reply:
         raise RuntimeError("Sneak did not release the canceled trip's train controls.")
 
     conductor.click(world, actor, who, 0)
