@@ -4509,6 +4509,35 @@ Run `tools/test-train-signal.py --comparator`, `--lan`, `--craft`,
 with the standard Horizon arguments. Branched signal sections,
 graph reservations, and rail overlays remain under comparison.
 
+## APP-2050 finite occupancy persistence pass
+
+Train Track/railway casing (APP-2045) and Bogeys/train assembly (APP-2047)
+are Done. On candidate `native-9f42064-6bdf8691aa42` with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`,
+the existing `train-signal-occupancy` replay matched all 125 Java ticks,
+including speed, four wheel positions and four signal lamps. The real LAN
+placement check matched host/guest convergence when the guest bound the
+opposite direction and changed only that side to a Cross Signal.
+
+The new `train-signal-occupancy-reopen` check establishes a graph through a
+station, disassembles the train, and confirms all four clear sections remain
+green through idle save/reopen. Its active case saves a train inside a signalled
+section, resumes its speed/wheels and all four lamps against the Java trace, and
+then samples the settled end state. The capture matched 119 Java samples around
+the client restart; startup advances the live world before the harness can
+freeze it, so resumed samples use the corresponding shifted Java tick. The
+occupied and unoccupied checks exercise one train. The second-station assembly
+probe found that the station needs one discovery tick before its bogeys become
+eligible; after that, a second two-bogey train assembled with four wheel
+TrackPoints. A candidate-only moving probe changed the affected lamps from
+green to red as that train entered the signal section, but has not compared a
+two-train trace to pinned Java or verified clearance after both trains leave.
+This does not complete APP-2050's baseline.
+
+The branched LAN replay matched host train motion and all six lamps to 160 Java
+ticks. The guest's local lamp state matched the host at seven reads spanning
+five Java occupancy transition points (east-out and north-out changes).
+
 ## Track Station naming
 
 The [original Java GameTest](tools/java-track-station-name.patch) renames a

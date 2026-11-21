@@ -1624,6 +1624,7 @@ CHECKS = (
     ("train-signal-crafting", "test-train-signal", "--craft"),
     ("train-signal-lan", "test-train-signal", "--lan"),
     ("train-signal-occupancy", "test-signal-train-occupancy"),
+    ("train-signal-occupancy-reopen", "test-signal-train-occupancy", "--reopen"),
     ("train-signal-chain", "test-train-signal-chain"),
     ("curved-signal-chain", "test-curved-signal-chain"),
     ("branched-signal-chain", "test-curved-signal-chain", "--branches"),
@@ -1634,6 +1635,7 @@ CHECKS = (
     ("train-steer-lan", "test-multiplayer-train-steering"),
     ("curved-signal-occupancy", "test-curved-train", "--signals"),
     ("branched-signal-occupancy", "test-curved-train", "--branch-signals"),
+    ("branched-signal-occupancy-lan", "test-multiplayer-signal-occupancy"),
 
     ("track-placement", "test-track-placement"),
     ("fluid-threshold", "test-fluid-threshold"),
