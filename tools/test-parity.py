@@ -1196,6 +1196,7 @@ CHECKS = (
     ("observed-train-display-lan", "test-observed-train-display", "--lan"),
     ("repackager-initial", "test-repackager-initial"),
     ("repackager-orders", "test-repackager-orders"),
+    ("repackager-gameplay", "test-repackager-lifecycle"),
     ("cuckoo-clock", "test-cuckoo-clock", "--pack", str(ROOT / ".local/create.hmod")),
     ("basin-milk", "test-basin-milk"),
     ("basin-liquid-display", "test-basin-liquid-display", "--visual"),
