@@ -7740,6 +7740,26 @@ next tick. A competing guest visiting the Nether left the existing
 Overworld owner in place. Swapping, visuals and original client
 transport timing remain open.
 
+The bounded persistence checks (`linked-controller-persistence` and
+`lectern-controller-persistence`, each with solo and LAN variants) passed
+on `native-9f42064-6ce68a31b125` with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The handheld retained both pairs (diamond/emerald in slots 0/1 and
+gold/iron in 4/5) and its custom-data marker through a host save/reopen;
+the same named LAN guest rejoined, used the saved bindings, and drove the
+matching receiver and wire 0→15→0. The attached Lectern retained its
+diamond/emerald `ControllerData`, and the host or rejoined guest acquired
+it and resumed input to a matching receiver and adjacent wire after reopen.
+These are source-aligned Horizon save/reopen checks, not Java reload
+comparisons. The four new checks can be rerun with
+`python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client
+/path/to/prepared/26.3 --jobs 1 --check 'linked-controller-persistence*'
+--check 'lectern-controller-persistence*'` after preparing the pack as in
+the README. The first post-rebase LAN run exposed a fixture race before the
+rejoined guest received its test item; the failed output is retained at
+`.local/app-2033/failed/lectern-controller-persistence-lan-first-attempt.log`.
+The fixture now waits for the item to reach the guest inventory before use.
+
 ## Shopping List
 
 The [survival replay](tools/test-shopping-list-discard.py) on
