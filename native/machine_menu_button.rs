@@ -5,7 +5,7 @@ fn machine_menu_button(
     id: i32,
 ) {
     if entity.id == crate::game::create_factory_gauge::ENTITY {
-        crate::game::create_factory_gauge::menu_button(game, pos, id);
+        crate::game::create_factory_gauge::menu_button(game, pos, entity, id);
     } else if entity.id == crate::game::create_toolbox::ENTITY {
         crate::game::create_toolbox_menu::menu_button(game, pos, entity, id);
     } else if entity.id == crate::game::create_station::STATION {
