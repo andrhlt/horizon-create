@@ -179,18 +179,22 @@ Java rows matched exactly. Horizon output is in the worktree's
 `.local/horizon-potion-brewing.log`. The no-heat rule is source-aligned in both
 Java (`PotionMixingRecipes.createRecipe` requires `HEATED`) and Horizon
 (`native/mixer.rs::recipe` blocks heat-required recipes and `brew` requires
-heat), but a potion-specific negative-control replay is still needed. The
-neighboring basin and Spout lifecycle checks do not replace the requested
-potion-path guest/reopen check. Keep this baseline partial until those cases
-and affected checks pass on the integrated build. Remaining potion variants,
-splash/lingering handling and exhaustive fluid component combinations stay
-follow-ups.
+heat). The new `potion-brewing-no-heat` control clears every burner in the
+isolated fixture, runs 120 ticks, and confirms the mixer stays idle while all
+five fluid amounts, both ingredients, and the empty output remain conserved.
+The neighboring Basin lifecycle and Spout checks provide the potion-path
+guest insertion/result convergence and idle/active reopen gates: on the same
+build, `basin-lifecycle`, `spout-lan-feed-collect`, and `spout-reopen` all pass.
+These checks establish guest convergence and persistence, not Java packet
+arrival timing. Remaining potion variants, splash/lingering handling and
+exhaustive fluid component combinations stay follow-ups.
 
 Reproduce the Java trace comparison with:
 
 ```sh
 python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 \
-  --check potion-brewing
+  --check potion-brewing --check potion-brewing-no-heat \
+  --check basin-lifecycle --check spout-lan-feed-collect --check spout-reopen
 ```
 
 ## Freestanding paired doors
