@@ -519,6 +519,7 @@ CHECKS = (
     ("zinc-mining", "test-zinc-progression"),
     ("zinc-fortune", "test-zinc-progression", "--fortune"),
     ("zinc-mining-lan", "test-multiplayer-zinc"),
+    ("striated-ore-mining-lan", "test-multiplayer-striated-ore"),
     ("zinc-heating", "test-zinc-progression", "--heating"),
     ("zinc-crafting", "test-machine-crafting", "--reference", "fixtures/zinc-crafting-java.csv"),
     ("stone-palettes", "test-stone-palettes"),
