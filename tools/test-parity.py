@@ -1687,6 +1687,8 @@ CHECKS = (
     ("seat-mob-rival", "test-seat-mob-landing", "--occupied"),
     ("rose-quartz-palettes", "test-rose-quartz-palettes"),
     ("rose-quartz-palettes-lan", "test-rose-quartz-palettes", "--lan"),
+    ("rose-quartz-lifecycle", "test-rose-quartz-lifecycle"),
+    ("rose-quartz-lifecycle-lan", "test-rose-quartz-lifecycle", "--lan"),
     ("rose-quartz-lamp", "test-rose-quartz-lamp"),
     ("rose-quartz-lamp-lan", "test-rose-quartz-lamp", "--lan"),
     ("redstone-latches", "test-create-latches"),
