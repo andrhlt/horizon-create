@@ -12565,7 +12565,14 @@ required count, and the three directly affected checks were rerun on the final
 build. `python3 tools/check-source.py` and `git diff --check` passed. The
 original Java replay covers ticks 0–232 with zero differences in its discrete
 fields, six-decimal progress and flight counters. No full-suite or desktop-game
-run was used.
+run was used. After main advanced to `16696be` (APP-2086 symmetry-wand
+implementation and APP-2052/2055 documentation), the PR merged that source and
+rebuilt as `native-9f42064-352ad233a46a` in 193 s. All ten selected checks
+passed together: `schematicannon`, both Schematicannon baselines, and all seven
+`symmetry-wand-*` checks. Source checks passed with 489 JSON, 45 JSONL, 893
+Python, two shell and three TOML files. This is the combined-source integration
+result; it does not expand APP-2093's bounded gameplay claim.
+
 ## APP-2086 Wand of Symmetry gameplay baseline
 
 The bounded pass retains the earlier powered-crafter acquisition, XY/YZ plane,
