@@ -812,6 +812,8 @@ CHECKS = (
     ("honey-chocolate-flow", "test-honey-chocolate-flow"),
     ("honey-pipe", "test-fluid-split-trace", "--fluid", "honey"),
     ("tea-pipe", "test-fluid-split-trace", "--fluid", "tea"),
+    ("honey-pipe-reopen", "test-fluid-split-trace", "--fluid", "honey", "--reopen"),
+    ("tea-pipe-reopen", "test-fluid-split-trace", "--fluid", "tea", "--reopen"),
     ("placed-create-liquids", "test-placed-liquids"),
     ("placed-create-liquids-lan", "test-placed-liquids", "--lan"),
     ("fluid-bucket-machines", "test-fluid-bucket-machines"),

@@ -9370,6 +9370,47 @@ The [Java Tea probe](tools/java-tea-pipe-trace.patch) filled the source tank
 through its fluid capability. All 11,000 mB reached the destinations by tick 99.
 The virtual fluid can be stored and pumped through the network.
 
+## APP-1992 Honey, Chocolate and Tea gameplay baseline
+
+The finite recipe paths come directly from the pinned Create generators:
+`CreateMixingRecipeGen` makes 1,000 mB Honey from a Honey Block, 250 mB
+Chocolate from a Bar of Chocolate, and 250 mB Chocolate from milk, sugar and
+cocoa beans. It makes 500 mB Builder's Tea from 250 mB water, 250 mB milk and
+leaves. `CreateEmptyingRecipeGen` returns 250 mB Honey or Tea and a glass
+bottle from the corresponding bottle item. Existing
+[`test-fluid-food.py`](tools/test-fluid-food.py) and
+[`test-builders-tea.py`](tools/test-builders-tea.py) exercise those Basin and
+Spout recipe outcomes; the latter also drinks the Tea and checks the bottle,
+Haste and saturation. Existing placed-fluid bucket checks cover Honey and
+Chocolate in solo and LAN, and `test-fluid-bucket-machines.py` checks 1,000 mB
+bucket fill/drain paths. Existing Java traces remain the reference for 120
+Honey/Chocolate channel states and 101 ticks each of Honey and Tea through the
+three-way pipe. APP-1961 (Basin) and APP-1990 (Spout) are Done.
+
+The added `--reopen` mode in [`test-fluid-split-trace.py`](tools/test-fluid-split-trace.py)
+stops each Java pipe replay at tick 50, after 51 matched samples, and saves the
+active Honey or Tea network. It verifies that fluid identity and the 11,000 mB
+total survive reopening, that a separate 1,000 mB Chocolate tank retains its
+identity and amount, and that active transfer continues for another 100 ticks.
+The server can tick during startup before the fixture is frozen again, so the
+post-open assertion checks conserved quantity and resumed progress, not
+per-destination amounts or reload timing.
+
+Both new cases passed on available client `native-9f42064-6ce68a31b125` with
+pack SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+That client predates current main fluid changes, so these are candidate results
+only; the new checks and carried acceptance evidence still need a
+source-matched current build before this gameplay baseline can be called
+verified. A current build attempt could not stage the pinned Horizon source:
+the launcher source cache already contains some repository patches, and
+applying the remaining patch set privately stops at
+`horizon-create-potato-impact.patch`. The shared launcher source and cache were
+left unchanged. Details and preserved exploratory logs are under
+`.local/parity/app1992/` and the worktree-local `.local/` logs. The shared fluid
+pipe lifecycle check also fails on the old client; this is not evidence about
+the current integrated build. Full branch distributions, other pipe layouts,
+fog/rendering and registry-wide audits remain follow-ups.
+
 ## Mixed-fluid vertical tanks
 
 The [Java mixed tank probe](tools/java-tank-mixed-trace.patch) recorded
