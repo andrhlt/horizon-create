@@ -1631,6 +1631,7 @@ CHECKS = (
     ("train-steer-lan", "test-multiplayer-train-steering"),
     ("curved-signal-occupancy", "test-curved-train", "--signals"),
     ("branched-signal-occupancy", "test-curved-train", "--branch-signals"),
+    ("branched-signal-occupancy-lan", "test-multiplayer-signal-occupancy"),
 
     ("track-placement", "test-track-placement"),
     ("fluid-threshold", "test-fluid-threshold"),
