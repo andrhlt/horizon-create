@@ -12619,3 +12619,64 @@ source review, implementation and fixture authoring 9 minutes; Java captures
 74 seconds; complete native builds 586 + 379 + 242 seconds; syntax checks a few
 seconds per pass; integration and fixture debugging about 18 minutes, plus the
 combined run above. These categories overlap and are not an elapsed-time sum.
+
+## APP-2098 block, item and entity models, textures and animation
+
+### Bounded gameplay pass
+
+This pass reuses the existing Java-derived asset, face-culling, animation and
+vertex references. The representative cases were: a transparent window and
+pane placed by LAN players and retained across a cold reopen; the 272-context
+window face-visibility comparison; Toolbox lid opening and closing for both
+LAN viewers; all eight weighted-ejector flying item poses for host and guest;
+moving item cargo on a train port for host and guest; and a moving mounted
+port cold reopen. The Creative Motor's active and idle settings and resulting
+speeds also survived reopen. These are scoped gameplay and rendering checks,
+not an all-model or pixel-equivalence claim.
+
+The existing source inventory provides the missing-resource screen: all 642
+block IDs and 699 item IDs are loaded at the same Java IDs. The pack carries
+the original 1,307 textures and 2,760 of 2,762 model files byte for byte; the
+remaining two have documented Horizon conversions for Copper Casing and the
+flat Encased Fluid Pipe. These totals are the catalog audit, not new captures
+from this pass.
+
+The successful checks reused the Java traces already referenced by their
+individual harnesses. They ran with Horizon `9f42064` build
+`native-9f42064-340cbe866fa7`, Minecraft 26.3 prepared resources, and Create
+pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The client SHA-256 was
+`39712c37f7f666a2d730506198523f0d0b42ef7b4a15c0ea9142a95b450224ea`.
+The binary was built for the APP-2097 integration branch, not this ticket's
+`origin/main` worktree at `16696be2`, so it is supporting evidence only until
+a current ticket-branch build is checked. The ignored runtime assets were linked into
+this isolated worktree; the test runner wrote worlds and logs under its own
+`.local/parity` and temporary game directories.
+
+```sh
+python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 1 \
+  --check 'window-palettes-lan' --check 'window-reopen' \
+  --check 'creative-motor-reload' --check 'toolbox-animation-lan' \
+  --check 'weighted-ejector-flight-pose-lan' \
+  --check 'mounted-moving-port-render-reload' \
+  --check 'train-moving-item-port-render-lan'
+
+python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 1 \
+  --check 'window-culling' --window-culling
+```
+
+All seven checks in the first command and the 272-context window-culling check
+passed. A Creative Motor render probe was also attempted on the same binary,
+both solo and LAN. Neither run emitted `CREATE_MOTOR_FRAME`; its dedicated
+render check therefore failed while the save/reopen speed check passed. Since
+the client was not built from this worktree, this does not yet establish whether
+the source renderer or that build lacks the callback. Rebuild this ticket branch
+with a private launcher cache and rerun `creative-motor-render` and
+`creative-motor-render-lan` before closing the remaining renderer verification
+item. Early mounted-port and train-port fixture attempts lacked the ignored
+NBTs; after linking the repository's prepared fixtures, both selected checks
+passed. Their initial setup failures are not counted as gameplay failures.
+
+Full 1:1 remains Open for the unexamined asset/model combinations, additional
+animation states, pixel comparisons, and renderer compatibility.
