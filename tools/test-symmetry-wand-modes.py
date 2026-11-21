@@ -18,11 +18,20 @@ def configure(host, actor, player, mode, orientation):
     host.command(f'/tp {player} 10.5 170 25.5')
     mp.until('configuration position',lambda:actor.call('state')['player']['position']==[10.5,170.0,25.5])
     actor.call('select',WAND)
+    mp.until('wand selected on server',lambda:'wand_of_symmetry' in host.command(f'/data get entity {player} SelectedItem'))
     actor.call('look',0,-90)
-    actor.call('key','shift','down');actor.call('wait',4)
-    actor.call('use-item')
-    mp.until('settings screen',lambda:actor.call('state')['screen']=='mod')
-    actor.call('key','shift','up')
+    actor.call('key','shift','down')
+    try:
+        mp.until('actual crouching pose',lambda:actor.call('state')['player']['sneaking'])
+        # Keep Shift down through four network ticks, as the Worldshaper UI rig does.
+        actor.call('wait',4)
+        actor.call('mouse','right','click')
+        mp.until('settings screen',lambda:actor.call('state')['screen']=='mod')
+    except RuntimeError:
+        print('editor failure',actor.call('state'),host.command(f'/data get entity {player} SelectedItem'),flush=True)
+        raise
+    finally:
+        actor.call('key','shift','up')
     names=['Single Plane','Double Plane','Triple Plane']
     desired=1 if mode < 2 else 2
     current=mp.until('mode selector',lambda:next((b['label'].split(': ',1)[1] for b in actor.call('screen')['buttons'] if b['label'].startswith('Mirror Type:')),None))
@@ -37,6 +46,8 @@ def configure(host, actor, player, mode, orientation):
     actor.call('click-at',*ui.widget(actor,'Confirm'))
     kind='cross_plane' if mode<2 else 'triple_plane'
     mp.until('saved configuration',lambda:all(part in host.command(f'/data get entity {player} SelectedItem') for part in (kind,f'orientation_index: {orientation}')))
+    mp.until('settings closed',lambda:actor.call('state')['screen']=='playing')
+    mp.until('sneak released',lambda:not actor.call('state')['player']['sneaking'])
     actor.call('look',45 if orientation else 0,0);actor.call('wait',4)
     actor.call('interact',10,169,22,'up')
     mp.until('enabled configured origin',lambda:all(part in host.command(f'/data get entity {player} SelectedItem') for part in (kind,f'orientation_index: {orientation}','position: [10.0d, 170.0d, 22.0d]','"create:symmetry_wand_enable": 1b')))
@@ -51,7 +62,7 @@ def run(args, scratch):
         port = None
         if args.lan:
             port = host.call('lan', 'open', '0', 'commands', 'force')['port']
-            player = 'SymmetryModesGuest'
+            player = 'SymmetryModes'
             actor = sessions.enter_context(mp.joined_client(args, scratch, f'127.0.0.1:{port}', player,
                 render=True, scenario='symmetry-modes', pack=args.pack, env={'HORIZON_NO_AUDIO':'1'}))
             mp.until('guest joined', lambda: any(g['name'] == player and g['placed'] for g in host.call('lan','status')['guests']))
@@ -64,7 +75,7 @@ def run(args, scratch):
         # Shift-use is the ordinary Java configuration entry point.
         actor.call('look', 0, -90)
         actor.call('key','shift','down'); actor.call('wait',4)
-        actor.call('use-item')
+        actor.call('mouse','right','click')
         mp.until('wand editor', lambda: actor.call('state')['screen'] == 'mod')
         actor.call('key','shift','up')
         mp.until('wand controls', lambda: any(b['label'].startswith('Mirror Type:') for b in actor.call('screen')['buttons']))
@@ -137,6 +148,8 @@ def run(args, scratch):
                 actor=sessions.enter_context(mp.joined_client(args,scratch,f'127.0.0.1:{port}',player,
                     render=True,scenario='symmetry-modes-rejoin',pack=args.pack,env={'HORIZON_NO_AUDIO':'1'}))
                 mp.until('guest rejoined',lambda:any(g['name']==player and g['placed'] for g in host.call('lan','status')['guests']))
+            # LAN force mode follows the Creative host when reconnecting.
+            host.call('command',f'/gamemode survival {player}')
             mp.until('saved wand arrived',lambda:mp.count(actor,WAND)==1)
             actor.call('select',WAND)
             mp.until('saved wand selected',lambda:'wand_of_symmetry' in host.command(f'/data get entity {player} SelectedItem'))
