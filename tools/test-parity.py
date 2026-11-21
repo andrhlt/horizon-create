@@ -1188,6 +1188,7 @@ CHECKS = (
     ("factory-gauge-filter", "test-factory-gauge-item", "--filter"),
     ("factory-gauge-connection", "test-factory-gauge-item", "--connection"),
     ("factory-gauge-stock-display", "test-factory-gauge-item", "--stock-display"),
+    ("factory-gauge-reopen", "test-factory-gauge-item", "--connection", "--reopen"),
     ("factory-gauge-stock-display-lan", "test-factory-gauge-lan"),
     ("factory-gauge-orientation", "test-factory-gauge-orientation"),
     ("factory-gauge-display", "test-factory-gauge-display"),
