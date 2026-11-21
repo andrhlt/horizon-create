@@ -81,7 +81,7 @@ fn legacy_material_float(game: &mut crate::game::Game<'_>) {
             } else if in_beacon_beam(game, at) {
                 Some(RADIANCE)
             } else {
-                if collect_placed_light(game, at) {
+                if collect_sampled_light(game, at) {
                     let item = &mut game.dropped[index];
                     let mut charged = item.stack.clone();
                     charged.count = 1;
@@ -153,7 +153,7 @@ fn legacy_material_float(game: &mut crate::game::Game<'_>) {
         game.remove_dropped(index);
     }
 
-    fn collect_placed_light(game: &mut crate::game::Game<'_>, at: Vec3) -> bool {
+    fn collect_sampled_light(game: &mut crate::game::Game<'_>, at: Vec3) -> bool {
         fn sampled_block(random: &mut impl RandomSource, at: Vec3) -> Option<[i32; 3]> {
             if random.next_float() > 0.5 {
                 return None;
@@ -179,6 +179,14 @@ fn legacy_material_float(game: &mut crate::game::Game<'_>) {
         let Some([x, y, z]) = sample else {
             return false;
         };
+        if game.native_block([x, y, z]) == crate::game::create_depot::DEPOT {
+            return collect_light_from_transport(game, at, [x, y, z]);
+        }
+        collect_placed_light_at(game, at, [x, y, z])
+    }
+
+    fn collect_placed_light_at(game: &mut crate::game::Game<'_>, at: Vec3, pos: [i32; 3]) -> bool {
+        let [x, y, z] = pos;
         let state = game.res.facts().get(game.world.block(x, y, z));
         if state.emission == 0
             || state.hardness == -1.0
@@ -188,13 +196,62 @@ fn legacy_material_float(game: &mut crate::game::Game<'_>) {
         }
         let eye = Vec3::new(at.x, at.y + 0.5, at.z);
         let target = Vec3::new(f64::from(x) + 0.5, f64::from(y) + 0.5, f64::from(z) + 0.5);
-        if game.mob_world_base(&[]).clip_block_at(eye, target) != Some([x, y, z]) {
+        if game.mob_world_base(&[]).clip_block_at(eye, target) != Some(pos) {
             return false;
         }
         let Some(air) = game.pack.assets.registry.default_state("minecraft:air") else {
             return false;
         };
-        game.native_set_block(game.native_dimension(), [x, y, z], air, flags::UPDATE_ALL)
+        game.native_set_block(game.native_dimension(), pos, air, flags::UPDATE_ALL)
+    }
+
+    fn collect_light_from_transport(
+        game: &mut crate::game::Game<'_>,
+        at: Vec3,
+        pos: [i32; 3],
+    ) -> bool {
+        let Some(light) = crate::game::create_machines::mod_entity(game, pos)
+            .and_then(|entity| entity.items.first().and_then(Option::as_ref))
+            .filter(|stack| stack.count > 0)
+            .cloned()
+        else {
+            return false;
+        };
+        let Some(state) = game.native_default_state(&light.item) else {
+            return false;
+        };
+        let facts = game.res.facts().get(state);
+        if facts.emission == 0 || facts.hardness == -1.0 {
+            return false;
+        }
+        let eye = Vec3::new(at.x, at.y + 0.5, at.z);
+        let target = Vec3::new(
+            f64::from(pos[0]) + 0.5,
+            f64::from(pos[1]) + 0.5,
+            f64::from(pos[2]) + 0.5,
+        );
+        if game.mob_world_base(&[]).clip_block_at(eye, target) != Some(pos) {
+            return false;
+        }
+
+        let consumed = game.native_with_mod_block_entity(pos, |depot| {
+            let Some(Some(stack)) = depot.items.first_mut() else {
+                return false;
+            };
+            if stack.item != light.item || stack.count == 0 {
+                return false;
+            }
+            stack.count -= 1;
+            if stack.count == 0 {
+                depot.items[0] = None;
+            }
+            true
+        }) == Some(true);
+        if !consumed {
+            return false;
+        }
+        game.native_block_entity_sync(pos);
+        true
     }
 
     fn in_beacon_beam(game: &crate::game::Game<'_>, at: horizon_core::geometry::Vec3) -> bool {

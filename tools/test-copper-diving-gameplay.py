@@ -42,9 +42,10 @@ def set_up(world, *, boots=False):
         world.command("/item replace entity @s armor.feet with create:copper_diving_boots")
 
 
-def equip_tank(world, air):
+def equip_tank(world, air, material="copper"):
     x, y, z = TANK_POS
-    world.command(f"/setblock {x} {y} {z} create:copper_backtank[facing=south,waterlogged=false]")
+    tank_item = f"create:{material}_backtank"
+    world.command(f"/setblock {x} {y} {z} {tank_item}[facing=south,waterlogged=false]")
     world.command(f"/data merge block {x} {y} {z} {{Air:{air}}}")
     world.call("interact", x, y, z, "south")
     expected = f'"create:banktank_air": {air}'
@@ -64,7 +65,7 @@ def tank_air(world):
     return int(match[1])
 
 
-def movement(args):
+def movement(args, boots_item="create:copper_diving_boots"):
     def scenario(label, boots, *, forward=False):
         with fixture_world(args, f"CopperBootMovement{label}{'Forward' if forward else ''}",
                            render=False, pack=args.pack, terrain_seed=2081) as world:
@@ -90,10 +91,10 @@ def movement(args):
             if not forward:
                 world.command("/setblock 9 169 22 minecraft:air")
             if boots:
-                world.command("/item replace entity @s armor.feet with create:copper_diving_boots")
+                world.command(f"/item replace entity @s armor.feet with {boots_item}")
                 feet = world.command("/data get entity @s equipment.feet")
-                if 'id: "create:copper_diving_boots"' not in feet:
-                    raise RuntimeError(f"The copper boots were not equipped before the movement tick: {feet}")
+                if f'id: "{boots_item}"' not in feet:
+                    raise RuntimeError(f"The {boots_item} were not equipped before the movement tick: {feet}")
             tick = world.clock()
             sample_count = 3 if forward else 8
             for sample_tick in range(tick + 1, tick + sample_count + 1):
@@ -112,9 +113,9 @@ def movement(args):
     bare_dy = bare_after["velocity"][1] - bare["velocity"][1]
     boots_dy = equipped_after["velocity"][1] - equipped["velocity"][1]
     if boots_dy > bare_dy - 0.04:
-        raise RuntimeError(f"Copper boots missed Java's -0.05/tick downward impulse: bare Δvy={bare_dy:.6f}, boots Δvy={boots_dy:.6f}; start={equipped}; end={equipped_after}")
+        raise RuntimeError(f"{boots_item} missed Java's -0.05/tick downward impulse: bare Δvy={bare_dy:.6f}, boots Δvy={boots_dy:.6f}; start={equipped}; end={equipped_after}")
     if equipped_after["position"][1] > bare_after["position"][1] - 0.2:
-        raise RuntimeError(f"Copper boots did not cause consequentially faster sinking over eight submerged ticks: bare={bare_after}, boots={equipped_after}")
+        raise RuntimeError(f"{boots_item} did not cause consequentially faster sinking over eight submerged ticks: bare={bare_after}, boots={equipped_after}")
 
     moving_bare, moving_bare_after = scenario("Control", False, forward=True)
     moving_boots, moving_boots_after = scenario("Equipped", True, forward=True)
@@ -125,11 +126,11 @@ def movement(args):
     bare_speed = (moving_bare_after["velocity"][0] ** 2 + moving_bare_after["velocity"][2] ** 2) ** 0.5
     boots_speed = (moving_boots_after["velocity"][0] ** 2 + moving_boots_after["velocity"][2] ** 2) ** 0.5
     if bare_speed <= 0 or boots_speed < bare_speed * 1.25:
-        raise RuntimeError(f"Copper boots did not apply Java's 1.3 underwater movement multiplier: bare={moving_bare_after}, boots={moving_boots_after}")
-    print(f"Matched submerged start: boots Δvy={boots_dy:.6f}, bare Δvy={bare_dy:.6f}; forward speed bare={bare_speed:.6f}, boots={boots_speed:.6f}.")
+        raise RuntimeError(f"{boots_item} did not apply Java's 1.3 underwater movement multiplier: bare={moving_bare_after}, boots={moving_boots_after}")
+    print(f"{boots_item}: matched submerged start; Δvy equipped={boots_dy:.6f}, bare={bare_dy:.6f}; forward speed bare={bare_speed:.6f}, equipped={boots_speed:.6f}.")
 
 
-def lan_movement(args):
+def lan_movement(args, boots_item="create:copper_diving_boots"):
     with TemporaryDirectory(prefix="hc-copper-boots-lan-", dir="/private/tmp") as temp:
         with ExitStack() as sessions:
             host = sessions.enter_context(fixture_world(args, "CopperBootMovementLan", render=False,
@@ -161,8 +162,8 @@ def lan_movement(args):
                 if state["pose"] != "STANDING" or not state["on_ground"] or abs(state["position"][1] - 170) > 1e-3:
                     raise RuntimeError(f"LAN {label} did not start standing on the submerged floor: {state}")
             host.commands((
-                "/item replace entity @s armor.feet with create:copper_diving_boots",
-                f"/item replace entity {guest_name} armor.feet with create:copper_diving_boots",
+                f"/item replace entity @s armor.feet with {boots_item}",
+                f"/item replace entity {guest_name} armor.feet with {boots_item}",
             ))
             host.commands(("/setblock 9 169 22 minecraft:air", "/setblock 13 169 22 minecraft:air"))
             tick = host.clock()
@@ -172,8 +173,8 @@ def lan_movement(args):
             for label, start, end in zip(("host", "guest"), starts, ends):
                 drop = start["position"][1] - end["position"][1]
                 if drop < 0.25 or end["velocity"][1] > -0.15:
-                    raise RuntimeError(f"LAN {label} did not receive the copper boots sinking effect: start={start}, end={end}")
-            print("Copper boots sinking ran for both the LAN host player and joined guest.")
+                    raise RuntimeError(f"LAN {label} did not receive the {boots_item} sinking effect: start={start}, end={end}")
+            print(f"{boots_item} sinking ran for both the LAN host player and joined guest.")
 
 
 def warning(args, starting_air):
@@ -198,16 +199,17 @@ def warning(args, starting_air):
         print(f"Backtank warning appeared at {starting_air}→{starting_air - 1} air: {subtitle}")
 
 
-def reopen(args):
-    with fixture_world(args, "CopperDivingReopen", render=False, pack=args.pack) as world:
+def reopen(args, material="copper"):
+    helmet_item = f"create:{material}_diving_helmet"
+    with fixture_world(args, f"{material.title()}DivingReopen", render=False, pack=args.pack) as world:
         set_up(world, boots=True)
         world.command(f"/tp @s {PLAYER_DRY[0]} {PLAYER_DRY[1]} {PLAYER_DRY[2]} 180 0")
-        equip_tank(world, 900)
+        equip_tank(world, 900, material)
         world.restart()
         if tank_air(world) != 900:
             raise RuntimeError("A charged Backtank did not retain 900 air on reopen.")
 
-        world.command("/item replace entity @s armor.head with create:copper_diving_helmet")
+        world.command(f"/item replace entity @s armor.head with {helmet_item}")
         world.command(f"/tp @s {PLAYER_WATER[0]} {PLAYER_WATER[1]} {PLAYER_WATER[2]} 180 0")
         for _ in range(40):
             world.step_to(world.clock() + 1)
@@ -225,7 +227,7 @@ def reopen(args):
                 break
         else:
             raise RuntimeError("Underwater air consumption did not resume after reopening.")
-    print("Charged and partially depleted Backtanks survived reopen; breathing resumed after reload.")
+    print(f"Charged and partially depleted {material.title()} Backtanks survived reopen; breathing resumed after reload.")
 
 
 def main():
@@ -235,19 +237,28 @@ def main():
     parser.add_argument("--pack", type=lambda value: Path(value).resolve(strict=True))
     parser.add_argument("--movement", action="store_true")
     parser.add_argument("--lan-movement", action="store_true")
+    parser.add_argument("--netherite-movement", action="store_true")
+    parser.add_argument("--netherite-lan-movement", action="store_true")
     parser.add_argument("--warnings", action="store_true")
     parser.add_argument("--reopen", action="store_true")
+    parser.add_argument("--netherite-reopen", action="store_true")
     args = parser.parse_args()
-    selected = args.movement or args.lan_movement or args.warnings or args.reopen
+    selected = args.movement or args.lan_movement or args.netherite_movement or args.netherite_lan_movement or args.warnings or args.reopen or args.netherite_reopen
     if not selected or args.movement:
         movement(args)
     if not selected or args.lan_movement:
         lan_movement(args)
+    if args.netherite_movement:
+        movement(args, "create:netherite_diving_boots")
+    if args.netherite_lan_movement:
+        lan_movement(args, "create:netherite_diving_boots")
     if not selected or args.warnings:
         warning(args, 91)
         warning(args, 2)
     if not selected or args.reopen:
         reopen(args)
+    if args.netherite_reopen:
+        reopen(args, "netherite")
 
 
 if __name__ == "__main__":

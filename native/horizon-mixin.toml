@@ -4297,6 +4297,17 @@ name = "create_backtank"
 source = "backtank.rs"
 
 [[injection]]
+id = "diving_player_fire_immunity"
+target = "horizon_client::game::creatures::Game<'_>::hurt_player_from"
+kind = "HEAD"
+cancellable = true
+helper = "diving_player_damage.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "damage_type", ty = "&str", value = "damage_type" },
+]
+
+[[injection]]
 id = "diving_player_tick"
 target = "horizon_client::game::remote::Game<'_>::tick_remote_level"
 kind = "HEAD"

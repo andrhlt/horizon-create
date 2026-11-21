@@ -53,6 +53,15 @@ def run(args):
                 assert state(host) is None
                 assert actor.call("inventory")["held"]["durability_left"] == 100
                 actor.call("wait", 10)
+                host.command(f"/item replace entity {name} hotbar.1 with minecraft:stick 3")
+                editor.wait_for(actor, "unsupported stick ammunition", lambda:
+                    actor.call("inventory")["counts"].get("minecraft:stick") == 3)
+                actor.call("mouse", "right", "click")
+                actor.call("wait", 3)
+                inventory = actor.call("inventory")
+                assert state(host) is None
+                assert inventory["counts"].get("minecraft:stick") == 3
+                assert inventory["held"]["durability_left"] == 100
                 host.command(f"/item replace entity {name} hotbar.1 with minecraft:potato 3")
                 editor.wait_for(actor, "three potatoes", lambda: actor.call("inventory")["counts"].get("minecraft:potato") == 3)
                 actor.call("mouse", "right", "click")
@@ -70,7 +79,7 @@ def run(args):
                     expected = tuple(float(row[k]) for k in ("x", "y", "z", "vx", "vy", "vz"))
                     actual = state(host)
                     assert actual is not None and all(math.isclose(a, b, abs_tol=1e-6) for a, b in zip(actual, expected, strict=True)), (row["tick"], actual, expected)
-    print("Empty and loaded cannon clicks and three flight ticks matched the Java fixture.")
+    print("Empty and unsupported ammo were rejected; loaded clicks and three flight ticks matched Java.")
 
 
 if __name__ == "__main__":
