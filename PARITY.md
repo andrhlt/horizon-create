@@ -12542,3 +12542,21 @@ existing Worldshaper helper. It also explicitly returns a forced LAN rejoin from
 the Creative host's mode to Survival before checking costs. An idempotent
 `/gamemode` returns no chat, so setup reads the command reply rather than indexing
 an empty chat list. None of these fixture corrections changed production code.
+
+### Combined-source verification
+
+After rebasing onto main `2b92921` (including the portable minecart cargo fix),
+`native-9f42064-14bf8b98c5e3` built successfully in 242 seconds. Its client SHA-256
+is `2df9b896c8f534d5404fae55eff772a956a68a727358606ebe2706368383224c`;
+its control tool and pack hashes remain those recorded above. All seven registered
+`symmetry-wand-*` checks passed together with `--jobs 2` in approximately 143
+seconds. This includes both complete new mode/lifecycle runs and all five existing
+regressions. Raw summary: `.local/combined-suite.log`; individual outputs:
+`.local/parity/symmetry-wand-*.log`; build: `.local/build-combined.log`.
+Verification ran on the rebased PR head before protected-branch integration.
+
+Approximate overlapping work times: setup/cache recovery 9 minutes;
+source review, implementation and fixture authoring 9 minutes; Java captures
+74 seconds; complete native builds 586 + 379 + 242 seconds; syntax checks a few
+seconds per pass; integration and fixture debugging about 18 minutes, plus the
+combined run above. These categories overlap and are not an elapsed-time sum.
