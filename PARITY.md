@@ -5344,6 +5344,42 @@ python3 tools/test-parity.py CTL CLIENT RESOURCES --jobs 2 \
   --check mounted-fluid-port-comparator-lan --check mounted-idle-port-comparator-lan
 ```
 
+### APP-2055 mounted train item and fluid storage
+
+The mounted-storage baseline reuses the pinned Java cargo and portable-interface
+fixtures instead of expanding the family into an exhaustive storage audit. The
+finite acceptance cases are chest/barrel and fluid-tank cargo retained while a
+train travels, item and fluid docking transfer in both directions, full and
+empty receiver boundaries, disassembly back to the original blocks, host and
+guest interaction, and moving/docked save-reopen conservation.
+
+The item and fluid extraction fixtures (`mounted-item-extract` and
+`mounted-fluid-drain`) compare the source, mounted and receiving inventories
+through assembly, movement and disassembly. The scheduled station checks cover
+mounted Chest, Barrel, Item Vault and empty-carriage threshold/cargo behavior,
+including LAN variants. `mounted-port-comparator*` covers item and fluid
+interface transfer, comparator output, contact/retraction and disassembly in
+solo and LAN; `dual-port-bearing*` adds paired item/fluid exchange, full
+receivers, docking and active/idle reopen. `mounted-moving-port-render*` and
+`mounted-fixed-port-render*` verify the moving and stationary interface state
+through contact, retraction and reload.
+
+Run the bounded regression set on one exact compatible build with:
+
+```sh
+python3 tools/test-parity.py CTL CLIENT RESOURCES --jobs 2 \
+  --check mounted-item-extract --check mounted-fluid-drain \
+  --check 'scheduled-train-stock-*' --check 'scheduled-train-stock-*-lan' \
+  --check 'dual-port-bearing*' --check 'mounted-port-comparator*' \
+  --check 'mounted-idle-port-comparator*' --check 'mounted-moving-port-render*' \
+  --check 'mounted-fixed-port-render*'
+```
+
+The scoped baseline retains item and fluid identity and amount across the
+tested travel, docking, guest, disassembly and reopen transitions. Broader
+storage layouts, additional materials and exact Java reload/network timing
+remain follow-ups; Full 1:1 stays Open.
+
 ## Train conductor Schedule handoff
 
 The [pinned Java GameTest](tools/java-train-conductor-trace.patch) assembles
