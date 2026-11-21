@@ -579,6 +579,7 @@ CHECKS = (
     ("copper-diving-reopen", "test-copper-diving-gameplay", "--reopen"),
     ("deployer-applications", "test-deployer-applications"),
     ("deployer-applications-lan", "test-deployer-applications", "--lan"),
+    ("deployer-shearing", "test-deployer-shearing"),
     ("standalone-deploying", "test-standalone-deploying"),
     ("efficient-deployers", "test-efficient-deployers"),
     ("schematicannon", "test-schematicannon"),
