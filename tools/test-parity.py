@@ -1610,6 +1610,8 @@ CHECKS = (
     ("scheduled-wildcard-route", "test-scheduled-route-cost"),
     ("scheduled-wildcard-route-red", "test-scheduled-route-cost", "--forced-red"),
     ("scheduled-wildcard-route-red-lan", "test-scheduled-route-cost", "--forced-red", "--multiplayer"),
+    ("scheduled-route-recovery", "test-scheduled-route-recovery"),
+    ("scheduled-route-recovery-lan", "test-scheduled-route-recovery", "--multiplayer"),
     ("train-conductor", "test-train-conductor"),
     ("train-conductor-lan", "test-train-conductor", "--multiplayer"),
     ("train-schedule-groups", "test-train-schedule-groups"),
