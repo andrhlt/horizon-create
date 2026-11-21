@@ -6986,8 +6986,40 @@ retained incomplete orders 77 and 88. Completing order 77 yielded one
 queued package with two iron ingots followed by two gold ingots and
 retained order 88. The [exact outcome replay](tools/test-repackager-orders.py)
 matched on `native-9f42064-f550e55a9faa` with
-`create-factory-gauge-block.hmod`. Java's timed redstone path, attached
-inventory behavior and the sparse crafting pattern remain open.
+`create-factory-gauge-block.hmod`. Java's timed redstone path and broader
+attached-inventory behavior remain open.
+
+### APP-2022 Repackager gameplay baseline
+
+The bounded APP-2022 pass reuses the original survival and order fixtures and
+adds [lifecycle/LAN coverage](tools/test-repackager-lifecycle.py). The finite
+cases are: (1) one incomplete split order remains in the attached Barrel, then
+completes after a redstone off/on cycle and the Repackager cooldown; (2) the
+merged package retains its address and ordered iron/gold contents; (3) a
+second complete order remains in the Barrel while the first output occupies
+the machine queue; (4) idle state with a partial order and active output state
+survive save/reopen; and (5) a LAN guest toggles a lever and the host observes
+the package dispatch. The backpressure fixture resets the machine's cooldown
+field immediately before the second pulse to isolate the queue guard from the
+separate cooldown gate. After reopen, the queued item resumes as the held
+package/animation; its address and contents remain intact.
+
+On `native-9f42064-6ce68a31b125` (Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, including cursor fix
+`16af87f5046ccbf0438a4b8aaeddca2ee0b50b24`) with pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`,
+`repackager-initial`, `repackager-orders`, and the new `repackager-gameplay`
+check passed. The first two reuse the existing survival actions and Java
+method-probe outcome; that probe retains incomplete orders 77/88 and verifies
+the completed order 77 contents plus sparse crafting context. The lifecycle
+case checked one host and one guest dispatch and two save/reopen states. The
+portable case list is registered in `tools/test-parity.py`; detailed runtime
+logs are under `.local/app-2022-evidence/`.
+
+The ticket baseline does not claim Java-equivalent redstone/attachment timing
+or exhaustive inventory, recipe, and layout coverage. Those combinations,
+other inventory providers and optional ComputerCraft integration remain
+follow-ups; Full 1:1 remains Open.
 
 ## Peculiar Bell and Haunted Bell
 
