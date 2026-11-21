@@ -17,8 +17,23 @@ PROGRAM = ('{"create:train_schedule":{Cyclic:0b,Entries:[{Instruction:{Id:"creat
            'Data:{Text:"Terminal"}},Conditions:[]}]}}')
 
 
-def value(world, field):
-    reply = world.command(f"/data get entity {train.ENTITY} CreateTrain.{field}")
+def value(world, field, observer=None):
+    """Read route state through the observing client when one is supplied."""
+    observer = observer or world
+    command = f"/data get entity {train.ENTITY} CreateTrain.{field}"
+    if observer is world:
+        reply = observer.command(command)
+    else:
+        observer.call("chat", command)
+        observer.call("wait", 2)
+        messages = observer.call("messages")["chat"]
+        reply = next(
+            (item if isinstance(item, str) else item.get("message", "")
+             for item in reversed(messages) if "entity data:" in (item if isinstance(item, str) else item.get("message", ""))),
+            "",
+        )
+        if not reply:
+            raise RuntimeError(f"Guest did not return route state for {field}: {messages}")
     return reply.partition("entity data: ")[2]
 
 
@@ -33,7 +48,7 @@ def advance(world, ticks):
         time.sleep(0.05)
 
 
-def missing_target_then_restore(world, actor, who):
+def missing_target_then_restore(world, actor, who, observer):
     terminal = trip.approach.DESTINATION
     x, y, z = terminal
     world.command(f'/data merge block {x} {y} {z} {{Name:"Offline"}}')
@@ -43,20 +58,20 @@ def missing_target_then_restore(world, actor, who):
         raise RuntimeError("The seated conductor did not take the route-recovery timetable.")
 
     advance(world, 42)
-    if value(world, "ApproachStation") or value(world, "SchedulePaused").endswith("1b"):
+    if value(world, "ApproachStation", observer) or value(world, "SchedulePaused", observer).endswith("1b"):
         raise RuntimeError("An unreachable destination started travel or paused the schedule.")
-    if float(value(world, "Speed")[:-1]) != 0.0:
+    if float(value(world, "Speed", observer)[:-1]) != 0.0:
         raise RuntimeError("The train moved while its named destination was unavailable.")
 
     world.command(f'/data merge block {x} {y} {z} {{Name:"Terminal"}}')
     advance(world, 45)
-    if not value(world, "ApproachStation").endswith("[I; " + ", ".join(map(str, terminal)) + "]"):
+    if not value(world, "ApproachStation", observer).endswith("[I; " + ", ".join(map(str, terminal)) + "]"):
         raise RuntimeError("The route did not recover after its destination became reachable.")
-    if float(value(world, "Speed")[:-1]) <= 0.0:
+    if float(value(world, "Speed", observer)[:-1]) <= 0.0:
         raise RuntimeError("The recovered route did not begin moving.")
 
 
-def cancel_and_resume(world, actor, who):
+def cancel_and_resume(world, actor, who, observer):
     # The train starts within one control-block reach of the assembled train.
     # After 45 ticks it has moved along the same straight rail, so use the
     # leading wheel's offset to place the actor beside its mounted controls.
@@ -70,32 +85,43 @@ def cancel_and_resume(world, actor, who):
     actor.call("mouse", "right", "click")
     actor.call("wait", 3)
 
-    if not value(world, "SchedulePaused").endswith("1b"):
+    if not value(world, "SchedulePaused", observer).endswith("1b"):
         raise RuntimeError("Taking controls did not pause the scheduled trip.")
-    if value(world, "ScheduleRuntime.Stage") or value(world, "ApproachStation"):
+    if value(world, "ScheduleRuntime.Stage", observer) or value(world, "ApproachStation", observer):
         raise RuntimeError("Taking controls left stale in-transit navigation state.")
 
     actor.call("key", "shift", "down")
     actor.call("wait", 3)
     advance(world, 1)
     actor.call("key", "shift", "up")
-    if "entity data:" in world.command(f"/data get entity {train.ENTITY} CreateTrain.Driver"):
+    driver_command = f"/data get entity {train.ENTITY} CreateTrain.Driver"
+    if observer is world:
+        driver_reply = observer.command(driver_command)
+    else:
+        observer.call("chat", driver_command)
+        observer.call("wait", 2)
+        driver_reply = "\n".join(
+            item if isinstance(item, str) else item.get("message", "")
+            for item in observer.call("messages")["chat"]
+        )
+    if "entity data:" in driver_reply:
         raise RuntimeError("Sneak did not release the canceled trip's train controls.")
 
     conductor.click(world, actor, who, 0)
-    if value(world, "SchedulePaused").endswith("1b"):
+    if value(world, "SchedulePaused", observer).endswith("1b"):
         raise RuntimeError("The conductor did not resume the canceled timetable.")
     advance(world, 1)
-    if not value(world, "ApproachStation").endswith("[I; " + ", ".join(map(str, trip.approach.DESTINATION)) + "]"):
+    if not value(world, "ApproachStation", observer).endswith("[I; " + ", ".join(map(str, trip.approach.DESTINATION)) + "]"):
         raise RuntimeError("The resumed timetable did not redispatch its destination.")
 
 
-def exercise(world, actor, who):
+def exercise(world, actor, who, observer=None):
+    observer = observer or world
     world.command(f"/attribute {who} minecraft:gravity base set 0")
-    missing_target_then_restore(world, actor, who)
-    cancel_and_resume(world, actor, who)
+    missing_target_then_restore(world, actor, who, observer)
+    cancel_and_resume(world, actor, who, observer)
     advance(world, 100)
-    arrived = value(world, "ArrivedStation")
+    arrived = value(world, "ArrivedStation", observer)
     expected = "[I; " + ", ".join(map(str, trip.approach.DESTINATION)) + "]"
     if not arrived.endswith(expected):
         raise RuntimeError(f"The recovered timetable did not arrive at Terminal: {arrived}")
@@ -119,7 +145,7 @@ def run(args):
                 item["name"] == GUEST and item["placed"] for item in world.call("lan", "status")["guests"]
             ))
             world.command(f"/gamemode survival {GUEST}")
-            exercise(world, guest, GUEST)
+            exercise(world, guest, GUEST, observer=guest)
 
 
 if __name__ == "__main__":
