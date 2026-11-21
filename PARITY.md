@@ -2405,6 +2405,31 @@ mixed book, and used the sword as 1,000-tick furnace fuel. The
 [nonzero knockback control](tools/test-cardboard-sword-base-knockback.py)
 also matched the Java pig impulse in both roles.
 
+The finite APP-2080 pass reuses those mob and PvP results and adds a
+[save/reopen check](tools/test-cardboard-sword-reopen.py): a survival player's
+Cardboard Sword retains Knockback I and damage 3 after a real non-damaging pig
+hit; the pig retains 10 health and Slowness after the world reopens. This is a
+meaningful active-after-hit persistence state; an ongoing active-equipment
+state does not apply to this instant-use weapon. Armor stands, the Ender
+Dragon, held-item rendering, other enchantment variants, and packet arrival
+timing remain follow-ups.
+
+The reopen check passed on 2026-11-20 against Horizon source `9f42064`, client
+directory `native-9f42064-558283db0c26`, and Create pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The client SHA-256 was
+`37358d394a10d7758fbf1651f7432696b41f37036ff08f1bd2b18883a80ba99a`; the
+controller SHA-256 was
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`.
+It used the prepared 26.3 bundle from the retained Cardboard Sword test build.
+Reproduce with `python3 tools/test-cardboard-sword-reopen.py <horizon-ctl>
+<horizon-client> <prepared-26.3> --pack <create.hmod> --artifacts <output>`.
+The control log is retained under `.local/parity/horizon-cardboardswordreopen.log`
+in the isolated APP-2080 checkout. Pinned Java source is
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; the retained mob and PvP fixtures
+have SHA-256 values `a9513fd58ec50bd6d4e25b78301c5407e18453c1c80e4f9c69d2ae017ecc8aed`
+and `a01b12d85c6691db5ee75de24f0f90ec65fed707ab93788914dcb70cafab056c`.
+
 The [Sword PvP replay](tools/test-cardboard-sword-pvp.py) matched seven
 [original Java impact cases](fixtures/cardboard-sword-pvp-java.csv) in
 each direction between a host and guest on `8fd28a1355c0`. The Sword
