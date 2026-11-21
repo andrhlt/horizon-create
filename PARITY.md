@@ -5935,6 +5935,52 @@ Full 1:1 remains Open. Advanced crafting orders, address suggestions,
 multi-network tie cases and request effects are follow-ups; they were not
 needed to establish this bounded gameplay baseline.
 
+## APP-2025 Stock Ticker and Stock Keeper gameplay baseline
+
+The bounded case list reuses keeper eligibility, summary/cache timing,
+addressed order, category grouping, search, and tuning/placement evidence below.
+The pinned Java reference is Create 6.0.10 at
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; the tested Horizon client is
+`native-9f42064-6ce68a31b125`, using pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+
+The eight registered Java replay checks passed on that client and pack:
+`stock-ticker-keeper`, `stock-ticker-keeper-lan`, `stock-ticker-summary`,
+`stock-ticker-summary-lan`, `stock-ticker-order`, `stock-ticker-order-lan`,
+`stock-ticker-categories`, and `stock-ticker-categories-lan`. They cover nine
+keeper cases; 24 summary samples and both cache lifetimes; search hide/restore;
+six addressed-order samples, including a nine-item request with four available;
+and the completed/reordered category groups at ticks 4 and 5. The order replay
+also checks package contents/addresses, remaining Barrel stock and retained
+order metadata. Packager and Stock Link prerequisites are resolved by APP-2021
+and APP-2023, respectively.
+
+The added [ownership and reopen replay](tools/test-stock-ticker-ownership.py)
+passed on the same client and pack. It first cold-reopens an idle Ticker, Stock
+Link and Barrel with 11 iron ingots. Two LAN guests then send separate orders
+to `Guest Depot` and `Host Depot`; their player inventories remain untouched,
+and the Packager holds two ingots for the first order while queuing four from
+the second player's request for nine when only four remain. The package retains
+the requested count of nine. Cold reopen preserves the Ticker frequency and
+address, both parcels, and the partial order; the Packager animation advances
+on the first stepped tick after reopening. This is gameplay persistence
+evidence, not an exact Java reload-timing comparison.
+
+Run the complete bounded replay set with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 \
+  --jobs 2 --check stock-ticker-keeper --check stock-ticker-keeper-lan \
+  --check stock-ticker-summary --check stock-ticker-summary-lan \
+  --check stock-ticker-order --check stock-ticker-order-lan \
+  --check stock-ticker-categories --check stock-ticker-categories-lan \
+  --check stock-ticker-ownership-reopen
+```
+
+The category editor, player-specific hiding, multipart transmissions,
+crafting orders, keeper rendering, crafting play tests, and multi-inventory
+summary comparisons remain follow-ups. Full 1:1 remains Open.
+
 ## Stock Ticker
 
 Two headless Java runs produced identical
