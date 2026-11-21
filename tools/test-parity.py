@@ -802,6 +802,7 @@ CHECKS = (
     ("chocolate-bar-lan", "test-chocolate-bar-lan"),
     ("builders-tea", "test-builders-tea"),
     ("builders-tea-drink", "test-builders-tea-drink"),
+    ("builders-tea-rejoin-lan", "test-builders-tea-rejoin-lan"),
     ("palette-reverse-cutting", "test-palettes-reverse-cutting"),
     ("utility-crafting", "test-machine-crafting", "--reference", str(ROOT / "fixtures/utility-crafting-java.csv")),
     ("placard", "test-placard"),
