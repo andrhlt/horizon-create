@@ -11612,3 +11612,36 @@ rejection and no-loss consumed-material boundaries. That bounded gate remains op
 we do not claim the whole APP-2007 baseline complete. The placement redirect and filter boundary code still need focused integration
 coverage before calling those paths verified. Additional terrain patterns, drum visuals, animation and exact
 network timing remain follow-ups; Full 1:1 stays Open.
+## Creative Crate gameplay baseline — APP-2016
+
+The finite baseline reuses the supply, filter refund, Hopper, Dropper, Funnel,
+and Chute Java comparisons above and in the feature matrix. `creative-tabs`
+checks creative availability. The persistence replay configures a tagged filter
+through the crate's value box, saves and reopens the world, then verifies the
+unchanged filter and continued bottomless Hopper extraction with item components
+intact. The crate is a static source, so persistence is checked before and after
+reopen rather than requiring an internal active-processing state. Host/guest
+configuration and extraction evidence is supplied by the existing LAN cases;
+guest convergence is not claimed as Java packet-timing parity. Other filter
+variants, automation targets, and cosmetic/visual fidelity remain open.
+
+On `native-9f42064-6bdf8691aa42`, the APP-2016 persistence replay and
+`create-creative-tabs` passed. The persistence case used the APP-2017 evidence
+pack (`create.hmod`, SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`) and
+prepared 26.3 resources. It configures the filter with an actual player click,
+reopens the saved world, and checks extraction for 40 ticks. Focused LAN
+regressions for supply, Hopper extraction, Dropper insertion, and Funnel
+insertion also passed on that build. Command:
+
+```sh
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 2 \
+  --check creative-crate-persistence --check create-creative-tabs \
+  --check creative-crate-supply-lan --check creative-crate-hopper-lan \
+  --check creative-crate-dropper-lan --check creative-crate-funnel-insert-lan
+```
+
+The Java behavior references remain pinned to Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; earlier per-family sections record
+their capture patches and sampled counts. The persistence case checks ordinary
+Horizon save/reopen and does not claim Java reload parity.

@@ -1153,6 +1153,7 @@ CHECKS = (
     ("creative-crate-supply-capped-lan", "test-creative-crate-supply", "--limit", "16", "--lan"),
     ("creative-crate-supply-exact", "test-creative-crate-supply", "--limit", "16", "--exact"),
     ("creative-crate-supply-exact-lan", "test-creative-crate-supply", "--limit", "16", "--exact", "--lan"),
+    ("creative-crate-persistence", "test-creative-crate-persistence"),
     ("creative-crate-hopper", "test-creative-crate-hopper"),
     ("creative-crate-dropper", "test-creative-crate-dropper"),
     ("creative-crate-dropper-lan", "test-creative-crate-dropper", "--lan"),
