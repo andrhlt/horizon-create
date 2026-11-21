@@ -12411,3 +12411,134 @@ stops the player without changing the door states. Both host and LAN guest
 positions are checked against the authoritative server. This is scoped gameplay
 collision evidence; exact Java player motion and packet arrival are unverified.
 APP-2051 and APP-2057 are completed prerequisites. Full 1:1 remains Open.
+
+## APP-2086 Wand of Symmetry gameplay baseline
+
+The bounded pass retains the earlier powered-crafter acquisition, XY/YZ plane,
+Survival mining and Creative mining evidence. It adds ordinary Shift-use mode
+configuration, both double-plane alignments and triple-plane mirroring. Java
+calls these reflections rather than a separate rotational mode; their composed
+reflections produce the corresponding repeated patterns around the vertical axis.
+
+Pinned Java remains `ac0c444d9828da3453ae8cc65338e8de063286fb`; Horizon remains
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. The real headless Java GameTest patch
+is `tools/java-symmetry-wand-modes.patch`, with source/capture metadata in
+`fixtures/symmetry_wand_modes-java.metadata.json` and 13 discrete target/facing/
+stair-shape samples in `fixtures/symmetry_wand_modes-java.csv`. The source is
+north-facing straight Oak Stairs at `(12,170,25)` around origin `(10,169,22)`.
+The CSV coordinates are offsets from that origin, in Java map iteration order.
+The patch adds a probe and client-only annotations to render methods, without
+changing gameplay rules. Initial capture passed in 27 seconds; the world-origin
+refresh passed in 47 seconds.
+
+Required cases: both additional double-plane alignments and triple-plane with
+all destinations valid, one blocked by Bedrock, and supplies for only one mirror;
+correct material consumption, source/mirrored loot and pickaxe damage; 13 stair
+state transforms; ordinary mode/orientation UI and origin placement; disabled and
+enabled item/settings save/reopen followed by resumed mirroring. Run the same
+cases with a real LAN guest and host-authoritative observations. This instantaneous
+feature has no active processing timer: saved enabled state plus subsequent
+placement is the meaningful active substitute. Guest checks prove convergence,
+not exact Java packet arrival timing. Preserve Full 1:1 Open.
+
+Build environment: isolated worktree `/private/tmp/horizon-app-2086`, branch
+`codex/app-2086-wand-of-symmetry`, private writable launcher/cache under `.local/`.
+The supplied launcher cache source was already patched and failed reapplication;
+retain `build-pinned.log` and `build-clean.log`. Fetching the exact pinned official
+source and materializing its `CLAUDE.md` documentation symlink restored staging.
+The source archive SHA-256 is
+`a2549acc67393bc7e388531f59afb4a827d7427923f44b2777f05545f2495ffa`.
+The official launcher 0.2.67 is used through `tools/build-native.sh`. Cursor fix
+`16af87f` is an ancestor of the build source. No shared compiler cache, worlds or
+user desktop game were changed. The initial sandboxed baseline attempt could not
+open a control socket; `before-modes-runtime.log` is invalid gameplay evidence.
+The permitted existing-client run (`native-9f42064-d6dc2ad18d3f`) timed out opening
+the missing wand screen; see `before-modes-permitted.log`.
+
+The unchanged runtime pack SHA-256 is
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+Runtime resources are the prepared pinned Nightly's `.local/horizon-client/26.3`.
+All test worlds and sockets are temporary, render clients use hidden `--offscreen`,
+and pure hosts are headless. Raw build, capture and integration evidence remains
+under `/private/tmp/horizon-app-2086/.local/`; portable fixture and summaries are
+committed.
+
+Nonblocking follow-ups: exact preview effects, world mirror rendering and sounds,
+localized selector labels, additional block/geometry/material cross-products,
+custom server range configuration, and exact Java reload/network timing. The
+screen uses the original panel texture and an item icon; it does not claim the
+original rotating 3D mirror preview. Full 1:1 remains Open.
+
+Final candidate: `native-9f42064-33dee4e7bb07`, client SHA-256
+`a251e83f3225e484e903cd8d7b5733f537ee15f33cfe56909b3793d95562da5f`,
+control tool SHA-256
+`1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8`.
+Native and patch inputs are identical before/after rebasing from `40fa2fb` onto
+`cd18c0f`; the intervening main commit only changes train tests/documentation.
+The clean first build took 586 seconds, final incremental build 379 seconds.
+Source/syntax checks passed (488 JSON, 45 JSONL, 891 Python, 2 shell and 3 TOML).
+Targeted native Rust compiled as part of both complete builds; no standalone
+Clippy inputs changed.
+
+The first added implementation build `native-9f42064-c7f605d58ff4` passed the
+orthogonal clear/blocked cases but reproduced a wrong first target when only one
+extra stone was available. The final implementation preserves Java's 16-bucket
+BlockPos HashMap traversal (including stable insertion order within collisions),
+after collapsing repeated symmetry-axis positions. The initial screen screenshot
+was visually inspected: both selectors and confirmation are legible on the
+original panel. Raw screenshot: `.local/symmetry-settings.png` (solo) and
+`.local/symmetry-settings-lan.png` (guest).
+
+Preserved invalid harness attempts: `modes-initial.log` used an out-of-reach
+activation block; `modes-initial-reach-fixed.log` and
+`modes-initial-setup-debug.log` attempted a rejected direct custom-component item
+command and left a previous diagonal setting active. The corrected rig configures
+every mode through the actual UI. `modes-initial-ui-rig.log` is the valid pre-fix
+insufficient-supply reproduction. `modes-lan-invalid-name.log` and its client log
+used an overlength guest name and never exercised gameplay; the corrected guest
+name is `SymmetryModes`. The initial final-suite run passed all six other checks;
+only that LAN setup case needed a retry.
+
+The Java capture origin is one block below the clicked Horizon origin. This is
+a justified equivalence class: all included mirrors operate exclusively on X/Z
+and preserve source Y, so the same absolute source/target blocks and Java hash
+order apply. Both origins remain well inside the unchanged default 50-block range.
+There is no claim about vertical reflection, exact range-boundary parity or
+per-tick network timing. Integration checks are event/state assertions after
+convergence, with zero tolerance for discrete blocks, components, counts and
+wear; they are not tick-timing traces.
+
+Reproduction:
+
+```sh
+sh tools/build-native.sh /path/to/launcher-0.2.67/horizon-launcher /path/to/private-launcher-data
+python3 tools/test-parity.py /path/to/native-9f42064-33dee4e7bb07/horizon-ctl /path/to/native-9f42064-33dee4e7bb07/horizon-client /path/to/prepared/26.3 --jobs 2 --check 'symmetry-wand-*'
+python3 tools/test-parity.py /path/to/native-9f42064-33dee4e7bb07/horizon-ctl /path/to/native-9f42064-33dee4e7bb07/horizon-client /path/to/prepared/26.3 --jobs 1 --check symmetry-wand-modes-lan
+python3 tools/check-source.py
+```
+
+Pack is the worktree-local `.local/create.hmod` snapshot identified above. To
+recapture Java, clone the pinned Create revision into a disposable checkout,
+apply `tools/java-symmetry-wand-modes.patch`, and run
+`JAVA_HOME=/path/to/jdk21 ./gradlew --offline runGameTestServer`. Extract the 13
+`CREATE_SYMMETRY_MODE` rows; no Rust output is used to generate their expectations.
+
+All seven targeted checks passed on the candidate: existing plane solo/LAN,
+Survival break solo/LAN, Creative break, and the new modes solo/LAN. Final modes
+logs are `final-solo-held-mouse.log`, `final-lan-held-mouse.log` and their
+`.local/parity/symmetry-wand-modes*.log` case output. Across solo and guest this
+covers 18 Survival placement/mining groups, 26 sampled stair transforms, four
+world reopen checks, and two resumed seven-copy placements. Material/drop/wear
+expectations compose the unchanged Java apply/remove per-target rules and retained
+plane probes over the newly captured mirror targets.
+
+Additional invalid fixture runs are preserved as `modes-*-staged-sneak-invalid.log`,
+`modes-*-action-released-shift.log`, `modes-lan-before-input-send.log`,
+`modes-lan-reopen-failure.log` and `modes-lan-forced-gamemode.log`. Inspection of
+Horizon `TaskKind::releases_input` showed deferred interact/use-item tasks release
+held movement keys at completion, unlike `Wait`. The final rig holds Shift through
+four ticks and uses a direct mouse click until the screen opens, matching the
+existing Worldshaper helper. It also explicitly returns a forced LAN rejoin from
+the Creative host's mode to Survival before checking costs. An idempotent
+`/gamemode` returns no chat, so setup reads the command reply rather than indexing
+an empty chat list. None of these fixture corrections changed production code.
