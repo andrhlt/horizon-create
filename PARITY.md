@@ -8297,7 +8297,13 @@ the only passing case. The family has no native Blueprint entity or menu
 implementation yet; inventory audits show the Blueprint entity type and menu
 ID are not loaded by the pack. Consequently the placement, section selection,
 recipe programming, recipe use, break/drop, guest edit/use and persistence
-cases are blocked by missing functionality, rather than untested variants.
+cases now have a native persistent entity path: size-aware placement, Blueprint
+rendering, authoritative representative paper-to-Crafting-Table use, wrench
+configuration, break/recover drops and guest inventory resend. The current
+bounded implementation intentionally keeps the representative recipe and
+configuration state narrow; the full Java section editor/menu, arbitrary
+recipe-manager lookup and exact recipe-NBT round-trip remain follow-ups rather
+than parity claims.
 
 The pinned Java reference (`ac0c444d9828da3453ae8cc65338e8de063286fb`)
 defines the behavior in `BlueprintItem`, `BlueprintEntity`, `BlueprintMenu`

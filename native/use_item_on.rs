@@ -29,6 +29,7 @@ fn use_item_on(
         || crate::game::create_worldshaper::use_tool(game, stack, Some((pos, face)))
         || crate::game::create_shopping_list::discard(game, stack)
         || crate::game::create_package_world::place(game, stack, pos, face)
+        || crate::game::create_blueprint::place(game, stack, pos, face)
         || crate::game::create_table_cloth::blocked(game, pos, face, stack)
         || crate::game::create_sail::use_item(game, pos, stack)
         || crate::game::structure_blocks::create_schematic_capture::use_item(game, pos, stack)
