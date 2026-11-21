@@ -1279,6 +1279,7 @@ CHECKS = (
     ("track-lifecycle", "test-track-lifecycle"),
     ("track-lifecycle-lan", "test-track-lifecycle", "--lan"),
     ("track-station", "test-track-station"),
+    ("track-station-controls", "test-train-station-controls"),
     ("track-station-name", "test-track-station-name"),
     ("track-station-name-lan", "test-track-station-name", "--multiplayer"),
     ("track-station-schedule", "test-track-station-schedule"),
