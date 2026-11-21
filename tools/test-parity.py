@@ -1605,6 +1605,7 @@ CHECKS = (
     ("sturdy-sheet", "test-sturdy-sheet"),
     ("train-bogeys", "test-train-bogeys"),
     ("manual-train", "test-simple-train"),
+    ("manual-train-reopen", "test-manual-train-reopen"),
     ("train-standing-step", "test-train-standing"),
     ("train-standing-old-save", "test-train-standing", "--legacy-snapshot"),
     ("train-standing-live", "test-train-standing-live"),
