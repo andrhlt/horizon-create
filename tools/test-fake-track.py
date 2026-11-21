@@ -5,12 +5,16 @@ import argparse
 import csv
 import importlib.util
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from fixture_world import ROOT, fixture_world
 
 spec = importlib.util.spec_from_file_location("track_curve", ROOT / "tools/test-track-curve.py")
 track_curve = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(track_curve)
+mp_spec = importlib.util.spec_from_file_location("multiplayer", ROOT / "tools/test-multiplayer.py")
+multiplayer = importlib.util.module_from_spec(mp_spec)
+mp_spec.loader.exec_module(multiplayer)
 
 
 def markers(control):
@@ -43,6 +47,60 @@ def main():
         placed = markers(control)
         if not placed:
             raise RuntimeError("Creating the curve did not place any Fake Track markers")
+        first = set(placed)
+        second_case = dict(case)
+        track_curve.test_case(control, second_case, offset=(-1, 0, -1), reset=False, validate=False)
+        second = set(markers(control))
+        shared = first & second
+        if not shared:
+            raise RuntimeError(f"Offset curve pair had no shared markers: first={sorted(first)}, second={sorted(second)}")
+        if not (second - first):
+            raise RuntimeError("Offset curve pair had no exclusive markers")
+        control.command("/tick freeze")
+        network = control.call("lan", "open", "0", "commands", "force")
+        with TemporaryDirectory(prefix="hc-fake-track-lan-") as scratch, multiplayer.joined_client(
+            args, Path(scratch), f"127.0.0.1:{network['port']}", "FakeTrackGuest", scenario="fake-track", pack=args.pack,
+        ) as guest:
+            multiplayer.until("the Fake Track guest to join", lambda: any(
+                p["name"] == "FakeTrackGuest" and p["placed"] for p in control.call("lan", "status")["guests"]
+            ))
+            control.command("/tp FakeTrackGuest 11.5 112 -6.5")
+            guest.call("wait", 5)
+            authoritative = {
+                pos for pos in first | second
+                if control.call("block", *pos)["state"] == "create:fake_track"
+            }
+            missing = [pos for pos in authoritative if guest.call("block", *pos)["state"] != "create:fake_track"]
+            if missing:
+                for pos in missing:
+                    neighbors = [(pos[0] + dx, pos[1] + dy, pos[2] + dz)
+                                 for dx, dy, dz in ((1, 0, 0), (-1, 0, 0), (0, 1, 0),
+                                                    (0, -1, 0), (0, 0, 1), (0, 0, -1))]
+                    print("LAN diagnostic", pos,
+                          "host", control.call("block", *pos),
+                          "guest", guest.call("block", *pos),
+                          "host_neighbors", [control.call("block", *p)["state"] for p in neighbors],
+                          "guest_neighbors", [guest.call("block", *p)["state"] for p in neighbors],
+                          flush=True)
+                raise RuntimeError(f"Guest missing markers after explicit sync: {missing}")
+        control.command("/tick unfreeze")
+        control.command("/setblock 6 112 -9 minecraft:air")
+        step(control, 1)
+        remaining = markers(control)
+        if not shared <= remaining:
+            raise RuntimeError(f"Removing one curve deleted shared markers: {sorted(shared - remaining)}")
+        control.command("/setblock 7 112 -8 minecraft:air")
+        step(control, 1)
+        if markers(control):
+            raise RuntimeError("Removing the final curve owner left Fake Track markers")
+        track_curve.test_case(control, case)
+        placed = markers(control)
+        if not placed:
+            raise RuntimeError("Recreating the curve did not place markers")
+        control.command("/save-all flush")
+        control.restart()
+        if markers(control) != placed:
+            raise RuntimeError("Saved curve did not retain its Fake Track markers after reopen")
         step(control, 120)
         if markers(control) != placed:
             raise RuntimeError("The live curve did not keep its markers alive")
