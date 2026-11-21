@@ -468,6 +468,17 @@ bindings = [
 ]
 
 [[injection]]
+id = "roller_invalid_filter_prediction"
+target = "horizon_client::game::remote::Game<'_>::remote_use_item_on"
+kind = "HEAD"
+cancellable = true
+helper = "roller_invalid_filter_prediction.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "self" },
+  { name = "hand", ty = "Hand", value = "hand" },
+]
+
+[[injection]]
 id = "depot_has_analog_output"
 hook = "has_analog_output"
 hook_version = 1
