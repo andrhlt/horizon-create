@@ -1,0 +1,46 @@
+[
+  {
+    "case": "0",
+    "text": "Departs in 2 Minutes"
+  },
+  {
+    "case": "1",
+    "text": "Departs in 1 Minute"
+  },
+  {
+    "case": "1200",
+    "text": "Departs in 1 Minute"
+  },
+  {
+    "case": "1201",
+    "text": "Departs in 60 Seconds"
+  },
+  {
+    "case": "2301",
+    "text": "Departs in 5 Seconds"
+  },
+  {
+    "case": "2400",
+    "text": "Departs in 0 Seconds"
+  },
+  {
+    "case": "negative0",
+    "text": ""
+  },
+  {
+    "case": "negative1",
+    "text": ""
+  },
+  {
+    "case": "negative2",
+    "text": ""
+  },
+  {
+    "case": "negative3",
+    "text": ""
+  },
+  {
+    "case": "queue",
+    "text": "1,3"
+  }
+]

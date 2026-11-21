@@ -8677,6 +8677,89 @@ the original quick-click fixture matched 12 Java states and all
 three recipes in solo and LAN. The held Redstone Interval replay
 matched all eight settings and the short top click in both roles.
 
+## APP-2087 Worldshaper gameplay baseline (November 21, 2026)
+
+The [bounded replay](tools/test-worldshaper-baseline.py) supplements, rather than
+replaces, the Java comparisons in [Worldshaper selection](#worldshaper-selection).
+The source contract is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`:
+`AllItems.WORLDSHAPER` registers the Creative Worldshaper, `ZapperItem` limits
+stacks to one and rejects missing block selection, `WorldshaperItem` rejects
+missing brush settings, and `TerrainTools.run` directly edits blocks without
+consuming materials or creating drops. Creative acquisition and zero-material
+operation are therefore intentional; no survival crafting/material requirement
+is invented for this tool.
+
+The finite new cases, in both solo and LAN, are:
+
+- Acquire one tool from Creative Search using its hotbar-number shortcut.
+- Reject an unconfigured shot, then a configured Fill without block selection;
+  retain the source, adjacent air, and inventory counts.
+- Select actual Stone and configure Solid Cuboid 1×1×1 Attached Fill in the UI;
+  preserve unrelated custom data and save/reopen this idle state.
+- Fill the adjacent cell with zero Stone items, matching host/actor blocks and
+  one-tool/zero-Stone counts. Save/reopen and retain the edit and complete item.
+- Configure Merged Clear, remove only the filled cell, and save/reopen again;
+  retain selected Stone, Clear settings, custom data, source and stack counts.
+
+Each replay performs four shots (two rejected, one Fill, one Clear), advances
+four authoritative ticks per shot, and compares discrete state exactly. The
+three reopen boundaries cover idle, post-Fill and post-Clear. LAN repeats four
+guest connections around those host restarts and checks guest convergence.
+These instantaneous edits have no persistent in-flight operation. This is
+Horizon gameplay persistence, not an actual Java reload or packet-arrival trace.
+Existing selection, shape, pattern, seeded chance, connected brush, Flatten,
+range and effects evidence above remains valid; broader combinations, exact
+shot timing, beam width, hand animations and dynamic model remain open.
+
+Validation used `native-9f42064-de4782e18b5b`, rebuilt from committed main
+`6b060e2`, Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, compatible
+launcher 0.2.67 and the build's own prepared 26.3 resources. Native bundle SHA256:
+`a3f397468ddc99fc19dad33cabcfe9b21780a04b7aa2605c8ac5482be19e088d`.
+Client SHA256: `c907c923f868818ac12fd46b5b35cb62185efb88567e1b8fa98d97877c748ddd`.
+Pack SHA256: `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+No native production code changed in this pass. Existing Java capture patches
+were reused unchanged: selection SHA256
+`ced21d800bd741dbc71e017df8920fecf9d1f86542f4ac5d2942b8a398893aba`,
+Fill `38869ed89d6a78e4b5a97eb1230857c98d08499b1e16773821badda8bf01a15c`,
+and Cuboid tools `b52c39efb538679b5d459e024b1602f514a2d3df4a484a8a638751601e0d1584`.
+
+From the ticket worktree, with `build=.local/patched-launcher/versions/native-9f42064-de4782e18b5b`:
+
+```sh
+python3 tools/check-source.py
+python3 tools/test-parity.py "$build/horizon-ctl" "$build/horizon-client" \
+  "$build/.local/horizon-client/26.3" --jobs 2 \
+  --check 'worldshaper-baseline*' \
+  --check worldshaper-selection --check worldshaper-selection-lan \
+  --check worldshaper-preserve-selection-creative \
+  --check worldshaper-preserve-selection-creative-lan \
+  --check 'worldshaper-cuboid-tools*'
+```
+
+All eight scoped checks passed, including all five tools' eight-cell Java grids
+in solo and LAN (80 compared grid cells across ten tool cases). Syntax and
+`git diff --check` passed. After adding an explicit nearby dropped-item assertion,
+the two baseline replays were rerun on the same build. No native Rust changes
+required a separate standalone Rust/Clippy pass; the complete native build passed.
+
+Raw artifacts are retained under `/private/tmp/horizon-app-2087/.local/`:
+`evidence/final-checks.log`, `evidence/final-baseline-drops.log`,
+`evidence/sha256.txt`, `evidence/source-checks.log`, `evidence/build-*.log`,
+`parity/worldshaper-*.log`, and copied host/guest runtime logs. Setup failures
+are preserved: the shared source cache was already patched; a fresh pinned
+archive contained documentation symlinks rejected by the launcher; sandbox DNS
+and local socket restrictions required approved execution outside the sandbox.
+Only private source/cache inputs were repaired. Initial harness failures were
+an empty no-op gamemode response and use of Shift-click rather than the tested
+Creative hotbar shortcut; neither establishes a gameplay defect. Successful
+preflight solo/LAN runs used the older `native-9f42064-6bde2ea90cf2` and are
+kept as harness development evidence, not final-build acceptance.
+
+Approximate effort: source/setup 6 minutes, replay/evidence authoring and debugging
+7 minutes, native build 276 seconds, source checks 1 second, and the first final
+integration batch 140 seconds. These phases overlap. No Java recapture or
+native gameplay repair was needed.
+
 ## Worldshaper selection
 
 The [pinned selection probe](tools/java-worldshaper-selection-trace.patch)
@@ -12251,3 +12334,21 @@ pack SHA-256 `825e822d982dc624a691f0cced1ca2db370d030bea0899f46432021c7036642b`.
 The Deployer behavior remains shared with APP-1966; this ticket adds no
 duplicate Deployer implementation. Full 1:1 remains Open for broader actor
 types, settings, effects and packet timing.
+
+## APP-2059 train display, prompts and arrival audio
+
+On `native-9f42064-76138ca65acb`, the [bounded feedback pass](TRAIN-FEEDBACK-PARITY.md)
+adds station Train Schedule Status, the named driving HUD, manual station
+prompts and a mounted bell/note/whistle arrival queue. Six controlled Java delay
+strings and blank-status boundaries pass. Solo and LAN drivers see the HUD and
+receive the three muted playback events; configured idle links/countdowns and
+active named trains retain state through reopen. Seven neighboring checks pass,
+including 198 Java manual-approach samples and 183 title/throttle samples in each
+role. The initial LAN fixture used an unsupported synchronous remote chat API;
+the corrected full LAN replay passes, and its failed log is retained.
+
+This preserves the earlier observed-name and schedule evidence. It does not
+establish exact Java moving-audio, packet, physical speaker, waveform or reload
+phase equivalence. Station Summary predictions, broader status conditions,
+manual honking, continuous carriage mixing and exact HUD art/animation remain
+follow-ups; the feature matrix's Full 1:1 stays Open.
