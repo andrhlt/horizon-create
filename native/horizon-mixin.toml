@@ -3239,6 +3239,17 @@ name = "create_shopping_list"
 source = "shopping_list.rs"
 
 [[injection]]
+id = "shopping_list_tooltip"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tooltip"
+kind = "HEAD"
+helper = "shopping_list_tooltip.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "self" },
+  { name = "stack", ty = "&ItemStack", value = "stack" },
+  { name = "lines", ty = "&mut Vec<(Text, u32)>", value = "lines" },
+]
+
+[[injection]]
 id = "package_filter_use"
 target = "horizon_client::game::native_hooks::Game<'_>::native_use_item"
 kind = "HEAD"
