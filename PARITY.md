@@ -12399,3 +12399,15 @@ establish exact Java moving-audio, packet, physical speaker, waveform or reload
 phase equivalence. Station Summary predictions, broader status conditions,
 manual honking, continuous carriage mixing and exact HUD art/animation remain
 follow-ups; the feature matrix's Full 1:1 stays Open.
+
+## APP-2058 Train door integration gameplay baseline
+
+The [bounded acceptance record](APP-2058-EVIDENCE.md) retains the existing Java
+station, paired interaction and stopped/moving reopen comparisons. The new
+[passage check](tools/test-train-door-passage.py) uses real Survival walking:
+closed mounted Train Doors stop the player, manually opened paired leaves
+permit crossing onto the landing, and a solid column beyond the open doorway
+stops the player without changing the door states. Both host and LAN guest
+positions are checked against the authoritative server. This is scoped gameplay
+collision evidence; exact Java player motion and packet arrival are unverified.
+APP-2051 and APP-2057 are completed prerequisites. Full 1:1 remains Open.

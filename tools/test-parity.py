@@ -1373,6 +1373,8 @@ CHECKS = (
     ("world-paired-doors-power-lan", "test-world-door-power-post", "--lan"),
     ("world-paired-doors-rapid", "test-world-door-rapid-post"),
     ("world-paired-doors-rapid-lan", "test-world-door-rapid-post", "--lan"),
+    ("train-door-passage", "test-train-door-passage"),
+    ("train-door-passage-lan", "test-train-door-passage", "--multiplayer"),
     ("paired-train-door", "test-paired-train-door"),
     ("paired-train-door-lan", "test-paired-train-door", "--multiplayer"),
     ("paired-right-train-door", "test-paired-train-door", "--right"),
