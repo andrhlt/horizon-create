@@ -494,6 +494,8 @@ CHECKS = (
     ("cardboard-sword-pvp-guest", "test-cardboard-sword-pvp"),
     ("cardboard-sword-base-knockback", "test-cardboard-sword-base-knockback"),
     ("cardboard-sword-base-knockback-lan", "test-cardboard-sword-base-knockback", "--lan"),
+    ("cardboard-sword-reopen", "test-cardboard-sword-reopen", "--pack",
+     str(ROOT / ".local/create.hmod"), "--artifacts", str(ROOT / ".local/parity")),
     ("list-filter-editor", "test-list-filter-editor"),
     ("list-filter-editor-lan", "test-list-filter-editor", "--lan"),
     ("item-filter-chute", "test-item-filter-chute"),
