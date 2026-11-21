@@ -138,6 +138,39 @@ def belt_connector(args):
     print("Survival crafting consumed six dried kelp and produced the Belt Connector.")
 
 
+def flywheel(args):
+    """Craft and place the original eight-brass-ingot Flywheel recipe."""
+    table = (9, 95, -9)
+    with fixture_world(args, "Flywheel-crafting", STRUCTURE, render=True, pack=args.pack) as control:
+        control.commands((
+            "/fill 5 94 -12 13 94 -4 minecraft:smooth_stone",
+            f"/setblock {' '.join(map(str, table))} minecraft:crafting_table",
+            "/tp @s 7.5 95 -9.5",
+            "/gamemode survival",
+            "/item replace entity @s hotbar.0 with create:brass_ingot 8",
+            "/item replace entity @s hotbar.1 with create:shaft 1",
+        ))
+        control.call("interact", *table, "up")
+        distribute(control, inventory_slot(control, "create:brass_ingot"), (100, 101, 102, 103, 105, 106, 107, 108))
+        distribute(control, inventory_slot(control, "create:shaft"), (104,))
+        output(control, "create:flywheel", 1)
+        before = control.call("inventory")["counts"]
+        if before.get("create:brass_ingot", 0) != 0 or before.get("create:shaft", 0) != 0:
+            raise RuntimeError(f"Flywheel ingredients were not fully placed: {before}")
+        craft(control, "create:flywheel", 1)
+        after = control.call("inventory")["counts"]
+        if after.get("create:flywheel", 0) != 1 or after.get("create:brass_ingot", 0) or after.get("create:shaft", 0):
+            raise RuntimeError(f"Flywheel crafting left unexpected inventory: {after}")
+        control.call("close")
+        control.call("select", "create:flywheel")
+        control.call("interact", 9, 94, -10, "up")
+        placed = control.call("block", 9, 95, -10)["state"]
+        remaining = control.call("inventory")["counts"].get("create:flywheel", 0)
+        if placed not in {"create:flywheel[axis=x]", "create:flywheel[axis=y]", "create:flywheel[axis=z]"} or remaining != 0:
+            raise RuntimeError(f"Survival Flywheel placement left {placed} and {remaining} item(s)")
+    print("Survival crafting consumed eight brass ingots and one shaft, produced one usable Flywheel, and placed it.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("ctl", "client", "resources"):
@@ -145,8 +178,9 @@ def main():
     parser.add_argument("--pack", type=Path)
     parser.add_argument("--chassis-conversions", action="store_true")
     parser.add_argument("--belt-connector", action="store_true")
+    parser.add_argument("--flywheel", action="store_true")
     args = parser.parse_args()
-    action = belt_connector if args.belt_connector else chassis_conversions if args.chassis_conversions else run
+    action = flywheel if args.flywheel else belt_connector if args.belt_connector else chassis_conversions if args.chassis_conversions else run
     action(args)
 
 

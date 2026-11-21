@@ -318,6 +318,7 @@ CHECKS = (
     ("gear-trains", "test-shaft-and-cogwheel"),
     ("flywheel", "test-flywheel", "--visual"),
     ("flywheel-reopen", "test-flywheel-reopen"),
+    ("flywheel-crafting", "test-survival-crafting", "--flywheel"),
     ("survival-crafting", "test-survival-crafting"),
     ("vanilla-recipe-reopen", "test-vanilla-recipe-reopen"),
     ("machine-crafting", "test-machine-crafting"),

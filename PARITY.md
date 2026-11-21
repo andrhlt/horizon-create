@@ -1273,7 +1273,9 @@ APP-1976 adds removal/reconnection and idle/active save/reopen of a powered
 Flywheel/shaft/cogwheel assembly. The packaged survival recipe is checked
 against Create's 3×3 brass-ingot and shaft pattern, and the player placement
 replay consumes four Flywheels in survival. Interactive crafting-table output
-was not exercised by this fixture and remains a follow-up. The Flywheel
+is exercised by `flywheel-crafting`: eight brass ingots surround one shaft,
+producing exactly one usable Flywheel with no ingredient loss or duplication
+before survival placement. The Flywheel
 transmits axial rotation and does not generate power. The lifecycle check
 verifies that the powered source drives the shaft at +64 RPM while the adjacent
 cogwheel remains stopped, removal stops the assembly, and a reconnected -32 RPM
