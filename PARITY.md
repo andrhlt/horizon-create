@@ -2626,6 +2626,69 @@ items while the host saw the water and zero output. The pickup reference is
 `fixtures/metal-girder-pickup-java.csv` and its capture is
 `tools/java-metal-girder-pickup-trace.patch`.
 
+### APP-2069 Metal Girders and encased Girder Shafts — November 20, 2026
+
+The bounded acceptance set passed on the available pinned Minecraft 26.3
+runtime, build `native-9f42064-6bdf8691aa42` (APP-2017 evidence build, source
+main commit `781c0ef`) and pack SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`. The
+available build predates current `origin/main` at `ef13693`; a source diff
+confirmed no changes to `native/shaft.rs`, girder helper modules, girder Java
+traces, fixtures or girder gameplay checks between those revisions. The only
+intervening `native/wrench.rs` changes add Deployer behavior and do not alter
+the girder branch. Rebuild and rerun on the combined current build before
+integration.
+
+The case set covers the original girder recipe; five placement cases and
+eight shape raycasts; five extension cases; dynamic beam arms and encased
+shaft caps; wrench cap and axis changes; shaft insertion/removal across X/Z
+configurations with wet/dry states and 32 RPM transmission; dry/wet drops and
+crouch pickup; a guest placing, extending, wrenching, connecting, inserting,
+removing and picking up; and persistence. Existing Java references are from
+Create `ac0c444d9828da3453ae8cc65338e8de063286fb`. Sample counts are 40
+placement rows, 35 assist rows, 42 connection rows, 36 wrench rows, 4 wrench
+preview cases, 24 shaft rows and 24 pickup rows. All 15 existing registered
+girder replay and LAN checks passed, including every Java trace row; the new
+reopen check passed too. The `electronics-crafting` survival recipe check
+also passed.
+
+The blocking prerequisite, APP-1944 (Shafts, andesite and brass encased
+shafts), is Done. Its integrated shaft casing/persistence work is in
+[PR #7](https://github.com/andrhlt/horizon-create/pull/7).
+
+Capture patch SHA-256 values:
+
+| Capture | SHA-256 |
+| --- | --- |
+| `java-metal-girder-placement-trace.patch` | `58da5dbb1dc1d6936d99ff06f3b914ccf829aea2d72d51d3c258bfce1ad8db57` |
+| `java-metal-girder-assist-trace.patch` | `6c7439f10681a01b18b4d9742adeb74d9e487e93944769c165555af61ed19df2` |
+| `java-metal-girder-connections-trace.patch` | `8bb2ead99d086f5c1606ab1377071ef99e34d66da28db9d92f46375e219def90` |
+| `java-metal-girder-wrench-trace.patch` | `977459b9e71195bbb0fe48862b10cf4807c6e6d84750ddc5257459e76ef0caf2` |
+| `java-girder-wrench-preview-trace.patch` | `cb2d8b3ef89d48cf198c7cc2297838a02f2e8413238774ba4d1fd90e998ec87c` |
+| `java-metal-girder-shaft-trace.patch` | `773901b1d40b4483efcbc7173f441688441918ae627b04a6913b22758934d606` |
+| `java-metal-girder-pickup-trace.patch` | `5ec64331a11863b75ea79a089fc6fadfb2d4f8ca553cf05f90aaee497b5ff375` |
+
+Reference CSV SHA-256 values in the same order are: `3027e120bddc7842398a3745256f252fdac36bb15c49139cd98b9f52ce033ddf`, `10920d8c8a0b28e173005ba5ef460cf84413a4d8b6503754806852d25b948eae`, `df1b8ea827783c71d5c219e492298aa7a5253e5ea1642b67dc884fc2f5053b1e`, `4bc66d9657d99e2a72f77c0e3bde25b7082118eace567b4ba2ad8fc23e383f01`, `ac922e8a41e75409703b7c5a94ec00f0b0168728e6ec57d442fc2ed0396ce4a6`, `4b89d634db7e39627e62f9bfec8404f1e0f01fec89ddc478fd6b4009f8a35918` and `8e54d5f0cf2fb369f4b83d84f7e2a049309e9439330ea3078f127ffd292b34eb`.
+
+`tools/test-metal-girder-persistence.py` passed an idle wet girder save/reopen
+and an active waterlogged encased shaft save/reopen. The block state remained
+encased and output resumed at 32 RPM. Since the fixture freezes time, the
+active state was sampled after one explicit tick following insertion.
+Persistence is a source-aligned Horizon save/reopen check, not a Java reload
+parity claim. The fixture is registered as `metal-girder-reopen` in
+`tools/test-parity.py`.
+
+The reproduction commands are:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 --check 'metal-girder-*'
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check 'electronics-crafting'
+```
+
+Broader support combinations, additional shaft-network layouts and visual
+variants remain follow-ups. These scoped checks do not establish exhaustive
+Full 1:1 parity.
+
 ```sh
 python3 tools/test-metal-girder-placement.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3
 python3 tools/test-metal-girder-placement.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --shapes
