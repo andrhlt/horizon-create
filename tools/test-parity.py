@@ -1709,6 +1709,7 @@ CHECKS = (
     ("rose-quartz-lifecycle-lan", "test-rose-quartz-lifecycle", "--lan"),
     ("rose-quartz-lamp", "test-rose-quartz-lamp"),
     ("rose-quartz-lamp-lan", "test-rose-quartz-lamp", "--lan"),
+    ("rose-quartz-lamp-persistence", "test-rose-quartz-lamp-persistence"),
     ("redstone-latches", "test-create-latches"),
     ("redstone-latches-lan", "test-create-latches", "--lan"),
     ("redstone-latches-persistence", "test-create-latches-persistence"),
