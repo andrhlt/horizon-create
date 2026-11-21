@@ -1,0 +1,14 @@
+{
+  "build": "Create 6.0.10 / Minecraft Java 1.21.1 / NeoForge 21.1.219 / OpenJDK 21.0.13.1",
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "command": "./gradlew --offline --no-daemon --max-workers 2 runGameTestServer",
+  "game_test": "TestMisc.verticalGearboxPlacementMatrix",
+  "template": "src/main/resources/data/create/structure/gametest/misc/shearing.nbt",
+  "template_sha256": "ee7f068bf608653a052112aab8bfaab4370ea92af182bd87ba191e2a150c0cbc",
+  "patch_sha256": "c31e87c0f8f2e686f1d0ce3232dcd370c918c474895dbcc72a2a762b46e85bc4",
+  "trace_sha256": "c51c1d6c0e4c6fc338276858ca57e5760c30c49b774264c5e9b5b4bf30c6ce49",
+  "setup": "Each case clears the target, places support and adjacent shaft states, and sets a survival FakePlayer's yaw and sneaking state before passing a hit to BlockItem.place.",
+  "sampling": "Record immediate action result, remaining item count and final block identity and casing axis. The three support-removal cases also read that block on the next game tick after deleting the clicked support.",
+  "cases": 20,
+  "capture_seconds": 16.24
+}

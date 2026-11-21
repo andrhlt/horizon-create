@@ -228,8 +228,9 @@ Both wheels accept planks by hand and through a rotating deployer. The
 fixture uses an original clutch and gearbox to power two deployers fed by
 straight chutes. It checks the ordered 11 Java plank species, both wheel
 materials, and both deployers' state, timer, and RPM through tick 126.
-Deployer item interactions currently cover wheel recoloring. The client
-draws the original rotors with the selected wood textures.
+Deployer item interactions cover wheel recoloring and the APP-1966 player
+baseline for Wrench mode/orientation, held-stack exchange, and filter behavior.
+The client draws the original rotors with the selected wood textures.
 
 Apply `tools/java-waterwheel-materials-trace.patch` to the pinned Java
 checkout and run `./gradlew runGameTestServer`. The `CREATE_MATERIAL_ORDER`
@@ -665,10 +666,11 @@ storage at disassembly. Run either scenario with
 
 Glue a portable interface and its matching storage to the bearing's
 payload. Place a matching interface along its path, facing the moving
-interface. The two interfaces dock automatically. Hoppers exchange
-items with the moving inventory, and pressurized pipes exchange water
-with its tanks. Both blocks use Create's retracted geometry. Head
-extension is still pending.
+interface. Each pair docks automatically when the moving interface
+reaches the facing receiver. Hoppers exchange items with the moving
+inventory, and pressurized pipes exchange fluid with its tanks. The
+[bearing render checks](tools/test-mounted-moving-port-render.py) cover
+the moving heads extending at the dock and retracting as they leave.
 
 ### Schematicannon
 
@@ -722,7 +724,17 @@ from a Creative Crate onto the belt.
 
 ```sh
 python3 tools/test-stone-crushing.py /path/to/horizon-ctl /path/to/native/horizon-client /path/to/prepared/26.3
+python3 tools/test-crushing-wheel-placement.py /path/to/horizon-ctl /path/to/native/horizon-client /path/to/prepared/26.3
 python3 tools/test-funnel-placement.py /path/to/horizon-ctl /path/to/native/horizon-client /path/to/prepared/26.3
+```
+
+The [APP-1959 gameplay baseline](PARITY.md#app-1959-crushing-wheels-and-controller-gameplay-baseline)
+also checks equal/opposed/reversed wheel speeds, stopping and resuming loaded
+processing, full-Depot output retention and recovery, LAN guest collection, and
+idle/active save and reopen. Run the complete bounded set on one build with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 2 --check crushing-wheel-placement --check crushing-wheel-rotation --check crushing-wheel-blocked-output --check crushing-wheel-reopen --check crushing-wheel-lan --check stone-crushing --check mechanical-crafter
 ```
 
 ### Mechanical pump and open pipes
@@ -1117,10 +1129,17 @@ to regenerate the Java reference.
 Polish Rose Quartz with Sand Paper or Red Sand Paper held in either
 hand. Holding use for 32 player ticks creates Polished Rose Quartz
 and spends one durability. Releasing early returns the quartz.
-The `test-sandpaper.py` fixture compares 80 active and terminal Java
-samples through both paths. `test-electronics-crafting.py` crafts nine
-original recipes, including Electron Tubes, Brass Tunnels, Nixie Tubes,
-Display Boards, Transmitters, and Display Links.
+Eligibility and output use the loaded `create:sandpaper_polishing` recipe,
+matching Java's recipe lookup and preserving the input if a saved polishing
+component no longer has a matching recipe. `test-sandpaper.py` compares 80
+active and terminal Java samples across normal paper completion, red paper
+completion, and early release. It also checks both paper variants in either
+hand, empty and invalid targets, last-quartz consumption, creative durability,
+and the eight-use break boundary. `test-sandpaper-lan.py` verifies guest use,
+host inventory convergence, and item counts and wear after disconnect/rejoin.
+`test-electronics-crafting.py` crafts both paper recipes and the existing
+electronics and machine recipes. Dropped-item targeting and exact particle,
+sound, and presentation parity remain open.
 
 ### Rope Pulley cargo
 

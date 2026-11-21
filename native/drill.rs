@@ -12,7 +12,9 @@ use horizon_world::{
 
 use crate::containers::ModBlockEntity;
 
-use super::create_machines::{float, int, offset};
+use super::create_bearing::{deposit, relative};
+use super::create_depot::compound;
+use super::create_machines::{float, int, offset, string};
 use super::create_visuals::wheel_angle;
 use super::native_block_entity_draw::BlockEntityDraw;
 use super::{Game, GameLevel};
@@ -124,6 +126,211 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
             .insert("NextTick".into(), Tag::Int((hardness / speed) as i32));
         crack(game, entity, target, progress);
     }
+}
+
+fn actor_pos(block: &Compound, key: &str) -> Option<[i32; 3]> {
+    match block.get(&key.into()) {
+        Some(Tag::IntArray(pos)) => pos.as_slice().try_into().ok(),
+        _ => None,
+    }
+}
+
+fn set_actor_pos(block: &mut Compound, key: &str, pos: [i32; 3]) {
+    block.insert(key.into(), Tag::IntArray(pos.to_vec()));
+}
+
+fn actor_int(block: &Compound, key: &str) -> Option<i32> {
+    match block.get(&key.into()) {
+        Some(Tag::Int(value)) => Some(*value),
+        _ => None,
+    }
+}
+
+fn actor_set_int(block: &mut Compound, key: &str, value: i32) {
+    block.insert(key.into(), Tag::Int(value));
+}
+
+fn actor_breaker(block: &mut Compound) -> i32 {
+    if let Some(id) = actor_int(block, "BreakerId") {
+        return id;
+    }
+    let id = NEXT_BREAKER.fetch_sub(1, Ordering::Relaxed);
+    actor_set_int(block, "BreakerId", id);
+    id
+}
+
+fn can_break(game: &Game<'_>, pos: [i32; 3]) -> bool {
+    let state = state_at(game, pos);
+    let facts = game.res.facts().get(state);
+    facts.hardness >= 0.0
+        && !game.res.behaviours().is_air(state)
+        && !game.native_block_collision(pos).is_empty()
+        && game.native_state_block(state) != Some("minecraft:moving_piston")
+        && !game.native_state_block(state).is_some_and(|block| {
+            matches!(block, "minecraft:water" | "minecraft:lava")
+                || game.block_in_tag("create:non_breakable", block)
+                || game.block_in_tag("create:tracks", block)
+        })
+}
+
+/// Permit a linear contraption to enter a cell only when its forward-facing
+/// drill can reach that cell and the pinned breaker rules allow it.
+pub(super) fn allows_obstruction(
+    game: &Game<'_>,
+    blocks: &[Compound],
+    next_anchor: [i32; 3],
+    blocked: [i32; 3],
+    motion: [i32; 3],
+) -> bool {
+    blocks.iter().any(|block| {
+        let Some(state_tag) = compound(block, "BlockState") else {
+            return false;
+        };
+        if string(state_tag, "Name").as_deref() != Some(DRILL) {
+            return false;
+        }
+        let Some(state) = game.state_from_nbt(&Tag::Compound(state_tag.clone())) else {
+            return false;
+        };
+        let Some(face) = super::create_fan::facing(game, state) else {
+            return false;
+        };
+        let normal = face.normal();
+        if normal != motion {
+            return false;
+        }
+        let local = relative(block);
+        let target = std::array::from_fn(|i| {
+            (f64::from(next_anchor[i] + local[i]) + 0.5 + f64::from(normal[i]) * 0.65)
+                .floor() as i32
+        });
+        target == blocked && can_break(game, blocked)
+    })
+}
+
+/// Run the pinned DrillMovementBehaviour rules for a drill mounted on a
+/// translating contraption. The block compound is the actor's persistent
+/// MovementContext data, so progress survives a stalled step and save/reopen.
+pub(super) fn translate(
+    game: &mut Game<'_>,
+    blocks: &mut [Compound],
+    previous: [f64; 3],
+    current: [f64; 3],
+    minimum_speed: f32,
+) -> bool {
+    let motion = std::array::from_fn::<_, 3, _>(|i| current[i] - previous[i]);
+    let mut stalled = false;
+    for index in 0..blocks.len() {
+        let (before, actor_and_after) = blocks.split_at_mut(index);
+        let Some((block, after)) = actor_and_after.split_first_mut() else {
+            continue;
+        };
+        let Some(state_tag) = compound(block, "BlockState") else {
+            continue;
+        };
+        if string(state_tag, "Name").as_deref() != Some(DRILL) {
+            continue;
+        }
+        let Some(state) = game.state_from_nbt(&Tag::Compound(state_tag.clone())) else {
+            continue;
+        };
+        let Some(face) = super::create_fan::facing(game, state) else {
+            continue;
+        };
+        let breaker = actor_breaker(block);
+        let normal = face.normal();
+        let local = relative(block);
+        let target = std::array::from_fn(|i| {
+            (current[i] + f64::from(local[i]) + 0.5 + f64::from(normal[i]) * 0.65).floor() as i32
+        });
+        set_actor_pos(block, "LastDrillCell", target);
+        let forward = motion
+            .into_iter()
+            .zip(normal)
+            .map(|(step, sign)| step * f64::from(sign))
+            .sum::<f64>();
+        if motion.into_iter().all(|step| step == 0.0) {
+            if let Some(break_at) = actor_pos(block, "BreakingPos") {
+                block.remove(&"BreakingPos".into());
+                block.remove(&"Progress".into());
+                block.remove(&"TicksUntilNextProgress".into());
+                game.native_set_break_progress(
+                    breaker,
+                    break_at,
+                    -1,
+                );
+            }
+            continue;
+        }
+        if actor_pos(block, "BreakingPos").is_none() && forward > 0.0 && can_break(game, target) {
+            set_actor_pos(block, "BreakingPos", target);
+            actor_set_int(block, "Progress", 0);
+            actor_set_int(block, "TicksUntilNextProgress", 0);
+        }
+        let Some(break_at) = actor_pos(block, "BreakingPos") else {
+            continue;
+        };
+        if !can_break(game, break_at) {
+            block.remove(&"BreakingPos".into());
+            block.remove(&"Progress".into());
+            block.remove(&"TicksUntilNextProgress".into());
+            game.native_set_break_progress(
+                breaker,
+                break_at,
+                -1,
+            );
+            continue;
+        }
+        let wait = actor_int(block, "TicksUntilNextProgress").unwrap_or(0);
+        if wait > 0 {
+            actor_set_int(block, "TicksUntilNextProgress", wait - 1);
+        } else {
+            let motion_length = motion
+                .into_iter()
+                .map(|v| v * v)
+                .sum::<f64>()
+                .sqrt();
+            let signed_length = -motion_length;
+            let animation_speed = ((
+                (signed_length * 1000.0 + 100.0 * signed_length.signum()) as i32 / 100
+            ) * 100) as f32;
+            let speed = (animation_speed.abs() / 500.0).clamp(minimum_speed, 16.0);
+            let hardness = game.res.facts().get(state_at(game, break_at)).hardness;
+            let progress = actor_int(block, "Progress").unwrap_or(0)
+                + ((speed / hardness) as i32)
+                    .clamp(1, 10 - actor_int(block, "Progress").unwrap_or(0));
+            if progress >= 10 {
+                game.native_set_break_progress(breaker, break_at, -1);
+                if let Some(drops) = game.native_machine_destroy_block(break_at, None, true) {
+                    let mut rest = drops;
+                    for stack in rest.drain(..) {
+                        let limit = game
+                            .items()
+                            .get(&stack.item)
+                            .map_or(64, |item| item.max_stack);
+                        if let Some(left) = deposit(before, stack, limit)
+                            .and_then(|left| deposit(after, left, limit))
+                        {
+                            game.pop_resource(break_at, left);
+                        }
+                    }
+                }
+                block.remove(&"BreakingPos".into());
+                block.remove(&"Progress".into());
+                block.remove(&"TicksUntilNextProgress".into());
+            } else {
+                actor_set_int(block, "Progress", progress);
+                actor_set_int(
+                    block,
+                    "TicksUntilNextProgress",
+                    (hardness / speed).max(0.0) as i32,
+                );
+                game.native_set_break_progress(breaker, break_at, progress);
+            }
+        }
+        stalled |= actor_pos(block, "BreakingPos").is_some();
+    }
+    stalled
 }
 
 pub(super) fn placement(

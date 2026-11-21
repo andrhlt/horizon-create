@@ -62,6 +62,10 @@ fn valid_id(id: &str) -> bool {
         })
 }
 
+pub(super) fn valid_template_id(id: &str) -> bool {
+    valid_id(id)
+}
+
 fn start(
     game: &mut Game<'_>,
     pos: [i32; 3],

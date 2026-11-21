@@ -1,0 +1,15 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "create": "6.0.10",
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.219",
+  "java": "21.0.13.1",
+  "patch_sha256": "43b4c16a73a260f7f1c145619c7630d59494544199fe76ee0abd3c7626e385e8",
+  "template_sha256": "ee7f068bf608653a052112aab8bfaab4370ea92af182bd87ba191e2a150c0cbc",
+  "trace_sha256": "fe09c401f6201f1edf18a01ad7622c5f582e3373bf023a970bccd6f8d88bcb9d",
+  "capture_seconds": 23.61,
+  "rotations": 18,
+  "powered_samples": 11,
+  "tick_origin": "GameTest tick 8 after network setup. The two after_use rows sample ordinary Wrench actions between world ticks.",
+  "scope": "Independent X/Y/Z starting states on all six rotation faces with west-face survival pickup. Powered north-input Y Gearbox rotated Y to Z and back using the accessible west face."
+}

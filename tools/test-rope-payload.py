@@ -14,22 +14,24 @@ MOTOR = f"{X + 1} {Y} {Z}"
 KEYS = ("offset", "running", "payload_y", "rpm", "casing", "planks", "chest_copper")
 
 
-def setup(control):
+def setup(control, y=Y):
+    pulley = f"{X} {y} {Z}"
+    motor = f"{X + 1} {y} {Z}"
     control.commands((
-        f"/setblock {PULLEY} create:rope_pulley[axis=x]",
-        f"/setblock {MOTOR} create:creative_motor[facing=west]{{ScrollValue:0}}",
-        f"/setblock {X} {Y - 1} {Z} create:andesite_casing",
-        f"/setblock {X + 1} {Y - 1} {Z} minecraft:oak_planks",
-        f'/setblock {X + 2} {Y - 1} {Z} minecraft:chest{{Items:[{{Slot:0b,count:7,id:"minecraft:copper_ingot"}}]}}',
-        f"/fill {X - 1} {Y - 3} {Z - 4} {X + 4} {Y - 3} {Z - 1} minecraft:smooth_stone",
+        f"/setblock {pulley} create:rope_pulley[axis=x]",
+        f"/setblock {motor} create:creative_motor[facing=west]{{ScrollValue:0}}",
+        f"/setblock {X} {y - 1} {Z} create:andesite_casing",
+        f"/setblock {X + 1} {y - 1} {Z} minecraft:oak_planks",
+        f'/setblock {X + 2} {y - 1} {Z} minecraft:chest{{Items:[{{Slot:0b,count:7,id:"minecraft:copper_ingot"}}]}}',
+        f"/fill {X - 1} {y - 3} {Z - 4} {X + 4} {y - 3} {Z - 1} minecraft:smooth_stone",
         "/gamemode survival",
         "/item replace entity @s hotbar.0 with create:super_glue",
     ))
     control.call("key", "1", "tap")
     for x in (X, X + 2):
-        control.command(f"/tp @s {x + 0.5} {Y - 2} {Z - 1.8} 0 20")
+        control.command(f"/tp @s {x + 0.5} {y - 2} {Z - 1.8} 0 20")
         control.call("wait", 3)
-        control.call("look-at", x + 0.5, Y - 0.55, Z + 0.5)
+        control.call("look-at", x + 0.5, y - 0.55, Z + 0.5)
         control.call("mouse", "right", "click")
         control.call("wait", 3)
     item = control.command("/data get entity @s Inventory")

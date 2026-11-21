@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 import json
+import hashlib
 import os
 from pathlib import Path
 from shutil import copy2
@@ -15,7 +16,13 @@ ROOT = Path(__file__).resolve().parents[1]
 def install_pack(game, pack=None):
     mods = game / "horizon-mods"
     mods.mkdir(parents=True)
-    copy2(pack or ROOT / ".local/create.hmod", mods / "create.hmod")
+    source = pack or ROOT / ".local/create.hmod"
+    target = mods / "create.hmod"
+    copy2(source, target)
+    digest = hashlib.sha256(target.read_bytes()).hexdigest()
+    if digest != hashlib.sha256(source.read_bytes()).hexdigest():
+        raise RuntimeError(f"Installed Create pack differs from source: {target}")
+    print(f"Create pack installed: {target} sha256={digest}")
     (game / "horizon-mods.txt").write_text("mod.create:true\n", encoding="utf-8")
 
 
@@ -43,7 +50,8 @@ def last_command_message(record):
 
 
 @contextmanager
-def fixture_world(args, world, template=None, *, render=False, env=None, pack=None, terrain_seed=None):
+def fixture_world(args, world, template=None, *, render=False, env=None, pack=None, terrain_seed=None,
+                  artifact_dir=None):
     with tempfile.TemporaryDirectory(prefix="hc-fixture-") as tmp:
         scratch = Path(tmp)
         socket = scratch / "ctl.sock"
@@ -69,8 +77,9 @@ def fixture_world(args, world, template=None, *, render=False, env=None, pack=No
                 control.stop()
             log = scratch / "ctl.log"
             if log.exists():
-                (ROOT / ".local").mkdir(exist_ok=True)
-                copy2(log, ROOT / f".local/horizon-{world.lower()}.log")
+                artifacts = artifact_dir or ROOT / ".local"
+                artifacts.mkdir(parents=True, exist_ok=True)
+                copy2(log, artifacts / f"horizon-{world.lower()}.log")
 
 
 class FixtureWorld:

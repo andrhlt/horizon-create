@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import json
 from pathlib import Path
 import re
 from zipfile import ZipFile
@@ -43,9 +44,9 @@ def place_by_player(control):
     with (ROOT / "fixtures/flywheel-placement-java.csv").open() as source:
         placement = list(csv.DictReader(source))
     control.command("/fill 3 96 -13 8 96 -5 minecraft:smooth_stone")
+    control.command("/gamemode survival")
     control.command("/item replace entity @s hotbar.0 with create:flywheel 4")
     control.call("select", "create:flywheel")
-    control.command("/gamemode survival")
     for row in placement:
         case = int(row["case"])
         if case == 1:
@@ -92,6 +93,20 @@ def check_assets(pack, source):
                 raise RuntimeError(f"The original Flywheel asset differs: {name}")
 
 
+def check_crafting_recipe(pack):
+    with ZipFile(pack) as archive:
+        recipe = json.loads(archive.read("data/create/recipe/crafting/kinetics/flywheel.json"))
+    expected = {
+        "type": "minecraft:crafting_shaped",
+        "key": {"A": "create:shaft", "C": "#c:ingots/brass"},
+        "pattern": ["CCC", "CAC", "CCC"],
+        "result": {"count": 1, "id": "create:flywheel"},
+    }
+    for key, value in expected.items():
+        if recipe.get(key) != value:
+            raise RuntimeError(f"Flywheel survival recipe {key} differs: {recipe.get(key)}")
+
+
 def read_motion(log, start):
     return {
         int(tick) - start: [float(previous), float(speed), float(angle)]
@@ -115,6 +130,7 @@ def run(args):
     pack = args.pack or ROOT / ".local/create.hmod"
     if args.java_source:
         check_assets(pack, args.java_source)
+    check_crafting_recipe(pack)
     actual = []
     env = {"CREATE_FLYWHEEL_TRACE_POS": WHEEL.replace(" ", ",")}
     with fixture_world(args, "Flywheel", render=True, env=env, pack=pack) as control:

@@ -1,0 +1,12 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "create": "6.0.10",
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.219",
+  "patch_sha256": "18e73746bf7fa04e20a54f70ed73e01b99bc809193f7c10245dda9e112771aed",
+  "template_sha256": "431ee3ec616f3db2eaee9194ec9b5d511a1501f4617238d631609bbba6680671",
+  "capture_seconds": 14,
+  "records": 120,
+  "tick_origin": "GameTest tick 2 after placing the payload and enabling the original fixture motor. Reverse after the settled endpoint at sample 10, before taking that sample.",
+  "scope": "Sticky mechanical piston carrying each Gearbox axis, regular mechanical piston carrying Y Gearbox, and sticky piston carrying stone. Placement mode 0 forces a fresh assembly when direction reverses."
+}

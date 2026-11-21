@@ -185,6 +185,7 @@ def craft(args):
             '/tp @s 8.5 101 -12.5',
         ))
         for result, ingredients in (
+            (NORMAL, (('create:cogwheel',(101,103,105,107)),('create:andesite_casing',(104,)))),
             (VERTICAL, (('create:cogwheel',(100,102,106,108)),('create:andesite_casing',(104,)))),
             (VERTICAL, ((NORMAL,(100,)),)),
             (NORMAL, ((VERTICAL,(100,)),)),
@@ -198,8 +199,11 @@ def craft(args):
                 crafting.distribute(control,index,slots)
             crafting.craft(control,result,1)
             control.call('close')
-            assert not any(control.call('inventory')['counts'].get(item) for item,_ in ingredients)
-    print('The original shaped Vertical Gearbox recipe and both one-to-one conversions crafted in survival.')
+            control.call('wait',2)
+            contents=control.call('inventory')['counts']
+            leftovers={item: contents.get(item) for item,_ in ingredients if contents.get(item)}
+            assert not leftovers, (result, leftovers, contents)
+    print('Both original shaped Gearbox recipes and both one-to-one conversions crafted in survival.')
 
 
 def verify_lan(args, scratch):

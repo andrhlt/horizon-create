@@ -147,6 +147,13 @@ pub(super) enum Motion {
     Distance(f32),
 }
 
+pub(super) fn distance_limit(motion: Option<Motion>, rpm: f32) -> Option<f32> {
+    match motion {
+        Some(Motion::Distance(relative)) => Some(relative * rpm.abs()),
+        _ => None,
+    }
+}
+
 pub(super) fn output(entity: Option<&ModBlockEntity>) -> (i32, i32, Option<Motion>) {
     let Some(entity) = entity else {
         return (0, 0, None);
@@ -333,17 +340,34 @@ pub(super) fn wrench_pose(
 
 pub(super) fn prepare(game: &mut Game<'_>) {
     let ticking = game.block_ticking_area();
-    let positions: Vec<_> = game
-        .world
-        .block_entity_tickers()
-        .iter()
-        .filter_map(|entry| {
-            let (x, y, z) = entry.0;
-            let pos = [x, y, z];
-            (ticking(x, z) && mod_entity(game, pos).is_some_and(|entity| entity.id == SEQUENCER))
+    // On the first block-entity pass after a world load, tickers have not yet
+    // promoted the loaded chunk's pending entries: the tick-list table is
+    // built later in tick_block_entities_inner. Include loaded sequencers for
+    // this one prepass so their instruction clock resumes on the first tick.
+    let positions: Vec<_> = if game.world.block_entities.has_states() {
+        game.world
+            .block_entity_tickers()
+            .iter()
+            .filter_map(|entry| {
+                let (x, y, z) = entry.0;
+                let pos = [x, y, z];
+                (ticking(x, z)
+                    && mod_entity(game, pos).is_some_and(|entity| entity.id == SEQUENCER))
                 .then_some(pos)
-        })
-        .collect();
+            })
+            .collect()
+    } else {
+        game.world
+            .block_entities
+            .iter()
+            .filter_map(|(&(x, y, z), entity)| {
+                let pos = [x, y, z];
+                (ticking(x, z)
+                    && matches!(entity, BlockEntity::Mod(entity) if entity.id == SEQUENCER))
+                .then_some(pos)
+            })
+            .collect()
+    };
     for pos in positions {
         let (rpm, from) = super::create_machines::sequencer_input(game, pos);
         let input_side = from.into_iter().sum();

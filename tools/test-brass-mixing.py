@@ -54,6 +54,32 @@ def equal(expected, actual):
     )
 
 
+def verify_no_heat_rejection(args, ticks):
+    samples = []
+    with fixture_world(args, "Brass-mixing-no-heat", STRUCTURE, pack=args.pack) as control:
+        control.command("/place template create:gametest/processing/brass_mixing 3 96 -12")
+        control.step_to(control.clock() + 1)
+        heater = control.call("block", 7, 97, -11)
+        if heater.get("block") not in {"create:blaze_burner", "create:lit_blaze_burner"}:
+            raise RuntimeError(f"Expected the brass fixture's Basin heater, got {heater}")
+        control.command("/setblock 7 97 -11 minecraft:air")
+        control.command("/setblock 5 98 -10 minecraft:lever[face=floor,facing=north,powered=false]")
+        start = control.clock()
+        for tick in range(ticks):
+            if tick:
+                control.step_to(start + tick)
+            samples.append(sample(control, tick))
+
+    processed = [(row[0], row[7], row[8]) for row in samples if int(row[7]) or int(row[8])]
+    ingredients_remain = int(samples[-1][5]) > 0 and int(samples[-1][6]) > 0
+    if processed or not ingredients_remain:
+        raise SystemExit(
+            f"No-heat brass rejection failed: ingredients_remain={ingredients_remain}, "
+            f"unexpected brass output rows={processed[:8]}"
+        )
+    print(f"Brass mixing rejected without heat across {ticks} ticks; ingredients remained unprocessed.")
+
+
 def run(args):
     with (ROOT / "fixtures/brass_mixing-java.csv").open() as file:
         reader = csv.reader(file)
@@ -78,6 +104,7 @@ def run(args):
         raise SystemExit(f"Brass mixing differs on {len(differences)} ticks. "
                          f"First rows (Java, Horizon): {differences[:8]}. See {path}")
     print(f"Original brass mixing matched Java across {len(actual)} ticks. See {path}")
+    verify_no_heat_rejection(args, len(expected))
 
 
 def main():

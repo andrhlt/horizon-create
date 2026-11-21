@@ -8,7 +8,7 @@ use super::create_bearing::{
 };
 use super::create_depot::compound;
 use super::create_fan::facing;
-use super::create_machines::{int, mod_entity, offset, rpm_at};
+use super::create_machines::{int, mod_entity, offset};
 
 pub(super) const SHAFT: &str = "create:gantry_shaft";
 pub(super) const CARRIAGE: &str = "create:gantry_carriage";
@@ -37,14 +37,15 @@ fn side(game: &Game<'_>, at: [i32; 3]) -> Option<Direction> {
     facing(game, game.world.block(at[0], at[1], at[2]))
 }
 
-fn drive(game: &Game<'_>, shaft: [i32; 3]) -> Option<(Direction, f32, bool)> {
+fn drive(game: &Game<'_>, shaft: [i32; 3]) -> Option<(Direction, f32, bool, Option<f32>)> {
     if game.native_block(shaft) != SHAFT
         || game.native_block_property(shaft, "powered").as_deref() == Some("true")
     {
         return None;
     }
     let facing = side(game, shaft)?;
-    let speed = (-rpm_at(game, shaft) / 512.0).clamp(-0.49, 0.49);
+    let (rpm, sequence_limit) = super::create_machines::drive_speed_and_distance(game, shaft);
+    let speed = (-rpm / 512.0).clamp(-0.49, 0.49);
     if speed == 0.0 {
         return None;
     }
@@ -54,7 +55,7 @@ fn drive(game: &Game<'_>, shaft: [i32; 3]) -> Option<(Direction, f32, bool)> {
         "middle" => true,
         _ => false,
     };
-    Some((facing, speed, can_move))
+    Some((facing, speed, can_move, sequence_limit))
 }
 
 fn matches_shaft(game: &Game<'_>, at: [i32; 3], facing: Direction) -> bool {
@@ -77,6 +78,24 @@ pub(super) fn shaft_shape(game: &mut Game<'_>, at: [i32; 3]) {
 
 pub(super) fn power_shafts(game: &mut Game<'_>) {
     let ticking = game.block_ticking_area();
+    let unloaded_networks: Vec<_> = game
+        .world
+        .block_entity_tickers()
+        .iter()
+        .filter_map(|entry| {
+            let (x, y, z) = entry.0;
+            let pos = [x, y, z];
+            (ticking(x, z)
+                && game.native_block(pos) == SHAFT
+                && mod_entity(game, pos).is_some_and(|entity| entity.data.is_empty()))
+            .then_some(pos)
+        })
+        .collect();
+    for pos in unloaded_networks {
+        // Gantry shafts have no kinetic ticker. Rebuild their saved network on
+        // load so a running carriage can resume after a world reopen.
+        super::create_machines::refresh_connected_network(game, pos);
+    }
     let runs: Vec<_> = game
         .world
         .block_entity_tickers()
@@ -115,11 +134,19 @@ pub(super) fn power_shafts(game: &mut Game<'_>) {
     }
 }
 
-fn space_for(game: &Game<'_>, anchor: [i32; 3], blocks: &[Compound], moving: &[[i32; 3]]) -> bool {
+fn space_for(
+    game: &Game<'_>,
+    anchor: [i32; 3],
+    blocks: &[Compound],
+    moving: &[[i32; 3]],
+    motion: [i32; 3],
+) -> bool {
     blocks.iter().all(|saved| {
         let at = offset(anchor, relative(saved));
         let state = game.world.block(at[0], at[1], at[2]);
-        moving.contains(&at) || game.res.behaviours().is_replaceable(state)
+        moving.contains(&at)
+            || game.res.behaviours().is_replaceable(state)
+            || super::create_drill::allows_obstruction(game, blocks, anchor, at, motion)
     })
 }
 
@@ -129,7 +156,7 @@ fn assemble(game: &mut Game<'_>, origin: [i32; 3]) {
     };
     let support = body.opposite().normal();
     let shaft = offset(origin, support);
-    let Some((track, speed, true)) = drive(game, shaft) else {
+    let Some((track, speed, true, sequence_limit)) = drive(game, shaft) else {
         return;
     };
     let direction = if speed > 0.0 { track } else { track.opposite() };
@@ -139,7 +166,7 @@ fn assemble(game: &mut Game<'_>, origin: [i32; 3]) {
         .iter()
         .map(|block| offset(origin, relative(block)))
         .collect();
-    if blocks.is_empty() || !space_for(game, next, &blocks, &source) {
+    if blocks.is_empty() || !space_for(game, next, &blocks, &source, direction.normal()) {
         return;
     }
     let dimension = game.native_dimension();
@@ -180,6 +207,9 @@ fn assemble(game: &mut Game<'_>, origin: [i32; 3]) {
         ("Support".into(), Tag::IntArray(support.to_vec())),
     ]);
     set_num(&mut data, "Offset", 0.0);
+    if let Some(limit) = sequence_limit {
+        set_num(&mut data, "SequencedOffsetLimit", f64::from(limit));
+    }
     save(game, id, data, blocks);
 }
 
@@ -224,10 +254,15 @@ fn move_one(game: &mut Game<'_>, id: u32, mut data: Compound) {
     let dimension = game.native_dimension();
     let mut next = distance;
     let mut stop = true;
-    if let Some((direction, speed, allowed)) = drive(game, offset(current, support))
+    let sequence_limit = match data.get(&"SequencedOffsetLimit".into()) {
+        Some(Tag::Double(bits)) => Some(f64::from_bits(*bits)),
+        _ => None,
+    };
+    if let Some((direction, speed, allowed, _)) = drive(game, offset(current, support))
         && direction.normal() == axis
     {
-        let change = if age > 2 { f64::from(speed) } else { 0.0 };
+        let raw_change = if age > 2 { f64::from(speed) } else { 0.0 };
+        let change = sequence_limit.map_or(raw_change, |limit| raw_change.clamp(-limit, limit));
         let candidate = distance + change;
         let next_block = target(origin, axis, candidate);
         let grid_offset = (0..3)
@@ -236,15 +271,33 @@ fn move_one(game: &mut Game<'_>, id: u32, mut data: Compound) {
         // The pinion compares the next world coordinate with the center
         // of its current shaft block. Equality counts as crossing west/down/north.
         let axis_sign = f64::from(axis.into_iter().sum::<i32>());
-        let crossing = (grid_offset * axis_sign < candidate * axis_sign)
-            != (f64::from(speed) * axis_sign < 0.0);
-        if (allowed || !crossing) && space_for(game, next_block, &blocks, &[]) {
+        let crossing = change != 0.0
+            && (grid_offset * axis_sign < candidate * axis_sign)
+                != (change * axis_sign < 0.0);
+        if (allowed || !crossing)
+            && space_for(
+                game,
+                next_block,
+                &blocks,
+                &[],
+                axis.map(|step| step * if change > 0.0 { 1 } else { -1 }),
+            )
+        {
             next = candidate;
             stop = false;
+            if let Some(limit) = sequence_limit {
+                set_num(
+                    &mut data,
+                    "SequencedOffsetLimit",
+                    (limit - change.abs()).max(0.0),
+                );
+            }
         }
     }
     let contact_origin =
         std::array::from_fn(|i| f64::from(origin[i]) + f64::from(axis[i]) * distance);
+    let planned_origin =
+        std::array::from_fn(|i| f64::from(origin[i]) + f64::from(axis[i]) * next);
     super::create_contact::moving(game, &blocks, contact_origin, &mut data, age > 2 && !stop);
     let previous = number(&data, "PreviousOffset");
     let previous_origin =
@@ -255,7 +308,28 @@ fn move_one(game: &mut Game<'_>, id: u32, mut data: Compound) {
         previous_origin,
         contact_origin,
     );
-    if !stop && super::create_roller::tick(game, &mut blocks, previous_origin, contact_origin, id) {
+    let drill_stalled = if stop {
+        // StopMoving cancels BlockBreakingMovementBehaviour progress before
+        // the actor is restored to the world.
+        super::create_drill::translate(
+            game,
+            &mut blocks,
+            contact_origin,
+            contact_origin,
+            1.0,
+        );
+        false
+    } else {
+        super::create_drill::translate(
+            game,
+            &mut blocks,
+            contact_origin,
+            planned_origin,
+            1.0,
+        )
+    };
+    if !stop && (drill_stalled
+        || super::create_roller::tick(game, &mut blocks, previous_origin, contact_origin, id)) {
         next = distance;
     }
     if stop && restore(game, current, &blocks, 1, 0.0) {

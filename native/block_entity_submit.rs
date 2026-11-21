@@ -47,8 +47,14 @@ fn block_entity_submit(
         crate::game::create_desk_bell::render(game, state, entity, draw);
     } else if block == crate::game::create_encased_fluid_pipe::BLOCK {
         crate::game::create_encased_pipe_visual::submit(game, pos, draw);
+    } else if block == crate::game::create_fluids::SMART_PIPE {
+        crate::game::create_fluids::render_filter(game, state, entity, draw);
     } else if block == crate::game::create_item_drain::DRAIN {
         crate::game::create_item_drain::render(game, pos, entity, draw);
+    } else if matches!(block,
+        crate::game::create_fluid_tank::TANK | crate::game::create_fluid_tank::CREATIVE
+    ) {
+        crate::game::create_tank_visual::render(game, pos, entity, draw);
     } else if matches!(block,
         crate::game::create_threshold_switch::THRESHOLD_SWITCH | crate::game::create_smart_observer::OBSERVER
     ) {

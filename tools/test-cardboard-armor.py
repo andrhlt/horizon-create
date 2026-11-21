@@ -49,6 +49,11 @@ def replay(world, actor, player, reference):
     defense = float(reply.split()[-1])
     if defense != int(reference["defense"]):
         raise AssertionError(f'{item} gives {defense} defense, expected {reference["defense"]}')
+    equipped = next(entry for entry in actor.call("inventory")["armor"] if entry["part"] == slot)
+    durability = (equipped.get("max_damage"), equipped.get("durability_left"))
+    expected_durability = (int(reference["max_damage"]), int(reference["max_damage"]))
+    if durability != expected_durability:
+        raise AssertionError(f"{item} durability is {durability}, expected unworn Java value {expected_durability}")
 
 
 def main():
@@ -87,7 +92,7 @@ def main():
         world.command(f"/gamemode survival {player}")
         for reference in references:
             replay(world, actor, player, reference)
-    print(f"All {len(references)} Java Cardboard armor recipes, equipment slots and defense values matched.")
+    print(f"All {len(references)} Java Cardboard recipes, equipment slots, defense and unworn durability values matched.")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,4 @@
+case,facing,wrenched
+0,south,north
+1,north,south
+2,west,east

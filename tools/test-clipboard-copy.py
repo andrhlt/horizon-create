@@ -35,15 +35,18 @@ def diode_at(host, position):
     return {"interval": int(duration.rsplit("block data: ", 1)[1]), "inverted": "inverted=true" in state}
 
 
-def aim(host, actor, player, position, height):
+def aim(host, actor, player, position, height, *, face="up"):
     x, y, z = position
     feet = (x + .5, float(y), z - 1.5)
     host.command(f"/tp {player} {clipboard.coords(feet)}")
     multiplayer.until("the player to reach the machine", lambda:
                       actor.call("state")["player"]["position"] == list(feet))
     actor.call("look-at", x + .5, y + height, z + .5)
-    multiplayer.until("the ray to hit the selected block", lambda:
-                      bool(clipboard.ray_hit(actor, position, "up")))
+    def targeted():
+        hit = actor.call("looking-at").get("block") or {}
+        return hit.get("pos") == list(position) and (face is None or hit.get("face") == face)
+
+    multiplayer.until("the ray to hit the selected block", targeted)
     actor.call("wait", 6)
 
 
@@ -192,15 +195,7 @@ def run_chute(host, actor, player, reference):
     tick = host.clock()
 
     def click_machine(position, button):
-        x, y, z = position
-        feet = (x + .5, float(y), z - 1.5)
-        host.command(f"/tp {player} {clipboard.coords(feet)}")
-        multiplayer.until("the player to reach the Smart Chute", lambda:
-                          actor.call("state")["player"]["position"] == list(feet))
-        actor.call("look-at", x + .5, y + .42, z + .5)
-        multiplayer.until("the ray to hit the Smart Chute", lambda:
-                          (actor.call("looking-at").get("block") or {}).get("pos") == list(position))
-        actor.call("wait", 6)
+        aim(host, actor, player, position, .42, face=None)
         actor.call("mouse", button, "click")
 
     def verify(case):

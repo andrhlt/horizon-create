@@ -1,0 +1,19 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "java": "OpenJDK 21",
+  "patch_sha256": "db44780c65607b239f78a9614835686615b33b52217f47ac44a80519eae53830",
+  "records": 1,
+  "expected": {
+    "result": "SUCCESS",
+    "held_count": 0,
+    "input_slot": 0,
+    "input_count": 9,
+    "input_item": "minecraft:raw_iron",
+    "open": true
+  },
+  "scope": "Survival main-hand raw iron \u00d79 through north-facing Item Hatch into unsided Furnace capability; actual Java invocation and inventory/open observation. Original five fixture CSVs also reproduced unchanged.",
+  "command": "JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home GRADLE_USER_HOME=\"$PWD/.local/java-capture/gradle-home\" .local/java-capture/Create/gradlew -p .local/java-capture/Create --offline --no-daemon runGameTestServer",
+  "elapsed": "2m37s",
+  "log": ".local/java-capture/java-hatch.log",
+  "outcome": "BUILD SUCCESSFUL"
+}

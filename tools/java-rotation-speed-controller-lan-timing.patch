@@ -1,0 +1,146 @@
+diff --git a/src/main/java/com/simibubi/create/foundation/blockEntity/behaviour/ValueSettingsPacket.java b/src/main/java/com/simibubi/create/foundation/blockEntity/behaviour/ValueSettingsPacket.java
+index b8b3003..8e4babd 100644
+--- a/src/main/java/com/simibubi/create/foundation/blockEntity/behaviour/ValueSettingsPacket.java
++++ b/src/main/java/com/simibubi/create/foundation/blockEntity/behaviour/ValueSettingsPacket.java
+@@ -66,6 +66,13 @@ public class ValueSettingsPacket extends BlockEntityConfigurationPacket<SmartBlo
+ 				return;
+ 			}
+ 			valueSettingsBehaviour.setValueSettings(player, new ValueSettings(row, value), ctrlDown);
++			if (Boolean.getBoolean("parity.controllerLanServer") && be instanceof com.simibubi.create.content.kinetics.speedController.SpeedControllerBlockEntity controller) {
++				var level = player.level();
++				var output = (com.simibubi.create.content.kinetics.base.KineticBlockEntity) level.getBlockEntity(pos.south());
++				System.out.printf(java.util.Locale.ROOT, "JAVA_CONTROLLER_LAN_ACCEPT %s %d %d %.4f%n",
++					player.getGameProfile().getName(), level.getGameTime(), controller.targetSpeed.getValue(),
++					output.getTheoreticalSpeed());
++			}
+ 			return;
+ 		}
+ 	}
+--- a/src/main/resources/create.mixins.json
++++ b/src/main/resources/create.mixins.json
+@@ -63,6 +63,7 @@
+     "client.BlockDestructionProgressMixin",
+     "client.CameraMixin",
+     "client.ControllerHiddenWindowMixin",
++    "client.ControllerLanLoopbackMixin",
+     "client.EntityContraptionInteractionMixin",
+     "client.GameRendererMixin",
+     "client.HeavyBootsOnPlayerMixin",
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/ControllerLanProbe.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/ControllerLanProbe.java
+new file mode 100644
+index 0000000..2d1317f
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/ControllerLanProbe.java
+@@ -0,0 +1,89 @@
++package com.simibubi.create.infrastructure.gametest.tests;
++
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.Locale;
++
++import com.simibubi.create.content.kinetics.speedController.SpeedControllerBlockEntity;
++import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsScreen;
++
++import net.minecraft.client.Minecraft;
++import net.minecraft.core.BlockPos;
++import net.minecraft.world.level.GameType;
++import net.neoforged.api.distmarker.Dist;
++import net.neoforged.bus.api.SubscribeEvent;
++import net.neoforged.fml.common.EventBusSubscriber;
++import net.neoforged.neoforge.client.event.ClientTickEvent;
++
++@EventBusSubscriber(value = Dist.CLIENT)
++public final class ControllerLanProbe {
++    private static final BlockPos POS = new BlockPos(6, 101, -10);
++    private static boolean publishing;
++    private static int previous = Integer.MIN_VALUE;
++    private static float previousSpeed = Float.NaN;
++    private static volatile boolean guestPlaced;
++    private static String lastRequest = "";
++
++    @SubscribeEvent
++    public static void tick(ClientTickEvent.Post event) throws Exception {
++        String role = System.getProperty("parity.controllerLanRole");
++        if (role == null)
++            return;
++        var mc = Minecraft.getInstance();
++        if (mc.level == null || mc.player == null || mc.getOverlay() != null)
++            return;
++        if (org.lwjgl.glfw.GLFW.glfwGetWindowAttrib(mc.getWindow().getWindow(), org.lwjgl.glfw.GLFW.GLFW_VISIBLE)
++            != org.lwjgl.glfw.GLFW.GLFW_FALSE)
++            throw new IllegalStateException("The controller LAN fixture client must be hidden");
++        if (role.equals("Host") && !publishing && mc.hasSingleplayerServer()) {
++            publishing = true;
++            var server = mc.getSingleplayerServer();
++            server.execute(() -> {
++                var source = server.createCommandSourceStack();
++                server.getCommands().performPrefixedCommand(source, "tp ControllerHost 4 101 -9.5 -90 24");
++                int port = Integer.getInteger("parity.controllerLanPort");
++                server.setUsesAuthentication(false);
++                if (!server.publishServer(GameType.SURVIVAL, true, port))
++                    throw new IllegalStateException("Unable to publish the controller fixture LAN server");
++                System.out.printf("JAVA_CONTROLLER_LAN_PUBLISHED %d %d%n", port, server.overworld().getGameTime());
++            });
++        }
++        if (role.equals("Host") && publishing && !guestPlaced && mc.hasSingleplayerServer()) {
++            var server = mc.getSingleplayerServer();
++            server.execute(() -> {
++                if (guestPlaced || server.getPlayerList().getPlayerByName("ControllerGuest") == null)
++                    return;
++                server.getCommands().performPrefixedCommand(server.createCommandSourceStack(),
++                    "tp ControllerGuest 4.2 101 -8.7 -76 25");
++                server.tickRateManager().setFrozen(true);
++                guestPlaced = true;
++                System.out.printf("JAVA_CONTROLLER_LAN_FROZEN %d%n", server.overworld().getGameTime());
++            });
++        }
++        if (!(mc.level.getBlockEntity(POS) instanceof SpeedControllerBlockEntity controller))
++            return;
++        int setting = controller.targetSpeed.getValue();
++        if (setting != previous || controller.getSpeed() != previousSpeed) {
++            previous = setting;
++            previousSpeed = controller.getSpeed();
++            System.out.printf(Locale.ROOT, "JAVA_CONTROLLER_LAN_REPLICA %s %d %d %.4f%n",
++                role, mc.level.getGameTime(), setting, controller.getSpeed());
++        }
++        Path signal = Path.of(System.getProperty("parity.controllerLanSignal"));
++        if (!Files.exists(signal))
++            return;
++        String text = Files.readString(signal).trim();
++        if (text.equals(lastRequest) || text.isEmpty() || mc.screen != null)
++            return;
++        lastRequest = text;
++        String[] action = text.split(" ");
++        int signed = Integer.parseInt(action[1]);
++        var behavior = controller.targetSpeed;
++        var panel = new ValueSettingsScreen(POS, behavior.createBoard(mc.player, null), behavior.getValueSettings(),
++            behavior::newSettingHovered, behavior.netId());
++        mc.setScreen(panel);
++        var cursor = panel.getCoordinateOfValue(signed < 0 ? 0 : 1, Math.abs(signed));
++        System.out.printf("JAVA_CONTROLLER_LAN_RELEASE %s %d %d%n", role, mc.level.getGameTime(), signed);
++        panel.mouseReleased(cursor.x, cursor.y, 1);
++    }
++}
+diff --git a/src/main/java/com/simibubi/create/foundation/mixin/client/ControllerLanLoopbackMixin.java b/src/main/java/com/simibubi/create/foundation/mixin/client/ControllerLanLoopbackMixin.java
+new file mode 100644
+--- /dev/null
++++ b/src/main/java/com/simibubi/create/foundation/mixin/client/ControllerLanLoopbackMixin.java
+@@ -0,0 +1,18 @@
++package com.simibubi.create.foundation.mixin.client;
++
++import java.net.InetAddress;
++import java.net.UnknownHostException;
++import net.minecraft.client.server.IntegratedServer;
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.ModifyArg;
++
++@Mixin(IntegratedServer.class)
++public class ControllerLanLoopbackMixin {
++    @ModifyArg(method = "publishServer", at = @At(value = "INVOKE", target =
++        "Lnet/minecraft/server/network/ServerConnectionListener;startTcpServerListener(Ljava/net/InetAddress;I)V"),
++        index = 0)
++    private InetAddress controllerLanLoopback(InetAddress address) throws UnknownHostException {
++        return Boolean.getBoolean("parity.controllerLanServer") ? InetAddress.getByAddress(new byte[]{127, 0, 0, 1}) : address;
++    }
++}

@@ -1,0 +1,31 @@
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestProcessing.java
+@@ -201,6 +201,28 @@
+ 				}
+ 			}
+ 			System.out.println();
++			if (scenario == 0 || scenario == 1 || scenario == 3) {
++				var firstEnd = connection.bePositions.getFirst();
++				var lastEnd = connection.bePositions.getSecond();
++				var removed = scenario == 1 ? lastEnd : firstEnd;
++				var other = scenario == 1 ? firstEnd : lastEnd;
++				var drops = level.getGameRules().getRule(net.minecraft.world.level.GameRules.RULE_DOBLOCKDROPS);
++				var area = new net.minecraft.world.phys.AABB(firstEnd).minmax(new net.minecraft.world.phys.AABB(lastEnd)).inflate(2);
++				var before = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, area);
++				if (scenario == 1) drops.set(false, level.getServer());
++				if (scenario == 3) {
++					var creative = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
++					track.playerWillDestroy(level, removed, level.getBlockState(removed), creative);
++				}
++				level.destroyBlock(removed, scenario != 3);
++				int recovered = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, area)
++					.stream().filter(item -> !before.contains(item) && item.getItem().is(track.asItem()))
++					.mapToInt(item -> item.getItem().getCount()).sum();
++				var hasOther = level.getBlockState(other).getValue(com.simibubi.create.content.trains.track.TrackBlock.HAS_BE);
++				System.out.printf("CREATE_TRACK_REMOVAL %d %d %d %b%n",
++					scenario, connection.getTrackItemCost(), recovered, hasOther);
++				drops.set(true, level.getServer());
++			}
+ 		}
+ 		helper.succeed();
+ 	}

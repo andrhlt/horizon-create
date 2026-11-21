@@ -69,6 +69,51 @@ def mine(args, rows):
     print(f"All {len(rows)} survival mining cases matched Java's Zinc drops.")
 
 
+def fortune(args):
+    """Check the pinned ore_drops loot function with Fortune III on seeded blocks."""
+    targets = [(8 + index % 3, 180, 21 + index // 3) for index in range(12)]
+    item = "@e[type=minecraft:item,x=4,y=179,z=21,dx=8,dy=5,dz=5]"
+    boosted = 0
+    with fixture_world(args, "Zinc-fortune", pack=args.pack, render=True) as control:
+        control.commands((
+            "/fill 5 179 21 11 179 25 minecraft:smooth_stone",
+            "/fill 5 180 21 11 183 25 minecraft:air",
+            "/tp @s 6.5 180 23.5",
+            "/gamemode survival",
+            "/item replace entity @s hotbar.0 with minecraft:iron_pickaxe",
+        ))
+        enchanted = control.command("/enchant @s minecraft:fortune 3")
+        if not enchanted.startswith("Applied enchantment Fortune"):
+            raise RuntimeError(enchanted)
+        control.call("select", "minecraft:iron_pickaxe")
+        for index, target in enumerate(targets):
+            control.command(f"/kill {item}")
+            control.command(f"/setblock {coords(target)} create:{'zinc_ore' if index < 6 else 'deepslate_zinc_ore'}")
+            control.call("look-at", target[0] + 0.5, target[1] + 0.5, target[2] + 0.5)
+            control.call("mouse", "left", "down")
+            try:
+                for _ in range(130):
+                    if control.call("block", *target)["block"] == "minecraft:air":
+                        break
+                    control.step_to(control.clock() + 1)
+                else:
+                    raise RuntimeError(f"Fortune III could not mine Zinc at {target}.")
+            finally:
+                control.call("mouse", "left", "up")
+            control.call("wait", 3)
+            if not control.command(f"/execute if entity {item}").startswith("Test passed"):
+                raise RuntimeError(f"Fortune III produced no Zinc drop at {target}.")
+            nbt = control.command(f"/data get entity {item[:-1]},limit=1] Item")
+            identifier = re.search(r'\bid: "([^"]+)"', nbt)
+            count = int(recycling.numeric(nbt, "count"))
+            if identifier is None or identifier[1] != "create:raw_zinc" or not 1 <= count <= 4:
+                raise RuntimeError(f"Fortune III Zinc drop outside Java ore_drops bounds: {nbt}")
+            boosted += count > 1
+    if boosted == 0:
+        raise RuntimeError("Fortune III did not produce a bonus Zinc drop in twelve seeded trials.")
+    print(f"Fortune III matched Java's ore_drops outcome (12 seeded ores; {boosted} bonus drops).")
+
+
 def step(control, ticks):
     goal = control.clock() + ticks
     control.command(f"/tick step {ticks}")
@@ -122,8 +167,11 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--heating", action="store_true")
     mode.add_argument("--crushed", action="store_true")
+    mode.add_argument("--fortune", action="store_true")
     args = parser.parse_args()
-    if args.crushed:
+    if args.fortune:
+        fortune(args)
+    elif args.crushed:
         with (ROOT / "fixtures/crushed-materials-heating-java.csv").open(newline="") as source:
             heat(args, list(csv.DictReader(source)), world="Crushed-materials-heating")
     elif args.heating:

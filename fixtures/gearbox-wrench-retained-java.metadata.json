@@ -1,0 +1,15 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "create": "6.0.10",
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.219",
+  "java": "21.0.13.1",
+  "patch_sha256": "569b5e89c96da9f46b536156ad0bbebd4c6f5c429fd12049bcb2faa27e13eae5",
+  "template_sha256": "ee7f068bf608653a052112aab8bfaab4370ea92af182bd87ba191e2a150c0cbc",
+  "trace_sha256": "1525254eac60785a4fff0d370ba640648f0a1e77ddca298f6c1aad60e7d457ce",
+  "capture_seconds": 13.4,
+  "records": 15,
+  "points_per_sample": 7,
+  "tick_origin": "GameTest tick 8 after setup. Same-axis use occurs after X sample 0, rotations after both rigs\u2019 sample 2, with immediate post-use and each following tick observed.",
+  "scope": "X-to-Z with \u221232 RPM down input, Z-to-Y with +24 RPM east input, and powered X-axis no-op. The source motor and five physical shafts occupy all six neighboring positions."
+}
