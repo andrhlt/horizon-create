@@ -11087,3 +11087,85 @@ guest close enough to pick up the input before the saw. Their diagnostics are
 preserved in `.local/parity/mechanical-saw-lan.log`; the final fixture avoids
 both setup errors and passes. Broader tree species, other cutting outputs and
 exact moving-contraption tick timing remain follow-ups. Full 1:1 remains Open.
+# APP-2084 Potato Cannon gameplay baseline
+
+The bounded APP-2084 pass reuses the pinned Create Java traces and checks the finite gameplay gates in the issue. Java source is Create 6.0.10 at
+ac0c444d9828da3453ae8cc65338e8de063286fb; the cannon item callback reviewed
+for ammunition rejection is
+src/main/java/com/simibubi/create/content/equipment/potatoCannon/PotatoCannonItem.java
+(SHA-256 828a2f94493104651ad6d6beb0c3225cec8512fb42662b804b3f4c9428cd19cb).
+Unsupported ammunition is rejected by getAmmo when the selected item has no
+registered projectile type; use returns PASS before consumption, wear,
+cooldown, or projectile creation. The updated existing launch fixture checks
+this with three sticks, retaining all three and the cannon's durability with no
+projectile, in solo and LAN.
+
+| Gate | Bounded cases and result |
+| --- | --- |
+| Acquisition, ammo and cooldown | mechanical-tools-crafting produced the original cannon recipe. potato-cannon checked an empty click, rejected sticks, then an accepted potato shot, consumption, cannon wear, launch pose/velocity, and the first three Java flight ticks within 1e-6, solo and LAN. potato-cannon-priority covered eight supported-ammo selection/consumption cases in each mode. potato-cannon-ammo-cooldown matched Java player-tick cooldown boundaries for potato, carrot, apple, beetroot, melon slice and golden carrot in each mode. |
+| Crop action and special ammunition | potato-cannon-carrot-farmland matched the Java upward-face crop action control: a vanilla carrot shot removed the projectile but left farmland and the crop space unchanged through tick 5, solo and LAN. potato-cannon-cure matched golden-apple cure initiation for weakened and ordinary zombie villagers through ticks 0–4 in both modes. Other crop-action implementations and cure completion remain follow-ups. |
+| Player impact and multiplayer | potato-cannon-honey-guest-to-host and potato-cannon-honey-host-to-guest matched Java damage and Slowness II on an actual LAN player in both firing directions. The launch, ammo-priority, cooldown, Backtank, cure, crop-action, and projectile-save cases also ran as solo/LAN pairs. Guest convergence is established; packet arrival/interpolation timing is not claimed. |
+| Backtank and persistence | potato-cannon-backtank matched the six Java air-charge outcomes, ammunition use, cannon wear and projectile creation in solo and LAN. APP-2081's completed Copper Backtank baseline also checked charged/partially depleted save/reopen. potato-projectile-save retained an in-flight apple's source stack, projectile UUID and shooter UUID across save/reopen for a solo shooter and a LAN guest. Continued post-reopen flight and other recovery paths remain open. |
+
+The 17 focused checks passed: mechanical-tools-crafting, potato-cannon and
+potato-cannon-lan, potato-cannon-priority and its LAN variant,
+potato-cannon-ammo-cooldown and its LAN variant,
+potato-cannon-backtank and its LAN variant,
+potato-cannon-carrot-farmland and its LAN variant,
+potato-cannon-cure and its LAN variant, both Honeyed Apple LAN directions,
+and potato-projectile-save and its LAN variant. The original 17-check batch
+passed; after adding the unsupported-stick assertion to the existing launch
+fixture, both updated launch checks passed again (2/2). The initial socket
+denial and first LAN fixture-timing failure are preserved under
+.local/parity-app-2084-sandbox-denied/ and
+.local/parity-app-2084-stick-first-run/; the LAN fixture now waits three
+player ticks after the rejected click.
+
+The run used Horizon 9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0, native build
+native-9f42064-6bdf8691aa42 (prepared with main at 781c0ef), client SHA-256
+703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe, pinned
+Create Java above, and pack SHA-256
+a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b.
+Current main at verification is c8e0638. The Potato Cannon Rust module and its
+selected engine patches are unchanged between 781c0ef and 8e4d539. Newer main
+does include other native modules and mixin entries, so a fresh combined-build
+run is still needed before integration is considered complete.
+
+Commands:
+
+```sh
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \
+  --check mechanical-tools-crafting --check potato-cannon \
+  --check potato-cannon-lan --check potato-cannon-priority \
+  --check potato-cannon-priority-lan --check potato-cannon-ammo-cooldown \
+  --check potato-cannon-ammo-cooldown-lan --check potato-cannon-backtank \
+  --check potato-cannon-backtank-lan --check potato-cannon-carrot-farmland \
+  --check potato-cannon-carrot-farmland-lan --check potato-cannon-cure \
+  --check potato-cannon-cure-lan --check potato-cannon-honey-guest-to-host \
+  --check potato-cannon-honey-host-to-guest --check potato-projectile-save \
+  --check potato-projectile-save-lan
+
+python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \
+  --check potato-cannon --check potato-cannon-lan
+```
+
+The build script was attempted from an isolated APP-2084 worktree using a
+private copy-on-write launcher cache; the compatible launcher stopped before
+compilation when it could not resolve
+api.github.com/repos/horizon-rust/horizon/commits/9f42064 in this offline
+environment. No current-main native build was produced. The bounded gameplay
+baseline is supported by the identified run above; combined-build validation
+remains required after this PR. Full 1:1 remains Open.
+
+Reused Java capture patch SHA-256 values:
+
+| Capture patch | SHA-256 |
+| --- | --- |
+| tools/java-potato-cannon-trace.patch | abd17e22e40fe93b800f7aeedf3f527c8171cd7508a5edd10b59517c8b7b6cce |
+| tools/java-potato-cannon-ammo-batch.patch | 9176e13ec02e027252f38b86b4b70b9550ce89050764178d38b88dacc2c8e7a7 |
+| tools/java-potato-cannon-priority.patch | 5dcf16858c49c9f07c7033a4bf0e90b103498df24a1147f5715d428e432cf224 |
+| tools/java-potato-cannon-backtank.patch | 35659521871485e9dd6dc7c485f5736dfc44b44f4653b85133562801d1b6b8f8 |
+| tools/java-potato-cannon-carrot-farmland.patch | ab6d4fb9dd65fcb683efb8d89a7e6fd67424c5ac82391460701b73d91e1345ab |
+| tools/java-potato-cannon-cure.patch | 4c9678d92f0bd9cf7cd77432fea0db0c8696905141fa1f7f0729832273c2610e |
+| tools/java-potato-cannon-honey-player.patch | 6c1d67e4d2a19d1154828058a89b220f55ef4ba79446a44382c0df3c5230fa21 |
+| tools/java-potato-projectile-save.patch | 532c819b8da18f3b7ba03e03cf9a1894d533915c8362ca412be803765786acca |
