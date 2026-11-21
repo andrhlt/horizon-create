@@ -7994,6 +7994,22 @@ passed the entire flow from tuning through the Nixie result.
 Promises, restocking,
 multiple rows, and exact Display Board sections remain open.
 
+### APP-2026 Factory Gauge configuration and replenishment
+
+The prerequisite Redstone Requester issue APP-2024 is Done. This work extends the existing Factory Gauge port with player-facing target amount/unit controls and a periodic panel restock path. Matching Stock Link sources are discovered through the existing stock network code; inventory insertion is preflighted before source withdrawal, both sides commit together, and packager notifications refresh the affected inventories. Factory Panels are now included in native block-entity ticking.
+
+The [item replay](tools/test-factory-gauge-item.py) first filled the destination barrel with unrelated items and verified the source stayed at 12. It then removed the matching Stock Link frequency and verified the target stayed at two iron and the source stayed at 12. Restoring the matching frequency let five-item mode move exactly five iron ingots (source 12 → 9, target 2 → 5). It then switched the same panel to stack mode and verified the remaining nine move (source 9 → 0, target 5 → 14), with no additional transfer through two further 100-tick windows. The target amount, unit setting (`UpTo: 0b`), target inventory, and source inventory survived cold save/reopen. The [LAN replay](tools/test-factory-gauge-lan.py) had a guest set the target to one item and toggle units, then confirmed host state synchronization, one-item replenishment (source 12 → 11), and no duplicate after another 100 ticks. Existing filter, Display Link stock output, and idle reopen checks also passed.
+
+The checks ran against Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, build `native-9f42064-63b75493cc50` (client SHA-256 `e5efb1b4d79c04352a2894694a9fcefb61d01b3c0d794944099f4bd593db30f7`) and Create pack SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. The five final checks were `factory-gauge-filter`, `factory-gauge-stock-display`, `factory-gauge-reopen`, `factory-gauge-restock`, and `factory-gauge-stock-display-lan`; all passed. Run them with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check factory-gauge-filter --check factory-gauge-stock-display --check factory-gauge-reopen --check factory-gauge-restock --check factory-gauge-stock-display-lan
+```
+
+For reproducibility, the initial isolated build attempt hit the patch mismatch at `horizon-advancement-initial-inventory.patch`; resolving the mismatch in this APP-2026 private source/cache enabled the actual build without changing other workers' caches. The first regression attempt also hit OS socket denial before gameplay; rerunning fixtures with the authorized socket access produced the results above. These invalid attempts are summarized in `.local/app-2026-evidence/attempts.md`.
+
+The bounded gameplay path is implemented and verified. Broader Java logistics-manager package/address/promise semantics and remaining orientations/timing are follow-ups; this evidence does not claim exhaustive 1:1 parity. Restocking here is synchronous into the target packager's attached inventory, so there is no in-flight request state to persist or reopen.
+
 
 ## Portable Minecart Contraption pickup
 
@@ -11596,3 +11612,88 @@ Reused Java capture patch SHA-256 values:
 | tools/java-potato-cannon-cure.patch | 4c9678d92f0bd9cf7cd77432fea0db0c8696905141fa1f7f0729832273c2610e |
 | tools/java-potato-cannon-honey-player.patch | 6c1d67e4d2a19d1154828058a89b220f55ef4ba79446a44382c0df3c5230fa21 |
 | tools/java-potato-projectile-save.patch | 532c819b8da18f3b7ba03e03cf9a1894d533915c8362ca412be803765786acca |
+
+## APP-2007 Mechanical Roller gameplay baseline
+The finite checks completed on the pinned Create reference
+`ac0c444d9828da3453ae8cc65338e8de063286fb` and Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`:
+
+- Existing Java comparisons `roller_filling` and `roller_paving_and_clearing`
+  passed on the final combined client. Together they compare 262 captured ticks for
+  fill, paving and clearing behavior, including the recorded material cases.
+- `roller-mode-ui` crafted a Roller from its pinned survival recipe, placed it
+  on a full floor, and confirmed the crafted item was consumed. It selected
+  Tunnel Pave, Straight Fill and Wide Fill as host; a LAN guest selected Wide
+  Fill and the host observed the server value. The selected mode persisted
+  through `/save-all flush` and fixture restart. This
+  proves guest convergence and idle mode persistence, not packet-arrival timing
+  parity.
+- Gantry Shaft/Carriage is already Done; its existing integrated regressions
+  include the Roller. APP-2007's latest candidate build is
+  `native-9f42064-7f8245fcd225` (rebuilt after updating from current main);
+  client SHA-256
+  `eaf18600f300ee82c2454820c57ac44ee8cc274c7242ef09f88ea0d97b231b8b`; prepared
+  Create pack SHA-256
+  `921c10ce6a435a3c4e7d45a6651001e1b77bd321cf621d896b348a471c701bbe`.
+  Cursor fix `16af87f` is included in the client.
+- Exact scoped command:
+
+  ```sh
+  python3 tools/test-parity.py "$ctl" "$client" "$resources" --jobs 1 \\
+    --check roller-filling --check roller-paving-and-clearing \\
+    --check roller-mode-ui
+  ```
+
+The new `native/roller.rs` work adds the mode setter, Roller placement redirect,
+full-block filter validation, and the Java slab-to-double-block filter state.
+`native/speed_controller_controls.rs` exposes the three mode choices through the
+existing Roller value board. `tools/test-roller-mode-ui.py` is the LAN/mode and
+idle-reopen check registered by the parity runner.
+
+The bounded `roller-filling-reopen` fixture matched all 80 Java ticks, saved
+and reopened at tick 40, compared the Gantry carriage position, material stock
+and world blocks at the boundary, then confirmed subsequent ticks resumed with
+no duplicate or skipped work. Shared `gantry-lan-reload` and
+`mounted-drill-gantry-lan-reload` checks additionally cover guest motion,
+active save/reopen, and conserved payload output; these are shared Gantry
+transport evidence rather than a claim of exact packet-timing parity for every
+Roller actor case.
+
+This pass is partial. The current checks do not establish invalid-filter
+rejection and no-loss consumed-material boundaries. That bounded gate remains open;
+we do not claim the whole APP-2007 baseline complete. The placement redirect and filter boundary code still need focused integration
+coverage before calling those paths verified. Additional terrain patterns, drum visuals, animation and exact
+network timing remain follow-ups; Full 1:1 stays Open.
+## Creative Crate gameplay baseline — APP-2016
+
+The finite baseline reuses the supply, filter refund, Hopper, Dropper, Funnel,
+and Chute Java comparisons above and in the feature matrix. `creative-tabs`
+checks creative availability. The persistence replay configures a tagged filter
+through the crate's value box, saves and reopens the world, then verifies the
+unchanged filter and continued bottomless Hopper extraction with item components
+intact. The crate is a static source, so persistence is checked before and after
+reopen rather than requiring an internal active-processing state. Host/guest
+configuration and extraction evidence is supplied by the existing LAN cases;
+guest convergence is not claimed as Java packet-timing parity. Other filter
+variants, automation targets, and cosmetic/visual fidelity remain open.
+
+On `native-9f42064-6bdf8691aa42`, the APP-2016 persistence replay and
+`create-creative-tabs` passed. The persistence case used the APP-2017 evidence
+pack (`create.hmod`, SHA-256
+`a6d1b163171988886f3650e42edab3fe623ced56a9ca60856ba59a28d9b3e33b`) and
+prepared 26.3 resources. It configures the filter with an actual player click,
+reopens the saved world, and checks extraction for 40 ticks. Focused LAN
+regressions for supply, Hopper extraction, Dropper insertion, and Funnel
+insertion also passed on that build. Command:
+
+```sh
+python3 tools/test-parity.py "$CTL" "$CLIENT" "$RESOURCES" --jobs 2 \
+  --check creative-crate-persistence --check create-creative-tabs \
+  --check creative-crate-supply-lan --check creative-crate-hopper-lan \
+  --check creative-crate-dropper-lan --check creative-crate-funnel-insert-lan
+```
+
+The Java behavior references remain pinned to Create
+`ac0c444d9828da3453ae8cc65338e8de063286fb`; earlier per-family sections record
+their capture patches and sampled counts. The persistence case checks ordinary
+Horizon save/reopen and does not claim Java reload parity.
