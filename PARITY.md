@@ -5493,7 +5493,7 @@ The successful control log is retained as `.local/horizon-nixiepersistence.log`.
 The dye replays used the same arguments with `tools/test-nixie-colors.py`,
 adding `--lan` for the guest run; their successful logs are
 `.local/horizon-nixiecolors.log` and `.local/horizon-nixiecolorslan.log`.
-After syncing current `origin/main` at `e8943dd`, both registered checks passed together with `python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 1 --check nixie-survival --check nixie-persistence`. Runner logs are `.local/parity/nixie-survival.log` and `.local/parity/nixie-persistence.log`.
+After syncing current `origin/main` at `a5adcc5`, both registered checks passed together with `python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 1 --check nixie-survival --check nixie-persistence`. Runner logs are `.local/parity/nixie-survival.log` and `.local/parity/nixie-persistence.log`.
 Initial harness attempts were invalid: one used the fixture's one-tick step
 helper as a two-tick jump, and another combined custom text with the numeric
 output tube. The survival fixture first lacked the ignored NBT structure and
