@@ -7298,6 +7298,16 @@ On `native-9f42064-a55af2b6a899` with `create-steam-whistle-audio.hmod`,
 passive boiler, silence without heat, records-category loop onset,
 1/12-octave pitch steps, fading and high-octave redstone retrigger.
 The original Steam Engine replay passed all 13 samples on that build.
+APP-1994's bounded gameplay gates also call for idle and active save/reopen
+and a guest action. Candidate runners are registered as
+[persistence](tools/test-steam-whistle-persistence.py) and
+[LAN](tools/test-steam-whistle-lan.py): the former checks a cold idle reopen
+and a boiler-powered reopen with a two-part extension, while the latter checks
+guest extension growth and wrench octave propagation with host/guest state
+convergence. These checks have not yet run on an identified current build;
+prepared Minecraft 26.3 resources are absent from this environment, so they do
+not add evidence to the Pass status above. Chiff waveform, exact audio timing,
+full-height layouts and cosmetic effects remain follow-ups.
 
 ## Table Cloth display and reset
 
