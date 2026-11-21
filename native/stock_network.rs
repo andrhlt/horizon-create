@@ -133,6 +133,109 @@ fn collect_order(
     packages
 }
 
+pub(super) fn restock(
+    level: &mut GameLevel<'_>,
+    ticks: &mut Ticks,
+    frequency: &[i32],
+    item: &ItemStack,
+    amount: u32,
+    target: BlockPos,
+) -> u32 {
+    if amount == 0 {
+        return 0;
+    }
+    let target_key = key(target);
+    let Some(BlockEntity::Chest(target_slots)) = level.world.block_entities.get(&target_key) else {
+        return 0;
+    };
+    let mut proposed_target = target_slots.clone();
+    let available = sources(level, frequency)
+        .into_iter()
+        .filter(|source| key(source.barrel) != target_key)
+        .map(|source| {
+            level
+                .world
+                .block_entities
+                .get(&key(source.barrel))
+                .and_then(|entity| {
+                    let BlockEntity::Chest(slots) = entity else {
+                        return None;
+                    };
+                    Some(
+                        slots
+                            .iter()
+                            .flatten()
+                            .filter(|stack| same_stack(stack, item))
+                            .map(|stack| stack.count)
+                            .sum::<u32>(),
+                    )
+                })
+                .unwrap_or(0)
+        })
+        .sum::<u32>();
+    let requested = amount.min(available);
+    if requested == 0 {
+        return 0;
+    }
+    let mut offered = item.clone();
+    offered.count = requested;
+    let left = insert(
+        &mut proposed_target,
+        &offered,
+        packager::max_stack(level.items, &offered),
+    );
+    let accepted = requested.saturating_sub(left);
+    if accepted == 0 {
+        return 0;
+    }
+
+    let mut remaining = accepted;
+    let mut withdrawals = Vec::new();
+    for source in sources(level, frequency)
+        .into_iter()
+        .filter(|source| key(source.barrel) != target_key)
+    {
+        if remaining == 0 {
+            break;
+        }
+        let source_key = key(source.barrel);
+        let Some(BlockEntity::Chest(source_slots)) = level.world.block_entities.get(&source_key)
+        else {
+            continue;
+        };
+        let mut proposed_source = source_slots.clone();
+        for slot in &mut proposed_source {
+            let Some(stack) = slot.as_mut().filter(|stack| same_stack(stack, item)) else {
+                continue;
+            };
+            let taken = remaining.min(stack.count);
+            stack.count -= taken;
+            remaining -= taken;
+            if stack.count == 0 {
+                *slot = None;
+            }
+            if remaining == 0 {
+                break;
+            }
+        }
+        withdrawals.push((source_key, proposed_source));
+    }
+    if remaining != 0 {
+        return 0;
+    }
+    for (source, slots) in withdrawals {
+        if let Some(BlockEntity::Chest(current)) = level.world.block_entities.get_mut(&source) {
+            *current = slots;
+        }
+        packager::notify(level, ticks, BlockPos::new(source.0, source.1, source.2));
+    }
+    if let Some(BlockEntity::Chest(current)) = level.world.block_entities.get_mut(&target_key) {
+        *current = proposed_target;
+    }
+    packager::notify(level, ticks, target);
+    accepted
+}
+
 pub(super) fn encode_order(items: impl Iterator<Item = ItemStack>) -> Tag {
     let entries = items
         .map(|mut item| {

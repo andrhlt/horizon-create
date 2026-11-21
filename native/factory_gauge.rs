@@ -1,3 +1,4 @@
+use super::create_stock_network;
 use super::{
     Game, GameLevel, create_fluids::name as direction_name,
     native_block_entity_draw::BlockEntityDraw,
@@ -9,7 +10,7 @@ use crate::{
 use horizon_core::{geometry::Direction, position::BlockPos};
 use horizon_world::{
     fluid::{FluidKind, FluidState},
-    level::PlacementContext,
+    level::{LevelAccess, PlacementContext},
     nbt::{Compound, Tag},
     registry::BlockStateId,
 };
@@ -417,12 +418,6 @@ pub(super) fn open_config(game: &mut Game<'_>, at: [i32; 3], point: [f64; 3]) ->
     else {
         return false;
     };
-    if super::create_depot::compound(panel, "Filter")
-        .and_then(ItemStack::from_nbt)
-        .is_none()
-    {
-        return false;
-    }
     let Some(freq) = panel.get(&"Freq".into()).cloned() else {
         return false;
     };
@@ -471,6 +466,52 @@ pub(super) fn draw_screen(
     );
     horizon_client::widgets::record("Add new connection", [x + 31.0, y + 47.0, 18.0, 18.0], true);
     game.native_text(batch, "+", [x + 36.0, y + 51.0], 0xFFFFFF, false);
+    let (target, up_to) = SESSIONS
+        .with_borrow(|sessions| {
+            let session = sessions.values().next()?;
+            let panel = super::create_machines::mod_entity(game, session.pos)
+                .and_then(|entity| super::create_depot::compound(&entity.nbt, session.slot))?;
+            Some((
+                super::create_machines::int(panel, "TargetAmount").unwrap_or(0),
+                super::create_machines::int(panel, "UpTo").unwrap_or(1) != 0,
+            ))
+        })
+        .unwrap_or((0, true));
+    game.native_text(batch, "Target", [x + 64.0, y + 35.0], 0xFFFFFF, false);
+    horizon_client::widgets::record("Decrease target", [x + 64.0, y + 47.0, 20.0, 18.0], true);
+    game.native_text(batch, "-", [x + 71.0, y + 50.0], 0xFFFFFF, false);
+    game.native_text(
+        batch,
+        &target.to_string(),
+        [x + 102.0, y + 51.0],
+        0xFFFFFF,
+        false,
+    );
+    horizon_client::widgets::record("Increase target", [x + 140.0, y + 47.0, 20.0, 18.0], true);
+    game.native_text(batch, "+", [x + 147.0, y + 50.0], 0xFFFFFF, false);
+    horizon_client::widgets::record(
+        "Toggle target units",
+        [x + 64.0, y + 74.0, 104.0, 18.0],
+        true,
+    );
+    game.native_text(
+        batch,
+        if up_to {
+            "Measure: items"
+        } else {
+            "Measure: stacks"
+        },
+        [x + 68.0, y + 79.0],
+        0xFFFFFF,
+        false,
+    );
+    game.native_text(
+        batch,
+        "Replenish attached inventory",
+        [x + 64.0, y + 104.0],
+        0xFFFFFF,
+        false,
+    );
 }
 
 thread_local! {
@@ -481,6 +522,12 @@ pub(super) fn screen_click([x, y]: [f32; 2]) -> Option<i32> {
     if x >= 31.0 && x < 49.0 && y >= 47.0 && y < 65.0 {
         CLOSE_AFTER_CONNECT.set(true);
         Some(0)
+    } else if (64.0..84.0).contains(&x) && (47.0..65.0).contains(&y) {
+        Some(1)
+    } else if (140.0..160.0).contains(&x) && (47.0..65.0).contains(&y) {
+        Some(2)
+    } else if (64.0..168.0).contains(&x) && (74.0..92.0).contains(&y) {
+        Some(3)
     } else {
         None
     }
@@ -498,23 +545,142 @@ pub(super) fn close_after_connect(game: &mut Game<'_>) {
     game.capture(true);
 }
 
-pub(super) fn menu_button(game: &mut Game<'_>, pos: [i32; 3], button: i32) {
-    if button != 0 {
+pub(super) fn menu_button(
+    game: &mut Game<'_>,
+    pos: [i32; 3],
+    entity: &mut ModBlockEntity,
+    button: i32,
+) {
+    let player = game.acting_player_uuid();
+    if button == 0 {
+        let valid = SESSIONS.with_borrow_mut(|sessions| {
+            let Some(session) = sessions
+                .get_mut(&player)
+                .filter(|session| session.pos == pos)
+            else {
+                return false;
+            };
+            session.connecting = true;
+            true
+        });
+        if !valid {
+            return;
+        }
         return;
     }
-    let player = game.acting_player_uuid();
-    let valid = SESSIONS.with_borrow_mut(|sessions| {
-        let Some(session) = sessions
-            .get_mut(&player)
-            .filter(|session| session.pos == pos)
-        else {
-            return false;
-        };
-        session.connecting = true;
-        true
-    });
-    if !valid {
+    let Some(session) = SESSIONS.with_borrow(|sessions| sessions.get(&player).cloned()) else {
         return;
+    };
+    if session.pos != pos
+        || session.dimension != game.native_dimension()
+        || !(1..=3).contains(&button)
+    {
+        return;
+    }
+    let delta = match button {
+        1 => -1,
+        2 => 1,
+        _ => 0,
+    };
+    if let Some(Tag::Compound(panel)) = entity.nbt.get_mut(&session.slot.into()) {
+        if delta != 0 {
+            let current = match panel.get(&"TargetAmount".into()) {
+                Some(Tag::Int(value)) => *value,
+                _ => 0,
+            };
+            panel.insert(
+                "TargetAmount".into(),
+                Tag::Int((current + delta).clamp(0, 1000)),
+            );
+        } else {
+            let current = match panel.get(&"UpTo".into()) {
+                Some(Tag::Byte(value)) => *value != 0,
+                _ => true,
+            };
+            panel.insert("UpTo".into(), Tag::Byte(i8::from(!current)));
+        }
+    } else {
+        return;
+    }
+    game.native_block_entity_sync(pos);
+}
+
+pub(super) fn tick(game: &mut Game<'_>, at: [i32; 3], entity: &mut ModBlockEntity) {
+    let panel_pos = BlockPos::new(at[0], at[1], at[2]);
+    let names = ["top_left", "top_right", "bottom_left", "bottom_right"];
+    let mut changed = false;
+    for name in names {
+        let Some(Tag::Compound(panel)) = entity.nbt.get_mut(&name.into()) else {
+            continue;
+        };
+        let Some(filter) =
+            super::create_depot::compound(panel, "Filter").and_then(ItemStack::from_nbt)
+        else {
+            continue;
+        };
+        let Some(Tag::IntArray(freq)) = panel.get(&"Freq".into()) else {
+            continue;
+        };
+        let Ok(freq): Result<[i32; 4], _> = freq.as_slice().try_into() else {
+            continue;
+        };
+        let target = super::create_machines::int(panel, "TargetAmount")
+            .unwrap_or(0)
+            .clamp(0, 1000);
+        if target == 0 || filter.count == 0 {
+            continue;
+        }
+        let up_to = super::create_machines::int(panel, "UpTo").unwrap_or(1) != 0;
+        let desired = (target as u32).saturating_mul(if up_to {
+            1
+        } else {
+            super::create_packager::max_stack(game.items(), &filter)
+        });
+        let destination = game.with_level(|_, level, _| {
+            let state = level.block_state(panel_pos);
+            let support = support_direction(level, state)?;
+            let [dx, dy, dz] = support.normal();
+            let packager = panel_pos.offset(dx, dy, dz);
+            let state = level.block_state(packager);
+            (level.native_state_block(state) == Some(super::create_packager::PACKAGER))
+                .then(|| super::create_packager::attached_barrel(level, packager, state))
+                .flatten()
+        });
+        let Some(destination) = destination else {
+            continue;
+        };
+        let moved = game.with_level(|_, level, ticks| {
+            let BlockEntity::Chest(slots) =
+                level
+                    .world
+                    .block_entities
+                    .get(&(destination.x, destination.y, destination.z))?
+            else {
+                return None;
+            };
+            let stored = slots
+                .iter()
+                .flatten()
+                .filter(|stack| super::create_machines::same_stack(stack, &filter))
+                .map(|stack| stack.count)
+                .sum::<u32>();
+            if stored >= desired {
+                return Some(0);
+            }
+            let amount = desired.saturating_sub(stored).min(64 * 9);
+            Some(create_stock_network::restock(
+                level,
+                ticks,
+                &freq,
+                &filter,
+                amount,
+                destination,
+            ))
+        });
+        changed |= moved.is_some_and(|amount| amount > 0);
+    }
+    if changed {
+        game.native_block_entity_sync(at);
     }
 }
 

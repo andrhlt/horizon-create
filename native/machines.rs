@@ -413,7 +413,10 @@ pub(super) fn block_entity_ticks(block: &str, ticks: &mut bool) {
                 | super::create_item_hatch::HATCH
                 | SCHEMATIC_TABLE
         )
-    }) || block == super::create_track::TRACK;
+    }) || matches!(
+        block,
+        super::create_track::TRACK | super::create_factory_gauge::BLOCK
+    );
 }
 
 pub(super) fn block_entity_container(block: &str, container: &mut Option<ModContainer>) {
