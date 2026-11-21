@@ -4563,6 +4563,25 @@ advance to its second row. Solo and LAN clicks on Retrieve Schedule return
 the exact component, including `Progress: 1`, through both paths.
 Creating and discarding auto-schedules remains under comparison.
 
+## APP-2054 Train passengers, seats and dismount — partial pass
+
+The [bounded lifecycle evidence](fixtures/train-passenger-lifecycle.md) retains
+existing standing and Java seat/dismount results. On existing client
+`native-9f42064-6ce68a31b125`, four focused regressions passed: colored train
+seats (123 Java ticks), standing guest quarter turn, gradual ascent/descent,
+and stopped/moving manual train reopen. The new
+[passenger lifecycle check](tools/test-train-passenger-lifecycle.py) also passed
+host/guest seat boarding, passenger input rejection, seated host driving,
+guest dismount without releasing Driver, and moving-seat remount.
+
+**The gameplay baseline remains blocked.** Idle and active save/reopen both
+lose the seated host's authoritative vehicle. The active case's later guest
+rejoin assertions were not reached. Pinned Horizon's shared parent-vehicle
+save/restore paths omit the armor-stand class used for these carriers; a shared
+persistence repair and focused verification are required. No native fix,
+combined-main verification, exact reload timing or completed baseline is claimed.
+Both prerequisites APP-2010 and APP-2051 are Done. Full 1:1 remains Open.
+
 ## Standing players on a straight train
 
 On `native-9f42064-49e14f320685`, an unseated survival player remained on
