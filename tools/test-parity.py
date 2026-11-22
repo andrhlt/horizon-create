@@ -993,6 +993,7 @@ CHECKS = (
     ("minecart-coupling-slope-hard-ns", "test-minecart-coupling-slope-ns", "--direction", "both", "--strong"),
     ("minecart-coupling-slope-hard-ns-lan", "test-minecart-coupling-slope-ns", "--direction", "both", "--strong", "--lan"),
     ("crafting-blueprint", "test-crafting-blueprint"),
+    ("crafting-blueprint-gameplay", "test-crafting-blueprint-gameplay"),
     ("lit-blaze-burner", "test-lit-blaze-burner"),
     ("minecart-contraption-items", "test-minecart-contraption-items"),
     ("minecart-pickup", "test-minecart-pickup"),
@@ -1755,8 +1756,10 @@ CHECKS = (
 )
 
 
-def run(check, paths, logs):
+def run(check, paths, logs, pack):
     name, script, *options = check
+    if pack is not None and script in ("test-crafting-blueprint", "test-crafting-blueprint-gameplay"):
+        options.extend(("--pack", str(pack)))
     log = logs / f"{name}.log"
     with log.open("w", encoding="utf-8") as output:
         result = subprocess.run(
@@ -1771,6 +1774,8 @@ def main():
     for name in ("ctl", "client", "resources"):
         parser.add_argument(name, type=lambda value: Path(value).resolve(strict=True))
     parser.add_argument("--jobs", type=int, default=2)
+    parser.add_argument("--pack", type=lambda value: Path(value).resolve(strict=True),
+                        help="local Create pack override for Blueprint regressions")
     parser.add_argument("--check", action="append", metavar="PATTERN",
                         help="run checks by name or glob, repeat to select several groups")
     parser.add_argument("--window-culling", action="store_true",
@@ -1806,7 +1811,7 @@ def main():
         os.environ.setdefault("HORIZON_CREATE_TEST_AUDIO", "1")
     failures = 0
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        futures = [pool.submit(run, check, paths, logs) for check in checks]
+        futures = [pool.submit(run, check, paths, logs, args.pack) for check in checks]
         for future in as_completed(futures):
             name, status, log = future.result()
             failures += status != 0
