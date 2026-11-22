@@ -150,6 +150,7 @@ CHECKS = (
     ("kinetic-network-sources", "test-kinetic-network-sources"),
     ("goggles", "test-goggles"),
     ("goggles-gauges", "test-goggles-gauges"),
+    ("goggles-multiplayer-rejoin", "test-goggles-multiplayer"),
     ("wrench", "test-wrench"),
     ("wrench-tagged", "test-wrench", "--tagged"),
     ("wrench-crafting", "test-wrench", "--craft"),

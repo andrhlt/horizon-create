@@ -13384,3 +13384,53 @@ stress text changing from 50% to 112% and back to 12%, and Speedometer's
 strikethrough style changed while overloaded and cleared on recovery. This
 closes the direct guest idle/loaded/load-change evidence gap for the bounded
 APP-1975 gate; exhaustive visual parity remains Open.
+
+## APP-2077 Engineer's Goggles gameplay baseline
+
+The bounded scope retained the existing analog lever and Frogport evidence and
+added survival crafting/equipping, a held-but-not-worn control, the existing
+Java gauge readouts, representative chute and tank inspection, and guest
+inspection after save/rejoin. The dependency evidence for Speedometer and
+Stressometer is recorded in [APP-1975](#speedometer-and-stressometer-gameplay-baseline-app-1975).
+
+Reference Create is `ac0c444d9828da3453ae8cc65338e8de063286fb` and Horizon is
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`. The final client is
+`native-9f42064-16f68d597f49` (SHA-256
+`5b6c49a4776a9efbf21b76f0b1313ba71ad8eb9634a5af1038b2b14d5244d3a5`) with
+Create pack SHA-256
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678` and the
+prepared Minecraft 26.3 resources.
+
+| Case | Check and result |
+| --- | --- |
+| Survival acquisition and control | `goggles` crafted Engineer's Goggles from the survival recipe, right-click equipped them, and captured the worn overlay. The control removed the helmet, put Goggles in the selected hand, verified they were held but not worn, and captured the analog lever without a Goggles readout. |
+| Power and stress information | `goggles-gauges` matched all 20 existing Java gauge readouts, including values, text, colors and overload strikethrough. Existing Java fixture and APP-1975 load/threshold results were reused. |
+| Processing and fluid inspection | `goggles-gauges` showed the Java chute header, no-fan state and downward movement for a chute with no fan. The fluid tank showed localized Water and `2500 mB / 8000 mB`. These targets were added from the pinned `IHaveGoggleInformation`, `ChuteBlockEntity.getItemMotion` and `FluidTankBlockEntity` behavior. |
+| Host, guest and save/rejoin | `goggles-multiplayer-rejoin` ran a dedicated server with host and guest clients. Both rendered the same chute and tank values. After `save-all`, server restart and guest rejoin, the guest read the same saved tank and chute values again. The overlay itself is instantaneous; saved tank contents are the applicable persistence state. |
+| Neighbor regression | `chute-observer` matched all 18 Java ticks using the original smart observer chute structure (SHA-256 `0e5857ff9052e720e88cd73eac2c486c34eb4a0c3ab80f038b1cb03465f1232d`). |
+
+The checks were run with the build's `horizon-ctl` and `horizon-client`, the
+prepared `.local/horizon-client/26.3` resources, and `.local/create.hmod`:
+
+```sh
+python3 tools/test-goggles.py "$CTL" "$CLIENT" "$RESOURCES"
+python3 tools/test-goggles-gauges.py "$CTL" "$CLIENT" "$RESOURCES" --pack .local/create.hmod
+python3 tools/test-goggles-multiplayer.py "$CTL" "$CLIENT" "$RESOURCES"
+python3 tools/test-chute-observer.py "$CTL" "$CLIENT" "$RESOURCES"
+```
+
+The gauge fixture reused its captured Java values; no new Java capture was
+needed. Raw client/server logs and screenshots are in `.local/app-2077-goggles/`
+and `.local/`. An initial LAN fixture state check compared a bare block ID
+against a state with connection properties; after correcting it to match the
+block ID prefix, the host/guest and rejoin check passed. The first chute
+observer run stopped before launch because its ignored NBT was absent; the
+exact 611-byte fixture was staged locally and the check then passed. A
+separate chute item-content setup did not create a saved `Item` state, so the
+item-content line is not claimed as verified.
+
+The overlay has no independent active operation or saved settings. This pass
+verifies static before/after persistence through the retained tank fluid and a
+returning guest; it does not claim exact Java reload timing. Additional target
+families, the chute item-content line, hover timing and pixel appearance remain
+follow-ups. Full 1:1 remains Open.
