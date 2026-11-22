@@ -97,3 +97,63 @@ claimed as migrated.
 Pending Stage 1 verification. The Full 1:1 migration and the other Create
 families remain out of scope until the three selected cases pass and the
 assessment checkpoint is presented.
+
+## Kinetic-only feasibility checkpoint (2026-11-22)
+
+The isolated `machines.rs` compile is not a representative kinetic build: at
+4,356 lines, the module imports and matches many unrelated machine families.
+The intentionally narrowed build omitted its sibling modules. Its Rust output
+had 475 primary diagnostics: 306 are artifacts of that isolation (33 missing
+sibling imports, 233 references to omitted siblings, and 40 pattern bindings
+that cease to be constants when those imports are absent). The other 169 are
+real migration diagnostics in this whole module: one NBT path moved from
+`horizon_world::nbt` to `horizon_core::nbt`, 160 missing legacy `Game` methods,
+two missing fields, two changed call arities, and four type mismatches. The
+launcher footer summarized these as 471 previous errors. This count mixes
+whole-module failures; it is not a count for a motor-only extraction.
+
+The old motor path shares 1,276 lines of `machines.rs` source spans with the
+general kinetic enum, graph traversal, source arbitration, motor initialization,
+and network publication. Those spans refer to 22 sibling `create_*` modules
+because the enum also handles other kinetic blocks. For the selected fixture,
+the required behavior boundary is smaller: the Creative Motor block entity,
+the `simple_kinetic` entities used by shaft/cogwheel, signed RPM traversal over
+those three block kinds, guest speed configuration, and publishing/saving the
+result. Existing entry points cross `block_entity`, `block_entity_ticks`,
+`block_entity_tick`, motor setting changes in `speed_controller`, and the
+`visuals` readout. Other source and consumer kinds can be left outside this
+slice. A full 1,276-line copy would keep unrelated branches and would not be an
+acceptable isolation fix.
+
+A typed-Part probe was built with launcher 0.2.105, the pinned Nov 20 nightly,
+SDK `sdk-0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, and the isolated launcher
+and game homes. It attached `BlockEntityPart` to `create:motor`, enabled ticking,
+read the level through `ServerHost`, and changed the saved NBT through the
+tick event. The SDK's normal `native-build` validation and compilation passed
+(`prebuilt-api` route; Rust compile 966 ms; build completed). This is a compile
+probe only: it has no migrated content, network algorithm, guest interaction,
+or parity/runtime evidence. It establishes that the supported typed-Part
+surface can express the required server boundary; no missing engine capability
+has been reproduced.
+
+**Recommendation:** continue only the bounded motor/shaft/cogwheel port using
+typed `BlockPart`/`BlockEntityPart` callbacks and `ServerHost` block/entity
+reads, saved-data writes, and sync. Keep the graph limited to the three selected
+block kinds and retain the existing signed RPM and persistence observations.
+The probe makes this approach technically plausible, but the actual flow is
+not yet viable: there is no compiled production slice or passing parity run.
+
+Estimated remaining kinetic work is **5–10 engineer-days**, with roughly ±50%
+uncertainty: extract and adapt the motor graph plus guest configuration and
+visual state (3–6 days), adapt the fixture's required content for SDK content
+API 0.2 (1–2 days), then run host/guest and save/reopen checks and repair
+failures (1–2 days). The estimate is based on the 1,276-line source boundary
+and the compile probe, not a completed extraction. The largest uncertainties
+are the exact minimum motor callback/content closure and whether the saved
+`create:motor`/`create:simple_kinetic` data can be attached cleanly under the
+new registry path. Do not use the broad `machines.rs` compiler count as a
+kinetic estimate. Processing and train work has not started.
+
+Time record: **24 minutes wall-clock** from the first timestamped APP-2136
+diagnostic commit at 09:26 MDT to this checkpoint at 09:50 MDT. This is an
+upper bound on hands-on time because it includes pauses between requests.
