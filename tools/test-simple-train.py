@@ -22,7 +22,8 @@ def click_track(control, x):
     control.call("wait", 3)
 
 
-def setup(control, layout=None, *, after_station=None, before_glue=None, take_controls=True, rear_controls=False):
+def setup(control, layout=None, *, after_station=None, station_discovery_ticks=0, before_glue=None,
+          take_controls=True, rear_controls=False):
     if layout is None:
         control.commands((
             f"/fill {X - 21} {Y - 1} {Z - 5} {X + 25} {Y - 1} {Z + 5} minecraft:smooth_stone",
@@ -46,11 +47,19 @@ def setup(control, layout=None, *, after_station=None, before_glue=None, take_co
     if after_station:
         after_station(control)
         control.command(f"/tp @s {sx + 0.5} {sy} {sz + 2.5} 180 20")
+    for _ in range(station_discovery_ticks):
+        control.step_to(control.clock() + 1)
     control.call("wait", 3)
     control.call("interact", *STATION, "up")
     control.call("wait", 4)
     control.call("click-button", "Create New Train")
     control.step_to(control.clock() + 1)
+    if station_discovery_ticks:
+        control.call("wait", 1)
+        buttons = control.call("screen")["buttons"]
+        assemble = next((button for button in buttons if button["label"] == "Assemble Train"), None)
+        if not assemble:
+            raise RuntimeError(f"Station did not open its assembly screen: {buttons}")
     control.call("key", "esc", "tap")
     control.command("/item replace entity @s hotbar.0 with create:railway_casing 2")
     control.call("wait", 3)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify train detection, cargo filtering, guest configuration, and observer persistence."""
 import argparse
+from contextlib import ExitStack
 from importlib import import_module
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -26,7 +27,7 @@ scenario = 'Track-observer-train' + ('-accept' if args.filter_accept else '-reje
 
 with TemporaryDirectory(prefix='hc-track-observer-') as scratch, fixture_world(
     args, scenario, train.STRUCTURE, render=True, pack=args.pack, env={'HORIZON_NO_AUDIO': '1'},
-) as world:
+) as world, ExitStack() as clients:
     ox, oy, oz = train.X - 5, train.Y, train.Z + 3
 
     def observer(control):
@@ -43,39 +44,59 @@ with TemporaryDirectory(prefix='hc-track-observer-') as scratch, fixture_world(
             control.command(f'/setblock {cx} {cy} {cz} minecraft:chest')
             control.command(f'/item replace block {cx} {cy} {cz} container.0 with {cargo_item} 1')
 
-    train.setup(world, after_station=observer,
+    train.setup(world, after_station=observer, station_discovery_ticks=8,
                 before_glue=cargo if args.filter_accept or args.filter_reject or args.lan else None)
     if args.filter_accept or args.filter_reject or args.lan:
         carriage = world.command(f'/data get entity {train.ENTITY} CreateTrain.Blocks')
         assert f'id: "{cargo_item}"' in carriage, f'Assembled train did not retain {cargo_item}: {carriage}'
 
+    guest = None
     if args.lan:
         world.command('/tick unfreeze')
         address = f"127.0.0.1:{world.call('lan', 'open', '0', 'commands', 'force')['port']}"
-        with multiplayer.joined_client(
+        guest = clients.enter_context(multiplayer.joined_client(
             args, Path(scratch), address, 'TrackObserverGuest', render=True,
             scenario='track-observer-filter', pack=args.pack,
             launch_timeout=120,
-        ) as guest:
-            guest_name = 'TrackObserverGuest'
-            multiplayer.until('the Track Observer guest to join', lambda: any(
-                player['name'] == guest_name and player['placed']
-                for player in world.call('lan', 'status')['guests']
-            ))
-            world.command(f'/gamemode survival {guest_name}')
-            world.command(f'/item replace entity {guest_name} hotbar.0 with {filter_item} 1')
-            world.command(f'/tp {guest_name} {ox + .5} {oy + 2.5} {oz + .5}')
-            guest.call('select', filter_item)
+        ))
+        guest_name = 'TrackObserverGuest'
+        multiplayer.until('the Track Observer guest to join', lambda: any(
+            player['name'] == guest_name and player['placed']
+            for player in world.call('lan', 'status')['guests']
+        ))
+        world.command(f'/gamemode survival {guest_name}')
+        world.command(f'/item replace entity {guest_name} hotbar.0 with {filter_item} 1')
+        world.command(f'/item replace entity {guest_name} hotbar.1 with minecraft:gold_ingot 1')
+        world.command(f'/tp {guest_name} {ox + .5} {oy + 2.5} {oz + .5}')
+
+        def guest_filter(item, slot):
+            guest.call('select', slot)
             guest.call('look-at', ox + .5, oy + .873, oz + .5)
-            guest.call('wait', 3)
+            guest.call('wait', 1)
             hit = guest.call('looking-at').get('block')
             assert hit and hit['pos'] == [ox, oy, oz] and hit['face'] == 'up', hit
             guest.call('mouse', 'right', 'click')
-            multiplayer.until('the host to receive the guest-set cargo filter', lambda:
-                f'id: "{filter_item}"' in world.command(f'/data get block {ox} {oy} {oz}')
-            )
-            assert guest.call('inventory')['counts'].get(filter_item) == 1
-            print(f'Guest configured {filter_item} on the Track Observer.', flush=True)
+
+            def host_filter():
+                data = world.command(f'/data get block {ox} {oy} {oz}')
+                matches = (f'id: "{item}"' in data) if item else (
+                    'id: "minecraft:iron_ingot"' not in data
+                    and 'id: "minecraft:gold_ingot"' not in data
+                )
+                return data if matches else False
+
+            return multiplayer.until(f'the host observer filter to become {item or "empty"}', host_filter)
+
+        for item, slot in ((filter_item, 1), ('minecraft:gold_ingot', 2)):
+            state = guest_filter(item, slot)
+            print(f'Guest set {item}; host observer data: {state}', flush=True)
+
+        state = guest_filter(None, 3)  # An empty survival hotbar slot clears the filter.
+        print(f'Guest cleared the filter; host observer data: {state}', flush=True)
+        state = guest_filter(filter_item, 1)
+        counts = guest.call('inventory')['counts']
+        assert counts.get(filter_item) == counts.get('minecraft:gold_ingot') == 1, counts
+        print(f'Guest set, changed, and cleared the filter; both held items remained. Final state: {state}', flush=True)
         world.command('/tick freeze')
 
     world.call('key', 'w', 'down')
@@ -92,7 +113,11 @@ with TemporaryDirectory(prefix='hc-track-observer-') as scratch, fixture_world(
             sample = train.sample(world)
             print(f'tick={i + 1} observer={state} wire={wire} train={sample}', flush=True)
             last = active
-        if active and not active_reopened and (args.filter_accept or args.lan):
+        if guest is not None:
+            multiplayer.until('guest observer state to converge with host', lambda:
+                guest.call('block', ox, oy, oz)['state'] == state
+            )
+        if active and not active_reopened and args.filter_accept:
             world.call('key', 'w', 'up')
             world.restart()
             state = world.call('block', ox, oy, oz)['state']
@@ -109,9 +134,12 @@ with TemporaryDirectory(prefix='hc-track-observer-') as scratch, fixture_world(
         assert seen == {False}, seen
     else:
         assert seen == {False, True}, seen
-    if args.filter_accept or args.lan:
+    if args.filter_accept:
         assert active_reopened, 'The accepted cargo did not survive an active save/reopen.'
 
+    if args.lan:
+        clients.pop_all().close()
+        guest = None
     if args.filter_accept or args.filter_reject or args.lan:
         world.restart()
         saved = world.command(f'/data get block {ox} {oy} {oz}')
