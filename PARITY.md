@@ -8332,6 +8332,39 @@ ran the focused Track Observer cases. On the identified build:
   state convergence therefore remain unverified for this ticket. The focused
   rerun command and preserved logs are recorded in the PR.
 
+### APP-2114 guest filter follow-up (November 21, 2026)
+
+The ticket's exact predecessor client `native-9f42064-a7485cf0edab` was not
+present in the local ignored artifacts, so these runs used a preserved
+diagnostic client, `native-9f42064-340cbe866fa7`, with the recorded Create pack
+(SHA-256 `e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`)
+and prepared 26.3 resources from `native-9f42064-6bdf8691aa42`. The diagnostic
+client is not source-matched to this checkout and does not count toward the
+ticket's integration gate.
+
+The focused `track-observer-train` check passed on that diagnostic client after
+the fixture advanced eight world ticks after observer placement. This confirms
+the assembly helper completes its normal bogey placement, train assembly and
+observer passage with the revised sequencing, but is not accepted as a
+source-matched result. The LAN attempt opened the host on port 63123; the guest
+reached its first rendered frame but did not join before the existing 120-second
+launch timeout. The failure occurred before guest filter assertions, so it
+does not establish a guest interaction or gameplay defect. Its captured runner
+trace is `.local/parity/track-observer-lan.log` in the ticket worktree.
+
+The repeatable LAN fixture now keeps its guest connected through the train
+passage, changes the filter from iron to gold, clears it with an empty hand,
+restores iron, checks that neither held item was consumed, and waits for the
+guest's observer powered state to converge to each host sample. Those assertions
+remain unverified until the fixture runs on a source-matched client. The
+`horizon-ctl block` response exposes state rather than guest-side block-entity
+NBT, so the current assertion also does not directly read the guest's filter
+payload. Required follow-up: obtain/rebuild the exact compatible client, resolve
+guest startup, add a direct guest-side filter readout or visible filter check,
+then run `track-observer-lan`, `track-observer-filter-accept`,
+`track-observer-filter-reject`, and `track-observer` on that final build. Do not
+mark this multiplayer gate complete from the diagnostic run.
+
 Pinned Java `TrackObserverBlockEntity.tick()` keeps the powered state for
 eight ticks after `keepAlive(train)`. The source-based timeout is implemented;
 exact Java arrival timing has not been independently traced. Curved-rail
