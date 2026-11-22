@@ -1322,12 +1322,33 @@ host/guest state convergence. A separate Copycat Bars Wrench case reproduced
 that Bars rotation was not dispatched: an upward-facing block remained up
 after a verified south-face Wrench hit. Java's
 `WrenchableDirectionalBlock.getRotatedBlockState` rotates it to east. The
-native Wrench dispatch was updated to route Bars through its existing
-directional rotation rule. The rebuilt candidate could not be verified: the
-available launcher source already contains a different engine-patch set, so
-the documented build stopped when the advancement patch did not apply. The
-Bars rotation check and rebuilt regression suite remain required before this
-baseline is complete.
+first matching-build fixture also failed: its player pose had stale downward
+aim, and its target tuple used Y=111 while Bars was placed at Y=113. The
+diagnostic trace showed no hit for the held-Wrench mouse path, so this result
+was retained as a fixture failure rather than treated as a gameplay result.
+After synchronizing the server pose and placing the target at the actual Y,
+the real mouse path reported the Wrench-held hit on
+`create:copycat_bars` at `[8,113,-10]`, face South; the guarded Copycat click
+handler called the existing Wrench apply path, which returned `turned=true`
+and wrote `facing=east`. The generic Wrench state rule was present, but the
+mouse `use_hand` route bypassed its ordinary block-use dispatch, so a
+Wrench-only Copycat Bars route was added. Bars' thin selection shape is now
+declared as its interaction shape so the real ray reaches that plate. On
+matching installed build `native-9f42064-1a4016feb869` with pack
+`bcb281e186afd31ce972310b3c8582d1816b337e2257c231dd5884f4eafc62b4`, the
+south/east/north representative cases reached expected states; west was not
+completed before the final clean rebuild attempt. The affected Copycat
+90-case and Wrench 42-case regressions both passed on that build. A clean
+private rebuild then succeeded as `native-9f42064-118e45924ac4`; Copycat
+90/90 and Wrench 42/42 also passed on that clean build. The corrected bounded
+four-face fixture then passed on that same client with exit 0: real mouse clicks
+reported `south: up -> east`, `north: up -> east`, `east: up -> north`, and
+`west: up -> north`. The fixture uses a support platform covering all approach
+positions and validates each outer face at Y=113.1; the earlier failed runs are
+retained as synchronization/visibility evidence rather than gameplay results.
+`rustfmt --edition 2024 --check native/wrench.rs` reports pre-existing
+whole-file formatting differences outside this ticket's added dispatch; those
+unrelated lines were left unchanged.
 
 Reproduce the six passing pre-fix checks with:
 

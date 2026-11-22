@@ -150,24 +150,42 @@ def copycat_bars_wrench(args):
     with fixture_world(args, "CopycatBarsWrench", pack=args.pack) as control:
         pos = (8, 111, -10)
         control.commands((
-            "/fill 7 110 -11 9 110 -9 minecraft:stone",
-            "/gamemode survival",
+            "/fill 3 110 -14 13 110 -6 minecraft:stone",
             f"/setblock {pos[0]} 113 {pos[2]} create:copycat_bars[facing=up]",
         ))
+        control.call("command", "/gamemode creative")
         copycat.put(control, "create:wrench")
-        control.call("tp", 8.5, 111.5, -7.5)
-        control.call("look-at", 8.5, 113.1, -9.5)
-        hit = control.call("looking-at").get("block")
-        if not hit or hit["pos"] != [pos[0], 113, pos[2]] or hit["face"] != "south":
-            raise RuntimeError(f"Copycat Bars Wrench missed the south face: {hit}")
-        tick = control.clock()
-        control.call("mouse", "right", "click")
-        multiplayer.until("Copycat Bars Wrench rotation", lambda: (
-            control.call("block", pos[0], 113, pos[2])["state"] == "create:copycat_bars[facing=east]"
-        ))
-        if control.clock() != tick:
-            raise RuntimeError("Copycat Bars rotation advanced the frozen world")
-    print("Copycat Bars rotated up to east from a south-face Wrench hit, matching WrenchableDirectionalBlock.")
+        control.command("/tp @s 8.5 111.0 -7.5 180 -10")
+        control.call("wait", 3)
+        control.call("command", "/gamemode survival")
+        control.call("wait", 1)
+        cases = (
+            ("south", "east", (8.5, 111.0, -7.5), 180, (8.5, 113.1, -9.0)),
+            ("north", "east", (8.5, 111.0, -12.5), 0, (8.5, 113.1, -10.0)),
+            ("east", "north", (11.5, 111.0, -9.5), -90, (9.0, 113.1, -9.5)),
+            ("west", "north", (4.5, 111.0, -9.5), 90, (8.0, 113.1, -9.5)),
+        )
+        for face, expected, approach, yaw, target in cases:
+            control.command(f"/setblock {pos[0]} 113 {pos[2]} create:copycat_bars[facing=up]")
+            control.command(f"/tp @s {approach[0]} {approach[1]} {approach[2]} {yaw} -10")
+            control.call("wait", 1)
+            if target is not None:
+                control.call("look-at", *target)
+                control.call("wait", 1)
+                hit = control.call("looking-at").get("block")
+                if not hit or hit["pos"] != [pos[0], 113, pos[2]] or hit["face"] != face:
+                    raise RuntimeError(f"Copycat Bars Wrench missed the {face} face: {hit}")
+            tick = control.clock()
+            result = control.call("mouse", "right", "click")
+            if result.get("ok") is False:
+                raise RuntimeError(f"Copycat Bars Wrench {face} mouse click failed: {result}")
+            multiplayer.until(f"Copycat Bars Wrench {face} rotation", lambda: (
+                control.call("block", pos[0], 113, pos[2])["state"] == f"create:copycat_bars[facing={expected}]"
+            ))
+            print(f"Copycat Bars {face}: {control.call('block', pos[0], 113, pos[2])['state']}")
+            if control.clock() != tick:
+                raise RuntimeError("Copycat Bars rotation advanced the frozen world")
+    print("Copycat Bars Wrench rotations matched south/east/north/west face cases on the matching build.")
 
 
 if __name__ == "__main__":
