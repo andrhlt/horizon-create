@@ -115,15 +115,28 @@ whole-module failures; it is not a count for a motor-only extraction.
 The old motor path shares 1,276 lines of `machines.rs` source spans with the
 general kinetic enum, graph traversal, source arbitration, motor initialization,
 and network publication. Those spans refer to 22 sibling `create_*` modules
-because the enum also handles other kinetic blocks. For the selected fixture,
-the required behavior boundary is smaller: the Creative Motor block entity,
-the `simple_kinetic` entities used by shaft/cogwheel, signed RPM traversal over
-those three block kinds, guest speed configuration, and publishing/saving the
-result. Existing entry points cross `block_entity`, `block_entity_ticks`,
-`block_entity_tick`, motor setting changes in `speed_controller`, and the
-`visuals` readout. Other source and consumer kinds can be left outside this
-slice. A full 1,276-line copy would keep unrelated branches and would not be an
-acceptable isolation fix.
+because the enum also handles other kinetic blocks: `backtank`, `bearing`,
+`belt`, `chain_conveyor_connect`, `chain_gearshift`, `display_board`, `drill`,
+`elevator`, `fan`, `fluids`, `flywheel`, `gantry`, `hand_crank`, `hose`,
+`mechanical_piston`, `saw`, `sequencer`, `shaft`, `speed_controller`, `steam`,
+`turntable`, and `valve`. That is the broad source closure, not the selected
+fixture's closure.
+
+The selected fixture's observed production call graph is narrower. `motor`
+has BE id `create:motor`; `shaft`, `cogwheel`, and `large_cogwheel` have BE id
+`create:simple_kinetic`. Current code enters that graph through the common
+`block_entity`, `block_entity_ticks`, and `block_entity_tick` helpers; motor
+setting changes route through `speed_controller`, world changes through
+`prepare_sequencers`/`windmill_data_loaded`, disconnection through
+`flush_clutch_signals`, and visual speed reads through `visuals`. The
+test-specific algorithm needs only motor, shaft, and cogwheel connection
+rules, signed RPM propagation, saved BE data/sync, the guest setting action,
+and shaft/cogwheel draw state. Gearboxes, other source/consumer types, and the
+other 22 helpers are not dependencies of the selected structure. The exact
+post-extraction file list remains to be confirmed by the next build; the
+current monolith does not expose that closure as separate Rust modules. A full
+1,276-line copy would retain unrelated branches and is not an acceptable
+isolation fix.
 
 A typed-Part probe was built with launcher 0.2.105, the pinned Nov 20 nightly,
 SDK `sdk-0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, and the isolated launcher
@@ -143,16 +156,16 @@ block kinds and retain the existing signed RPM and persistence observations.
 The probe makes this approach technically plausible, but the actual flow is
 not yet viable: there is no compiled production slice or passing parity run.
 
-Estimated remaining kinetic work is **5–10 engineer-days**, with roughly ±50%
-uncertainty: extract and adapt the motor graph plus guest configuration and
-visual state (3–6 days), adapt the fixture's required content for SDK content
-API 0.2 (1–2 days), then run host/guest and save/reopen checks and repair
-failures (1–2 days). The estimate is based on the 1,276-line source boundary
-and the compile probe, not a completed extraction. The largest uncertainties
-are the exact minimum motor callback/content closure and whether the saved
-`create:motor`/`create:simple_kinetic` data can be attached cleanly under the
-new registry path. Do not use the broad `machines.rs` compiler count as a
-kinetic estimate. Processing and train work has not started.
+Estimated remaining kinetic work is **5–10 engineer-days**: extract and adapt
+the motor graph plus guest configuration and visual state (3–6 days), adapt
+the fixture's required content for SDK content API 0.2 (1–2 days), then run
+host/guest and save/reopen checks and repair failures (1–2 days). The estimate
+is based on the observed call graph and compile probe, not a completed
+extraction; it may exceed 10 days if the callback or content closure is wider
+than it appears. The largest uncertainties are guest action routing, motor
+reinitialization after reload, and the exact draw/content closure. Do not use
+the broad `machines.rs` compiler count as a kinetic estimate. Processing and
+train work has not started.
 
 Time record: **24 minutes wall-clock** from the first timestamped APP-2136
 diagnostic commit at 09:26 MDT to this checkpoint at 09:50 MDT. This is an
