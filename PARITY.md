@@ -9280,6 +9280,14 @@ port in the same arrival, leaving carriage cargo unchanged. Both native port
 buffers matched their live inventories after saving. Native graph UUID identity
 and other rebinding and dwelling-transfer cases remain open.
 
+For APP-2056, the Horizon rebind replay now also saves and reopens after rail
+replacement, before dispatch. It compares the station's saved target and the
+registered Postbox station, position, address, and both buffered packages
+before continuing the scheduled import. This checks the port's persisted
+station-position binding across the rebind/reopen sequence; it does not claim
+Create's Java graph UUID is represented natively. The updated integration case
+has not yet been run on a compatible prepared client.
+
 ## Sequenced Gearshift release timing
 
 On the older broad-run candidate, the Contraption Controls replay
