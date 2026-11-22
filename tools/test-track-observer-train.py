@@ -69,13 +69,16 @@ with TemporaryDirectory(prefix='hc-track-observer-') as scratch, fixture_world(
         world.command(f'/item replace entity {guest_name} hotbar.1 with minecraft:gold_ingot 1')
         world.command(f'/tp {guest_name} {ox + .5} {oy + 2.5} {oz + .5}')
 
-        def guest_filter(item, slot):
-            guest.call('select', item or slot)
+        def guest_filter(item, slot, select_item=None):
+            guest.call('select', select_item or item or slot)
             guest.call('look-at', ox + .5, oy + .873, oz + .5)
             guest.call('wait', 1)
             hit = guest.call('looking-at').get('block')
             assert hit and hit['pos'] == [ox, oy, oz] and hit['face'] == 'up', hit
-            guest.call('mouse', 'right', 'click')
+            # Send one held-button interval in a single control script.  The
+            # standalone `mouse ... click` command can be observed as two
+            # server-side interactions (sample, then empty hand) on LAN.
+            guest.call('script', script='mouse right down\nwait 2\nmouse right up')
 
             def host_filter():
                 data = world.command(f'/data get block {ox} {oy} {oz}')
@@ -93,7 +96,9 @@ with TemporaryDirectory(prefix='hc-track-observer-') as scratch, fixture_world(
 
         state = guest_filter(None, 3)  # An empty survival hotbar slot clears the filter.
         print(f'Guest cleared the filter; host observer data: {state}', flush=True)
-        state = guest_filter(filter_item, 1)
+        # After clearing, select the known hotbar slot explicitly; item-ID
+        # selection can leave the guest hand empty after the clear dispatch.
+        state = guest_filter(filter_item, 1, select_item=1)
         counts = guest.call('inventory')['counts']
         assert counts.get(filter_item) == counts.get('minecraft:gold_ingot') == 1, counts
         print(f'Guest set, changed, and cleared the filter; both held items remained. Final state: {state}', flush=True)

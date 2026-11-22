@@ -215,6 +215,12 @@ pub(super) fn filter_hit(game: &Game<'_>, hit: &super::Hit, bottom: bool) -> boo
 }
 
 pub(super) fn filter_click(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> bool {
+    // Block use is attempted for both hands.  FilteringBehaviour handles the
+    // main-hand interaction; allowing the empty off-hand fallback through
+    // would immediately clear a filter just written by the main hand.
+    if game.hand != super::Hand::Main {
+        return false;
+    }
     let bottom = match game.native_block(pos).as_str() {
         THRESHOLD_SWITCH => true,
         OBSERVER | TRACK_OBSERVER => false,
