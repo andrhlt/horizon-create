@@ -72,8 +72,9 @@ ID mentions because some lines combine several rows). The reported functions
 span world ticks, block entities, interaction, persistence, and vehicle paths.
 The pinned source puts `mobs` in `horizon-client-lib`'s `client_lib.rs` and
 re-exports that crate from `horizon-client/src/lib.rs`; the mod API generator's
-source resolver does not follow that re-export for this package's combined
-target set.
+source resolver does not follow that re-export while validating the full
+support-module graph. The same `check_transmission_reconnections` mixin no
+longer reports this diagnostic when paired with `machines` alone.
 
 This filtering is a diagnostic scope reduction, not a gameplay fix: it removes
 rows from the candidate, and therefore does not validate their behavior. A
