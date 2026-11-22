@@ -13162,3 +13162,20 @@ Goggles trace, removes three mills on the host, and requires the guest readout
 to change. The successful run used 9 GiB free after safe cache recovery; the
 earlier disk-full retries and the camera self-hit retry remain preserved as
 diagnostic logs.
+
+## APP-1975 follow-up — full LAN gauge matrix — November 21, 2026
+
+The follow-up harness was rerun from merged `main` on the source-compatible
+`native-9f42064-76138ca65acb` client and passed. It uses the actual live
+water-wheel/cog/mill network and never uses `/data merge` for measured states.
+Host and guest block states agreed for both Speedometer and Stressometer,
+including isolated idle gauges. The guest Goggles trace showed idle `No
+Rotation` and `None (0 RPM)`, then loaded `Slow (8 RPM)` and `Low (50%)` with
+four millstones (8 RPM, 128 SU).
+
+The host then changed the live mill count to nine and back to one. Host data
+reached 288 SU/zero effective speed and then 32 SU/8 RPM; the guest observed
+stress text changing from 50% to 112% and back to 12%, and Speedometer's
+strikethrough style changed while overloaded and cleared on recovery. This
+closes the direct guest idle/loaded/load-change evidence gap for the bounded
+APP-1975 gate; exhaustive visual parity remains Open.
