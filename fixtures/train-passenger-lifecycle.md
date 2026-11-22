@@ -49,6 +49,13 @@ patch has not yet been runtime-verified. Keep APP-2113 In Progress until the
 pending cases and justified neighboring regressions pass on the repaired build.
 Exact Java reload parity is not claimed.
 
+The isolated native build attempt stopped before compilation: the launcher-data
+source tree already contained an older patch set, so reapplying the repository
+patches failed at `horizon-advancement-initial-inventory.patch`. The separate
+13 GB compilation cache was copy-on-write cloned in `/private/tmp`; it was not
+written by this attempt. This is a source-input/setup failure, not a result for
+the APP-2113 patch.
+
 ## Source diagnosis and repair
 
 Create's `native/elevator_seats.rs` uses marker armor stands as passenger
