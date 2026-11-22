@@ -38,6 +38,24 @@ def check_rider(world, actor, name):
     return server
 
 
+def check_seat_identity(world, actor, name):
+    """Check the live mount UUID and passenger-to-carrier seat pose."""
+    carrier_uuid = world.command(
+        f"/execute as {name} on vehicle run data get entity @s UUID"
+    )
+    assert "[I;" in carrier_uuid, (name, "missing vehicle UUID", carrier_uuid)
+    carrier_pos = elevator.pos_reply(world.command(
+        f"/execute as {name} on vehicle run data get entity @s Pos"
+    ))
+    rider_pos = elevator.pos_reply(world.command(f"/data get entity {name} Pos"))
+    # Seat carriers place a player 0.6 blocks below the marker; retain a tight
+    # tolerance while checking x/z identity rather than only mount success.
+    assert abs(rider_pos[0] - carrier_pos[0]) < 0.02
+    assert abs(rider_pos[2] - carrier_pos[2]) < 0.02
+    assert abs((carrier_pos[1] - rider_pos[1]) - 0.6) < 0.02
+    return carrier_uuid, carrier_pos
+
+
 def check_carriers(world, expected):
     world.command("/scoreboard players set #carriers elevator_ride 0")
     world.call("command", "/execute as @e[tag=create_train_seat_vehicle] run scoreboard players add #carriers elevator_ride 1")
@@ -76,12 +94,14 @@ def run(args):
         host.command("/attribute @s minecraft:gravity base set 0")
         board(host, host, host_name, 3)
         idle = check_rider(host, host, host_name)
+        check_seat_identity(host, host, host_name)
         if args.case == "idle":
             trace_records("before-save")
             host.call("save")
             host.restart()
             trace_records("after-restart")
             assert check_rider(host, host, host_name) == idle, "Idle rider moved across reopen"
+            check_seat_identity(host, host, host_name)
             assert reopen.snapshot(host)[0] == 0
             check_carriers(host, 1)
             print("Idle seated host retained mount and pose across save/reopen.")
@@ -97,6 +117,7 @@ def run(args):
             host.command(f"/attribute {GUEST} minecraft:gravity base set 0")
             board(host, guest, GUEST, 4)
             check_rider(host, guest, GUEST)
+            check_seat_identity(host, guest, GUEST)
             # A passenger's movement input must not acquire or drive controls.
             before = reopen.snapshot(host)
             guest.call("key", "w", "down")
@@ -112,6 +133,8 @@ def run(args):
             assert reopen.snapshot(host)[0] > 0, "Seated driver did not move train"
             check_rider(host, host, host_name)
             check_rider(host, guest, GUEST)
+            check_seat_identity(host, host, host_name)
+            check_seat_identity(host, guest, GUEST)
             # Dismounting the passenger must leave the driver's custody intact.
             guest.call("key", "shift", "down")
             step(host, 1)
@@ -138,6 +161,7 @@ def run(args):
         host.restart()
         trace_records("active-after-restart")
         check_rider(host, host, host_name)
+        check_seat_identity(host, host, host_name)
         assert reopen.snapshot(host)[1] > moving[1], "Active train did not resume"
         port = host.call("lan", "open", "0", "commands", "force")["port"]
         with mp.joined_client(args, Path(scratch), f"127.0.0.1:{port}", GUEST, render=True,
@@ -145,15 +169,18 @@ def run(args):
             mp.until("passenger rejoin", lambda: any(
                 p["name"] == GUEST and p["placed"] for p in host.call("lan", "status")["guests"]))
             check_rider(host, guest, GUEST)
+            check_seat_identity(host, guest, GUEST)
             check_carriers(host, 2)
             host.command(f"/ride {GUEST} dismount")
             assert not elevator.ride(host, GUEST)
             check_rider(host, host, host_name)
+            check_seat_identity(host, host, host_name)
             # A safe dismount must survive a subsequent save/reopen without
             # resurrecting the guest as a passenger.
             host.call("save")
             host.restart()
             check_rider(host, host, host_name)
+            check_seat_identity(host, host, host_name)
             assert not elevator.ride(host, GUEST), "Dismounted guest resurrected after reopen"
             # The empty guest carrier is cleaned up; only the host's carrier remains.
             check_carriers(host, 1)
