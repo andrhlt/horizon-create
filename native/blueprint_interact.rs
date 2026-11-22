@@ -1,11 +1,14 @@
 fn blueprint_interact(
-    game: &mut crate::game::Game<'_>,
+    game: &mut Game<'_>,
     entity: i32,
-    stack: Option<&crate::items::ItemStack>,
-    _location: [f64; 3],
+    kind: &str,
+    stack: Option<&ItemStack>,
     cancel: &mut bool,
 ) {
-    if !*cancel && crate::game::create_blueprint::interact(game, entity as u32, stack) {
+    if !*cancel
+        && kind == "create:blueprint"
+        && crate::game::create_blueprint::interact(game, entity as u32, stack)
+    {
         *cancel = true;
     }
 }

@@ -8359,18 +8359,23 @@ placement, result programming and recipe handling remain open.
 
 APP-2091 uses a finite gameplay scope: acquire the item, place a hanging
 display, program and view one recipe, use it, break and recover it, then check
-guest interaction and save/reopen identity. The existing survival replay is
-the only passing case. The family has no native Blueprint entity or menu
-implementation yet; inventory audits show the Blueprint entity type and menu
-ID are not loaded by the pack. Consequently the placement, section selection,
-recipe programming, recipe use, break/drop, guest edit/use and persistence
-cases now have a native persistent entity path: size-aware placement, Blueprint
-rendering, authoritative representative paper-to-Crafting-Table use, wrench
-configuration, break/recover drops and guest inventory resend. The current
-bounded implementation intentionally keeps the representative recipe and
-configuration state narrow; the full Java section editor/menu, arbitrary
-recipe-manager lookup and exact recipe-NBT round-trip remain follow-ups rather
-than parity claims.
+guest interaction and save/reopen identity. The bounded offscreen replay
+[`tools/test-crafting-blueprint-gameplay.py`](tools/test-crafting-blueprint-gameplay.py)
+passed on `native-9f42064-8a7c118f566d` with a derived local test pack
+(`38e8de43c0a855a3a1985a8c62e0f32d6ba09de6ca966513b74f094d70506cab`). It
+crafted and placed the Blueprint, configured and persisted a representative
+recipe, consumed four planks for one Crafting Table on the host and a LAN guest,
+then broke the display and observed one recovered Blueprint drop. The original
+Painting + Crafting Table survival recipe remains covered by
+[`tools/test-crafting-blueprint.py`](tools/test-crafting-blueprint.py).
+
+The current native path uses a persistent mob entity, size-aware supported
+placement, Blueprint item rendering, wrench-triggered recipe configuration,
+authoritative inventory consumption/output and one-item recovery. The bounded
+recipe is `#minecraft:planks` ×4 → Crafting Table. The Java section editor/menu,
+arbitrary recipe-manager lookup, nine independent ingredient filters, and
+exact Java recipe-NBT round-trip remain open; this replay does not claim those
+paths or exhaustive visual parity.
 
 The pinned Java reference (`ac0c444d9828da3453ae8cc65338e8de063286fb`)
 defines the behavior in `BlueprintItem`, `BlueprintEntity`, `BlueprintMenu`

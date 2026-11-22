@@ -3588,8 +3588,8 @@ source = "blueprint.rs"
 [[module]]
 id = "blueprint_mob"
 file = "crates/horizon-client/src/mobs.rs"
-name = "create_blueprint"
-source = "blueprint.rs"
+name = "create_blueprint_mob"
+source = "blueprint_mob.rs"
 
 [[injection]]
 id = "blueprint_mob_size"
@@ -3616,14 +3616,14 @@ bindings = [
 
 [[injection]]
 id = "blueprint_interact"
-target = "horizon_client::game::native_hooks::Game<'_>::native_entity_interact_specific"
+target = "horizon_client::game::native_hooks::Game<'_>::native_interact_entity"
 kind = "HEAD"
 helper = "blueprint_interact.rs"
 bindings = [
   { name = "game", ty = "&mut Game<'_>", value = "self" },
   { name = "entity", ty = "i32", value = "entity" },
+  { name = "kind", ty = "&str", value = "kind" },
   { name = "stack", ty = "Option<&ItemStack>", value = "stack" },
-  { name = "location", ty = "[f64; 3]", value = "location" },
   { name = "cancel", ty = "&mut bool", value = "claimed" },
 ]
 
