@@ -20,6 +20,17 @@
   "default_state": {
     "facing": "up"
   },
+  "interaction_shapes": {
+    "property": "facing",
+    "values": {
+      "up": [[0, 0, 0, 1, 0.1875, 1]],
+      "down": [[0, 0.8125, 0, 1, 1, 1]],
+      "north": [[0, 0, 0.8125, 1, 1, 1]],
+      "south": [[0, 0, 0, 1, 1, 0.1875]],
+      "west": [[0.8125, 0, 0, 1, 1, 1]],
+      "east": [[0, 0, 0, 0.1875, 1, 1]]
+    }
+  },
   "shapes": {
     "properties": [
       "facing"

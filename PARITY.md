@@ -1296,6 +1296,73 @@ Steps per Zinc Ingot. [Java GameTests](tools/java-copycat-material.patch),
 [material trace](fixtures/copycat-material-java.csv), and
 [lifecycle trace](fixtures/copycat-lifecycle-java.csv).
 
+APP-2065's bounded gameplay baseline reuses these Java captures: opaque
+stone/log and transparent glass/window materials; Panel and Step application,
+same/different material interactions, Wrench reset and removal; off-hand
+material return and survival/Creative drops; Bars/trapdoor special materials;
+blocked placement and source/flowing water placement. Existing bucket cases
+cover filling and draining both forms. The 90 material observations include
+the `copycat_base` reset result and Bars as a copied material; the eight
+lifecycle observations cover both wrapper drops. The focused
+`copycat-persistence` check additionally saves and reopens a Panel with a
+transparent Oak Window, a top/east Step with an axis-X Oak Log, and a base
+material Panel, then verifies exact stored materials and shape states. Static
+Copycats have no active operation state to preserve. Full 1:1 remains Open for
+other material/lighting combinations and third-party rendering.
+
+Six related checks passed on `native-9f42064-6bdf8691aa42` with Horizon
+pin `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, Minecraft 26.3 resources, and
+Create pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. It
+passed material/Wrench (90 Java observations), lifecycle (8 observations and
+both Stonecutter recipes), placement assist (12 Java outcomes), placement
+assist on LAN (3 Java outcomes), bucket interactions (8 Java outcomes), and
+idle persistence (Panel, Step and base identities). The LAN result establishes
+host/guest state convergence. A separate Copycat Bars Wrench case reproduced
+that Bars rotation was not dispatched: an upward-facing block remained up
+after a verified south-face Wrench hit. Java's
+`WrenchableDirectionalBlock.getRotatedBlockState` rotates it to east. The
+first matching-build fixture also failed: its player pose had stale downward
+aim, and its target tuple used Y=111 while Bars was placed at Y=113. The
+diagnostic trace showed no hit for the held-Wrench mouse path, so this result
+was retained as a fixture failure rather than treated as a gameplay result.
+After synchronizing the server pose and placing the target at the actual Y,
+the real mouse path reported the Wrench-held hit on
+`create:copycat_bars` at `[8,113,-10]`, face South; the guarded Copycat click
+handler called the existing Wrench apply path, which returned `turned=true`
+and wrote `facing=east`. The generic Wrench state rule was present, but the
+mouse `use_hand` route bypassed its ordinary block-use dispatch, so a
+Wrench-only Copycat Bars route was added. Bars' thin selection shape is now
+declared as its interaction shape so the real ray reaches that plate. On
+matching installed build `native-9f42064-1a4016feb869` with pack
+`bcb281e186afd31ce972310b3c8582d1816b337e2257c231dd5884f4eafc62b4`, the
+south/east/north representative cases reached expected states; west was not
+completed before the final clean rebuild attempt. The affected Copycat
+90-case and Wrench 42-case regressions both passed on that build. A clean
+private rebuild then succeeded as `native-9f42064-118e45924ac4`; Copycat
+90/90 and Wrench 42/42 also passed on that clean build. The corrected bounded
+four-face fixture then passed on that same client with exit 0: real mouse clicks
+reported `south: up -> east`, `north: up -> east`, `east: up -> north`, and
+`west: up -> north`. The fixture uses a support platform covering all approach
+positions and validates each outer face at Y=113.1; the earlier failed runs are
+retained as synchronization/visibility evidence rather than gameplay results.
+After rebasing onto `origin/main` at `e9296d2`, the same matrix passed again on
+clean build `native-9f42064-8878a1a79fd3` (exit 0), with Copycat 90/90 and
+Wrench 42/42 passing on that build as well.
+`rustfmt --edition 2024 --check native/wrench.rs` reports pre-existing
+whole-file formatting differences outside this ticket's added dispatch; those
+unrelated lines were left unchanged.
+
+Reproduce the six passing pre-fix checks with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check copycat-material --check copycat-lifecycle --check copycat-assist --check copycat-assist-lan --check copycat-buckets --check copycat-persistence
+```
+
+Approximate effort: source/evidence review 10 minutes, harness and evidence
+updates 20 minutes, build attempt 15 minutes, static checks under one minute,
+integration about 4 minutes. All tests used isolated temporary worlds.
+
 The standalone FFmpeg replays check applied materials on both original
 shapes and the host and guest framebuffers during material application
 and removal. The LAN replay observes both changes on the action tick.
@@ -2357,6 +2424,61 @@ The selected sample renders on the original slot faces. A flat bucket and a
 stone block each matched [18 Java slot transforms](fixtures/stockpile-switch-filter-transform-java.csv)
 and submitted item geometry. When a guest selects a sample, both players see
 it on all three active faces of the tested wall-mounted switch.
+
+## APP-2115 Stockpile Switch save/reopen
+
+`tools/test-stockpile-switch-lifecycle.py` is registered as
+`stockpile-switch-lifecycle`. The isolated headless world checks an item switch
+filtered to stone against a barrel containing stone and dirt, and a fluid
+switch filtered to water against a fluid tank. Both retain their wall target,
+thresholds, filter, stock and inventory contents across idle and active
+save/reopen. The active save includes both item and fluid outputs.
+
+The replay then exercises Java's hysteresis rules from
+`ThresholdSwitchBlockEntity.updateCurrentLevel`: an active switch remains on
+between its lower and upper thresholds, switches off at the lower threshold,
+and switches on at the upper threshold. It checks item counts with a
+nonmatching stack present and fluid amounts at the same boundaries. Each
+stock change advances through a complete sampling interval and the two-tick
+redstone update. The five observed phases are:
+
+| Phase | Filtered items | Water | Raw/output | Saved and reopened |
+| --- | ---: | ---: | --- | --- |
+| Idle | 32 (32 stone + 16 dirt in barrel) | 2,000 mB | off/off | Yes |
+| Active | 64 stone | 4,000 mB | on/on | Yes |
+| Mid-band | 32 stone | 2,000 mB | remains on/on | Yes |
+| Lower boundary | 16 stone | 1,000 mB | off/off | — |
+| Upper boundary | 48 stone | 3,000 mB | on/on | Yes |
+
+The lower and upper comparisons match the pinned Java `<= offWhenBelow` and
+`>= onWhenAbove` rules. Inventory contents are checked at each phase, including
+the unfiltered dirt stack, so observation does not consume or count unrelated
+items. Exact Java reload timing and other storage implementations remain open.
+
+The final registered run passed `stockpile-switch-lifecycle`,
+`stockpile-switch-targets`, `stockpile-switch-targets-lan`,
+`stockpile-switch-filter`, and `stockpile-switch-filter-lan`. The target checks
+each matched 84 Java samples; the filter checks each matched 40 Java
+observations. One earlier registered run found the upper-bound output one tick
+short of its completed Java delay; the bounded wait was extended to cover the
+full sampling cycle, and the final run passed.
+
+Runtime identity: Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client build
+`native-9f42064-d6dc2ad18d3f` (`nightly-2026-11-13-9f42064`, performance
+profile), with the `create` native bundle hash from `native-mods.json`
+`47c08d9b81f86283b7c511b10486222571ca2dd119d0f9ab775ebf098b5122b5`.
+The prepared 26.3 resources were in that build's `.local/horizon-client/26.3`
+directory. The imported Create pack was `.local/create.hmod`, SHA-256
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`.
+Java source revision: `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+Run with the documented compatible Horizon 0.2.67 build and prepared 26.3
+resources:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check stockpile-switch-lifecycle
+```
 
 ## Smart Observer filter
 
@@ -8390,6 +8512,39 @@ on `native-9f42064-18472b3bb96b` with
 Crafting Table ingredients into one Crafting Blueprint. Display
 placement, result programming and recipe handling remain open.
 
+APP-2091 uses a finite gameplay scope: acquire the item, place a hanging
+display, program and view one recipe, use it, break and recover it, then check
+guest interaction and save/reopen identity. The bounded offscreen replay
+[`tools/test-crafting-blueprint-gameplay.py`](tools/test-crafting-blueprint-gameplay.py)
+passed on `native-9f42064-8a7c118f566d` with a derived local test pack
+(`38e8de43c0a855a3a1985a8c62e0f32d6ba09de6ca966513b74f094d70506cab`). It
+crafted and placed the Blueprint, configured and persisted a representative
+recipe, consumed four planks for one Crafting Table on the host and a LAN guest,
+then broke the display and observed one recovered Blueprint drop. The original
+Painting + Crafting Table survival recipe remains covered by
+[`tools/test-crafting-blueprint.py`](tools/test-crafting-blueprint.py).
+
+The current native path uses a persistent mob entity, size-aware supported
+placement, Blueprint item rendering, wrench-triggered recipe configuration,
+authoritative inventory consumption/output and one-item recovery. The bounded
+recipe is `#minecraft:planks` ×4 → Crafting Table. The Java section editor/menu,
+arbitrary recipe-manager lookup, nine independent ingredient filters, and
+exact Java recipe-NBT round-trip remain open; this replay does not claim those
+paths or exhaustive visual parity.
+
+The pinned Java reference (`ac0c444d9828da3453ae8cc65338e8de063286fb`)
+defines the behavior in `BlueprintItem`, `BlueprintEntity`, `BlueprintMenu`
+and `BlueprintAssignCompleteRecipePacket`. Placement tries display sizes 3,
+2, then 1, saving the chosen size and facing. Each section stores nine
+ingredient filters, a result icon and an output slot under persistent entity
+data. Ordinary use crafts from matching player inventory items (repeating
+while shift is held); a wrench opens the section editor. Breaking drops one
+Blueprint unless entity drops are disabled or the player is creative. The
+menu derives a result from the current crafting recipe manager and supports
+assigning a complete recipe by recipe ID. These are source findings, not
+Horizon runtime equivalence claims. Exact rendering and additional recipe
+forms remain follow-ups after the bounded gameplay path works.
+
 ## Lit Blaze Burner
 
 The [survival interaction replay](tools/test-lit-blaze-burner.py) on
@@ -9157,6 +9312,19 @@ mail imported from one loaded port was exported to a second matching loaded
 port in the same arrival, leaving carriage cargo unchanged. Both native port
 buffers matched their live inventories after saving. Native graph UUID identity
 and other rebinding and dwelling-transfer cases remain open.
+
+For APP-2056, the Horizon rebind replay saves and reopens after rail
+replacement, before dispatch. It compares the station's saved target and the
+registered Postbox station, position, address, and both buffered packages
+before continuing the scheduled import. On the source-matched Nightly
+9f42064 resources (`/private/tmp/app2065-launcher-data/.../.local/horizon-client/26.3`)
+with native build `native-9f42064-d6dc2ad18d3f`,
+`python3 tools/test-train-postbox-import.py --rebind --loaded ...` passed:
+the targeted rail was replaced, the saved binding and two packages survived
+restart, and addressed mail imported at Java tick 102 without loss or
+duplication. This checks the port's persisted station-position binding across
+the rebind/reopen sequence; it does not claim Create's Java graph UUID is
+represented natively.
 
 ## Sequenced Gearshift release timing
 
@@ -11911,6 +12079,43 @@ dedicated baseline check passed these bounded cases:
   from +32 to −32 RPM. Its idle and active save/reopen cases passed; the active
   16 RPM motor and shaft resumed after reopening.
 
+## APP-2103 Java integration equivalents — November 21, 2026
+
+The pinned Java `SpoutCategory` presents one item ingredient, one sized fluid
+ingredient, one item result, and the Spout catalyst. `FillingRecipe` identifies
+the Spout as its required machine and exposes its fluid requirement. The
+Horizon inventory lookup now collects `create:filling`, retains simple sized
+fluid ingredients in their ingredient slots, and draws multi-input Filling
+recipes with a Spout tab. The bounded new route is glass bottle + 250 mB honey
+→ honey bottle, queried by R over the result and U over the input. The
+registered `filling-lookup` check also checks Back, save/reopen with the lookup
+items retained, and the same route from a LAN guest. Dynamic JEI recipes
+generated for arbitrary fluid containers and potion variants remain outside
+this case.
+
+The exact ticket client was built after isolating a clean private copy of the
+pinned engine source and COW compiler cache. The shared source overlay had
+already applied `horizon-advancement-initial-inventory.patch` and
+`horizon-create-potato-impact.patch`; the clean private source accepted both
+patches without changing the engine revision. Offline mixin planning and
+staging completed with 407 injections and 207 modules. The private client
+(`horizon-client` SHA-256
+`64da711d497571c8d9a9126bb2dd93aff0f265331905be00b6ae317cea9035e8`) was
+packaged with prepared 26.3 resources (artifact SHA-256
+`4cf5d73a812067b517ce1b0fd4d1c410a9dc00bef825d544514ec7022f69ebfb`) and
+Create pack SHA-256
+`036218cf690405199aa24e67e63433bc138cfd3272742d435f7ec602992ccc85`.
+
+On that exact build and pack, `filling-lookup` passed solo, save/reopen,
+R/U lookup, Back navigation, 250 mB `create:honey` identity and LAN guest
+lookup. The bounded viewer regressions also passed: pressing, milling,
+crushing, bulk washing, sawing, mixing, recipe navigation, and pressing
+category collection/synchronization with reload (8/8 checks). The fixture
+setup now sends idempotent guest setup commands individually so an empty chat
+reply does not obscure the subsequent inventory assertions. Dynamic JEI
+recipes generated for arbitrary fluid containers and potion variants remain
+outside this case.
+
 ## Bogeys and train assembly (APP-2047)
 
 The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
@@ -12984,6 +13189,95 @@ source review, implementation and fixture authoring 9 minutes; Java captures
 seconds per pass; integration and fixture debugging about 18 minutes, plus the
 combined run above. These categories overlap and are not an elapsed-time sum.
 
+## APP-2098 block, item and entity models, textures and animation
+
+### Bounded gameplay pass
+
+This pass reuses the existing Java-derived asset, face-culling, animation and
+vertex references. The representative cases were: a transparent window and
+pane placed by LAN players and retained across a cold reopen; the 272-context
+window face-visibility comparison; Toolbox lid opening and closing for both
+LAN viewers; all eight weighted-ejector flying item poses for host and guest;
+moving item cargo on a train port for host and guest; and a moving mounted
+port cold reopen. The Creative Motor's active and idle settings and resulting
+speeds also survived reopen. These are scoped gameplay and rendering checks,
+not an all-model or pixel-equivalence claim.
+
+The existing source inventory provides the missing-resource screen: all 642
+block IDs and 699 item IDs are loaded at the same Java IDs. The pack carries
+the original 1,307 textures and 2,760 of 2,762 model files byte for byte; the
+remaining two have documented Horizon conversions for Copper Casing and the
+flat Encased Fluid Pipe. These totals are the catalog audit, not new captures
+from this pass.
+
+The successful checks reused the Java traces already referenced by their
+individual harnesses. They ran with Horizon `9f42064` build
+`native-9f42064-340cbe866fa7`, Minecraft 26.3 prepared resources, and Create
+pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`.
+The client SHA-256 was
+`39712c37f7f666a2d730506198523f0d0b42ef7b4a15c0ea9142a95b450224ea`.
+The binary was built for the APP-2097 integration branch, not this ticket's
+`origin/main` worktree at `16696be2`, so it is supporting evidence only until
+a current ticket-branch build is checked. The ignored runtime assets were linked into
+this isolated worktree; the test runner wrote worlds and logs under its own
+`.local/parity` and temporary game directories.
+
+```sh
+python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 1 \
+  --check 'window-palettes-lan' --check 'window-reopen' \
+  --check 'creative-motor-reload' --check 'toolbox-animation-lan' \
+  --check 'weighted-ejector-flight-pose-lan' \
+  --check 'mounted-moving-port-render-reload' \
+  --check 'train-moving-item-port-render-lan'
+
+python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 1 \
+  --check 'window-culling' --window-culling
+```
+
+All seven checks in the first command and the 272-context window-culling check
+passed. A Creative Motor render probe was also attempted on the same binary,
+both solo and LAN. Neither run emitted `CREATE_MOTOR_FRAME`; its dedicated
+render check therefore failed while the save/reopen speed check passed.
+
+The checked-out renderer and hook were present: `native/visuals.rs` dispatches
+`create:creative_motor`/`create:motor` to `render_motor`, and the
+`block_entity_submit` hook in `native/horizon-mixin.toml` routes submissions to
+that renderer. The Create pack SHA stayed identical. The missing input was the
+client's motor speed: `block_entity_tick` updated authoritative network speed
+but omitted `create:motor` from the `speed_changed` sync arm. Adding the motor
+there publishes `VisualSpeed` before render capture. The resulting branch
+build, `native-9f42064-c63df6c89898`, used Horizon revision
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client SHA-256
+`5a9a82abd7a6d3a40cd6c41bcf33002cd4088d055cf307ea7dfa8376de3af169`, and the
+same Create pack SHA shown above. Its private launcher data and Cargo target
+kept the build isolated from shared caches.
+
+The seven motor checks passed on that build: placement, placement render,
+solo render, LAN render, reload, competition, and LAN gameplay. Both render
+probes emitted `CREATE_MOTOR_FRAME` (354 solo and 637 LAN records); each sampled
+facing produced 24 shaft vertices. Solo covered all six facings and matched
+Java's axis, side, RPM, phase, and angle at both settings. LAN host and guest
+matched the half-shaft, phase, and RPM at both settings. This confirms the
+motor is visible, the render hook runs, and frame capture works. The failed
+logs from the earlier APP-2097 build remain as motivating evidence, not as
+current branch results.
+
+```sh
+python3 tools/test-parity.py <horizon-ctl> <horizon-client> <prepared-26.3> --jobs 2 \
+  --check 'creative-motor' --check 'creative-motor-placement' \
+  --check 'creative-motor-render' --check 'creative-motor-render-lan' \
+  --check 'creative-motor-reload' --check 'creative-motor-competition' \
+  --check 'creative-motor-lan'
+```
+
+Early mounted-port and train-port fixture attempts lacked the ignored NBTs;
+after linking the repository's prepared fixtures, both selected checks passed.
+Their initial setup failures are not counted as gameplay failures.
+
+Full 1:1 remains Open for the unexamined asset/model combinations, additional
+animation states, pixel comparisons, and renderer compatibility.
+
 ## APP-2100 Localization and UI gameplay baseline
 
 The finite acceptance set reuses existing Java-backed fixtures for English UI,
@@ -13106,3 +13400,20 @@ Goggles trace, removes three mills on the host, and requires the guest readout
 to change. The successful run used 9 GiB free after safe cache recovery; the
 earlier disk-full retries and the camera self-hit retry remain preserved as
 diagnostic logs.
+
+## APP-1975 follow-up — full LAN gauge matrix — November 21, 2026
+
+The follow-up harness was rerun from merged `main` on the source-compatible
+`native-9f42064-76138ca65acb` client and passed. It uses the actual live
+water-wheel/cog/mill network and never uses `/data merge` for measured states.
+Host and guest block states agreed for both Speedometer and Stressometer,
+including isolated idle gauges. The guest Goggles trace showed idle `No
+Rotation` and `None (0 RPM)`, then loaded `Slow (8 RPM)` and `Low (50%)` with
+four millstones (8 RPM, 128 SU).
+
+The host then changed the live mill count to nine and back to one. Host data
+reached 288 SU/zero effective speed and then 32 SU/8 RPM; the guest observed
+stress text changing from 50% to 112% and back to 12%, and Speedometer's
+strikethrough style changed while overloaded and cleared on recovery. This
+closes the direct guest idle/loaded/load-change evidence gap for the bounded
+APP-1975 gate; exhaustive visual parity remains Open.

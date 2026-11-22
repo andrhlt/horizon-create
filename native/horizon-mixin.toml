@@ -3580,6 +3580,72 @@ name = "create_package_world"
 source = "package_world.rs"
 
 [[module]]
+id = "blueprint"
+file = "crates/horizon-client/src/game.rs"
+name = "create_blueprint"
+source = "blueprint.rs"
+
+[[module]]
+id = "blueprint_mob"
+file = "crates/horizon-client/src/mobs.rs"
+name = "create_blueprint_mob"
+source = "blueprint_mob.rs"
+
+[[injection]]
+id = "blueprint_mob_size"
+target = "horizon_client_lib::mobs::living::Mob::awake_dims_in"
+kind = "HEAD"
+cancellable = true
+helper = "blueprint_mob_size.rs"
+bindings = [{ name = "mob", ty = "&crate::mobs::Mob", value = "self" }]
+
+[[injection]]
+id = "blueprint_mob_draw"
+target = "horizon_client::game::native_mob_draw::Game<'_>::mod_mob_geometry"
+kind = "HEAD"
+cancellable = true
+helper = "blueprint_mob_draw.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "self" },
+  { name = "mob", ty = "&Mob", value = "mob" },
+  { name = "partial", ty = "f32", value = "partial" },
+  { name = "camera", ty = "DVec3", value = "camera" },
+  { name = "light", ty = "u32", value = "light" },
+  { name = "out", ty = "&mut Vec<Vertex>", value = "&mut *out" },
+]
+
+[[injection]]
+id = "blueprint_interact"
+target = "horizon_client::game::native_hooks::Game<'_>::native_interact_entity"
+kind = "HEAD"
+helper = "blueprint_interact.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "self" },
+  { name = "entity", ty = "i32", value = "entity" },
+  { name = "kind", ty = "&str", value = "kind" },
+  { name = "stack", ty = "Option<&ItemStack>", value = "stack" },
+  { name = "cancel", ty = "&mut bool", value = "claimed" },
+]
+
+[[injection]]
+id = "blueprint_attack"
+target = "horizon_client::game::native_hooks::Game<'_>::native_attack_entity"
+kind = "HEAD"
+helper = "blueprint_attack.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "self" },
+  { name = "entity", ty = "i32", value = "entity" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
+]
+
+[[injection]]
+id = "blueprint_world_goals"
+target = "horizon_client::mobs::ai::native_register_goals"
+kind = "HEAD"
+helper = "blueprint_world_goals.rs"
+bindings = [{ name = "mob", ty = "&mut crate::mobs::Mob", value = "&mut *mob" }]
+
+[[module]]
 id = "package_style_game"
 file = "crates/horizon-client/src/game.rs"
 name = "create_package_style"
