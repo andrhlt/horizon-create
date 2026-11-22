@@ -54,7 +54,14 @@ def run(args):
         ))
         control.call("wait", 30)
         control.call("screenshot", ROOT / ".local/goggles-analog.png")
-        control.command("/item replace entity @s armor.head with minecraft:air")
+        control.commands((
+            "/item replace entity @s armor.head with minecraft:air",
+            "/item replace entity @s hotbar.0 with create:goggles",
+        ))
+        equipment = control.command("/data get entity @s equipment.head")
+        held = control.call("inventory")["held"]
+        if 'id: "create:goggles"' in equipment or (held or {}).get("item") != "create:goggles":
+            raise RuntimeError(f"Held-only control did not leave the Goggles unworn: {equipment}; {held}")
         control.call("wait", 30)
         control.call("screenshot", ROOT / ".local/goggles-analog-no-helmet.png")
     print("Crafted Engineer's Goggles in survival, equipped them with right-click and captured the HUD.")

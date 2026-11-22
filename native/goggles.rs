@@ -22,7 +22,11 @@ thread_local! {
 }
 
 pub(super) fn draw(game: &Game<'_>, batch: &mut HudBatch) {
-    let Some(lines) = target(game).and_then(|entity| readout(game, &entity.id, &entity.nbt)) else {
+    let Some((pos, entity)) = target(game) else {
+        HOVER_FRAMES.set(0);
+        return;
+    };
+    let Some(lines) = readout(game, pos, &entity.id, &entity.nbt, entity) else {
         HOVER_FRAMES.set(0);
         return;
     };
@@ -96,7 +100,7 @@ pub(super) fn draw(game: &Game<'_>, batch: &mut HudBatch) {
     game.native_item(batch, GOGGLES, [left + 10.0 + shift, top - 16.0], 16.0);
 }
 
-fn target<'a>(game: &'a Game<'_>) -> Option<&'a ModBlockEntity> {
+fn target<'a>(game: &'a Game<'_>) -> Option<([i32; 3], &'a ModBlockEntity)> {
     if game.spectator() {
         return None;
     }
@@ -109,10 +113,16 @@ fn target<'a>(game: &'a Game<'_>) -> Option<&'a ModBlockEntity> {
         || game
             .native_equipment(EquipmentSlot::Head)
             .is_some_and(|item| item.item.as_ref() == GOGGLES))
-    .then_some(entity)
+    .then_some((hit.pos, entity))
 }
 
-fn readout(game: &Game<'_>, id: &str, nbt: &horizon_world::nbt::Compound) -> Option<Vec<Text>> {
+fn readout(
+    game: &Game<'_>,
+    pos: [i32; 3],
+    id: &str,
+    nbt: &horizon_world::nbt::Compound,
+    entity: &ModBlockEntity,
+) -> Option<Vec<Text>> {
     match id {
         FROGPORT if int(nbt, BLOCKED_EXPORT) == Some(1) => {
             let title = label("create.hint.blocked_frogport.title").with_color(GOLD);
@@ -147,8 +157,108 @@ fn readout(game: &Game<'_>, id: &str, nbt: &horizon_world::nbt::Compound) -> Opt
         )]),
         SPEEDOMETER => Some(speedometer(network_values(nbt))),
         STRESSOMETER => Some(stressometer(network_values(nbt))),
+        "create:chute" | "create:smart_chute" => Some(chute(game, nbt, entity)),
+        "create:fluid_tank" | "create:creative_fluid_tank" => tank(game, pos, nbt),
         _ => None,
     }
+}
+
+fn chute(
+    game: &Game<'_>,
+    nbt: &horizon_world::nbt::Compound,
+    entity: &ModBlockEntity,
+) -> Vec<Text> {
+    let mut lines = vec![indented(label("create.tooltip.chute.header"), 0)];
+    let pull = super::create_machines::float(nbt, "Pull").unwrap_or(0.0);
+    let push = super::create_machines::float(nbt, "Push").unwrap_or(0.0);
+    if pull == 0.0 && push == 0.0 {
+        lines.push(indented(
+            label("create.tooltip.chute.no_fans_attached").with_color(GRAY),
+            0,
+        ));
+    }
+    for (value, positive, negative) in [
+        (
+            pull,
+            "create.tooltip.chute.fans_pull_up",
+            "create.tooltip.chute.fans_push_down",
+        ),
+        (
+            push,
+            "create.tooltip.chute.fans_push_up",
+            "create.tooltip.chute.fans_pull_down",
+        ),
+    ] {
+        if value != 0.0 {
+            lines.push(indented(
+                label(if value > 0.0 { positive } else { negative }).with_color(GRAY),
+                0,
+            ));
+        }
+    }
+    let motion = (pull + push) / 64.0;
+    let upward = (motion.clamp(-20.0, 20.0) + if motion <= 0.0 { -4.0 } else { 0.0 }) >= 0.0;
+    lines.push(indented(
+        Text::literal("-> ").with_color(YELLOW).append(label(if upward {
+            "create.tooltip.chute.items_move_up"
+        } else {
+            "create.tooltip.chute.items_move_down"
+        })),
+        0,
+    ));
+    if let Some(item) = entity.items.iter().flatten().next() {
+        lines.push(indented(
+            Text::translate(
+                "create.tooltip.chute.contains",
+                &[game.stack_display_name(item), Text::literal(item.count.to_string())],
+            )
+            .with_color(GREEN),
+            0,
+        ));
+    }
+    lines
+}
+
+fn tank(
+    game: &Game<'_>,
+    pos: [i32; 3],
+    nbt: &horizon_world::nbt::Compound,
+) -> Option<Vec<Text>> {
+    use super::create_depot::compound;
+    use super::create_fluids::read_fluid;
+    let stored_fluid = compound(nbt, "TankContent")
+        .and_then(|tank| compound(tank, "Fluid"))
+        .and_then(read_fluid);
+    let (capacity, fluid) = super::create_fluid_tank::storage(game, pos)
+        .map(|(_, capacity, fluid)| (capacity, fluid))
+        .unwrap_or_else(|| {
+            let size = int(nbt, "Size").unwrap_or(1);
+            let height = int(nbt, "Height").unwrap_or(1);
+            (8000 * size * size * height, stored_fluid)
+        });
+    let mut lines = vec![indented(label("create.gui.goggles.fluid_container"), 0)];
+    if let Some(fluid) = fluid {
+        let name = if let Some((namespace, path)) = fluid.id.split_once(':') {
+            if namespace == "minecraft" {
+                Text::translate(&format!("block.minecraft.{path}"), &[])
+            } else {
+                Text::translate(&format!("fluid.{namespace}.{path}"), &[])
+            }
+        } else {
+            Text::literal(fluid.id.clone())
+        };
+        lines.push(indented(name.with_color(GRAY), 1));
+        lines.push(indented(
+            Text::literal(format!("{} mB / {} mB", fluid.amount, capacity)).with_color(GOLD),
+            1,
+        ));
+    } else {
+        lines.push(indented(
+            Text::literal(format!("Capacity: {capacity} mB")).with_color(GRAY),
+            1,
+        ));
+    }
+    Some(lines)
 }
 
 fn speedometer([rpm, capacity, stress]: [f32; 3]) -> Vec<Text> {
