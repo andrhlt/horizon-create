@@ -3323,7 +3323,7 @@ pub(super) fn block_entity_tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut
                 tick_cuckoo_clock(game, pos, entity, state.speed());
             }
             match entity.id.as_str() {
-                WHEEL | LARGE_WHEEL | "create:simple_kinetic" if speed_changed => {
+                "create:motor" | WHEEL | LARGE_WHEEL | "create:simple_kinetic" if speed_changed => {
                     game.native_block_entity_sync(pos);
                 }
                 SPEEDOMETER => {
