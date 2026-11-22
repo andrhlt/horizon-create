@@ -83,6 +83,7 @@ def run(args):
         if args.loaded:
             world.command(f"/forceload add {PORT[0]} {PORT[2]}")
         train.setup(world, after_station=setup_station_and_cargo, take_controls=False)
+        path = Path(world._launch[world._launch.index("--game-dir") + 1]) / "saves/TrainOfflineMail/dimensions/minecraft/overworld/data/horizon/attachments.dat"
         if args.rebind:
             # Replace the station's actual targeted rail, as in the Java oracle.
             world.command(f"/setblock {TERMINAL[0]} {Y} {Z} minecraft:air")
@@ -91,9 +92,23 @@ def run(args):
             world.command(f"/setblock {TERMINAL[0]} {Y} {Z} create:track[shape=xo]")
             for _ in range(30):
                 world.step_to(world.clock() + 1)
+            station_before_restart = world.command(
+                f"/data get block {TERMINAL[0]} {Y} {TERMINAL[2]} TargetTrack")
             live = world.command(f"/data get block {PORT[0]} {Y} {PORT[2]} Items")
             assert "Elsewhere" in live and "Depot" in live, live
-        path = Path(world._launch[world._launch.index("--game-dir") + 1]) / "saves/TrainOfflineMail/dimensions/minecraft/overworld/data/horizon/attachments.dat"
+            world.stop()
+            world.open()
+            station_after_restart = world.command(
+                f"/data get block {TERMINAL[0]} {Y} {TERMINAL[2]} TargetTrack")
+            assert station_after_restart == station_before_restart, (
+                station_before_restart, station_after_restart)
+            saved = import_module("test-schematic-capture").read_nbt(path)
+            ports = saved["data"]["create"]["train_postbox_ports"]["value"]["Ports"]
+            assert len(ports) == 1 and ports[0]["Station"] == list(TERMINAL), ports
+            assert ports[0]["Pos"] == list(PORT) and ports[0]["Address"] == "Depot", ports
+            buffered = ports[0]["OfflineBuffer"]["Items"]
+            assert len(buffered) == 2 and {item["components"]["create:package_address"]
+                                           for item in buffered} == {"Elsewhere", "Depot"}, buffered
         destination = PORT if args.loaded else (5000, Y, 5000)
         if not args.loaded:
             # The Java oracle has a real scheduled train and a synthetic
