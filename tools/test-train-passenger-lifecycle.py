@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check train seat custody, driver independence and idle/active passenger saves."""
 import argparse
+import json
 import re
 from importlib import import_module
 from pathlib import Path
@@ -46,10 +47,25 @@ def check_carriers(world, expected):
 
 
 def run(args):
+    retained = Path(args.retain_save).resolve() if args.retain_save else None
     with TemporaryDirectory(prefix="hc-passengers-", dir="/private/tmp") as scratch, fixture_world(
         args, "TrainPassengerLifecycle", train.STRUCTURE, render=True, pack=args.pack,
         env={"HORIZON_NO_AUDIO": "1"},
+        persist_save_to=retained,
     ) as host:
+        def trace_records(label):
+            if not args.trace_dir:
+                return
+            out = Path(args.trace_dir).resolve()
+            out.mkdir(parents=True, exist_ok=True)
+            selectors = {
+                "player": "/data get entity @s",
+                "root_vehicle": "/data get entity @s RootVehicle",
+                "carrier": "/data get entity @e[tag=create_train_seat_vehicle,sort=nearest,limit=1]",
+            }
+            records = {name: host.command(command) for name, command in selectors.items()}
+            (out / f"{label}.json").write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+
         def add_seats(world):
             for offset, color in ((3, "red"), (4, "blue")):
                 world.command(f"/setblock {train.X+offset} {train.Y+3} {train.Z} create:{color}_seat")
@@ -61,8 +77,10 @@ def run(args):
         board(host, host, host_name, 3)
         idle = check_rider(host, host, host_name)
         if args.case == "idle":
+            trace_records("before-save")
             host.call("save")
             host.restart()
+            trace_records("after-restart")
             assert check_rider(host, host, host_name) == idle, "Idle rider moved across reopen"
             assert reopen.snapshot(host)[0] == 0
             check_carriers(host, 1)
@@ -116,7 +134,9 @@ def run(args):
         # Guest disconnect must leave a usable train, and reopening must keep its
         # geometry and host passenger while permitting normal rejoin recovery.
         moving = reopen.snapshot(host)
+        trace_records("active-before-restart")
         host.restart()
+        trace_records("active-after-restart")
         check_rider(host, host, host_name)
         assert reopen.snapshot(host)[1] > moving[1], "Active train did not resume"
         port = host.call("lan", "open", "0", "commands", "force")["port"]
@@ -129,6 +149,14 @@ def run(args):
             host.command(f"/ride {GUEST} dismount")
             assert not elevator.ride(host, GUEST)
             check_rider(host, host, host_name)
+            # A safe dismount must survive a subsequent save/reopen without
+            # resurrecting the guest as a passenger.
+            host.call("save")
+            host.restart()
+            check_rider(host, host, host_name)
+            assert not elevator.ride(host, GUEST), "Dismounted guest resurrected after reopen"
+            # The empty guest carrier is cleaned up; only the host's carrier remains.
+            check_carriers(host, 1)
         print("Active host passenger save, guest rejoin and independent driver custody passed.")
 
 
@@ -138,5 +166,7 @@ if __name__ == "__main__":
         parser.add_argument(name, type=lambda value: Path(value).resolve(strict=True))
     parser.add_argument("--pack", type=Path)
     parser.add_argument("--case", choices=("idle", "active", "interactions"), default="idle")
+    parser.add_argument("--retain-save", type=Path, help="Copy the isolated save out before cleanup.")
+    parser.add_argument("--trace-dir", type=Path, help="Write player/RootVehicle/carrier NBT command output here.")
     run(parser.parse_args())
 
