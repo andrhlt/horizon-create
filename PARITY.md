@@ -1296,6 +1296,73 @@ Steps per Zinc Ingot. [Java GameTests](tools/java-copycat-material.patch),
 [material trace](fixtures/copycat-material-java.csv), and
 [lifecycle trace](fixtures/copycat-lifecycle-java.csv).
 
+APP-2065's bounded gameplay baseline reuses these Java captures: opaque
+stone/log and transparent glass/window materials; Panel and Step application,
+same/different material interactions, Wrench reset and removal; off-hand
+material return and survival/Creative drops; Bars/trapdoor special materials;
+blocked placement and source/flowing water placement. Existing bucket cases
+cover filling and draining both forms. The 90 material observations include
+the `copycat_base` reset result and Bars as a copied material; the eight
+lifecycle observations cover both wrapper drops. The focused
+`copycat-persistence` check additionally saves and reopens a Panel with a
+transparent Oak Window, a top/east Step with an axis-X Oak Log, and a base
+material Panel, then verifies exact stored materials and shape states. Static
+Copycats have no active operation state to preserve. Full 1:1 remains Open for
+other material/lighting combinations and third-party rendering.
+
+Six related checks passed on `native-9f42064-6bdf8691aa42` with Horizon
+pin `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, Minecraft 26.3 resources, and
+Create pack SHA-256
+`e0027300944fde1c6f1e31f74f25b9e79b01a9334062db2b2ab9a060135ac4d7`. It
+passed material/Wrench (90 Java observations), lifecycle (8 observations and
+both Stonecutter recipes), placement assist (12 Java outcomes), placement
+assist on LAN (3 Java outcomes), bucket interactions (8 Java outcomes), and
+idle persistence (Panel, Step and base identities). The LAN result establishes
+host/guest state convergence. A separate Copycat Bars Wrench case reproduced
+that Bars rotation was not dispatched: an upward-facing block remained up
+after a verified south-face Wrench hit. Java's
+`WrenchableDirectionalBlock.getRotatedBlockState` rotates it to east. The
+first matching-build fixture also failed: its player pose had stale downward
+aim, and its target tuple used Y=111 while Bars was placed at Y=113. The
+diagnostic trace showed no hit for the held-Wrench mouse path, so this result
+was retained as a fixture failure rather than treated as a gameplay result.
+After synchronizing the server pose and placing the target at the actual Y,
+the real mouse path reported the Wrench-held hit on
+`create:copycat_bars` at `[8,113,-10]`, face South; the guarded Copycat click
+handler called the existing Wrench apply path, which returned `turned=true`
+and wrote `facing=east`. The generic Wrench state rule was present, but the
+mouse `use_hand` route bypassed its ordinary block-use dispatch, so a
+Wrench-only Copycat Bars route was added. Bars' thin selection shape is now
+declared as its interaction shape so the real ray reaches that plate. On
+matching installed build `native-9f42064-1a4016feb869` with pack
+`bcb281e186afd31ce972310b3c8582d1816b337e2257c231dd5884f4eafc62b4`, the
+south/east/north representative cases reached expected states; west was not
+completed before the final clean rebuild attempt. The affected Copycat
+90-case and Wrench 42-case regressions both passed on that build. A clean
+private rebuild then succeeded as `native-9f42064-118e45924ac4`; Copycat
+90/90 and Wrench 42/42 also passed on that clean build. The corrected bounded
+four-face fixture then passed on that same client with exit 0: real mouse clicks
+reported `south: up -> east`, `north: up -> east`, `east: up -> north`, and
+`west: up -> north`. The fixture uses a support platform covering all approach
+positions and validates each outer face at Y=113.1; the earlier failed runs are
+retained as synchronization/visibility evidence rather than gameplay results.
+After rebasing onto `origin/main` at `e9296d2`, the same matrix passed again on
+clean build `native-9f42064-8878a1a79fd3` (exit 0), with Copycat 90/90 and
+Wrench 42/42 passing on that build as well.
+`rustfmt --edition 2024 --check native/wrench.rs` reports pre-existing
+whole-file formatting differences outside this ticket's added dispatch; those
+unrelated lines were left unchanged.
+
+Reproduce the six passing pre-fix checks with:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check copycat-material --check copycat-lifecycle --check copycat-assist --check copycat-assist-lan --check copycat-buckets --check copycat-persistence
+```
+
+Approximate effort: source/evidence review 10 minutes, harness and evidence
+updates 20 minutes, build attempt 15 minutes, static checks under one minute,
+integration about 4 minutes. All tests used isolated temporary worlds.
+
 The standalone FFmpeg replays check applied materials on both original
 shapes and the host and guest framebuffers during material application
 and removal. The LAN replay observes both changes on the action tick.
