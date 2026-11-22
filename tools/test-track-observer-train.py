@@ -55,11 +55,11 @@ with TemporaryDirectory(prefix='hc-track-observer-') as scratch, fixture_world(
         world.command('/tick unfreeze')
         address = f"127.0.0.1:{world.call('lan', 'open', '0', 'commands', 'force')['port']}"
         guest = clients.enter_context(multiplayer.joined_client(
-            args, Path(scratch), address, 'TrackObserverGuest', render=True,
+            args, Path(scratch), address, 'TrackObsGuest', render=True,
             scenario='track-observer-filter', pack=args.pack,
             launch_timeout=120,
         ))
-        guest_name = 'TrackObserverGuest'
+        guest_name = 'TrackObsGuest'
         multiplayer.until('the Track Observer guest to join', lambda: any(
             player['name'] == guest_name and player['placed']
             for player in world.call('lan', 'status')['guests']
