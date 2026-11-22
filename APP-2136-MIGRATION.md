@@ -62,13 +62,34 @@ plus 329 source mixins. The SDK package limit and the disappeared old engine
 extension points make a broad row-for-row manifest conversion unsuitable for
 Stage 1.
 
-A diagnostic retry excluded all rows reported by the initial validator and
-the two obsolete module destinations. This reached SDK source validation, then
-failed because remaining helpers reference the old `horizon_client::mobs`
-module path from extension modules that no longer resolve in the flat project
-(`E_MIXIN_SOURCE`, 57 diagnostics). This filtered package is only a diagnostic
-artifact: it drops gameplay rows and is not a candidate runtime build. The
-three Stage 1 flows have not passed and no behavior is claimed as migrated.
+The diagnostic retry excluded 245 mixin IDs reported by the first validator,
+the two obsolete module destinations, and the previously out-of-scope
+Elevator/nozzle rows. The resulting package has 207 modules and 58 mixins. It
+then failed SDK source validation with 57 `E_MIXIN_SOURCE` diagnostics. They
+are one root-cause group: every message says `no module horizon_client::mobs`.
+The 57 lines name 39 distinct target functions and 57 distinct mixin IDs (121
+ID mentions because some lines combine several rows). The reported functions
+span world ticks, block entities, interaction, persistence, and vehicle paths.
+The pinned source puts `mobs` in `horizon-client-lib`'s `client_lib.rs` and
+re-exports that crate from `horizon-client/src/lib.rs`; the mod API generator's
+source resolver does not follow that re-export for this package's combined
+target set.
+
+This filtering is a diagnostic scope reduction, not a gameplay fix: it removes
+rows from the candidate, and therefore does not validate their behavior. A
+one-row `check_transmission_reconnections` package with only the `machines`
+module no longer produces `E_MIXIN_SOURCE`, but compilation then fails on the
+module's broad dependencies and outdated internal `Game` API calls (471 Rust
+errors). With the full support-module set and that same row, the SDK reports
+`E_MIXIN_SOURCE` again. So the source diagnostic is avoidable in a narrow
+package, while the motor implementation itself still needs a scoped port or a
+reproduced engine/API blocker. No kinetic flow has compiled or passed runtime
+verification. The filtered package is not a candidate runtime build.
+
+`tools/migrate-flat-native.py` now supports explicit module/mixin inclusion so
+follow-up attempts can build small candidates rather than starting from every
+Create family. The three Stage 1 flows have not passed and no behavior is
+claimed as migrated.
 
 ## Remaining migration inventory and assessment
 

@@ -45,6 +45,8 @@ def main():
     parser.add_argument("--skip-mixin-prefix", action="append", default=[])
     parser.add_argument("--exclude-mixin-id", action="append", default=[])
     parser.add_argument("--skip-module-id", action="append", default=[])
+    parser.add_argument("--include-mixin-id", action="append", default=[])
+    parser.add_argument("--include-module-id", action="append", default=[])
     args = parser.parse_args()
 
     content = tomllib.loads((args.metadata / "horizon-mod.toml").read_text())
@@ -73,6 +75,8 @@ def main():
     skipped_mixins = []
     with (out / "horizon-mod.toml").open("a") as manifest:
         for module in legacy.get("module", []):
+            if args.include_module_id and module["id"] not in args.include_module_id:
+                continue
             if module["id"] in args.skip_module_id:
                 continue
             source = module["source"]
@@ -83,6 +87,8 @@ def main():
             })
         for injection in legacy.get("injection", []):
             helper = injection["helper"]
+            if args.include_mixin_id and injection["id"] not in args.include_mixin_id:
+                continue
             if "hook" in injection:
                 skipped_hooks.append((injection["id"], injection["hook"], helper))
                 continue
