@@ -11892,17 +11892,28 @@ items retained, and the same route from a LAN guest. Dynamic JEI recipes
 generated for arbitrary fluid containers and potion variants remain outside
 this case.
 
-The new client integration result is pending. The compatible pre-change client
-`native-9f42064-b2e225daec86` (from baseline commit
-`9b0957d7f9ccc84e21cb5f392d7f0ca201074b1e`) reached the inventory but timed out
-waiting for a Filling page, confirming the missing route in that build. Building
-the ticket source with `tools/build-native.sh` is currently blocked before
-compilation: `horizon-advancement-initial-inventory.patch` does not apply
-because the pinned source already contains its first-snapshot change, and
-`horizon-create-potato-impact.patch` targets an older `creatures.rs` layout.
-These unrelated engine patch conflicts were left untouched. The Filling case
-has not passed on a client containing this change; gameplay and integrated
-completion remain unverified.
+The exact ticket client was built after isolating a clean private copy of the
+pinned engine source and COW compiler cache. The shared source overlay had
+already applied `horizon-advancement-initial-inventory.patch` and
+`horizon-create-potato-impact.patch`; the clean private source accepted both
+patches without changing the engine revision. Offline mixin planning and
+staging completed with 407 injections and 207 modules. The private client
+(`horizon-client` SHA-256
+`64da711d497571c8d9a9126bb2dd93aff0f265331905be00b6ae317cea9035e8`) was
+packaged with prepared 26.3 resources (artifact SHA-256
+`4cf5d73a812067b517ce1b0fd4d1c410a9dc00bef825d544514ec7022f69ebfb`) and
+Create pack SHA-256
+`036218cf690405199aa24e67e63433bc138cfd3272742d435f7ec602992ccc85`.
+
+On that exact build and pack, `filling-lookup` passed solo, save/reopen,
+R/U lookup, Back navigation, 250 mB `create:honey` identity and LAN guest
+lookup. The bounded viewer regressions also passed: pressing, milling,
+crushing, bulk washing, sawing, mixing, recipe navigation, and pressing
+category collection/synchronization with reload (8/8 checks). The fixture
+setup now sends idempotent guest setup commands individually so an empty chat
+reply does not obscure the subsequent inventory assertions. Dynamic JEI
+recipes generated for arbitrary fluid containers and potion variants remain
+outside this case.
 
 ## Bogeys and train assembly (APP-2047)
 
