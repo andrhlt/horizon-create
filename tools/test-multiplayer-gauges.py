@@ -30,16 +30,32 @@ def advance(host, ticks):
         host.command("/tick step 1")
 
 
-def trace_lines(log):
-    return [line for line in log.read_text(encoding="utf-8").splitlines()
-            if line.startswith("CREATE_GOGGLES ")]
+def trace_readouts(log):
+    result = []
+    for line in log.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("CREATE_GOGGLES "):
+            continue
+        _prefix, payload = line.removeprefix("CREATE_GOGGLES ").split(" ", 1)
+        try:
+            rows = json.loads(payload)
+        except json.JSONDecodeError:
+            # The client may still be appending its current trace line.
+            continue
+        result.append((line, "".join(text for row in rows for text, _color, _strike in row)))
+    return result
 
 
-def latest_readout(log):
-    lines = trace_lines(log)
-    if not lines:
-        raise RuntimeError("Guest produced no CREATE_GOGGLES readout")
-    return lines[-1]
+def observe(guest, log, target, marker):
+    guest.call("look-at", target[0] + 0.5, target[1] + 0.4, target[2] + 0.5)
+    guest.call("wait", 8)
+    for raw, text in reversed(trace_readouts(log)):
+        if marker in text:
+            return raw, text
+    raise RuntimeError(f"Guest produced no Goggles readout containing {marker!r}")
+
+
+def host_data(host, pos):
+    return host.call("command", f"/data get block {pos[0]} {pos[1]} {pos[2]}")["chat"][-1]
 
 
 def verify(args, scratch):
@@ -57,15 +73,26 @@ def verify(args, scratch):
             "/setblock 6 101 -10 create:cogwheel[axis=y]",
             "/setblock 6 102 -10 create:stressometer[facing=east,axis_along_first=true]",
             "/setblock 6 103 -10 create:speedometer[facing=east,axis_along_first=true]",
+            "/setblock 12 102 -10 create:stressometer[facing=east,axis_along_first=true]",
+            "/setblock 12 103 -10 create:speedometer[facing=east,axis_along_first=true]",
             "/setblock 7 100 -9 minecraft:water",
             "/fill 6 101 -9 6 101 -6 create:millstone",
         ))
         advance(host, 70)
         if host.clock() != 76:
             raise RuntimeError(f"Host did not reach the loaded warmup tick: {host.clock()}")
-        initial = host.call("command", f"/data get block {GAUGE[0]} {GAUGE[1]} {GAUGE[2]}")["chat"][-1]
-        if not re.search(r"Stress:\s*128\.0f", initial):
-            raise RuntimeError(f"Host did not reach the loaded 4-mill state: {initial}")
+        loaded_stress = host_data(host, (6, 102, -10))
+        loaded_speed = host_data(host, (6, 103, -10))
+        idle_stress = host_data(host, (12, 102, -10))
+        idle_speed = host_data(host, (12, 103, -10))
+        if not re.search(r"Stress:\s*128\.0f", loaded_stress) or "Value: 0.5f" not in loaded_stress:
+            raise RuntimeError(f"Host loaded stressometer state was unexpected: {loaded_stress}")
+        if "Speed: 8.0f" not in loaded_speed or "Value: 0.12" not in loaded_speed:
+            raise RuntimeError(f"Host loaded speedometer state was unexpected: {loaded_speed}")
+        if "Speed: 0.0f" not in idle_stress or "Value: 0.0f" not in idle_stress:
+            raise RuntimeError(f"Host idle stressometer state was unexpected: {idle_stress}")
+        if "Speed: 0.0f" not in idle_speed or "Value: 0.0f" not in idle_speed:
+            raise RuntimeError(f"Host idle speedometer state was unexpected: {idle_speed}")
         host.command(f"/tp @s 10.5 101 -10.5")
         network = host.call("lan", "open", "0", "commands", "force")
         address = f"127.0.0.1:{network['port']}"
@@ -84,25 +111,45 @@ def verify(args, scratch):
             multiplayer.until("guest to receive the stressometer", lambda: (
                 guest.call("block", *GAUGE)["state"].startswith("create:stressometer")
             ))
+            for pos in ((6, 102, -10), (6, 103, -10), (12, 102, -10), (12, 103, -10)):
+                if guest.call("block", *pos)["state"] != host.call("block", *pos)["state"]:
+                    raise RuntimeError(f"Guest block state disagreed with host at {pos}")
             guest.call("look-at", 6.5, 102.4, -9.5)
             multiplayer.until("guest to target the gauge block", lambda: (
                 guest.call("state")["looking_at"]["kind"] == "block"
             ))
-            guest.call("wait", 8)
-            loaded_readout = latest_readout(guest_log)
-            if "Network Stress" not in loaded_readout or "Stress" not in loaded_readout:
-                raise RuntimeError(f"Guest loaded readout did not contain stress output: {loaded_readout}")
+            host.call("command", f"/tp {GUEST} 11.5 101 -10.5")
+            idle_stress_readout = observe(guest, guest_log, (12, 102, -10), "Network Stress")
+            idle_speed_readout = observe(guest, guest_log, (12, 103, -10), "Rotation Speed")
+            host.call("command", f"/tp {GUEST} 8.5 101 -10.5")
+            loaded_stress_readout = observe(guest, guest_log, (6, 102, -10), "Network Stress")
+            loaded_speed_readout = observe(guest, guest_log, (6, 103, -10), "Rotation Speed")
+            if "No Rotation" not in idle_stress_readout[1] or "None (0 RPM)" not in idle_speed_readout[1]:
+                raise RuntimeError("Guest idle readouts did not show no rotation")
+            if "Slow (8 RPM)" not in loaded_speed_readout[1] or "50%" not in loaded_stress_readout[1]:
+                raise RuntimeError("Guest loaded readouts did not show 8 RPM and 50% stress")
 
-            host.command("/fill 6 101 -9 6 101 -7 minecraft:air")
+            host.command("/fill 6 101 -9 6 101 -1 create:millstone")
             advance(host, 3)
-            guest.call("wait", 8)
-            recovered_readout = latest_readout(guest_log)
-            if recovered_readout == loaded_readout:
-                raise RuntimeError("Guest readout did not change after host removed three millstones")
-            if "Network Stress" not in recovered_readout:
-                raise RuntimeError(f"Guest recovery readout lost stress output: {recovered_readout}")
+            overloaded_stress = host_data(host, (6, 102, -10))
+            overloaded_speed = host_data(host, (6, 103, -10))
+            if "Stress: 288.0f" not in overloaded_stress or "Value: 0.0f" not in overloaded_speed:
+                raise RuntimeError("Host did not reach the nine-mill overload state")
+            overloaded_stress_readout = observe(guest, guest_log, (6, 102, -10), "Network Stress")
+            overloaded_speed_readout = observe(guest, guest_log, (6, 103, -10), "Rotation Speed")
 
-    print("Live LAN guest observed loaded and reduced stressometer readouts after host mill removal.")
+            host.command("/fill 6 101 -8 6 101 -1 minecraft:air")
+            advance(host, 3)
+            recovered_stress = host_data(host, (6, 102, -10))
+            recovered_speed = host_data(host, (6, 103, -10))
+            if "Stress: 32.0f" not in recovered_stress or "Value: 0.12" not in recovered_speed:
+                raise RuntimeError("Host did not recover to the one-mill state")
+            recovered_stress_readout = observe(guest, guest_log, (6, 102, -10), "Network Stress")
+            recovered_speed_readout = observe(guest, guest_log, (6, 103, -10), "Rotation Speed")
+            if overloaded_speed_readout[0] == recovered_speed_readout[0] or overloaded_stress_readout[0] == recovered_stress_readout[0]:
+                raise RuntimeError("Guest readouts did not change across overload recovery")
+
+    print("Live LAN guest observed idle and loaded Speedometer/Stressometer readouts and both changed across host overload/recovery.")
 
 
 def main():
