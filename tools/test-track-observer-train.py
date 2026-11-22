@@ -70,7 +70,7 @@ with TemporaryDirectory(prefix='hc-track-observer-') as scratch, fixture_world(
         world.command(f'/tp {guest_name} {ox + .5} {oy + 2.5} {oz + .5}')
 
         def guest_filter(item, slot):
-            guest.call('select', slot)
+            guest.call('select', item or slot)
             guest.call('look-at', ox + .5, oy + .873, oz + .5)
             guest.call('wait', 1)
             hit = guest.call('looking-at').get('block')
