@@ -9280,13 +9280,18 @@ port in the same arrival, leaving carriage cargo unchanged. Both native port
 buffers matched their live inventories after saving. Native graph UUID identity
 and other rebinding and dwelling-transfer cases remain open.
 
-For APP-2056, the Horizon rebind replay now also saves and reopens after rail
+For APP-2056, the Horizon rebind replay saves and reopens after rail
 replacement, before dispatch. It compares the station's saved target and the
 registered Postbox station, position, address, and both buffered packages
-before continuing the scheduled import. This checks the port's persisted
-station-position binding across the rebind/reopen sequence; it does not claim
-Create's Java graph UUID is represented natively. The updated integration case
-has not yet been run on a compatible prepared client.
+before continuing the scheduled import. On the source-matched Nightly
+9f42064 resources (`/private/tmp/app2065-launcher-data/.../.local/horizon-client/26.3`)
+with native build `native-9f42064-d6dc2ad18d3f`,
+`python3 tools/test-train-postbox-import.py --rebind --loaded ...` passed:
+the targeted rail was replaced, the saved binding and two packages survived
+restart, and addressed mail imported at Java tick 102 without loss or
+duplication. This checks the port's persisted station-position binding across
+the rebind/reopen sequence; it does not claim Create's Java graph UUID is
+represented natively.
 
 ## Sequenced Gearshift release timing
 
