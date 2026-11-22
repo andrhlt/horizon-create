@@ -8357,6 +8357,39 @@ on `native-9f42064-18472b3bb96b` with
 Crafting Table ingredients into one Crafting Blueprint. Display
 placement, result programming and recipe handling remain open.
 
+APP-2091 uses a finite gameplay scope: acquire the item, place a hanging
+display, program and view one recipe, use it, break and recover it, then check
+guest interaction and save/reopen identity. The bounded offscreen replay
+[`tools/test-crafting-blueprint-gameplay.py`](tools/test-crafting-blueprint-gameplay.py)
+passed on `native-9f42064-8a7c118f566d` with a derived local test pack
+(`38e8de43c0a855a3a1985a8c62e0f32d6ba09de6ca966513b74f094d70506cab`). It
+crafted and placed the Blueprint, configured and persisted a representative
+recipe, consumed four planks for one Crafting Table on the host and a LAN guest,
+then broke the display and observed one recovered Blueprint drop. The original
+Painting + Crafting Table survival recipe remains covered by
+[`tools/test-crafting-blueprint.py`](tools/test-crafting-blueprint.py).
+
+The current native path uses a persistent mob entity, size-aware supported
+placement, Blueprint item rendering, wrench-triggered recipe configuration,
+authoritative inventory consumption/output and one-item recovery. The bounded
+recipe is `#minecraft:planks` ×4 → Crafting Table. The Java section editor/menu,
+arbitrary recipe-manager lookup, nine independent ingredient filters, and
+exact Java recipe-NBT round-trip remain open; this replay does not claim those
+paths or exhaustive visual parity.
+
+The pinned Java reference (`ac0c444d9828da3453ae8cc65338e8de063286fb`)
+defines the behavior in `BlueprintItem`, `BlueprintEntity`, `BlueprintMenu`
+and `BlueprintAssignCompleteRecipePacket`. Placement tries display sizes 3,
+2, then 1, saving the chosen size and facing. Each section stores nine
+ingredient filters, a result icon and an output slot under persistent entity
+data. Ordinary use crafts from matching player inventory items (repeating
+while shift is held); a wrench opens the section editor. Breaking drops one
+Blueprint unless entity drops are disabled or the player is creative. The
+menu derives a result from the current crafting recipe manager and supports
+assigning a complete recipe by recipe ID. These are source findings, not
+Horizon runtime equivalence claims. Exact rendering and additional recipe
+forms remain follow-ups after the bounded gameplay path works.
+
 ## Lit Blaze Burner
 
 The [survival interaction replay](tools/test-lit-blaze-burner.py) on
