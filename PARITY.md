@@ -11878,6 +11878,43 @@ dedicated baseline check passed these bounded cases:
   from +32 to −32 RPM. Its idle and active save/reopen cases passed; the active
   16 RPM motor and shaft resumed after reopening.
 
+## APP-2103 Java integration equivalents — November 21, 2026
+
+The pinned Java `SpoutCategory` presents one item ingredient, one sized fluid
+ingredient, one item result, and the Spout catalyst. `FillingRecipe` identifies
+the Spout as its required machine and exposes its fluid requirement. The
+Horizon inventory lookup now collects `create:filling`, retains simple sized
+fluid ingredients in their ingredient slots, and draws multi-input Filling
+recipes with a Spout tab. The bounded new route is glass bottle + 250 mB honey
+→ honey bottle, queried by R over the result and U over the input. The
+registered `filling-lookup` check also checks Back, save/reopen with the lookup
+items retained, and the same route from a LAN guest. Dynamic JEI recipes
+generated for arbitrary fluid containers and potion variants remain outside
+this case.
+
+The exact ticket client was built after isolating a clean private copy of the
+pinned engine source and COW compiler cache. The shared source overlay had
+already applied `horizon-advancement-initial-inventory.patch` and
+`horizon-create-potato-impact.patch`; the clean private source accepted both
+patches without changing the engine revision. Offline mixin planning and
+staging completed with 407 injections and 207 modules. The private client
+(`horizon-client` SHA-256
+`64da711d497571c8d9a9126bb2dd93aff0f265331905be00b6ae317cea9035e8`) was
+packaged with prepared 26.3 resources (artifact SHA-256
+`4cf5d73a812067b517ce1b0fd4d1c410a9dc00bef825d544514ec7022f69ebfb`) and
+Create pack SHA-256
+`036218cf690405199aa24e67e63433bc138cfd3272742d435f7ec602992ccc85`.
+
+On that exact build and pack, `filling-lookup` passed solo, save/reopen,
+R/U lookup, Back navigation, 250 mB `create:honey` identity and LAN guest
+lookup. The bounded viewer regressions also passed: pressing, milling,
+crushing, bulk washing, sawing, mixing, recipe navigation, and pressing
+category collection/synchronization with reload (8/8 checks). The fixture
+setup now sends idempotent guest setup commands individually so an empty chat
+reply does not obscure the subsequent inventory assertions. Dynamic JEI
+recipes generated for arbitrary fluid containers and potion variants remain
+outside this case.
+
 ## Bogeys and train assembly (APP-2047)
 
 The pinned Java reference is Create `ac0c444d9828da3453ae8cc65338e8de063286fb`.
