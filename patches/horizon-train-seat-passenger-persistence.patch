@@ -1,0 +1,97 @@
+--- a/crates/horizon-client/src/game/persist.rs
++++ b/crates/horizon-client/src/game/persist.rs
+@@ -978,13 +978,22 @@
+     }
+ 
+     /// A saved armor stand.
+-    pub(super) fn load_armor_stand(&mut self, tag: Tag, uuid: Option<[i32; 4]>) {
++    pub(super) fn load_armor_stand(&mut self, mut tag: Tag, uuid: Option<[i32; 4]>) {
++        let passengers = if let Tag::Compound(c) = &mut tag {
++            c.remove(&"Passengers".into())
++        } else {
++            None
++        };
+         self.next_entity += 1;
+         // Its own random makes its UUID, kept unless the tag has one.
+         let (_, fresh) = horizon_client::mobs::living_random();
+         if let Some(a) = entity_nbt::armor_stand_from_nbt(&tag, self.next_entity) {
+-            self.remember(a.id, Some(uuid.unwrap_or(fresh)), tag);
++            let id = a.id;
++            self.remember(id, Some(uuid.unwrap_or(fresh)), tag);
+             self.armor_stands.push(a);
++            if let Some(passengers) = passengers {
++                self.load_passengers(id, passengers);
++            }
+         }
+     }
+ 
+@@ -1404,6 +1413,7 @@
+     fn vehicle_of(&self, id: u32) -> Option<u32> {
+         let v = self.mobs.iter().find(|m| m.id == id)?.extra.mount?;
+         let there = self.mobs.iter().any(|m| m.id == v)
++            || self.armor_stands.iter().any(|a| a.id == v)
+             || self.boats.iter().any(|b| b.id == v)
+             || self.carts.iter().any(|c| c.id == v);
+         there.then_some(v)
+@@ -1412,6 +1422,13 @@
+     pub(super) fn vehicle_tree_nbt(&mut self, root: u32) -> Option<Tag> {
+         if let Some(i) = self.mobs.iter().position(|m| m.id == root) {
+             return Some(self.mob_tree_nbt(i));
++        }
++        if self.armor_stands.iter().any(|a| a.id == root) {
++            let uuid = self.uuid_for(root);
++            let a = self.armor_stands.iter().find(|a| a.id == root)?;
++            let mut tag = entity_nbt::armor_stand_to_nbt(a, uuid, self.persist.raw.get(&root));
++            self.put_mob_passengers(&mut tag, root);
++            return Some(tag);
+         }
+         if self.boats.iter().any(|b| b.id == root) {
+             let uuid = self.uuid_for(root);
+@@ -1461,6 +1478,7 @@
+         for &id in &gone {
+             self.release_vehicle_container(id);
+         }
++        self.armor_stands.retain(|a| !gone.contains(&a.id));
+         self.boats.retain(|b| !gone.contains(&b.id));
+         self.carts.retain(|c| !gone.contains(&c.id));
+         for g in gone {
+@@ -1476,6 +1494,7 @@
+             .find(|(_, u)| **u == uuid)
+             .map(|(id, _)| id)?;
+         let there = self.mobs.iter().any(|m| m.id == id && m.alive())
++            || self.armor_stands.iter().any(|a| a.id == id)
+             || self.boats.iter().any(|b| b.id == id)
+             || self.carts.iter().any(|c| c.id == id);
+         there.then_some(id)
+@@ -1502,6 +1521,7 @@
+         let root_uuid = entity_nbt::uuid(&tag)?;
+         let kind = entity_nbt::kind(&tag)?;
+         if !self.res.mob_types().contains_key(&kind)
++            && kind != "minecraft:armor_stand"
+             && super::boats::any_boat_wood(&kind).is_none()
+             && super::minecarts::CartKind::from_id(&kind).is_none()
+         {
+@@ -2400,11 +2420,18 @@
+         keys: &HashSet<ChunkKey>,
+     ) -> Option<(ChunkKey, Tag)> {
+         let a = &self.armor_stands[i];
+-        keys.contains(&chunk_of(a.position)).then(|| {
+-            let uuid = self.saved_uuid_or_random(a.id);
+-            let tag = entity_nbt::armor_stand_to_nbt(a, uuid, self.persist.raw.get(&a.id));
+-            (chunk_of(a.position), tag)
+-        })
++        if !keys.contains(&chunk_of(a.position)) {
++            return None;
++        }
++        let id = a.id;
++        let chunk = chunk_of(a.position);
++        let mut tag = entity_nbt::armor_stand_to_nbt(
++            a,
++            self.saved_uuid_or_random(id),
++            self.persist.raw.get(&id),
++        );
++        self.put_mob_passengers(&mut tag, id);
++        Some((chunk, tag))
+     }
+     /// The UUID kept for `id`, or a new one that is not remembered (what a
+     /// saved vehicle or stand gets when it never had one).
