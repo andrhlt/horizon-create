@@ -66,9 +66,10 @@ def main():
     with TemporaryDirectory(prefix="create-filling-lookup-") as tmp:
         with fixture_world(args, "FillingLookup", render=True, pack=args.pack, env=ENV) as host:
             def equip(target):
-                host.commands((f"/gamemode survival {target}", f"/clear {target}",
-                    f"/item replace entity {target} hotbar.0 with minecraft:honey_bottle",
-                    f"/item replace entity {target} hotbar.1 with minecraft:glass_bottle"))
+                for command in (f"/gamemode survival {target}", f"/clear {target}",
+                                f"/item replace entity {target} hotbar.0 with minecraft:honey_bottle",
+                                f"/item replace entity {target} hotbar.1 with minecraft:glass_bottle"):
+                    host.call("command", command)
 
             equip("@s")
             lookup(host, "solo")
