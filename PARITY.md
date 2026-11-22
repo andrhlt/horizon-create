@@ -2358,6 +2358,61 @@ stone block each matched [18 Java slot transforms](fixtures/stockpile-switch-fil
 and submitted item geometry. When a guest selects a sample, both players see
 it on all three active faces of the tested wall-mounted switch.
 
+## APP-2115 Stockpile Switch save/reopen
+
+`tools/test-stockpile-switch-lifecycle.py` is registered as
+`stockpile-switch-lifecycle`. The isolated headless world checks an item switch
+filtered to stone against a barrel containing stone and dirt, and a fluid
+switch filtered to water against a fluid tank. Both retain their wall target,
+thresholds, filter, stock and inventory contents across idle and active
+save/reopen. The active save includes both item and fluid outputs.
+
+The replay then exercises Java's hysteresis rules from
+`ThresholdSwitchBlockEntity.updateCurrentLevel`: an active switch remains on
+between its lower and upper thresholds, switches off at the lower threshold,
+and switches on at the upper threshold. It checks item counts with a
+nonmatching stack present and fluid amounts at the same boundaries. Each
+stock change advances through a complete sampling interval and the two-tick
+redstone update. The five observed phases are:
+
+| Phase | Filtered items | Water | Raw/output | Saved and reopened |
+| --- | ---: | ---: | --- | --- |
+| Idle | 32 (32 stone + 16 dirt in barrel) | 2,000 mB | off/off | Yes |
+| Active | 64 stone | 4,000 mB | on/on | Yes |
+| Mid-band | 32 stone | 2,000 mB | remains on/on | Yes |
+| Lower boundary | 16 stone | 1,000 mB | off/off | — |
+| Upper boundary | 48 stone | 3,000 mB | on/on | Yes |
+
+The lower and upper comparisons match the pinned Java `<= offWhenBelow` and
+`>= onWhenAbove` rules. Inventory contents are checked at each phase, including
+the unfiltered dirt stack, so observation does not consume or count unrelated
+items. Exact Java reload timing and other storage implementations remain open.
+
+The final registered run passed `stockpile-switch-lifecycle`,
+`stockpile-switch-targets`, `stockpile-switch-targets-lan`,
+`stockpile-switch-filter`, and `stockpile-switch-filter-lan`. The target checks
+each matched 84 Java samples; the filter checks each matched 40 Java
+observations. One earlier registered run found the upper-bound output one tick
+short of its completed Java delay; the bounded wait was extended to cover the
+full sampling cycle, and the final run passed.
+
+Runtime identity: Horizon pin
+`9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0`, client build
+`native-9f42064-d6dc2ad18d3f` (`nightly-2026-11-13-9f42064`, performance
+profile), with the `create` native bundle hash from `native-mods.json`
+`47c08d9b81f86283b7c511b10486222571ca2dd119d0f9ab775ebf098b5122b5`.
+The prepared 26.3 resources were in that build's `.local/horizon-client/26.3`
+directory. The imported Create pack was `.local/create.hmod`, SHA-256
+`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678`.
+Java source revision: `ac0c444d9828da3453ae8cc65338e8de063286fb`.
+
+Run with the documented compatible Horizon 0.2.67 build and prepared 26.3
+resources:
+
+```sh
+python3 tools/test-parity.py /path/to/horizon-ctl /path/to/horizon-client /path/to/prepared/26.3 --jobs 1 --check stockpile-switch-lifecycle
+```
+
 ## Smart Observer filter
 
 The [72 original slot cases](fixtures/smart-observer-filter-poses-java.csv)
