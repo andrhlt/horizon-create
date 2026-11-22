@@ -9,6 +9,7 @@ use crate::items::ItemStack;
 
 use super::create_machines::{float, int, mod_entity, offset};
 use super::create_smart_observer::OBSERVER;
+use super::create_track_observer::OBSERVER as TRACK_OBSERVER;
 use super::{Game, GameLevel};
 
 pub(super) const THRESHOLD_SWITCH: &str = "create:stockpile_switch";
@@ -216,7 +217,7 @@ pub(super) fn filter_hit(game: &Game<'_>, hit: &super::Hit, bottom: bool) -> boo
 pub(super) fn filter_click(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> bool {
     let bottom = match game.native_block(pos).as_str() {
         THRESHOLD_SWITCH => true,
-        OBSERVER => false,
+        OBSERVER | TRACK_OBSERVER => false,
         _ => return false,
     };
     if !game.may_build() || game.native_sneaking() {
@@ -429,11 +430,12 @@ pub(super) fn release_observer_filter(
     let Some(BlockEntity::Mod(entity)) = level.world.block_entities.get(&(pos.x, pos.y, pos.z)) else {
         return;
     };
-    if !matches!(entity.id.as_str(), OBSERVER | super::create_fluids::SMART_PIPE) {
+    if !matches!(entity.id.as_str(), OBSERVER | TRACK_OBSERVER | super::create_fluids::SMART_PIPE) {
         return;
     }
     let Some(stack) = super::create_depot::compound(&entity.nbt, "Filter")
-        .and_then(ItemStack::from_nbt).filter(is_filter_item) else {
+        .and_then(ItemStack::from_nbt)
+        .filter(is_filter_item) else {
         return;
     };
     level.spill.spawns.push(super::spill::Spawn {
