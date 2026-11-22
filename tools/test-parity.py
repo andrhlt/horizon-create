@@ -273,6 +273,7 @@ CHECKS = (
     ("threshold-switch", "test-threshold-switch"),
     ("stockpile-switch-editor", "test-stockpile-switch-editor"),
     ("stockpile-switch-editor-lan", "test-stockpile-switch-editor", "--lan"),
+    ("stockpile-switch-lifecycle", "test-stockpile-switch-lifecycle"),
     ("stockpile-switch-targets", "test-stockpile-switch-targets"),
     ("stockpile-switch-targets-lan", "test-stockpile-switch-targets", "--lan"),
     ("stockpile-switch-placement", "test-stockpile-switch-placement"),
