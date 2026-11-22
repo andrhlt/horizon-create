@@ -1346,6 +1346,9 @@ reported `south: up -> east`, `north: up -> east`, `east: up -> north`, and
 `west: up -> north`. The fixture uses a support platform covering all approach
 positions and validates each outer face at Y=113.1; the earlier failed runs are
 retained as synchronization/visibility evidence rather than gameplay results.
+After rebasing onto `origin/main` at `e9296d2`, the same matrix passed again on
+clean build `native-9f42064-8878a1a79fd3` (exit 0), with Copycat 90/90 and
+Wrench 42/42 passing on that build as well.
 `rustfmt --edition 2024 --check native/wrench.rs` reports pre-existing
 whole-file formatting differences outside this ticket's added dispatch; those
 unrelated lines were left unchanged.
