@@ -9,7 +9,8 @@ use crate::kinetic_slice::{self, Node};
 static KINETIC_PART: OnceLock<KineticPart> = OnceLock::new();
 use mod_api::{
     BlockEntityOnLoadEvent, BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent, BlockKey,
-    BlockPart, BlockState, Compound, HostSide, LevelHost, LevelRef, ServerHost, Tag,
+    BlockPart, BlockState, Compound, HostBlockStates, HostSide, LevelHost, LevelRef, ServerHost,
+    Tag,
 };
 
 pub fn register(registrar: &mut dyn mod_api::Registrar) {
@@ -151,6 +152,78 @@ fn opposite(direction: &str) -> &'static str {
 
 #[mod_api::horizon_part]
 impl BlockEntityPart for KineticPart {
+    fn block_entity_update_tag(
+        &self,
+        event: &mut mod_api::BlockEntityUpdateTagEvent<'_>,
+    ) -> Option<Compound> {
+        Some(event.entity.nbt.clone())
+    }
+
+    fn block_entity_submit(
+        &self,
+        host: &dyn mod_api::ClientHost,
+        event: &mut mod_api::BlockEntitySubmitEvent<'_>,
+    ) {
+        if event.block != "create:creative_motor" {
+            return;
+        }
+        let metadata = host.block_states();
+        let Ok(Some(facing)) = event.state.property(&metadata, "facing") else {
+            return;
+        };
+        let (axis, direction) = match facing {
+            "east" => (0, 1),
+            "west" => (0, -1),
+            "up" => (1, 1),
+            "down" => (1, -1),
+            "south" => (2, 1),
+            "north" => (2, -1),
+            _ => return,
+        };
+        let rpm = ["VisualSpeed", "MotorGeneratedSpeed", "Speed"]
+            .into_iter()
+            .find_map(|key| match event.entity.nbt.get(&key.into()) {
+                Some(Tag::Float(value)) => Some(f32::from_bits(*value)),
+                _ => None,
+            })
+            .unwrap_or(0.0);
+        let [x, y, z] = event.pos;
+        let coordinates = [x, y, z];
+        let parity = coordinates[(axis + 1) % 3].wrapping_add(coordinates[(axis + 2) % 3]);
+        let phase = if parity % 2 == 0 { 22.5 } else { 0.0 };
+        let angle = (((event.draw.game_time() as f64 + f64::from(event.draw.partial()))
+            * f64::from(rpm)
+            * 0.3
+            + f64::from(phase))
+            % 360.0) as f32;
+        let mut axis_vector = [0.0; 3];
+        axis_vector[axis] = 1.0;
+        let Some(shaft) = host.block_key("create:shaft") else {
+            return;
+        };
+        event.draw.push();
+        event.draw.spin(axis_vector, [0.5; 3], rpm * 0.3, phase);
+        let mut offset = [0.375; 3];
+        offset[axis] = if direction > 0 { 0.5 } else { 0.0 };
+        let mut scale = [0.25; 3];
+        scale[axis] = 0.5;
+        event.draw.translate(offset);
+        event.draw.scale(scale);
+        let drawn = event
+            .draw
+            .block(shaft, &[("axis", ["x", "y", "z"][axis])]);
+        event.draw.still();
+        event.draw.pop();
+        if std::env::var_os("CREATE_MOTOR_RENDER").is_some() {
+            println!(
+                "CREATE_MOTOR_FRAME {x},{y},{z},{facing},{axis},{direction},{},{:.8},{phase:.4},{rpm:.6},{angle:.8},{}",
+                event.draw.game_time(),
+                event.draw.partial(),
+                if drawn { 24 } else { 0 }
+            );
+        }
+    }
+
     fn block_entity_on_load(&self, side: HostSide<'_>, event: &mut BlockEntityOnLoadEvent) {
         let HostSide::Server(host) = side else { return };
         let Some(pos) = event.entity.position(host) else {

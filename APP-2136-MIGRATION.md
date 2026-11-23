@@ -355,9 +355,13 @@ fixture commands reported:
 * tools/test-multiplayer-creative-motor.py: failed at the existing normal
   board action; the typed-Part probe has not migrated the motor menu/input
   route, so this does not test the new setting method or guest replication.
-* tools/test-creative-motor-render.py: failed at the frame assertion.
-  The offscreen client loaded and rendered, but emitted no
-  CREATE_MOTOR_FRAME record.
+* tools/test-creative-motor-render.py: the first typed-Part attempt failed
+  because the probe did not send a block-entity update tag; the callback ran
+  with an empty client NBT. Adding `block_entity_update_tag` to the same
+  `KineticPart`, reading its saved speed, and drawing the scaled shaft under
+  `block_entity_submit` fixed it. The final offscreen run passed all six
+  facings at both Java reference speeds, with matching axis, side, RPM, phase,
+  and angle and nonzero submitted geometry.
 
 Tests used horizon-ctl and horizon-client from the built pinned runtime,
 prepared 26.3 resources from the installed matching-pinned client, unique
@@ -384,18 +388,25 @@ durations were 29.4, 7.8, and 8.1 seconds respectively.
 
 ### Concrete remaining SDK/API seams
 
-The SDK Part surface supports the server work verified above. Its
-BlockEntityPart API has no client block-entity draw callback. The minimal
-reproduction is this typed motor entity build plus the existing
-test-creative-motor-render.py: with CREATE_MOTOR_RENDER=1, the pinned
-offscreen runtime loads the pack and draws frames, but no Part receives the
-motor render event and no motor frame trace appears. The old motor draw is in
-the broad native/visuals.rs dispatcher alongside many unrelated renderers.
-This establishes a missing typed-Part renderer entry point for a behavior-
-preserving bounded migration; it does not show that the Horizon renderer
-cannot render or that a broad engine rewrite is required. Preserve the old
-render path as the reference and resolve through a narrow rendering adapter or
-leave this acceptance gate open; do not port the monolithic visuals module.
+The pinned SDK has a supported `BlockEntityPart::block_entity_submit` draw
+callback and a separate `block_entity_update_tag` replacement hook. The prior
+checkpoint incorrectly inferred a renderer gap from `BlockEntityPart`'s
+surface. The bounded candidate implements both hooks on `KineticPart`, uses
+`BlockEntityDrawContext::spin` and `block`, and reuses the existing direction,
+phase, and `rpm * 0.3` rules. It compiles against the pinned SDK and the
+offscreen fixture passes its numerical and nonempty-geometry checks. The
+current probe draws a scaled `create:shaft` block; the fixture package lacks
+Create's shaft-half model and textures, so exact material/mesh parity is not
+verified. Replace that with the resolved shaft-half model when the selected
+content package supplies it; do not import `native/visuals.rs` wholesale.
+
+Waterlogging remains a concrete content-schema compatibility gap. In this
+pin, `horizon_mod_package::content::BlockProperties` uses `deny_unknown_fields`
+and has no `waterloggable` member. The probe therefore continues to omit that
+property, while tracked source definitions still declare it. The passing
+kinetic tests do not establish waterlogging behavior. A narrow supported
+content representation or a behavior test against a waterloggable template is
+still required; do not count the schema omission as equivalent behavior.
 
 The normal board, its setting gesture, and its client-to-server guest path are
 also not part of this adapter. APP-2164 owns those interactions and common
@@ -422,16 +433,14 @@ with the pinned launcher command recorded in the Linear handoff; test headless
 and use --offscreen only for visual frames.
 
 Implementation has not been integrated into the full package, and the setting
-setter is not yet called by normal UI. The successful build and three
-server-side fixture gates revise the remaining motor work to 1–3 engineer-
-days: about 0.5–1 day to wire normal board/guest setting through APP-2164 and
-prove it, 0.5–1 day to preserve/render rotation through a bounded client
-adapter, and 0.5–1 day for content waterlogging compatibility, integrated
-package validation, and regressions. This range assumes a narrow supported
-rendering path or a deliberately open visual gate; inability to add custom
-block-entity rendering within the pinned API raises that scope and requires a
-decision before an engine-side adapter. It is evidence-based from the passing
-server slice, not measured throughput.
+setter is not yet called by normal UI. The successful server and renderer
+gates revise remaining motor work to about 0.5–1.5 engineer-days: about 0.5 day
+to connect normal board/guest setting through APP-2164 and prove it, and 0.5–1
+day for faithful shaft-half assets, waterlogging representation, integrated
+package validation, and regressions. The first native renderer build took
+under one second on the pinned prebuilt route; the six-facing offscreen frame
+test took 19.8 seconds including client startup. This is measured slice
+evidence, not end-to-end integration time.
 
 Active work in this resumed focused cycle is approximately 14 minutes:
 about 6 minutes source/API work, 1.2 seconds successful native compilation,
@@ -439,6 +448,105 @@ roughly 1 minute across the passing gear/placement/reopen fixtures, and about
 1.5 minutes across the failed render and guest checks. Fixture startup includes
 resource loading; these are command durations, not counted as implementation
 time. No processing or train flow has been started.
+
+## Source-matched kinetic candidate and lane checkpoints (2026-11-23)
+
+`migration/kinetic-probe` is the tracked SDK package harness. Run
+`python3 tools/prepare-kinetic-probe.py` to stage the exact tracked
+`native/kinetic_slice.rs` and `native/kinetic_adapter.rs` into the isolated
+launcher project, then run:
+
+```sh
+HORIZON_LAUNCHER_HOME="$PWD/.local/sdk-check/home" HORIZON_HOME="$PWD/.local/sdk-check/game" .local/toolchains/launcher-0.2.105/horizon-launcher native-build .local/sdk-check/project --instance 'APP-2136 SDK Probe' --trust-native-code --profile optimized
+```
+
+That normal optimized SDK build passed in **1 second**, producing
+`native-0a875da-eb660c9fc22d`. This proves the tracked adapter code compiles;
+it is still a probe package, not central-registry integration into the full
+Create package.
+
+The four existing cases rerun on that source-matched build and
+`.local/create.hmod`:
+
+* `tools/test-shaft-and-cogwheel.py`: **36/36 Java rows passed**, including
+  speed propagation, signs, interruption, motor replacement, and restoration.
+* `tools/test-creative-motor-placement.py`: **7/7 Java placement cases passed**.
+* `tools/test-creative-motor-reload.py`: **active horizontal/vertical and idle
+  motors retained settings and regenerated expected speed after reopen**.
+* `tools/test-creative-motor-render.py`: **all six facings passed at both
+  reference speeds** using `--offscreen`; axis, direction, RPM, phase, angle,
+  and nonempty model submissions matched the Java-derived expectations.
+
+The measured command wall times for these fixture runs were approximately 24,
+8, 7, and 6 seconds (about **45 seconds total**, including isolated client
+startup). The build took 1 second. This resumed source-matched cycle from the
+11:52 MDT build through the final offscreen result took about **4 minutes wall
+time** including iteration and tool overhead; time before that build was not
+separately timed. The earlier 14-minute cycle in the prior section is a
+separate report, not throughput derived from this run.
+
+The renderer uses the supported client update-tag and submit hooks and submits
+a scaled `create:shaft` model with kinetic spin speed/phase. The fixture
+package lacks Create's shaft-half model and textures; its successful geometry
+and angle assertions do not prove material or exact mesh parity. Waterlogging
+also remains unverified: the pinned `BlockProperties` schema rejects
+`waterloggable`, and the ignored test pack omits it. The source JSON still
+declares waterlogging. Neither gap is presented as an SDK renderer blocker or
+as equivalent waterlogging behavior.
+
+### Processing handoff: Millstone
+
+The bounded Millstone tick in `native/machines.rs::tick_mill` consumes these
+interfaces: its existing kinetic entity `Speed`; a ten-slot saved inventory
+(slot 0 input and slots 1–9 outputs); a `ModContainer` declaration for normal
+player/hopper access; `create:milling` recipes and `recipe_ingredient` /
+`recipe_result`; a saved `Timer`; and level RNG for chance outputs. It also
+uses the existing landed-item collection path. The original wheat fixture adds
+a barrel, Smart Chute, hopper, chest, motor, and shaft/cogwheel drive, so its
+whole fixture closure includes item logistics and redstone controls rather
+than only Millstone. The narrow machine boundary can first use a typed
+Millstone Part and the API's existing block-container/capability interfaces;
+APP-2163 owns the stationary inventory/recipe/item-transfer behavior and its
+fixture expansion.
+
+Pinned SDK source inspection found `BlockEntityPart` server ticking and saved
+NBT, `ModBlockEntityFields.items`, `Registrar::block_container` with
+side/input/output rules, the `ITEMS` capability, `Host::recipes_of_type`,
+`recipe_ingredient`, `recipe_result`, and `LevelRef::with_random`. These are
+concrete supported APIs for the listed boundaries. No missing engine
+capability has been reproduced for this Millstone slice. No Millstone runtime
+pass is claimed; APP-2163 still needs to implement and compare its first flow.
+
+The usable kinetic interface is `kinetic_adapter::register` plus
+`KineticPart::set_motor_setting` in `native/kinetic_adapter.rs`; connected
+machine Parts can read synchronized saved `Speed` in their own tick NBT. The
+central registry stays with APP-2136; APP-2163 owns Millstone state, recipes,
+and inventory; APP-2164 owns player menu/input and guest networking. APP-2163
+can start against this handoff without importing the other 22 machine modules
+or waiting for the motor board work.
+
+### Moving/train feasibility checkpoint
+
+APP-2165 owns the moving train/contraption family. Its selected train replay
+needs shared package registration, typed server block/entity hooks, saved and
+synchronized moving state, guest-visible movement, and moving-payload draw
+callbacks. The kinetic source can supply speed state as described above; the
+train lane owns track/contraption graph, collision, payload and train
+rendering. The current kinetic candidate does not compile or run any train
+family, so no train API seam is declared solved and no train runtime pass is
+claimed. Pinned API source exposes typed block/entity callbacks and supported
+draw contexts, and inspection found no specific missing capability; the
+remaining uncertainty is migration/fixture closure, not a reproduced engine
+blocker. APP-2165 can prepare its owned modules against the source-matched
+adapter/build recipe now. A minimal moving-flow runtime probe is still needed
+before estimating the full lane from measured throughput.
+
+Kinetic feasibility is established for the bounded server graph, placement,
+reload, and submitted shaft rotation. A complete playable motor flow remains
+open pending normal board/guest setting, source/registry integration, faithful
+shaft-half assets, and waterlogging. The processing and moving lanes are
+unblocked at their specific adapter/interface boundaries; neither lane is
+represented as complete.
 
 ## FEATURE-MATRIX migration ownership (2026-11-23)
 
