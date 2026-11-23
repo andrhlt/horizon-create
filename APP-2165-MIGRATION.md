@@ -121,11 +121,20 @@ broaden the current chest probe.
 - Pure lifecycle: assembly, motion, rider landing, and conservation pass.
 - Existing legacy fixtures remain the source-matched acceptance set for bearing,
   piston, pulley, elevator, and train behavior.
-- The focused rotation fixture now asserts source-matched angular advancement,
-  rider coordinates, angle/payload/inventory save-reopen, safe dismount, and a
-  solid-target collision limit. It is committed at `c0bc857` and is pending the
-  next shared frozen post-API candidate run; the earlier candidate evidence
-  covered the less strict rotation fixture.
+- The focused fixture passed independently on frozen candidate
+  `native-0a875da-615d7c802370` using moving-probe source SHA
+  `952f6218d064463c758f4afdc1dad915f9a812c2b6c95a64791e0b85940d570e`:
+  chest+barrel state/NBT and 7+3 inventory conservation, 90-degree angular
+  advancement, rider transport, MotionOffset-based save/reopen continuity,
+  zero-power dismount, and occupied-target collision/safe-dismount. The exact
+  candidate mod hashes were `native-mods.json`
+  `44e32db0bd00c33025cb62364ed5f8432c4ff1c073a87f36740eefd88d596604` and
+  `libmod_create_kinetic_probe.dylib`
+  `692e5c82d749294fcc1a760db1e3a615979987a61a385231294aae4e39ff1c6f`.
+- The pre-multi-block `0728db6` single-chest fixture also passed against that
+  candidate with its collision target moved outside the new adjacent capture
+  footprint; the unmodified historical obstacle coordinate is now itself an
+  attached neighbor under the bounded capture rule.
 - Still outside this checkpoint: arbitrary glued payload capture, host/guest
   convergence, train boarding, passenger restoration beyond the retained rider,
   and pixel-level offscreen render comparison.
