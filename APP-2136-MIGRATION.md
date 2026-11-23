@@ -766,8 +766,9 @@ migration defects.
 The normal pinned `native-build` passed with launcher 0.2.105, Rust 1.99.1,
 Horizon `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, MC 26.3 and mixins
 `e59da9094f0c2fdda6c627fe9eff22dec6a906f0`. Lane source heads were APP-2164
-`915b4b6`, APP-2163 `39e6c28`, APP-2165 `476f5b2`; final artifact was
-`native-0a875da-fd5a34da7dae`.
+`915b4b6`, APP-2163 `39e6c28` and APP-2165 `476f5b2`; central integration is
+source commit `b15a2ca`, and final artifact is
+`native-0a875da-a61b632c7d2d`.
 
 ### Runtime evidence on that artifact
 
