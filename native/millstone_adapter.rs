@@ -108,7 +108,7 @@ fn finish(
     recipe: &mod_api::Recipe,
     level: Option<LevelRef>,
 ) -> bool {
-    let Some(results) = recipe["results"].as_array() else {
+    let Some(results) = recipe.json["results"].as_array() else {
         return false;
     };
     let mut pending = Vec::new();
@@ -200,12 +200,19 @@ impl BlockEntityPart for MillstonePart {
                             .into_iter()
                             .find(|level| level.block(host, event.pos).is_some())
                     });
-                let (left, right) = event.entity.items.split_at_mut(INPUT + 1);
-                if finish(host, right, &recipe, level) {
-                    set_timer(&mut event.entity.nbt, timer);
-                    if let Some(stack) = left[INPUT].take() {
-                        left[INPUT] = stack.shrink(1);
+                let completed = {
+                    let (left, right) = event.entity.items.split_at_mut(INPUT + 1);
+                    if !finish(host, right, &recipe, level) {
+                        false
+                    } else {
+                        if let Some(stack) = left[INPUT].take() {
+                            left[INPUT] = stack.shrink(1);
+                        }
+                        true
                     }
+                };
+                if completed {
+                    set_timer(&mut event.entity.nbt, timer);
                 } else {
                     // Keep the input and retry without dropping any result when
                     // the complete result set cannot fit in the output slots.
