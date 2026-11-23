@@ -32,6 +32,10 @@ fn menu_key(host: &dyn ServerHost) -> Option<mod_api::MenuKey> {
 }
 
 pub fn register(registrar: &mut dyn mod_api::Registrar) {
+    // A block-entity subscription does not dispatch BlockPart interactions.
+    // Attach the main-hand board opener to the motor block explicitly.
+    let motor = registrar.block_key(MENU_ID);
+    registrar.block_part(motor, MotorBoard);
     let kind = registrar.block_entity_type_key("create:motor");
     registrar
         .block_entity_part(&kind, MotorBoard)

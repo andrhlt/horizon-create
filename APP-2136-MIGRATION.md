@@ -1240,6 +1240,28 @@ The pack-builder check is not a Horizon gameplay result. The moving fixture has
 the bounded offline result above; the production Millstone fixture still awaits
 a runnable matching candidate.
 
+### Explicit block-part dispatch and motor placement (2026-11-23)
+
+The motor placement-facing hook and board right-click hook were implemented on
+`KineticPart`/`MotorBoard` but registered only through the block-entity dispatch
+table. The pinned SDK keeps `BlockPart` dispatch in a separate block-key table.
+I now attach both parts to `create:creative_motor` with `registrar.block_part`;
+the same `KineticPart` remains registered for the motor and shaft/cogwheel
+block-entity types. This closes the omitted registration transition for
+ordinary motor placement and board opening without changing the kinetic
+calculation.
+
+The pinned offline `native-build` succeeded in 2 seconds as candidate
+`native-0a875da-06927c0aa6c7` (Horizon `0a875da`, Rust `1.99.1`); its
+`native-mods.json` and library hashes are in the isolated launcher home.
+`cargo test --offline` on the staged typed project passed 7/7 logic tests.
+The seven-case ordinary placement fixture was attempted headless/offscreen but
+exited before world startup because direct `horizon-ctl` launch rejected
+unregistered cache directories and required managed Launcher Play. I did not
+bypass that lease check. Thus the registration fix compiles, while normal
+player placement, board opening/configuration, and guest convergence still
+need a supported developer-offline runtime result.
+
 ### Remaining migration inventory size
 
 The ownership table contains 174 entries: 163 FEATURE-MATRIX gameplay-family

@@ -30,6 +30,10 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         millstone: registrar.block_key("create:millstone"),
     };
     let _ = KINETIC_PART.set(part);
+    // BlockEntityPart does not implicitly join the separate block-key
+    // dispatch table. Attach this part there too so placement orientation
+    // runs for an ordinary Creative Motor placement.
+    registrar.block_part(part.motor, part);
     registrar.block_entity_part(&motor, part).unwrap();
     registrar.block_entity_part(&kinetic, part).unwrap();
 }
