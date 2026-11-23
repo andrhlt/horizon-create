@@ -71,16 +71,32 @@ impl MovingPart {
         let x = f64::from(payload_pos[0]);
         let y = f64::from(payload_pos[1] + 1);
         let z = f64::from(payload_pos[2]);
+        let mut online_count = 0;
+        let mut position_count = 0;
         for player in players {
+            online_count += 1;
             let Some([px, py, pz]) = player.entity().position(host) else {
                 continue;
             };
+            position_count += 1;
+            if !entity.contains_key(&"RiderObservedPosition".into()) {
+                entity.insert(
+                    "RiderObservedPosition".into(),
+                    Tag::IntArray(vec![
+                        (px * 1000.0) as i32,
+                        (py * 1000.0) as i32,
+                        (pz * 1000.0) as i32,
+                    ]),
+                );
+            }
             if px >= x && px < x + 1.0 && pz >= z && pz < z + 1.0 && py >= y && py < y + 1.25 {
                 entity.insert("RiderUuid".into(), Self::uuid_tag(player.uuid()));
                 entity.insert("RiderCaptured".into(), Tag::Byte(1));
                 return;
             }
         }
+        entity.insert("RiderOnlineCount".into(), Tag::Int(online_count));
+        entity.insert("RiderPositionCount".into(), Tag::Int(position_count));
     }
 
     fn move_rider(
