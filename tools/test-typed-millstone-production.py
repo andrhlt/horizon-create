@@ -8,7 +8,7 @@ from fixture_world import fixture_world
 
 
 MILL = (0, 100, 0)
-PROCESSING_TICKS = 105
+PROCESSING_TICKS = 155
 
 
 def xyz(pos):
