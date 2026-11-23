@@ -1185,9 +1185,41 @@ fixture `35e341f0f0df29faeed7b489bdfa06c42d467e2b4daf70f2371df8d5428bad00`,
 Millstone fixture `9593fbce2c3caa4c33c11a84c9bcdae5a80f4b68bc9fa65efd14ea0b0d46af30`,
 and Java-backed recipe
 `c90d2e53533cc896d76f76054dc4eea3506406b905feccada49d8d8cde8ca1dc47`.
-The matching runtime fixtures remain blocked before world start by managed
-launcher preparation/lease requirements; no runtime result is claimed for the
-new multi-block source or the production Millstone recipe.
+The production Millstone runtime fixture remains blocked before world start by
+managed launcher preparation/lease requirements; no processing or persistence
+result is claimed for the Java-backed recipe.
+
+### Offline bounded moving-flow runtime (2026-11-23)
+
+APP-2165 independently ran the current adjacent chest+barrel bearing slice on
+candidate `native-0a875da-615d7c802370`. Its pinned native artifact hashes are
+`native-mods.json` `44e32db0bd00c33025cb62364ed5f8432c4ff1c073a87f36740eefd88d596604`
+and `libmod_create_kinetic_probe.dylib`
+`692e5c82d749294fcc1a760db1e3a615979987a61a385231294aae4e39ff1c6f`;
+the staged moving Part SHA-256 is
+`952f6218d064463c758f4afdc1dad915f9a812c2b6c95a64791e0b85940d570e`, matching
+the central Part body (the lane's only source difference is the registration
+wrapper). The Create pack SHA-256 is
+`b185423f64c75cfae3c24a31cfc17de72257447eb43998520fcef89b8bc9775a`.
+
+The headless fixture ran two isolated local worlds with no session file or
+session argument, no Microsoft sign-in/device flow, and no server connection.
+It passed 90-degree rotation, rider transport, chest/barrel inventory
+conservation (7 iron + 3 gold), save/reopen motion continuity, occupied-target
+collision, and safe dismount. This is no-session single-player behavior for the
+bounded moving Part. It does not verify the launcher's
+`--developer-single-player` install path, a LAN/dedicated guest, separate
+offline UUIDs, screen rendering, or arbitrary glue traversal. The latest glue
+probe found that frozen `LevelRef::entities_in` excludes CreateSuperGlue and
+other special entities, so the adjacent-block probe does not establish the
+full glued-contraption closure.
+
+This moving-flow result supersedes the earlier statement that the new
+multi-block source had no runtime result. The Millstone runtime, motor board
+open/configure path, distinct host/guest setting convergence, and
+multi-block offscreen rendering remain unverified. The exact fixture is now
+`tools/test-typed-bearing-rotation.py` SHA-256
+`0a1f93a0a82cc4966b27a37f90ae412eab08671aaa28b16e60c5717adb9a88c7`.
 
 The integrated movement fixture was corrected after checking the capture closure:
 the chest and barrel now occupy two immediate neighbors of the bearing, rather
@@ -1202,10 +1234,11 @@ Java-backed fixture recipe. Pure pack assertions passed with `.local/create.hmod
 synthetic recipe absent, fixture recipe present; generated test pack SHA-256
 `6acac7cf0c44399d74fd9af240a8ba3d21b88ca4b6db69481ec42b23d6b590f4`.
 Updated fixture hashes: bearing
-`35e341f0f0df29faeed7b489bdfa06c42d467e2b4daf70f2371df8d5428bad00` and
+`0a1f93a0a82cc4966b27a37f90ae412eab08671aaa28b16e60c5717adb9a88c7` and
 Millstone `15696ea4ecfe9e3d76020d7d9c1c4320d9e0d9ef0f2cca98d170100fad0a3fa1`.
-The pack-builder check is not a Horizon gameplay result; both runtime fixtures
-still await a runnable matching registered candidate.
+The pack-builder check is not a Horizon gameplay result. The moving fixture has
+the bounded offline result above; the production Millstone fixture still awaits
+a runnable matching candidate.
 
 ### Remaining migration inventory size
 
