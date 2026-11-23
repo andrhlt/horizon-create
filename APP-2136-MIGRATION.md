@@ -1117,3 +1117,35 @@ instrumented; this investigation/integration cycle took about 25 minutes by
 elapsed work. The earlier 4–7 engineer-day estimate is not a measured rate and
 should be replaced with scoped estimates after board source/runtime provenance
 is resolved. No processing or train expansion was performed in this cycle.
+
+### Screen source port and production Millstone recipe (2026-11-23)
+
+The central `native/motor_board.rs` now contains the typed `screen`,
+`screen_draw`, and `screen_click` handlers from APP-2164's source-generated API
+candidate, using the shared adapter setter for the authoritative server action.
+Formatting and diff checks pass. Source-generated API compilation was verified
+on APP-2164's isolated candidate, but this central combined source has not been
+built against a matching client/runtime. The Nov 20 cached `libmod_api.rmeta`
+remains ABI-stale for those hooks, and the exact source-matched developer
+version is not prepared in the isolated launcher home. The supported launcher
+`prepare --download` path returned the Java Edition account-entitlement gate.
+No account files, managed resources, or cache leases were copied or bypassed.
+Host/guest board opening, rendering, clicks, and motor changes remain
+unverified; this is a runtime provisioning blocker, not evidence that Horizon's
+frozen source lacks those hooks.
+
+APP-2163 supplied a separate Java-backed wheat milling recipe: wheat flour ×1
+at 100%, flour ×2 at 25%, seeds ×1 at 25%, `processing_time: 150` (fixture
+`fixtures/typed-millstone-production`, source commit `1569bbb`). It must not be
+mixed with the synthetic probe wheat-to-bread override. I built an isolated
+temporary test pack containing the existing test pack plus only this recipe;
+pack SHA-256 is
+`43e3eac075c7c60172ddae1013576d45cf8770d777774d8d8f9432c321fc212e`, and the
+synthetic recipe is absent. The production fixture needs 152 ticks at 16 RPM
+to account for the start tick and 150 timer decrements. Its run was blocked
+before world startup: direct `horizon-ctl` launch returned exit 78 for
+unregistered managed cache leases; the registered-version route said the
+candidate was not prepared in the selected home. No processing, persistence,
+or backpressure result is claimed from that attempt. The ordinary production
+pack has no milling recipe directory yet, so this temporary recipe tests the
+matcher only; it is not shipped gameplay content.
