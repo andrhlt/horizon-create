@@ -914,11 +914,13 @@ time was not instrumented.
 The earlier statement that the pinned API lacks a menu identifier resolver is
 incorrect. `KeysHost::menu_keys()` and `KeysHost::menu_key_id(MenuKey) -> String`
 provide a supported canonical-ID scan, and APP-2164 pushed it in PR #194
-(commit `c243446`). The resolver compiles, but normal use is still not verified:
-`tools/test-creative-motor.py` did not open a board on candidate
-`native-0a875da-614736877ab7`; after right-click the captured state was
-`screen=playing`, `menu=None`, and no screen buttons. The event/registration or
-open-result cause remains unresolved. A separate click-input gap also exists
+(commit `c243446`). The resolver compiles, and the diagnostic use trace now confirms the server
+path runs: `USE` reached the motor, the canonical resolver returned
+`key=true`, and `open_mod_menu` returned `Some(1)` / `Some(2)`. The focused
+`tools/test-creative-motor.py` still fails because after those server opens the
+client reports `screen=playing`, `menu=None`, and no screen buttons. The
+remaining gate is client-side screen presentation/widgets. A separate
+click-input gap also exists
 on the typed route: the prebuilt API exposes
 `screen_mouse_button_pressed_pre(&dyn ClientHost)`, while `MenuRef::click_button`
 requires `&mut dyn ClientHost`, and the pinned prebuilt API has no
@@ -969,3 +971,20 @@ wall-clock for resolver integration, build, focused test and hook registration
 investigation; active coding time was not instrumented. A test call on this
 candidate takes about 10 seconds; the normal optimized mod build rounded to
 1 second. The source-transition, stress and reload headless tests passed again.
+
+
+### Motor board server-open trace (2026-11-23)
+
+The diagnostic candidate `native-0a875da-e4a376e468b3` compiled with
+APP-2164's env-gated trace and the production resource
+`content/data/create/horizon/menu/creative_motor.json`. The same offscreen
+interaction fixture reached the server callback twice. Logs show the expected
+motor block/position, `CREATE_MOTOR_BOARD_MENU key=true`, and
+`CREATE_MOTOR_BOARD_OPEN result=Some(1)` / `Some(2)`; no `OpenMenuError`
+was returned. The client nevertheless stayed at `screen=playing`,
+`menu=None`, with an empty buttons list. This isolates server callback dispatch,
+menu-key resolution and server open success; it does not pass client menu
+presentation or button interaction. The current pinned typed client click hook
+still lacks a mutable `ClientHost` path, and the APP-2164 engine helper is
+checking a minimal hook fix. The stager now sources the menu JSON from
+production `content/` so subsequent probes use the real resource.

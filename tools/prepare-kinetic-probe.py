@@ -39,7 +39,7 @@ def main():
     copy2(SOURCE / "src/moving_probe.rs", OUTPUT / "src/moving_probe.rs")
     menu = OUTPUT / "data/create/horizon/menu"
     menu.mkdir(parents=True, exist_ok=True)
-    copy2(SOURCE / "data/create/horizon/menu/creative_motor.json",
+    copy2(ROOT / "content/data/create/horizon/menu/creative_motor.json",
           menu / "creative_motor.json")
     recipes = OUTPUT / "data/create/recipe"
     recipes.mkdir(parents=True, exist_ok=True)
