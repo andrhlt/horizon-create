@@ -138,7 +138,7 @@ impl MovingPart {
         host: &mut dyn ServerHost,
         entity: &mut Compound,
         delta: [f64; 3],
-        dismount_at: [f64; 3],
+        dismount_at: Option<[f64; 3]>,
     ) {
         let Some(uuid) = Self::rider_uuid(entity) else {
             return;
@@ -150,10 +150,13 @@ impl MovingPart {
         let Some([px, py, pz]) = player_entity.position(host) else {
             return;
         };
-        let target = if delta == [0.0; 3] {
-            dismount_at
-        } else {
-            [px + delta[0], py + delta[1], pz + delta[2]]
+        let Some(target) = dismount_at.or_else(|| {
+            (delta != [0.0; 3]).then_some([px + delta[0], py + delta[1], pz + delta[2]])
+        }) else {
+            // Angular motion can round to the same block for several ticks. It
+            // is still moving continuously, so a zero block delta is not a
+            // dismount request and must leave the rider in place.
+            return;
         };
         if player_entity.teleport_to(host, target, None) {
             entity.insert(
@@ -165,7 +168,7 @@ impl MovingPart {
                         .collect(),
                 ),
             );
-            if delta == [0.0; 3] {
+            if dismount_at.is_some() {
                 entity.insert("RiderSafeDismount".into(), Tag::Byte(1));
             }
         }
@@ -405,7 +408,7 @@ impl BlockEntityPart for MovingPart {
                     f64::from(next_pos[1] - payload_pos[1]),
                     f64::from(next_pos[2] - payload_pos[2]),
                 ],
-                [0.0, 0.0, 0.0],
+                None,
             );
         } else {
             data.insert("Moving".into(), Tag::Byte(0));
@@ -414,11 +417,11 @@ impl BlockEntityPart for MovingPart {
                 host,
                 &mut data,
                 [0.0; 3],
-                [
+                Some([
                     f64::from(payload_pos[0]) + 0.5,
                     f64::from(payload_pos[1] + 1),
                     f64::from(payload_pos[2]) + 0.5,
-                ],
+                ]),
             );
         }
         event.entity.nbt = data;
