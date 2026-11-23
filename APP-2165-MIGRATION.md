@@ -79,15 +79,41 @@ moving-payload collision geometry or a server-side contraption entity graph to
 the client renderer, so collision/restoration remains authoritative and
 discrete until that broader bridge exists.
 
+## Arbitrary payload bridge boundary
+
+The legacy capture path is intentionally not replaced by another chest-specific
+case. `native/bearing.rs` follows super glue and chassis/sticker attachment
+edges, snapshots each `BlockState`, block-entity NBT and mounted item/entity
+state, and captures the same shapes for rotated collision. The pinned typed SDK
+can read `LevelRef::block`, `LevelRef::block_state`,
+`HostBlockStates::block_state_string`, `BlockEntityRef::data`,
+`LevelRef::collision_boxes`, and `LevelRef::entities_in`; it can write a
+specific `BlockState` with `LevelRef::set_block` and restore NBT with
+`BlockEntityRef::merge_data`.
+
+That surface has no public glue-area/attachment graph, arbitrary moving
+contraption actor owner, mounted-item snapshot/restore contract, or captured
+rotated collision-shape handle. A bounded scan could discover neighboring block
+states, but it would be a new heuristic and would miss the legacy glue and
+chassis rules. The smallest production bridge is therefore a server-side
+attachment snapshot/actor layer that supplies the existing `MovedBlocks`,
+`MountedItems`, rider and collision records to the typed Part; extending the
+probe with more hard-coded block cases would not establish arbitrary payload
+parity.
+
 ## Evidence and remaining work
 
 - Pure lifecycle: assembly, motion, rider landing, and conservation pass.
 - Existing legacy fixtures remain the source-matched acceptance set for bearing,
   piston, pulley, elevator, and train behavior.
-- Not yet verified on the frozen post-API runtime: block/entity registration,
-  actual world payload capture, host/guest convergence, save/reopen, collision
-  against moving payloads, train boarding, passenger restoration, or offscreen
-  moving render output.
+- The focused rotation fixture now asserts source-matched angular advancement,
+  rider coordinates, angle/payload/inventory save-reopen, safe dismount, and a
+  solid-target collision limit. It is committed at `c0bc857` and is pending the
+  next shared frozen post-API candidate run; the earlier candidate evidence
+  covered the less strict rotation fixture.
+- Still outside this checkpoint: arbitrary glued payload capture, host/guest
+  convergence, train boarding, passenger restoration beyond the retained rider,
+  and pixel-level offscreen render comparison.
 - `native/fake_track.rs` changes from the coordinator checkout were not copied.
 
 This is an intentionally partial checkpoint. It identifies the concrete
