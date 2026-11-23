@@ -174,6 +174,59 @@ impl MovingPart {
         }
     }
 
+    fn payload_snapshots(entity: &Compound) -> Option<Vec<Compound>> {
+        let Some(Tag::List(blocks)) = entity.get(&"PayloadBlocks".into()) else {
+            return None;
+        };
+        Some(
+            blocks
+                .iter()
+                .filter_map(|block| match block {
+                    Tag::Compound(block) => Some(block.clone()),
+                    _ => None,
+                })
+                .collect(),
+        )
+    }
+
+    fn payload_positions(entity: &Compound) -> Option<Vec<[i32; 3]>> {
+        let Some(Tag::List(positions)) = entity.get(&"PayloadPositions".into()) else {
+            return None;
+        };
+        Some(
+            positions
+                .iter()
+                .filter_map(|position| match position {
+                    Tag::IntArray(position) if position.len() == 3 => {
+                        Some([position[0], position[1], position[2]])
+                    }
+                    _ => None,
+                })
+                .collect(),
+        )
+    }
+
+    fn snapshot_relative(snapshot: &Compound) -> Option<[i32; 3]> {
+        match snapshot.get(&"Pos".into()) {
+            Some(Tag::IntArray(pos)) if pos.len() == 3 => Some([pos[0], pos[1], pos[2]]),
+            _ => None,
+        }
+    }
+
+    fn snapshot_state(host: &dyn ServerHost, snapshot: &Compound) -> Option<BlockState> {
+        let Some(Tag::String(state)) = snapshot.get(&"State".into()) else {
+            return None;
+        };
+        host.block_states().block_state_id(state)
+    }
+
+    fn snapshot_entity(snapshot: &Compound) -> Option<Compound> {
+        match snapshot.get(&"Entity".into()) {
+            Some(Tag::Compound(entity)) => Some(entity.clone()),
+            _ => None,
+        }
+    }
+
     fn ensure_payload(
         &self,
         host: &dyn ServerHost,
@@ -187,10 +240,10 @@ impl MovingPart {
                 entity.insert(key, value);
             }
         }
-        if entity.contains_key(&"PayloadPos".into()) {
+        if entity.contains_key(&"PayloadPositions".into()) {
             return;
         }
-        let Some(chest) = host.block_key("minecraft:chest") else {
+        let Some(air) = host.block_key("minecraft:air") else {
             return;
         };
         let candidates = [
@@ -200,30 +253,71 @@ impl MovingPart {
             [pos[0], pos[1] + 1, pos[2] + 1],
             [pos[0], pos[1] + 1, pos[2] - 1],
         ];
-        let Some(attached) = candidates
-            .into_iter()
-            .find(|candidate| level.block(host, *candidate) == Some(chest))
-        else {
+        let mut snapshots = Vec::new();
+        let mut positions = Vec::new();
+        for candidate in candidates {
+            let Some(block) = level.block(host, candidate) else {
+                continue;
+            };
+            if block == air {
+                continue;
+            }
+            let Some(state) = level.block_state(host, candidate) else {
+                continue;
+            };
+            let Some(state) = host.block_states().block_state_string(state) else {
+                continue;
+            };
+            let mut snapshot = Compound::from([
+                (
+                    "Pos".into(),
+                    Tag::IntArray(
+                        candidate
+                            .into_iter()
+                            .zip(pos)
+                            .map(|(value, anchor)| value - anchor)
+                            .collect(),
+                    ),
+                ),
+                ("State".into(), Tag::String(state.into())),
+            ]);
+            if let Some(block_entity) = host.block_entity_identity(level, candidate)
+                && let Some(data) = block_entity.data(host)
+            {
+                snapshot.insert("Entity".into(), Tag::Compound(data));
+            }
+            snapshots.push(snapshot);
+            positions.push(candidate);
+        }
+        let Some(first) = positions.first().copied() else {
             return;
         };
-        let Some(block_entity) = host.block_entity_identity(level, attached) else {
-            return;
-        };
-        let Some(chest_data) = block_entity.data(host) else {
-            return;
-        };
-        entity.insert("PayloadPos".into(), Tag::IntArray(attached.to_vec()));
-        entity.insert("PayloadOrigin".into(), Tag::IntArray(attached.to_vec()));
+        entity.insert(
+            "PayloadBlocks".into(),
+            Tag::List(snapshots.into_iter().map(Tag::Compound).collect()),
+        );
+        entity.insert(
+            "PayloadPositions".into(),
+            Tag::List(
+                positions
+                    .iter()
+                    .map(|position| Tag::IntArray(position.to_vec()))
+                    .collect(),
+            ),
+        );
+        entity.insert("PayloadPos".into(), Tag::IntArray(first.to_vec()));
+        entity.insert("PayloadOrigin".into(), Tag::IntArray(first.to_vec()));
         entity.insert("PayloadAnchor".into(), Tag::IntArray(pos.to_vec()));
-        entity.insert("PayloadEntity".into(), Tag::Compound(chest_data));
-        entity.insert("PayloadSource".into(), Tag::String("world_chest".into()));
+        entity.insert("PayloadSource".into(), Tag::String("world_blocks".into()));
         if let Some(dimension) = level.dimension().id(host) {
             entity.insert(
                 "PayloadDimension".into(),
                 Tag::String(dimension.as_str().into()),
             );
         }
-        self.capture_standing_rider(host, level, attached, entity);
+        for position in positions {
+            self.capture_standing_rider(host, level, position, entity);
+        }
     }
 }
 
@@ -315,10 +409,17 @@ impl BlockEntityPart for MovingPart {
             Some(Tag::Int(value)) => *value,
             _ => 0,
         };
-        let payload_pos = match data.get(&"PayloadPos".into()) {
-            Some(Tag::IntArray(pos)) if pos.len() == 3 => [pos[0], pos[1], pos[2]],
-            _ => [event.pos[0], event.pos[1] + 1, event.pos[2]],
-        };
+        let snapshots = Self::payload_snapshots(&data).unwrap_or_default();
+        let positions = Self::payload_positions(&data).unwrap_or_else(|| {
+            match data.get(&"PayloadPos".into()) {
+                Some(Tag::IntArray(pos)) if pos.len() == 3 => vec![[pos[0], pos[1], pos[2]]],
+                _ => vec![[event.pos[0], event.pos[1] + 1, event.pos[2]]],
+            }
+        });
+        if snapshots.is_empty() || snapshots.len() != positions.len() {
+            return;
+        }
+        let payload_pos = positions[0];
         self.capture_standing_rider(host, level, payload_pos, &mut data);
         let scroll = self.motor_scroll(host, level, event.pos);
         let powered = scroll.is_some();
@@ -332,70 +433,111 @@ impl BlockEntityPart for MovingPart {
             Some(_) => angle,
             None => angle,
         };
-        let next_pos = if powered {
-            let origin = match data.get(&"PayloadOrigin".into()) {
-                Some(Tag::IntArray(pos)) if pos.len() == 3 => [pos[0], pos[1], pos[2]],
-                _ => payload_pos,
-            };
-            let anchor = match data.get(&"PayloadAnchor".into()) {
-                Some(Tag::IntArray(pos)) if pos.len() == 3 => [pos[0], pos[1], pos[2]],
-                _ => event.pos,
-            };
-            Self::rotate_position(origin, anchor, next_angle.to_radians())
-        } else {
-            [payload_pos[0], payload_pos[1] + 1, payload_pos[2]]
+        let anchor = match data.get(&"PayloadAnchor".into()) {
+            Some(Tag::IntArray(pos)) if pos.len() == 3 => [pos[0], pos[1], pos[2]],
+            _ => event.pos,
         };
-        let blocked = next_pos != payload_pos
-            && level
-                .has_collisions(
-                    host,
-                    [
-                        f64::from(next_pos[0]),
-                        f64::from(next_pos[1]),
-                        f64::from(next_pos[2]),
-                        f64::from(next_pos[0] + 1),
-                        f64::from(next_pos[1] + 1),
-                        f64::from(next_pos[2] + 1),
-                    ],
-                )
-                .unwrap_or(false);
+        let next_positions: Vec<_> = snapshots
+            .iter()
+            .zip(&positions)
+            .filter_map(|(snapshot, current)| {
+                let relative = Self::snapshot_relative(snapshot)?;
+                Some(if powered {
+                    Self::rotate_position(
+                        [
+                            anchor[0] + relative[0],
+                            anchor[1] + relative[1],
+                            anchor[2] + relative[2],
+                        ],
+                        anchor,
+                        next_angle.to_radians(),
+                    )
+                } else {
+                    [current[0], current[1] + 1, current[2]]
+                })
+            })
+            .collect();
+        if next_positions.len() != snapshots.len() {
+            return;
+        }
+        let duplicate_target = next_positions
+            .iter()
+            .enumerate()
+            .any(|(index, target)| next_positions[..index].contains(target));
+        let blocked = duplicate_target
+            || next_positions.iter().any(|next_pos| {
+                !positions.contains(next_pos)
+                    && level
+                        .has_collisions(
+                            host,
+                            [
+                                f64::from(next_pos[0]),
+                                f64::from(next_pos[1]),
+                                f64::from(next_pos[2]),
+                                f64::from(next_pos[0] + 1),
+                                f64::from(next_pos[1] + 1),
+                                f64::from(next_pos[2] + 1),
+                            ],
+                        )
+                        .unwrap_or(false)
+            });
         data.insert("CollisionBlocked".into(), Tag::Byte(blocked as i8));
         let moving = scroll.is_some_and(|value| value != 0) || (!powered && offset < 8);
-        if !blocked && moving && data.contains_key(&"PayloadPos".into()) {
-            let Some(chest) = host.block_key("minecraft:chest") else {
+        if !blocked && moving {
+            let Some(states) = snapshots
+                .iter()
+                .map(|snapshot| Self::snapshot_state(host, snapshot))
+                .collect::<Option<Vec<_>>>()
+            else {
                 return;
             };
-            let Ok(chest_state) = BlockState::of(&host.block_states(), chest, &[]) else {
-                return;
-            };
-            let chest_data = match data.get(&"PayloadEntity".into()) {
-                Some(Tag::Compound(chest_data)) => chest_data.clone(),
-                _ => return,
-            };
-            if !level.remove_block(host, payload_pos, true) {
-                return;
+            for position in &positions {
+                if !level.remove_block(host, *position, true) {
+                    return;
+                }
             }
-            if !level
-                .set_block(
-                    host,
-                    next_pos,
-                    chest_state,
-                    BlockUpdateFlags::NEIGHBORS | BlockUpdateFlags::CLIENTS,
-                )
-                .is_ok_and(|changed| changed)
-            {
-                let _ = level.set_block(
-                    host,
-                    payload_pos,
-                    chest_state,
-                    BlockUpdateFlags::NEIGHBORS | BlockUpdateFlags::CLIENTS,
-                );
-                return;
+            for (index, (next_pos, state)) in next_positions.iter().zip(&states).enumerate() {
+                if !level
+                    .set_block(
+                        host,
+                        *next_pos,
+                        *state,
+                        BlockUpdateFlags::NEIGHBORS | BlockUpdateFlags::CLIENTS,
+                    )
+                    .is_ok_and(|changed| changed)
+                {
+                    for position in &next_positions[..index] {
+                        let _ = level.remove_block(host, *position, true);
+                    }
+                    for (old_pos, old_state) in positions.iter().zip(&states) {
+                        let _ = level.set_block(
+                            host,
+                            *old_pos,
+                            *old_state,
+                            BlockUpdateFlags::NEIGHBORS | BlockUpdateFlags::CLIENTS,
+                        );
+                    }
+                    return;
+                }
+                if let Some(next_entity) = host.block_entity_identity(level, *next_pos)
+                    && let Some(entity_data) = Self::snapshot_entity(&snapshots[index])
+                {
+                    let _ = next_entity.merge_data(host, entity_data);
+                }
             }
-            if let Some(next_entity) = host.block_entity_identity(level, next_pos) {
-                let _ = next_entity.merge_data(host, chest_data);
-            }
-            data.insert("PayloadPos".into(), Tag::IntArray(next_pos.to_vec()));
+            data.insert(
+                "PayloadPositions".into(),
+                Tag::List(
+                    next_positions
+                        .iter()
+                        .map(|position| Tag::IntArray(position.to_vec()))
+                        .collect(),
+                ),
+            );
+            data.insert(
+                "PayloadPos".into(),
+                Tag::IntArray(next_positions[0].to_vec()),
+            );
             data.insert("MotionOffset".into(), Tag::Int(offset + 1));
             if powered {
                 data.insert("Angle".into(), Tag::Float((next_angle as f32).to_bits()));
@@ -404,9 +546,9 @@ impl BlockEntityPart for MovingPart {
                 host,
                 &mut data,
                 [
-                    f64::from(next_pos[0] - payload_pos[0]),
-                    f64::from(next_pos[1] - payload_pos[1]),
-                    f64::from(next_pos[2] - payload_pos[2]),
+                    f64::from(next_positions[0][0] - payload_pos[0]),
+                    f64::from(next_positions[0][1] - payload_pos[1]),
+                    f64::from(next_positions[0][2] - payload_pos[2]),
                 ],
                 None,
             );
