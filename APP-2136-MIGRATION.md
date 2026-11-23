@@ -170,3 +170,74 @@ train work has not started.
 Time record: **24 minutes wall-clock** from the first timestamped APP-2136
 diagnostic commit at 09:26 MDT to this checkpoint at 09:50 MDT. This is an
 upper bound on hands-on time because it includes pauses between requests.
+
+## Kinetic slice implementation checkpoint (2026-11-23)
+
+The requested slice is the motor, straight shaft, and the small/large cogwheel
+train already covered by `fixtures/shaft_and_cogwheel-java.csv`. The actual
+fixture closure is therefore three block-entity roles (`create:motor` and
+`create:simple_kinetic` for shaft/cogwheel), their orientation/state properties,
+the existing graph walk's shaft and gear connection rules, signed speed
+propagation, the motor board's setting action, block-entity persistence and
+sync, plus the client pose path for those shaft and cogwheel entities. The
+Java-backed checks already present are `creative-motor`, `creative-motor-lan`,
+`creative-motor-reload`, and `shaft-and-cogwheel`. The first three cover setting
+and reload paths; the last supplies the actual small/large gear train, ratios,
+opposite direction, and interruption/restoration. The selected gear-train
+fixture must be included alongside the motor fixture for the requested
+motor→shaft→cogwheel result.
+
+The former 22 `create_*` references are not the selected feature's dependency
+closure. They came from generic matches and helpers in the monolithic
+`Kinetic` enum and describe other cases that the enum supports. Leaving those
+siblings out of an extracted candidate would create unresolved names, not
+prove API incompatibility. The slice still has real cross-cutting seams in
+`machines.rs` (network rebuilding and event ordering), `speed_controller.rs`
+(motor input), `visuals.rs` (pose production), and the migrated block/content
+registrations. None of the 22 unrelated machine modules is needed to represent
+the selected fixture's entity types or gear edges.
+
+I did not complete the production extraction in this pass. The SDK's typed-Part
+compile probe recorded in the prior checkpoint demonstrates that a Part can
+attach to `create:motor` and request server ticks. In this resumed checkout, I
+attempted normal pinned `native-build` validation in `.local/sdk-check` using
+Horizon `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, its Nov 20 SDK metadata,
+and its matching mixin pin. The launcher stopped before Rust diagnostics with
+an empty `error:` and `The build failed:` in its private build log. The
+isolated launcher home has the pinned version, source and prebuilt artifacts;
+the precise launcher prerequisite producing this blank failure remains
+unresolved. This is an environment/build-route failure, not evidence that the
+typed Part API lacks a required capability. No gameplay stage was run in this
+pass, and no stage is claimed as passing. The earlier probe also was compile
+only; it does not count as block creation or ticking gameplay evidence.
+
+### Remaining work and revised estimate
+
+The API surface observed so far does not establish a missing engine capability:
+typed block/entity Parts, server tick callbacks, and host world/entity access
+are present. Concrete unverified API seams for a full slice are: supported
+guest screen input and motor-setting persistence; server-side graph mutation
+and block-entity sync at the old tick order; persistent `Speed` and
+`ScrollValue` behavior after reopening; and client-facing rotation state for
+the selected shaft/cogwheel parts. They need compile probes or runtime results
+before any of them can be called an API gap. The normal validation route must
+also be made reproducible in the isolated home before the production slice can
+be trusted.
+
+Based on the fixture closure and existing Java evidence, the implementation
+estimate is revised from **5–10 to 6–9 engineer-days**: 2–3 days to extract the
+three-kind topology and isolate its supported host adapter while preserving
+the current `ratio_to`/signed-speed rules; 1–2 days for guest configuration,
+sync, and save/reopen; 1–2 days for content registration and offscreen rotation;
+and 1–2 days for repair and final pinned validation. This is an estimate, not
+measured delivery: this pass produced no production code or passing check. It
+assumes the blank launcher failure is local setup and the old Java fixture
+content can be retained; failure of either assumption could increase the
+estimate. Processing and trains have not been started.
+
+Time record for the resumed pass: **4 minutes 51 seconds** from 13:59:26 to
+14:04:17 UTC (06:59:26–07:04:17 MDT), spent checking the dependency closure and
+attempting isolated SDK validation. Production implementation time: **0**;
+compiler time is not available because the launcher stopped before compilation;
+gameplay/test time: **0**. The earlier 24-minute diagnostic/checkpoint record
+remains separate and is not counted as implementation time.
