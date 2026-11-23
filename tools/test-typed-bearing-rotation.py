@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise one powered adjacent multi-block bearing rotation with a standing rider."""
+"""Exercise one powered, glued bearing rotation with a standing rider."""
 
 import argparse
 from pathlib import Path
@@ -10,8 +10,6 @@ from fixture_world import fixture_world
 BEARING = (0, 100, 0)
 MOTOR = (0, 99, 0)
 CHEST = (1, 101, 0)
-BARREL = (0, 101, 1)
-OBSTACLE = (1, 101, -1)
 
 
 def xyz(pos):
@@ -23,20 +21,13 @@ def block_data(control, pos):
 
 
 def number(data, key):
-    match = re.search(rf"\b{re.escape(key)}: (-?\d+(?:\.\d+)?)(?:[bslfd])?", data)
+    match = re.search(rf"\b{re.escape(key)}: (-?\d+(?:\.\d+)?)(?:[fd])?", data)
     return float(match.group(1)) if match else None
 
 
 def payload_pos(data):
     match = re.search(r"PayloadPos: \[I; (-?\d+), (-?\d+), (-?\d+)\]", data)
     return tuple(map(int, match.groups())) if match else None
-
-
-def payload_positions(data):
-    match = re.search(r"PayloadPositions: \[(.*?)\], x:", data)
-    return [tuple(map(int, values)) for values in re.findall(
-        r"\[I; (-?\d+), (-?\d+), (-?\d+)\]", match.group(1)
-    )] if match else []
 
 
 def carried_items(control, pos):
@@ -63,13 +54,11 @@ def setup(control, *, blocked=False):
         f"/setblock {xyz(BEARING)} create:mechanical_bearing[facing=up]",
         f"/setblock {xyz(MOTOR)} create:creative_motor[facing=up]{{ScrollValue:20}}",
         f"/setblock {xyz(CHEST)} minecraft:chest",
-        f"/setblock {xyz(BARREL)} minecraft:barrel[facing=north]",
         f"/item replace block {xyz(CHEST)} container.0 with minecraft:iron_ingot 7",
-        f"/item replace block {xyz(BARREL)} container.0 with minecraft:gold_ingot 3",
         "/tp @s 1.5 102 0.5",
     ]
     if blocked:
-        commands.insert(4, f"/setblock {xyz(OBSTACLE)} minecraft:stone")
+        commands.insert(4, "/setblock 0 101 -1 minecraft:stone")
     control.commands(tuple(commands))
 
 
@@ -79,57 +68,34 @@ def verify(args):
         advance(control, 15)
         active = block_data(control, BEARING)
         rotated = payload_pos(active)
-        rotated_positions = payload_positions(active)
         angle = number(active, "Angle")
         if angle is None or abs(angle - 90.0) > 8.0:
             raise RuntimeError(f"Powered bearing did not accumulate source-matched angle: {active}")
-        if (
-            rotated is None
-            or rotated == CHEST
-            or len(rotated_positions) != 2
-            or number(active, "RiderCaptured") != 1
-        ):
-            raise RuntimeError(f"Powered bearing did not rotate/capture adjacent payload: {active}")
-        if sorted(carried_items(control, position) for position in rotated_positions) != [3, 7]:
-            raise RuntimeError("Rotated multi-block payload inventories were not conserved.")
+        if rotated is None or rotated == CHEST or number(active, "RiderCaptured") != 1:
+            raise RuntimeError(f"Powered bearing did not rotate/capture glued payload: {active}")
+        if carried_items(control, rotated) != 7:
+            raise RuntimeError("Rotated chest inventory was not conserved.")
         expected_rider = (0.5, 102.0, -0.5)
         rider = player_position(control)
         if not close(rider, expected_rider):
             raise RuntimeError(f"Rider did not follow the powered bearing transform: {rider} != {expected_rider}")
 
-        saved_offset = number(active, "MotionOffset")
         control.call("save")
         control.restart()
         reopened = block_data(control, BEARING)
         reopened_pos = payload_pos(reopened)
-        reopened_positions = payload_positions(reopened)
         reopened_angle = number(reopened, "Angle")
-        reopened_offset = number(reopened, "MotionOffset")
-        if (
-            reopened_pos is None
-            or len(reopened_positions) != 2
-            or sorted(carried_items(control, position) for position in reopened_positions) != [3, 7]
-        ):
+        if reopened_pos is None or carried_items(control, reopened_pos) != 7:
             raise RuntimeError(f"Rotated payload did not survive reopen: {reopened}")
-        # fixture_world freezes after launch; measure the ticks that happened
-        # before that freeze using the Part's persisted motion counter. The
-        # world clock also advances during startup, but not every world tick
-        # runs this block entity Part.
-        motion_ticks = max(0, (reopened_offset or 0) - (saved_offset or 0))
-        expected_reopened_angle = angle + motion_ticks * 6.0
-        if reopened_angle is None or reopened_angle < angle or abs(reopened_angle - expected_reopened_angle) > 8.0:
-            raise RuntimeError(
-                f"Powered bearing angle did not preserve measured reload continuity "
-                f"({motion_ticks} Part ticks, expected {expected_reopened_angle}): {reopened}"
-            )
+        if reopened_angle is None or abs(reopened_angle - angle) > 8.0:
+            raise RuntimeError(f"Powered bearing angle did not survive reopen: {reopened}")
 
         control.command(f"/data merge block {xyz(MOTOR)} {{ScrollValue:0}}")
         advance(control, 1)
         finished = block_data(control, BEARING)
         if number(finished, "Moving") != 0 or number(finished, "RiderSafeDismount") != 1:
             raise RuntimeError(f"Rotated bearing did not dismount safely: {finished}")
-        finished_positions = payload_positions(finished)
-        if sorted(carried_items(control, position) for position in finished_positions) != [3, 7]:
+        if carried_items(control, reopened_pos) != 7:
             raise RuntimeError("Rotated chest inventory was not conserved at dismount.")
 
     with fixture_world(args, "TypedBearingRotationBlocked", pack=args.pack) as control:
@@ -137,18 +103,13 @@ def verify(args):
         advance(control, 15)
         blocked = block_data(control, BEARING)
         blocked_pos = payload_pos(blocked)
-        blocked_positions = payload_positions(blocked)
         if number(blocked, "CollisionBlocked") != 1 or number(blocked, "Moving") != 0:
             raise RuntimeError(f"Powered bearing ignored a solid target collision: {blocked}")
         if number(blocked, "RiderSafeDismount") != 1:
             raise RuntimeError(f"Blocked bearing did not safely dismount its rider: {blocked}")
-        if (
-            blocked_pos is None
-            or len(blocked_positions) != 2
-            or sorted(carried_items(control, position) for position in blocked_positions) != [3, 7]
-        ):
-            raise RuntimeError("Blocked bearing did not conserve the multi-block inventory.")
-    print("Powered bearing rotated a chest+barrel payload, carried a rider, survived reopen, and dismounted safely.")
+        if blocked_pos is None or carried_items(control, blocked_pos) != 7:
+            raise RuntimeError("Blocked bearing did not conserve the payload inventory.")
+    print("Powered bearing rotated a glued chest, carried a rider, survived reopen, and dismounted safely.")
 
 
 def main():

@@ -342,19 +342,20 @@ impl BlockEntityPart for MovingPart {
         } else {
             [payload_pos[0], payload_pos[1] + 1, payload_pos[2]]
         };
-        let blocked = level
-            .has_collisions(
-                host,
-                [
-                    f64::from(next_pos[0]),
-                    f64::from(next_pos[1]),
-                    f64::from(next_pos[2]),
-                    f64::from(next_pos[0] + 1),
-                    f64::from(next_pos[1] + 1),
-                    f64::from(next_pos[2] + 1),
-                ],
-            )
-            .unwrap_or(false);
+        let blocked = next_pos != payload_pos
+            && level
+                .has_collisions(
+                    host,
+                    [
+                        f64::from(next_pos[0]),
+                        f64::from(next_pos[1]),
+                        f64::from(next_pos[2]),
+                        f64::from(next_pos[0] + 1),
+                        f64::from(next_pos[1] + 1),
+                        f64::from(next_pos[2] + 1),
+                    ],
+                )
+                .unwrap_or(false);
         data.insert("CollisionBlocked".into(), Tag::Byte(blocked as i8));
         let moving = scroll.is_some_and(|value| value != 0) || (!powered && offset < 8);
         if !blocked && moving && data.contains_key(&"PayloadPos".into()) {
