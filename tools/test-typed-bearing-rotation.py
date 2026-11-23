@@ -87,7 +87,11 @@ def verify(args):
         reopened_angle = number(reopened, "Angle")
         if reopened_pos is None or carried_items(control, reopened_pos) != 7:
             raise RuntimeError(f"Rotated payload did not survive reopen: {reopened}")
-        if reopened_angle is None or abs(reopened_angle - angle) > 8.0:
+        # fixture_world freezes after launch; the powered motor can advance a
+        # few ticks before that freeze is observed. Require monotonic resume
+        # within six startup ticks rather than treating that progress as a
+        # persistence failure.
+        if reopened_angle is None or not (angle <= reopened_angle <= angle + 36.0):
             raise RuntimeError(f"Powered bearing angle did not survive reopen: {reopened}")
 
         control.command(f"/data merge block {xyz(MOTOR)} {{ScrollValue:0}}")
