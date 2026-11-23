@@ -730,3 +730,122 @@ Every distinct family row and exact-ID registry inventory entry below has a prim
 | `create:haunting/compat/farmersdelight/rotten_tomato` | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
 
 Repeated identical family labels within one matrix section are intentionally mapped once. Cross-cutting static content does not transfer ownership of the underlying machine algorithm. APP-2163 owns stationary processing/logistics; APP-2164 owns common player interaction and static content; APP-2165 owns moving assemblies/trains; APP-2136 owns residual kinetic behavior plus shared integration.
+
+## Central integration progress (2026-11-23)
+
+Reviewed APP-2163 PR #193 commits `3534d45` and `6360a23`: the existing
+Millstone tick path now calls the extracted pure `native/millstone_processing.rs`
+transition. Its focused Rust checks and GitHub quick checks passed. This owner
+integrated both commits into the PR #192 working branch and added the module to
+`native/horizon-mixin.toml` plus the kinetic probe crate/stager so the source is
+available to the typed package without pulling in `machines.rs`'s sibling
+machine closure. At this earlier checkpoint the pinned SDK validation was
+pending; the result below supersedes that status.
+
+APP-2164 PR #194's signed-speed zero-detent fix (`signed_speed`) is also
+integrated. It repairs the legacy board conversion. The later typed board Part
+and setter compile, but normal screen opening and host/guest configuration
+remain unverified. APP-2165's draft PR #195 is stacked on PR #192 and includes
+a typed mechanical-bearing feasibility probe. The later section records its
+pinned compile and bounded world-runtime results. Neither lane checkpoint
+establishes full processing or train migration.
+
+## Frozen-SDK kinetic and follow-on probe (2026-11-23)
+
+### Compiled dependency closure
+
+The bounded probe staged typed sources rather than trimming siblings out of
+`machines.rs`. Its closure was `kinetic_slice` + `kinetic_adapter` + the
+APP-2164 `motor_board` Part; Millstone Part/container + pure
+`millstone_processing` + the `create:milling` raw recipe serializer; and the
+APP-2165 bearing payload Part. It registered only Creative Motor, shaft,
+cogwheel, large cogwheel, Millstone and mechanical-bearing blocks. The other
+22 machinery modules were not included, and their omitted diagnostics are not
+migration defects.
+
+The normal pinned `native-build` passed with launcher 0.2.105, Rust 1.99.1,
+Horizon `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, MC 26.3 and mixins
+`e59da9094f0c2fdda6c627fe9eff22dec6a906f0`. Lane source heads were APP-2164
+`915b4b6`, APP-2163 `39e6c28`, APP-2165 `476f5b2`; final artifact was
+`native-0a875da-fd5a34da7dae`.
+
+### Runtime evidence on that artifact
+
+- Creative Motor placement: 7/7 Java cases.
+- Shaft/cogwheel graph: 36/36 Java trace ticks.
+- Connected and idle Motor save/reopen preserved `ScrollValue`, Motor speed
+  and driven shaft speed.
+- Supported offscreen Motor rendering: all six facings at both signed speeds
+  matched Java axis, half-shaft side, RPM, phase and angle assertions.
+- Typed Millstone probe: a synthetic `create:milling` wheat recipe completed
+  at 16 RPM; zero-speed input and existing output remained through save/reopen.
+- Typed bearing probe: a chest carrying seven iron ingots moved through the
+  payload path, retained inventory across active save/reopen, carried the host
+  player and reached the safe dismount state.
+
+The Millstone test exposed two closure/adaptation needs. The typed package
+must register the mod-owned `create:milling` recipe type and raw serializer.
+Create writes ingredients as `{item: ...}` / `{tag: ...}`, while the pinned
+`Host::recipe_ingredient` accepts a bare id, `#tag` or a string list; the
+adapter now normalizes those forms. This is a small supported-API adaptation,
+not an engine rewrite. The synthetic fixture does not prove the production
+wheat/flour recipe, output backpressure, automation or LAN behavior.
+
+### Remaining concrete gates
+
+The kinetic calculation and typed world adapter are viable without the
+monolithic machine closure. The complete user flow is not: the typed board
+Part and shared setter compile, but `PlayerRef::open_mod_menu` needs opaque
+`MenuKey`. The pinned public API exposes `menu_keys()` and `menu_key_id(key)`,
+but no supported content-id-to-key lookup or registrar resolver. The empty-hand
+board hook therefore remains non-opening; normal host/guest setting changes
+are unverified. No opaque-key indexing was used. This specific API seam is not
+evidence that the kinetic graph requires a broad rewrite.
+
+The bearing is a minimal typed feasibility probe, not a full bearing port: its
+runtime check covers block movement, inventory conservation, save/reopen, a
+host rider and safe terminal dismount. Legacy controls, arbitrary glued
+payloads, collision parity, guest riders, rendering and train behavior remain
+open. The typed Millstone uses a synthetic recipe; production recipe and
+inventory automation checks remain open.
+
+The broader `tools/test-kinetic-network-sources.py` does not pass on this
+adapter: it stops at the first assertion because the typed path publishes
+`Speed` / `MotorGeneratedSpeed` but does not publish legacy `Capacity` and
+`Stress` fields. That suite also exercises multiple-source conflicts and
+network merge/split behavior beyond the one-motor gear-train slice. Keep those
+as explicit kinetic follow-ups; do not infer their correctness from the 36-row
+single-source trace.
+
+The probe stager omits `BlockProperties.waterloggable` because the pinned
+content schema rejects it. The probe is not waterlogging-equivalent; production
+`.hmod` content was not stripped. Offscreen rendering currently validates the
+existing Motor rotation only.
+
+### Time and next steps
+
+The final `native-build` command reported 1 second (earlier iterations were
+0–1 seconds) and selected `native-0a875da-a61b632c7d2d`. The six final runtime
+suites accumulated about 69 seconds by the tool-reported wall times. The
+elapsed implementation cycle from resume to this report was 45 minutes 11
+seconds, including inspection, code changes, builds and
+runtime checks; uninterrupted coding time was not instrumented.
+
+Runtime traces/logs are retained under `.local/candidate-a61b632c7d2d-*`. The
+older working build and reference fixtures remain. PR #192 remains draft; the
+engine and shared pin are unchanged.
+
+1. Resolve the public `MenuKey` seam, then wire the existing board action and
+   verify host/guest setting changes plus shaft convergence.
+2. Run the typed Millstone against the production wheat/flour recipe, then
+   verify conservation, idle/active reopen, full outputs, hopper insertion and
+   extraction, and host/guest inventory authority. Reuse its current
+   Part/container/timer and recipe normalization.
+3. Bridge the bearing probe to actual legacy assembly/control, collision and
+   guest-rider semantics before measuring a train slice; the current proof does
+   not justify a train-monolith migration.
+
+The bounded proof shows typed adapters compile and run on the frozen SDK, with
+one known public menu-resolution gap before the normal kinetic user flow is
+complete. Re-estimate remaining effort from these scoped results; the broad
+full-mod estimate was not measured by this checkpoint.

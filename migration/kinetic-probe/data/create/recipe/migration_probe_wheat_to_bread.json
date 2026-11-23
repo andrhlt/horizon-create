@@ -1,0 +1,6 @@
+{
+  "type": "create:milling",
+  "ingredients": [{ "item": "minecraft:wheat" }],
+  "results": [{ "id": "minecraft:bread", "count": 1 }],
+  "processing_time": 2
+}

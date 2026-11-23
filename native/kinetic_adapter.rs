@@ -209,9 +209,7 @@ impl BlockEntityPart for KineticPart {
         scale[axis] = 0.5;
         event.draw.translate(offset);
         event.draw.scale(scale);
-        let drawn = event
-            .draw
-            .block(shaft, &[("axis", ["x", "y", "z"][axis])]);
+        let drawn = event.draw.block(shaft, &[("axis", ["x", "y", "z"][axis])]);
         event.draw.still();
         event.draw.pop();
         if std::env::var_os("CREATE_MOTOR_RENDER").is_some() {
