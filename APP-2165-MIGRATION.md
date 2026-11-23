@@ -17,14 +17,17 @@ pose, and disassembly returns blocks and inventories together.
 ## First retained slice
 
 The first bounded implementation is an assembled bearing payload with a chest
-and one rider. It covers start, motion, safe dismount, and one-shot disassembly
-with inventory conservation. The pure lifecycle checks are in
-`tools/test-moving-slice.py` and run without a game window or input.
+and one rider. `migration/motion-probe` registers a typed
+`BlockEntityPart` for `create:mechanical_bearing`; its load callback persists a
+payload, its server tick advances the motion offset and records a collision
+query, and its terminal state records safe rider dismount/disassembly. The
+pure lifecycle checks are in `tools/test-moving-slice.py` and run without a
+game window or input.
 
 The typed-Part base is PR #192 at `9009897f5461d3e0662b7114dd2a87ac42d417f4`.
 Its verified SDK boundary supplies block-entity save/load, server ticks, client
-draw submission, and collision queries. The next integration patch must bind
-the existing bearing capture/restore path to those callbacks; this PR does not
+draw submission, and collision queries. This probe is the minimal compile/runtime
+candidate for binding the existing bearing capture/restore path; it does not
 claim train, passenger, or LAN parity yet.
 
 ## Evidence and remaining work
