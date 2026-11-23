@@ -439,3 +439,186 @@ roughly 1 minute across the passing gear/placement/reopen fixtures, and about
 1.5 minutes across the failed render and guest checks. Fixture startup includes
 resource loading; these are command durations, not counted as implementation
 time. No processing or train flow has been started.
+
+## FEATURE-MATRIX migration ownership (2026-11-23)
+
+Every distinct family row and exact-ID registry inventory entry below has a primary migration owner. This assigns engine-migration ownership only; it does not reopen completed gameplay tickets or change historical verification. A primary family owner owns its gameplay adapter and focused fixtures. The listed co-owner owns only the named cross-cutting seam. APP-2136 retains shared typed-Part/package-root/registry integration and the bounded kinetic family.
+
+| FEATURE-MATRIX family | Primary migration owner | Explicit boundary |
+| --- | --- | --- |
+| Kinetic network propagation, speed, stress and overload | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Small and large cogwheels, encased cogwheels | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Shafts, andesite and brass encased shafts | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Gearbox and Vertical Gearbox | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Clutch and Gearshift | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Encased Chain Drive and Adjustable Chain Gearshift | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Sequenced Gearshift | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Creative Motor | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Rotation Speed Controller | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Hand Crank | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Copper Valve Handle and all dyed handles | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Water Wheels and Large Water Wheels | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Speedometer and Stressometer | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Flywheel | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Turntable | APP-2136 | Bounded kinetic graph/source/transmission/stress adapter; avoid unrelated machine modules. |
+| Millstone | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Crushing Wheels and controller | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Mechanical Press | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Basin compacting and mixing | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Mechanical Crafters | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Mechanical Saw | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Mechanical Drill | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Deployer | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Encased Fan | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Nozzle | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Sequenced Assembly and unfinished ingredients | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Sandpaper and Red Sandpaper | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Fluid Pipe, Glass Fluid Pipe, Smart Fluid Pipe | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Encased Fluid Pipe | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Mechanical Pump | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Fluid Valve | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Fluid Tank and Creative Fluid Tank | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Item Drain | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Hose Pulley | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Spout | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Potion fluids and heated brewing | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Honey, chocolate and tea | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Blaze Burner, fuels and blaze cakes | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Steam Engine, boiler and Powered Shaft | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Steam Whistle and extension | APP-2163 | Stationary processing/inventory/fluid behavior; common menu/network binding remains APP-2164. |
+| Super Glue and assembly selection | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Linear, Secondary Linear and Radial Chassis | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Mechanical Bearing | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Windmill Bearing and colored sails | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Clockwork Bearing | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Cuckoo Clock and Mysterious Cuckoo Clock | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Mechanical Piston, Sticky Mechanical Piston, Extension Poles | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Rope Pulley and moving payload | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Elevator Pulley, Elevator Contacts and cabin | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Gantry Shaft and Gantry Carriage | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Cart Assembler and Controller Rail | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Minecart Coupling, Anchor and portable contraption items | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Contraption Controls | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Harvester and Plough | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Mechanical Roller | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Dispensers, droppers and mounted actor behaviors | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Portable Storage and Fluid Interfaces | APP-2165 | APP-2165 owns moving target/lifecycle; APP-2163 owns inventory/fluid semantics; APP-2164 owns player interaction dispatch. |
+| Seats and colored seats | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Sticker | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| General contraption rendering, collision and synchronization | APP-2165 | Moving assemblies, lifecycle, collision and moving rendering; mounted inventory contents co-owned with APP-2163; input/menu dispatch with APP-2164. |
+| Mechanical Belt and Belt Connector | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Depot | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Weighted Ejector | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Chute and Smart Chute | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Andesite and Brass Funnels | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Andesite and Brass Tunnels | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Mechanical Arm | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Item Vault | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Creative Crate | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Item Hatch | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| List Filter, Attribute Filter and Package Filter | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Cardboard packages and rare variants | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Packager | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Repackager | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Stock Link | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Redstone Requester | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Stock Ticker and Stock Keeper | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Factory Gauge and Factory Panels | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Chain Conveyor | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Frogport | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Postboxes, 16 dyed blocks and items | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Table Cloths, 16 colors and 3 metal variants | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Shopping List | APP-2163 | Item logistics and inventory behavior; shared player interactions/UI with APP-2164. |
+| Redstone Contact | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Redstone Link | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Linked Controller and Lectern Controller | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Analog Lever | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Powered Latch and Powered Toggle Latch | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Pulse Repeater, Extender and Timer | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Desk Bell | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Peculiar Bell and Haunted Bell | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Stockpile Switch | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Smart Observer (Content Observer) | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Display Link and Display Board | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Nixie Tubes and dyed variants | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Rose Quartz Lamp | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Controller Rail | APP-2164 | Redstone/display family and common interaction/network hooks; kinetic consumers remain APP-2136. |
+| Train Track, curved spans and Railway Casing | APP-2165 | APP-2165 owns moving/train behavior; APP-2164 co-owns player input, menus and common networking. |
+| Fake Track | APP-2165 | APP-2165 owns moving/train behavior; APP-2164 co-owns player input, menus and common networking. |
+| Track Observer | APP-2165 | APP-2165 owns moving/train behavior; APP-2164 co-owns player input, menus and common networking. |
+| Bogeys and train assembly | APP-2165 | APP-2165 owns moving/train behavior; APP-2164 co-owns player input, menus and common networking. |
+| Train Station, names and dispatch | APP-2165 | APP-2165 owns moving/train behavior; APP-2164 co-owns player input, menus and common networking. |
+| Train Signals and occupancy | APP-2165 | APP-2165 owns moving/train behavior; APP-2164 co-owns player input, menus and common networking. |
+| Manual driving and Train Controls | APP-2165 | Track/train/moving state, collision and rendering; schedules/controls UI and common input/network dispatch co-owned with APP-2164. |
+| Train Schedules, conductor and schedule condition editor | APP-2165 | APP-2165 owns moving/train behavior; APP-2164 co-owns player input, menus and common networking. |
+| Scheduled routing and arrival | APP-2165 | Track/train/moving state, collision and rendering; schedules/controls UI and common input/network dispatch co-owned with APP-2164. |
+| Train passengers, seats and dismount | APP-2165 | APP-2165 owns moving/train behavior; APP-2164 co-owns player input, menus and common networking. |
+| Mounted train item and fluid storage | APP-2165 | APP-2165 owns moving target/lifecycle; APP-2163 owns inventory/fluid semantics; APP-2164 owns player interaction dispatch. |
+| Train post routes, parcels and station buffers | APP-2165 | APP-2165 owns moving/train behavior; APP-2164 co-owns player input, menus and common networking. |
+| Train door integration | APP-2165 | APP-2165 owns moving/train behavior; APP-2164 co-owns player input, menus and common networking. |
+| Train display sources, announcements and audio | APP-2165 | APP-2165 owns moving/train behavior; APP-2164 co-owns player input, menus and common networking. |
+| Zinc Ore, deeper Zinc Ore, raw/zinc blocks and Zinc processing | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Create stone world generation and Striated Ore | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Decorative stone palettes | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Rose Quartz and Polished Rose Quartz palettes | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Glass windows and panes | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Train Trapdoor and Framed Glass Trapdoor | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Copycat Panel, Step, base and Bars | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Andesite, Brass and Copper Casings | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Andesite Alloy and Industrial/Weathered Iron blocks | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Metal Bars | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Metal Ladders | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Andesite, Brass and Copper Scaffolding | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Metal Girders and encased Girder Shafts | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Wooden and Metal Brackets | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Copper Shingles and Tiles, slabs, stairs, wax/oxidation variants | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Placard | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Sliding Doors and train-side door interactions | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Shadow Steel and Refined Radiance family | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Common parts and metal intermediates | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Experience Nugget and Experience Block | APP-2164 | Content/static assets/worldgen; moving train-side door behavior co-owned with APP-2165. |
+| Wrench | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Engineer's Goggles | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Clipboard | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Cardboard, Pulp, Cardboard Block and Bound Cardboard | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Cardboard armor and disguise | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Cardboard Sword | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Copper Backtank, Copper Diving Helmet and Copper Diving Boots | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Netherite Backtank and Netherite diving gear | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Toolbox, 16 colors | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Potato Cannon | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Extendo Grip | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Wand of Symmetry | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Handheld Worldshaper | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Tree Fertilizer | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Shears/deployer interactions | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Create foods and Builder's Tea | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Crafting Blueprint and Blueprint display | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Empty Schematic, Schematic and Quill, Schematic Table | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Schematicannon | APP-2164 | Tools, equipment, screens and player interactions; recipe/machine outputs co-owned with APP-2163. |
+| Survival progression and advancement ownership | APP-2164 | Static presentation, UI and compatibility; machine recipe logic with APP-2163; kinetic rendering/dispatch with APP-2136; moving presentation with APP-2165. |
+| Creative tabs, creative search and item attribution | APP-2164 | Static presentation, UI and compatibility; machine recipe logic with APP-2163; kinetic rendering/dispatch with APP-2136; moving presentation with APP-2165. |
+| Crafting, Stonecutting, smelting, blasting, smoking and campfire recipes | APP-2164 | Static presentation, UI and compatibility; machine recipe logic with APP-2163; kinetic rendering/dispatch with APP-2136; moving presentation with APP-2165. |
+| Machine recipe logic and registry integration | APP-2163 | Static presentation, UI and compatibility; machine recipe logic with APP-2163; kinetic rendering/dispatch with APP-2136; moving presentation with APP-2165. |
+| Block, item and entity models, textures and animation | APP-2164 | APP-2164 owns static assets; APP-2136 owns bounded kinetic dynamic state; APP-2165 owns moving-world rendering. |
+| Sounds, particles and effects | APP-2164 | APP-2164 owns shared asset/event registration; each gameplay lane owns its event triggers and state. |
+| Localization and UI | APP-2164 | Static presentation, UI and compatibility; machine recipe logic with APP-2163; kinetic rendering/dispatch with APP-2136; moving presentation with APP-2165. |
+| Ponder and tutorials | APP-2164 | Static presentation, UI and compatibility; machine recipe logic with APP-2163; kinetic rendering/dispatch with APP-2136; moving presentation with APP-2165. |
+| Server configuration, permissions and persistence | APP-2136 (integration); each lane (family state) | APP-2136 owns shared save/runtime integration; APP-2163/2164/2165 own their family-specific data and multiplayer behavior. |
+| Java integration equivalents | APP-2164 | APP-2164 owns screens/input/common networking; APP-2163 owns recipe lookup/content integration. |
+| Blocks | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| Items | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| Recipes | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| Block entity types | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| Entity types | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| Fluids | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| Menus | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| Particle types | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| Recipe types | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| Sound events | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| Java recipe ID | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| `create:emptying/compat/farmersdelight/milk_bottle` | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| `create:filling/compat/farmersdelight/milk_bottle` | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+| `create:haunting/compat/farmersdelight/rotten_tomato` | APP-2136 | Central registry/package manifest integration; functional tests stay with the owning family. |
+
+Repeated identical family labels within one matrix section are intentionally mapped once. Cross-cutting static content does not transfer ownership of the underlying machine algorithm. APP-2163 owns stationary processing/logistics; APP-2164 owns common player interaction and static content; APP-2165 owns moving assemblies/trains; APP-2136 owns residual kinetic behavior plus shared integration.
