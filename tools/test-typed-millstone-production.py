@@ -2,13 +2,46 @@
 """Exercise the real Create wheat milling recipe and output backpressure."""
 
 import argparse
+from contextlib import contextmanager
 from pathlib import Path
+import tempfile
 
-from fixture_world import fixture_world
+from fixture_world import FixtureWorld, install_pack
+from launcher_managed import launch_managed
 
 
 MILL = (0, 100, 0)
 PROCESSING_TICKS = 155
+
+
+@contextmanager
+def managed_fixture(args, pack):
+    with tempfile.TemporaryDirectory(prefix="hc-managed-millstone-") as tmp:
+        scratch = Path(tmp)
+        socket = scratch / "ctl.sock"
+        game = scratch / "game"
+        install_pack(game, pack)
+        process, log, log_path, _ = launch_managed(
+            args.client.parent,
+            socket,
+            game,
+            "TypedMillstoneProduction",
+            instance=args.instance,
+            launcher=args.launcher,
+            launcher_home=args.launcher_home,
+            resources=args.resources,
+            creative=True,
+        )
+        control = FixtureWorld(args.ctl, socket, {}, launch=())
+        try:
+            control.call("script", script='command "/tick freeze"\n')
+            yield control
+        finally:
+            if socket.exists():
+                control.stop()
+            process.wait(timeout=30)
+            if not log.closed:
+                log.close()
 
 
 def xyz(pos):
@@ -21,7 +54,7 @@ def block_data(control):
 
 def advance(control, ticks):
     for _ in range(ticks):
-        control.step_to(control.clock() + 1)
+        control.call("command", "/tick step 1")
 
 
 def require_flour(data):
@@ -30,7 +63,7 @@ def require_flour(data):
 
 
 def verify(args):
-    with fixture_world(args, "TypedMillstoneProduction", pack=args.pack) as control:
+    with managed_fixture(args, args.pack) as control:
         control.commands((
             f"/setblock {xyz(MILL)} create:millstone",
             f"/data merge block {xyz(MILL)} {{Speed:16.0f}}",
@@ -66,6 +99,9 @@ def main():
     for name in ("ctl", "client", "resources"):
         parser.add_argument(name, type=lambda value: Path(value).resolve(strict=True))
     parser.add_argument("--pack", type=Path)
+    parser.add_argument("--instance", required=True)
+    parser.add_argument("--launcher", type=Path, required=True)
+    parser.add_argument("--launcher-home", type=Path, required=True)
     verify(parser.parse_args())
 
 
