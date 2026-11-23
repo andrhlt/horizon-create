@@ -850,3 +850,91 @@ The bounded proof shows typed adapters compile and run on the frozen SDK, with
 one known public menu-resolution gap before the normal kinetic user flow is
 complete. Re-estimate remaining effort from these scoped results; the broad
 full-mod estimate was not measured by this checkpoint.
+
+## Capacity, stress and source-transition checkpoint (2026-11-23)
+
+This supersedes the earlier source-network and MenuKey gate notes above. I
+extended the same bounded graph rather than importing `machines.rs` or any of
+the 22 omitted families. `kinetic_slice` now resolves motor source capacity,
+network RPM, Millstone impact and opposing-source conflict; `kinetic_adapter`
+publishes `Network.Capacity` and `Network.Stress` while preserving sibling
+network tags. It uses the retained constants and rules: a Creative Motor yields
+16,384 capacity per generated RPM; Millstone contributes 4 stress units per
+RPM adjusted by its graph ratio; sources sum capacity, greatest absolute
+supplied RPM wins, and the network overload boundary is strictly
+`stress > capacity`. The Millstone adapter uses effective speed at that same
+boundary, so overloaded motion does not continue processing.
+
+A supported `LevelRef::destroy_block(host, pos, drop, tool, collect)` call now
+removes a newly joined kinetic bridge when opposing nonzero source directions
+conflict, retaining normal drops. The existing Java transition fixture verifies
+equal, weaker and stronger conflicting joins; equal and unequal source merges;
+separation; motor-setting changes; and idle/active reopen. The adapter stages
+all retained network state and updates connected members from the graph.
+
+### Verified on the latest normal SDK candidate
+
+Pinned optimized `native-build` passed on launcher 0.2.105 / Rust 1.99.1 with
+Horizon `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, MC 26.3 and the unchanged
+mixins pin. Candidate: `native-0a875da-bd31d83d5ff9`. The probe-content SHA-256
+remains `b185423f64c75cfae3c24a31cfc17de72257447eb43998520fcef89b8bc9775a`.
+
+All eight headless/offscreen suites passed on that artifact:
+
+- `test-shaft-and-cogwheel.py`: 36/36 Java trace ticks.
+- `test-creative-motor-placement.py`: 7/7 placement cases.
+- `test-creative-motor-reload.py`: driven and idle persistence after reopen.
+- `test-creative-motor-render.py`: six facings at both signed settings through
+  the supported offscreen render path.
+- `test-kinetic-network-sources.py`: source conflict, merge/split and reopen
+  trace.
+- `test-typed-kinetic-stress.py`: motor capacity 262,144 and Millstone stress
+  64 at 16 RPM.
+- `test-typed-millstone-probe.py`: synthetic recipe, idle input and reopen.
+- `test-typed-bearing-probe.py`: seven-item payload, host rider and reopen.
+
+The standalone pinned Rust test harness for `native/kinetic_slice.rs` passed
+4/4, including exact-capacity operation, overload above capacity, capacity
+summing, and opposing source detection. The runtime stress fixture exercises
+real graph publication at its measured motor/Millstone values; an actually
+overloaded motor-to-Millstone world is not claimed because the bounded fixture
+load is far below Creative Motor capacity. Runtime command wall times summed
+across the eight concurrently run fixtures were about 84 seconds; their total
+batch wall time was about 16 seconds. The final SDK build reported 0 seconds
+(launcher rounded subsecond elapsed time). The retained artifacts are
+`.local/candidate-bd31d83d5ff9-horizon-ctl` (SHA-256
+`61ab9be5b1f232446f1d6d5be4b296b954d538986bbac38dc5f54ba8c7e11372`) and
+`.local/candidate-bd31d83d5ff9-horizon-client` (SHA-256
+`012bf6dbfecb095bfb27f9b84452105639501cc5444aca15517360cd90547935`). The fixture and pure-test loop after
+the previous checkpoint took about 17 minutes wall-clock; uninterrupted coding
+time was not instrumented.
+
+### Remaining kinetic and lane boundaries
+
+The earlier statement that the pinned API lacks a menu identifier resolver is
+incorrect. `KeysHost::menu_keys()` and `KeysHost::menu_key_id(MenuKey) -> String`
+provide a supported canonical-ID scan, and APP-2164 has now pushed it in PR #194
+(commit `c243446`); typed board opening compiles. A distinct click-input gap
+remains on the typed route: the prebuilt API exposes
+`screen_mouse_button_pressed_pre(&dyn ClientHost)`, while `MenuRef::click_button`
+requires `&mut dyn ClientHost`, and the pinned prebuilt API has no
+`screen_click` callback. The lane is investigating the existing legacy
+screen/input route. No guest setting change through the typed board has yet
+passed runtime acceptance; this is an API-boundary finding for click delivery,
+not a MenuKey lookup blocker.
+
+Waterlogging remains a content-compatibility gap: the isolated probe stager
+omits the pinned-schema-unsupported `BlockProperties.waterloggable`, and emits
+that warning each time it stages. Production source content was not stripped.
+The Millstone recipe is synthetic; production wheat/flour recipe, output
+backpressure and guest inventory authority remain unverified. The bearing result
+is feasibility evidence only; it is not complete legacy bearing, contraption or
+train behavior. Processing and moving-lane ownership/assessment remain separate
+from this bounded kinetic result.
+
+The motor/shaft/cogwheel adapter is viable without broad architecture changes.
+Reuse its `KineticPart` graph traversal, signed motor source, persistence/sync,
+source handling and gear ratios for the next integration step. Keep PR #192
+Draft and preserve the shared SDK pin. Continue from the board lane's supported
+menu resolver, then rerun host/guest input and save/reopen on the combined
+candidate before claiming the ordinary user flow complete.

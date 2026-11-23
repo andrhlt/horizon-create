@@ -55,6 +55,18 @@ fn float(nbt: &Compound, key: &str) -> f32 {
     }
 }
 
+fn effective_speed(nbt: &Compound) -> f32 {
+    let speed = float(nbt, "Speed");
+    let Some(Tag::Compound(network)) = nbt.get(&"Network".into()) else {
+        return speed;
+    };
+    super::kinetic_slice::effective_speed(
+        speed,
+        float(network, "Capacity"),
+        float(network, "Stress"),
+    )
+}
+
 fn set_timer(nbt: &mut Compound, timer: i32) {
     nbt.insert("Timer".into(), Tag::Int(timer));
 }
@@ -193,7 +205,7 @@ impl BlockEntityPart for MillstonePart {
         let Some((recipe_time, recipe)) = input.and_then(|stack| recipe_for(host, stack)) else {
             return;
         };
-        let speed = float(&event.entity.nbt, "Speed");
+        let speed = effective_speed(&event.entity.nbt);
         let timer = int(&event.entity.nbt, "Timer");
         match millstone_processing::tick(timer, speed, Some(recipe_time), input.is_some()) {
             Tick::Idle => {}

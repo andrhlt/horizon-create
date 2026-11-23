@@ -8,6 +8,7 @@ pub enum Node {
     Motor { facing: [i32; 3] },
     Shaft { axis: usize },
     Cogwheel { axis: usize, large: bool },
+    Millstone,
 }
 
 impl Node {
@@ -15,6 +16,15 @@ impl Node {
         match self {
             Self::Motor { facing } => face == facing,
             Self::Shaft { axis } | Self::Cogwheel { axis, .. } => face[axis] != 0,
+            Self::Millstone => face == [0, -1, 0],
+        }
+    }
+
+    fn gear(self) -> Option<(usize, bool)> {
+        match self {
+            Self::Cogwheel { axis, large } => Some((axis, large)),
+            Self::Millstone => Some((1, false)),
+            _ => None,
         }
     }
 
@@ -42,7 +52,7 @@ impl Node {
             [0, 1, 1],
         ];
         let mut result = DIRECTIONS.to_vec();
-        if matches!(self, Self::Cogwheel { .. }) {
+        if matches!(self, Self::Cogwheel { .. } | Self::Millstone) {
             result.extend(DIAGONALS);
         }
         result
@@ -55,13 +65,7 @@ impl Node {
         if adjacent && self.shaft(offset) && other.shaft(offset.map(|v| -v)) {
             return Some(1.0);
         }
-        let (
-            Self::Cogwheel { axis, large },
-            Self::Cogwheel {
-                axis: other_axis,
-                large: other_large,
-            },
-        ) = (self, other)
+        let (Some((axis, large)), Some((other_axis, other_large))) = (self.gear(), other.gear())
         else {
             return None;
         };
@@ -87,6 +91,60 @@ impl Node {
             _ => None,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Source {
+    pub speed: f32,
+    pub capacity: f32,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Network {
+    pub rpm: f32,
+    pub capacity: f32,
+    pub stress: f32,
+    pub source_conflict: bool,
+}
+
+impl Network {
+    pub fn speed(self) -> f32 {
+        effective_speed(self.rpm, self.capacity, self.stress)
+    }
+}
+
+pub fn effective_speed(rpm: f32, capacity: f32, stress: f32) -> f32 {
+    if stress > capacity { 0.0 } else { rpm }
+}
+
+/// Creative Motor's retained generator capacity is 16,384 units per RPM.
+pub fn motor_source(speed: f32) -> Source {
+    Source {
+        speed,
+        capacity: speed.abs() * 16_384.0,
+    }
+}
+
+/// Preserve the legacy source arbitration, capacity sum, and stress formula
+/// for the supported motor/shaft/cogwheel/Millstone subset.
+pub fn resolve_network(sources: &[Source], impact_per_rpm: f32) -> Network {
+    let mut network = Network::default();
+    let mut positive = false;
+    let mut negative = false;
+    for source in sources.iter().filter(|source| source.speed != 0.0) {
+        network.capacity += source.capacity;
+        if source.speed.is_sign_positive() {
+            positive = true;
+        } else {
+            negative = true;
+        }
+        if source.speed.abs() > network.rpm.abs() {
+            network.rpm = source.speed;
+        }
+    }
+    network.stress = impact_per_rpm * network.rpm.abs();
+    network.source_conflict = positive && negative;
+    network
 }
 
 pub fn motor_speed(facing: [i32; 3], scroll_value: i32) -> f32 {
@@ -137,6 +195,53 @@ mod tests {
             ),
             Some(-1.0)
         );
+        let millstone = Node::Millstone;
+        assert_eq!(
+            millstone.ratio_to(Node::Shaft { axis: 1 }, [0, -1, 0]),
+            Some(1.0)
+        );
+        assert_eq!(
+            Node::Cogwheel {
+                axis: 1,
+                large: true
+            }
+            .ratio_to(millstone, [1, 0, 1]),
+            Some(-2.0)
+        );
+    }
+
+    #[test]
+    fn source_capacity_stress_and_overload_use_legacy_boundaries() {
+        let source = motor_source(16.0);
+        assert_eq!(source.capacity, 262_144.0);
+        let exact = resolve_network(
+            &[Source {
+                capacity: 64.0,
+                ..source
+            }],
+            4.0,
+        );
+        assert_eq!(exact.stress, exact.capacity);
+        assert_eq!(exact.speed(), 16.0);
+        let overloaded = resolve_network(
+            &[Source {
+                capacity: 63.0,
+                ..source
+            }],
+            4.0,
+        );
+        assert!(overloaded.stress > overloaded.capacity);
+        assert_eq!(overloaded.speed(), 0.0);
+        assert_eq!(effective_speed(16.0, 63.0, 64.0), 0.0);
+        assert_eq!(effective_speed(16.0, 64.0, 64.0), 16.0);
+    }
+
+    #[test]
+    fn source_capacity_sums_and_opposing_directions_conflict() {
+        let network = resolve_network(&[motor_source(16.0), motor_source(-16.0)], 0.0);
+        assert_eq!(network.capacity, 524_288.0);
+        assert_eq!(network.rpm.abs(), 16.0);
+        assert!(network.source_conflict);
     }
 
     #[test]

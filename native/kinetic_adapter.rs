@@ -27,6 +27,7 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         shaft: registrar.block_key("create:shaft"),
         cogwheel: registrar.block_key("create:cogwheel"),
         large_cogwheel: registrar.block_key("create:large_cogwheel"),
+        millstone: registrar.block_key("create:millstone"),
     };
     let _ = KINETIC_PART.set(part);
     registrar.block_entity_part(&motor, part).unwrap();
@@ -39,6 +40,7 @@ pub struct KineticPart {
     shaft: BlockKey,
     cogwheel: BlockKey,
     large_cogwheel: BlockKey,
+    millstone: BlockKey,
 }
 
 impl KineticPart {
@@ -254,6 +256,13 @@ impl BlockEntityPart for KineticPart {
             let _ = event.entity.merge_data(host, data.clone());
         }
         let graph = network(host, level, pos, Some(&data), *self);
+        if graph.get(&pos).is_some_and(|state| state.source_conflict) {
+            // Match Java's kinetic join behavior: the newly added bridge is
+            // destroyed with its ordinary drops, then adjacent networks settle
+            // independently on their next server tick.
+            let _ = level.destroy_block(host, pos, true, None, false);
+            return;
+        }
         apply_speeds(host, level, graph, *self);
     }
 
@@ -282,26 +291,14 @@ impl BlockEntityPart for KineticPart {
         if graph.is_empty() {
             return;
         }
-        for (pos, speed) in graph {
+        for (pos, state) in graph {
             let is_motor =
                 node(host, level, pos, *self).is_some_and(|n| matches!(n, Node::Motor { .. }));
             if pos == event.pos {
-                event
-                    .entity
-                    .nbt
-                    .insert("Speed".into(), Tag::Float(speed.to_bits()));
-                if is_motor {
-                    event
-                        .entity
-                        .nbt
-                        .insert("MotorGeneratedSpeed".into(), Tag::Float(speed.to_bits()));
-                }
+                persist_network(&mut event.entity.nbt, state, is_motor);
             } else if let Some(entity) = host.block_entity_identity(level, pos) {
                 let mut data = Compound::new();
-                data.insert("Speed".into(), Tag::Float(speed.to_bits()));
-                if is_motor {
-                    data.insert("MotorGeneratedSpeed".into(), Tag::Float(speed.to_bits()));
-                }
+                persist_network(&mut data, state, is_motor);
                 let _ = entity.merge_data(host, data);
             }
         }
@@ -311,20 +308,36 @@ impl BlockEntityPart for KineticPart {
 fn apply_speeds(
     host: &mut dyn ServerHost,
     level: LevelRef,
-    graph: HashMap<[i32; 3], f32>,
+    graph: HashMap<[i32; 3], kinetic_slice::Network>,
     part: KineticPart,
 ) {
-    for (pos, speed) in graph {
+    for (pos, state) in graph {
         let Some(entity) = host.block_entity_identity(level, pos) else {
             continue;
         };
         let mut data = Compound::new();
-        data.insert("Speed".into(), Tag::Float(speed.to_bits()));
-        if node(host, level, pos, part).is_some_and(|n| matches!(n, Node::Motor { .. })) {
-            data.insert("MotorGeneratedSpeed".into(), Tag::Float(speed.to_bits()));
-        }
+        let is_motor =
+            node(host, level, pos, part).is_some_and(|n| matches!(n, Node::Motor { .. }));
+        persist_network(&mut data, state, is_motor);
         let _ = entity.merge_data(host, data);
     }
+}
+
+fn persist_network(data: &mut Compound, state: kinetic_slice::Network, is_motor: bool) {
+    data.insert("Speed".into(), Tag::Float(state.rpm.to_bits()));
+    if is_motor {
+        data.insert(
+            "MotorGeneratedSpeed".into(),
+            Tag::Float(state.rpm.to_bits()),
+        );
+    }
+    let mut saved = match data.get(&"Network".into()) {
+        Some(Tag::Compound(saved)) => saved.clone(),
+        _ => Compound::new(),
+    };
+    saved.insert("Capacity".into(), Tag::Float(state.capacity.to_bits()));
+    saved.insert("Stress".into(), Tag::Float(state.stress.to_bits()));
+    data.insert("Network".into(), Tag::Compound(saved));
 }
 
 fn node(
@@ -358,6 +371,9 @@ fn node(
             large: block == part.large_cogwheel,
         });
     }
+    if block == part.millstone {
+        return Some(Node::Millstone);
+    }
     None
 }
 
@@ -367,13 +383,15 @@ fn network(
     start: [i32; 3],
     current_data: Option<&Compound>,
     part: KineticPart,
-) -> HashMap<[i32; 3], f32> {
+) -> HashMap<[i32; 3], kinetic_slice::Network> {
     let Some(start_node) = node(host, level, start, part) else {
         return HashMap::new();
     };
     let mut ratios = HashMap::from([(start, 1.0f32)]);
     let mut pending = VecDeque::from([(start, start_node)]);
+    let mut order = Vec::new();
     while let Some((pos, block)) = pending.pop_front() {
+        order.push(pos);
         let ratio = ratios[&pos];
         for delta in block.neighbors() {
             let next = [pos[0] + delta[0], pos[1] + delta[1], pos[2] + delta[2]];
@@ -394,14 +412,25 @@ fn network(
             pending.push_back((next, other));
         }
     }
-    let mut generated = 0.0;
-    for (&pos, &ratio) in &ratios {
-        let Some(Node::Motor { facing }) = node(host, level, pos, part) else {
+    let mut sources = Vec::new();
+    let mut impact_per_rpm = 0.0;
+    for pos in order {
+        let ratio = ratios[&pos];
+        let Some(block) = node(host, level, pos, part) else {
+            continue;
+        };
+        if matches!(block, Node::Millstone) {
+            impact_per_rpm += 4.0 / ratio.abs();
+        }
+        let Node::Motor { facing } = block else {
             continue;
         };
         if pos == start {
             let Some(data) = current_data else { continue };
-            generated = kinetic_slice::motor_speed(facing, scroll_value(data)) * ratio;
+            let generated = kinetic_slice::motor_speed(facing, scroll_value(data));
+            let mut source = kinetic_slice::motor_source(generated);
+            source.speed *= ratio;
+            sources.push(source);
         } else {
             let Some(entity) = host.block_entity(level, pos) else {
                 continue;
@@ -409,13 +438,20 @@ fn network(
             let Some(data) = entity.data(host) else {
                 continue;
             };
-            generated = kinetic_slice::motor_speed(facing, scroll_value(&data)) * ratio;
+            let generated = kinetic_slice::motor_speed(facing, scroll_value(&data));
+            let mut source = kinetic_slice::motor_source(generated);
+            source.speed *= ratio;
+            sources.push(source);
         }
-        break;
     }
+    let resolved = kinetic_slice::resolve_network(&sources, impact_per_rpm);
     ratios
         .into_iter()
-        .map(|(pos, ratio)| (pos, generated / ratio))
+        .map(|(pos, ratio)| {
+            let mut state = resolved;
+            state.rpm /= ratio;
+            (pos, state)
+        })
         .collect()
 }
 
