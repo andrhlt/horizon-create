@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise powered bearing rotation with adjacent payload blocks and a rider."""
+"""Exercise one powered adjacent multi-block bearing rotation with a standing rider."""
 
 import argparse
 from pathlib import Path
@@ -11,6 +11,7 @@ BEARING = (0, 100, 0)
 MOTOR = (0, 99, 0)
 CHEST = (1, 101, 0)
 BARREL = (0, 101, 1)
+OBSTACLE = (1, 101, -1)
 
 
 def xyz(pos):
@@ -22,7 +23,7 @@ def block_data(control, pos):
 
 
 def number(data, key):
-    match = re.search(rf"\b{re.escape(key)}: (-?\d+(?:\.\d+)?)(?:[fd])?", data)
+    match = re.search(rf"\b{re.escape(key)}: (-?\d+(?:\.\d+)?)(?:[bslfd])?", data)
     return float(match.group(1)) if match else None
 
 
@@ -32,7 +33,7 @@ def payload_pos(data):
 
 
 def payload_positions(data):
-    match = re.search(r"PayloadPositions: \[(.*?)\], PayloadPos:", data)
+    match = re.search(r"PayloadPositions: \[(.*?)\], x:", data)
     return [tuple(map(int, values)) for values in re.findall(
         r"\[I; (-?\d+), (-?\d+), (-?\d+)\]", match.group(1)
     )] if match else []
@@ -68,7 +69,7 @@ def setup(control, *, blocked=False):
         "/tp @s 1.5 102 0.5",
     ]
     if blocked:
-        commands.insert(4, "/setblock 0 101 -1 minecraft:stone")
+        commands.insert(4, f"/setblock {xyz(OBSTACLE)} minecraft:stone")
     control.commands(tuple(commands))
 
 
@@ -88,7 +89,7 @@ def verify(args):
             or len(rotated_positions) != 2
             or number(active, "RiderCaptured") != 1
         ):
-            raise RuntimeError(f"Powered bearing did not rotate/capture glued payload: {active}")
+            raise RuntimeError(f"Powered bearing did not rotate/capture adjacent payload: {active}")
         if sorted(carried_items(control, position) for position in rotated_positions) != [3, 7]:
             raise RuntimeError("Rotated multi-block payload inventories were not conserved.")
         expected_rider = (0.5, 102.0, -0.5)
@@ -147,7 +148,7 @@ def verify(args):
             or sorted(carried_items(control, position) for position in blocked_positions) != [3, 7]
         ):
             raise RuntimeError("Blocked bearing did not conserve the multi-block inventory.")
-    print("Powered bearing rotated adjacent payload blocks, carried a rider, survived reopen, and dismounted safely.")
+    print("Powered bearing rotated a chest+barrel payload, carried a rider, survived reopen, and dismounted safely.")
 
 
 def main():
