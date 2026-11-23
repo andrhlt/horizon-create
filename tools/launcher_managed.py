@@ -31,6 +31,7 @@ def launch_managed(version, socket, game_dir, world, *, instance, launcher,
         command.extend(("--arg", arg))
     env = os.environ.copy()
     env.update({"HORIZON_LAUNCHER_HOME": str(launcher_home),
+                "HORIZON_LAUNCHER_DEVELOPER_OFFLINE": "1",
                 "HORIZON_NO_AUDIO": "1", "HORIZON_CONTROL": str(socket)})
     log_path = game_dir / "managed-play.log"
     log = log_path.open("w")
