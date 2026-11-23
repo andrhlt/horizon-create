@@ -1,0 +1,80 @@
+{
+  "ticket": "APP-2137",
+  "status": "preparation-only",
+  "scope": [
+    "andrhlt/horizon-create",
+    "andrhlt/horizon-naturalist",
+    "andrhlt/horizon-carry-on",
+    "andrhlt/horizon-wildlife-tuning",
+    "andrhlt/horizon-huge-trees"
+  ],
+  "cohort": {
+    "horizon_revision": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+    "sdk": "sdk-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+    "minecraft": "26.3",
+    "mixins": "e59da9094f0c2fdda6c627fe9eff22dec6a906f0",
+    "launcher": {
+      "version": "0.2.105",
+      "sha256": "616af1a099421ee02370f4c4c11227ad4d5bdfbcfa968688c71085d9c074647c"
+    },
+    "rust": {
+      "version": "1.99.1",
+      "build": "58cf8f9c3",
+      "sha256": "1ba7bb8e273bd64125f4048d2ecce530e0a6470e565ab1b3aecf0b82b532f7b1"
+    }
+  },
+  "sources": {
+    "create": {
+      "repository": "andrhlt/horizon-create",
+      "commit": "9009897f5461d3e0662b7114dd2a87ac42d417f4",
+      "owner": "APP-2136",
+      "note": "PR #192 tracked build handoff; later lane commits are not frozen here."
+    },
+    "naturalist": {
+      "repository": "andrhlt/horizon-naturalist",
+      "branch": "codex/naturalist-current-integration",
+      "commit": "66e2648c4e8fc3befb0c1b6d976817e7b4beae01",
+      "owner": "APP-2135",
+      "note": "Current source checkpoint; APP-2135 integration is still in progress."
+    },
+    "carry_on": {
+      "repository": "andrhlt/horizon-carry-on",
+      "commit": "cbf23c0",
+      "manifest": "horizon-mod.toml",
+      "package": "dist/carryblock-0.3.0.hmod",
+      "package_sha256": "cdf95127110428e35d6d72ab9099c5612875dba29cbbc23be65e90220d4fe627"
+    },
+    "wildlife_tuning": {
+      "repository": "andrhlt/horizon-wildlife-tuning",
+      "commit": "1a4e173",
+      "manifest": "horizon-mod.toml",
+      "package": "dist/wildlife_cap-0.3.0.hmod",
+      "package_sha256": "85a4ad4c85376087cb72c02234d9ac7140fc785eedef4cc9339aba76c435e021"
+    },
+    "huge_trees": {
+      "repository": "andrhlt/horizon-huge-trees",
+      "commit": "addfdc9",
+      "manifest": "horizon-mod.toml",
+      "package": "dist/horizon-huge-trees.hmod",
+      "package_sha256": "cb7218d650e9db853ce38d3a2691cc0aef4ff055b70f6a5c7537dde0813424dd",
+      "content_only": true
+    }
+  },
+  "verified_inputs": {
+    "create_probe": {
+      "candidate": "native-0a875da-eb660c9fc22d",
+      "client_sha256": "012bf6dbfecb095bfb27f9b84452105639501cc5444aca15517360cd90547935",
+      "server_sha256": "2b0f3d7bd318f52a8385b7d7b28db78d13f7752d25fd30d824d487aef5fe1f1d",
+      "mod_sha256": "10f4fa31f376cd77f58467c2addebb2ea496ea2eeb5086887677ccd512a47fc2",
+      "pack_sha256": "b185423f64c75cfae3c24a31cfc17de72257447eb43998520fcef89b8bc9775a",
+      "resources": "/Users/andrewholt/Library/Application Support/horizon-launcher/versions/native-0a875da-ba7f387d1de5/.local/horizon-client/26.3"
+    },
+    "naturalist": {
+      "candidate": "native-0a875da-3d513df20090",
+      "matching_client_server": true,
+      "naturalist_library_sha256": "f353e59be73ddbba2effe680db4fb9a4d990f121ea5217cb63fd96973f5adf59",
+      "horizon_patch_library_sha256": "3b81b5cc708231cb85fd67edbf71c1656e4241e88c583eac31c944db35e936d6",
+      "note": "Historical matching-artifact evidence reused for preparation; not final cohort acceptance."
+    }
+  }
+}
