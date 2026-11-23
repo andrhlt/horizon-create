@@ -913,9 +913,13 @@ time was not instrumented.
 
 The earlier statement that the pinned API lacks a menu identifier resolver is
 incorrect. `KeysHost::menu_keys()` and `KeysHost::menu_key_id(MenuKey) -> String`
-provide a supported canonical-ID scan, and APP-2164 has now pushed it in PR #194
-(commit `c243446`); typed board opening compiles. A distinct click-input gap
-remains on the typed route: the prebuilt API exposes
+provide a supported canonical-ID scan, and APP-2164 pushed it in PR #194
+(commit `c243446`). The resolver compiles, but normal use is still not verified:
+`tools/test-creative-motor.py` did not open a board on candidate
+`native-0a875da-614736877ab7`; after right-click the captured state was
+`screen=playing`, `menu=None`, and no screen buttons. The event/registration or
+open-result cause remains unresolved. A separate click-input gap also exists
+on the typed route: the prebuilt API exposes
 `screen_mouse_button_pressed_pre(&dyn ClientHost)`, while `MenuRef::click_button`
 requires `&mut dyn ClientHost`, and the pinned prebuilt API has no
 `screen_click` callback. The lane is investigating the existing legacy
@@ -938,3 +942,30 @@ source handling and gear ratios for the next integration step. Keep PR #192
 Draft and preserve the shared SDK pin. Continue from the board lane's supported
 menu resolver, then rerun host/guest input and save/reopen on the combined
 candidate before claiming the ordinary user flow complete.
+
+
+### Board-open integration follow-up (2026-11-23)
+
+Integrated APP-2164 resolver source `c243446` into the probe’s tracked
+`native/motor_board.rs`. Pinned `native-build` passed and selected
+`native-0a875da-614736877ab7`. Headless source-transition, capacity/stress and
+motor-reload checks pass on that candidate. The focused offscreen
+`tools/test-creative-motor.py` remains failed: it reports no board/buttons after
+seven input ticks; a direct state sample shows `menu=None` and `screen=playing`.
+This does not yet isolate whether the typed Part interaction hook fired or the
+menu open was refused. Adding a separate `Registrar::block_part` registration
+was tested and immediately refused at startup with duplicate `KineticPart` and
+`MotorBoard` attachments; those lines were reverted. On this SDK path,
+`block_entity_part` already attaches a dual-trait Part's BlockPart implementation.
+
+The fixture's reported state also included `pointer_grabbed=true` under its
+offscreen interaction path. No visible window was opened, but I stopped further
+interactive offscreen trials pending confirmation that this is only the virtual
+client state and not OS pointer capture. Headless server and persistence tests
+continued.
+
+Measured since the capacity checkpoint: approximately 12 minutes additional
+wall-clock for resolver integration, build, focused test and hook registration
+investigation; active coding time was not instrumented. A test call on this
+candidate takes about 10 seconds; the normal optimized mod build rounded to
+1 second. The source-transition, stress and reload headless tests passed again.

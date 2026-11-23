@@ -20,6 +20,12 @@ pub fn setting_from_button(id: i32) -> i32 {
 #[derive(Clone, Copy, Default)]
 pub struct MotorBoard;
 
+fn menu_key(host: &dyn ServerHost) -> Option<mod_api::MenuKey> {
+    host.menu_keys()
+        .into_iter()
+        .find(|key| mod_api::__private::menu_key_id(*key).as_deref() == Some(MENU_ID))
+}
+
 pub fn register(registrar: &mut dyn mod_api::Registrar) {
     let kind = registrar.block_entity_type_key("create:motor");
     registrar
@@ -27,9 +33,7 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         .expect("creative motor board part registration");
 }
 
-/// Open the board once the caller has resolved the content menu's opaque key.
-/// The pinned SDK has no supported content-id -> `MenuKey` lookup, so the
-/// normal block-use adapter is intentionally kept as a typed seam here.
+/// Open the board with a menu key resolved from the pinned host registry.
 pub fn open_with_menu(
     host: &mut dyn ServerHost,
     click: &mod_api::BlockClick<'_>,
@@ -63,13 +67,10 @@ impl BlockPart for MotorBoard {
         if host.block_key(MENU_ID) != Some(event.state.block()) {
             return None;
         }
-        // `MenuKey` is opaque and the pinned API provides no supported lookup
-        // from the content id declared in creative_motor.json. Keep the empty
-        // hand hook installed so the integration owner can pass the resolved
-        // key without changing the authority/hand contract.
-        let _ = host;
-        let _ = event;
-        None
+        // Resolve by canonical menu id, keeping the opaque key out of content
+        // code and preserving the normal main-hand interaction contract.
+        let menu = menu_key(host)?;
+        open_with_menu(host, &event.click, menu)
     }
 }
 
