@@ -9,7 +9,7 @@ use mod_api::{
     UseWithoutItemEvent,
 };
 
-use crate::kinetic_adapter;
+use super::kinetic_adapter;
 
 const MENU_ID: &str = "create:creative_motor";
 

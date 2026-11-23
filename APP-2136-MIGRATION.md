@@ -919,15 +919,10 @@ path runs: `USE` reached the motor, the canonical resolver returned
 `key=true`, and `open_mod_menu` returned `Some(1)` / `Some(2)`. The focused
 `tools/test-creative-motor.py` still fails because after those server opens the
 client reports `screen=playing`, `menu=None`, and no screen buttons. The
-remaining gate is client-side screen presentation/widgets. A separate
-click-input gap also exists
-on the typed route: the prebuilt API exposes
-`screen_mouse_button_pressed_pre(&dyn ClientHost)`, while `MenuRef::click_button`
-requires `&mut dyn ClientHost`, and the pinned prebuilt API has no
-`screen_click` callback. The lane is investigating the existing legacy
-screen/input route. No guest setting change through the typed board has yet
-passed runtime acceptance; this is an API-boundary finding for click delivery,
-not a MenuKey lookup blocker.
+remaining gate is client-side screen presentation/widgets. No guest setting
+change through the typed board has yet passed runtime acceptance. Earlier
+click-hook failures came from cached prebuilt metadata; source provenance now
+shows this is not a proven frozen-engine capability gap (see below).
 
 Waterlogging remains a content-compatibility gap: the isolated probe stager
 omits the pinned-schema-unsupported `BlockProperties.waterloggable`, and emits
@@ -987,15 +982,138 @@ menu-key resolution and server open success; it does not pass client menu
 presentation or button interaction. The stager now sources the menu JSON from
 production `content/` so subsequent probes use the real resource.
 
-The frozen SDK source documents scoped `screen` and `screen_draw` hooks for
-block menus, plus a separate mod-owned widget screen (`mod_screen_open`,
-`screen_render_post`, and read-only mouse/key hooks). `MotorBoard` currently
-implements only the server `menu_button` callback; it does not provide a
-`screen` layout/draw implementation. That is the next bounded client-side
-transition to test, not evidence of a server open or MenuKey failure. For
-clicks on a server-owned menu, the pinned surface still has no `screen_click`
-hook and its `MenuRef::click_button` needs mutable `ClientHost`, unavailable to
-the existing pressed-pre callback. A widget-owned screen has usable input hooks,
-but its click-to-server transport is not wired yet. Do not mark ordinary
-host/guest setting changes complete until a visible controls path invokes the
-shared setter exactly once.
+The frozen SDK source documents scoped `screen`, `screen_draw`, and
+`screen_click` hooks for block menus, plus a separate mod-owned widget screen.
+`MotorBoard` currently implements only the server `menu_button` callback; it
+does not provide a `screen` layout/draw implementation. The client screen path
+is still unverified, not an established API absence. Older builds reported
+`Hooks::screen_click` E0407 and an immutable/mutable ClientHost mismatch, but
+those builds used stale cached prebuilt metadata. The source checkout
+`e9e32af90a` has merge-base exactly
+`0a875da91dbb0fdcb7ba8c42c11341aa229af51a`; its generated
+`mod_api_generated.rs` exposes `Hooks::screen`, `screen_draw`, and `screen_click`
+(SHA-256 `78cb448493be7c4f0a868592c66d429c5ba6420a478de17cd1507b4b7bd6fed2`).
+The launcher 0.2.105 prebuilt `libmod_api.rmeta` used here has SHA-256
+`b2b76c563ba4495697a8fdd357331573651884992000892e435498fa27906c21` and lacks
+`screen_click`; its build log says it reused mod tools kept from the Nov 20
+update. This is an SDK artifact provenance mismatch. Do not label it an engine
+blocker or use regenerated API metadata with the old runtime until a
+source-matched build path is demonstrated. Separate Horizon PR #1
+(`e9e32af90a`) makes `MenuRef::click_button` use the immutable host and its
+focused test emits exactly one `ContainerButtonClick(container=5, button=3)`;
+that patch is not in this candidate. APP-2164 still owns proving the matching
+typed client screen/input route. The legacy NativeScreen helpers are excluded
+from this typed probe. Ordinary host/guest settings remain unverified until a
+matching client screen, visible controls and shared server setter pass
+together.
+
+### Typed adapter source-path validation (2026-11-23)
+
+The typed adapter now imports sibling `create_kinetic_slice` / `kinetic_adapter`
+modules through `super`, and the probe stager maps those production names back
+to its standalone crate's short module names. This is path adaptation only; the
+kinetic rules are unchanged. The normal optimized build command used the
+existing instance ID `app-2136-sdk-probe` (the old display-name alias no longer
+resolves) and selected `native-0a875da-d219d9ba5254` on Horizon
+`0a875da91dbb0fdcb7ba8c42c11341aa229af51a` / MC 26.3, launcher 0.2.105,
+Rust 1.99.1, unchanged mixins and unchanged `.local/create.hmod` SHA-256
+`b185423f64c75cfae3c24a31cfc17de72257447eb43998520fcef89b8bc9775a`.
+
+On that exact candidate, headless checks passed:
+
+* `tools/test-creative-motor-reload.py`: connected signed settings and idle
+  motor settings/speeds survive reopen (9.5 s).
+* `tools/test-kinetic-network-sources.py`: source conflicts, equal/unequal
+  merges, split, idle reopen and active reopen pass (21.9 s).
+* `tools/test-typed-kinetic-stress.py`: connected 16 RPM motor/Millstone
+  reports capacity 262144, stress 64 and speed 16 (4.6 s).
+
+All three harnesses first hit sandbox `Operation not permitted` while creating
+their local control socket; rerunning through the approved scoped filesystem
+escalation reached the headless world and passed. I did not rerun the offscreen
+placement/click fixtures because the earlier offscreen snapshot reported
+`pointer_grabbed=true`; their previous passing results remain attached to the
+earlier candidates, not this final source hash. Active time for this follow-up
+is about 18 minutes wall-clock; the successful optimized compile took 1.2 s,
+and the three passing harnesses took 25.7 s as a parallel batch (35.9 s summed
+process time). The board's client layout and visible controls remain open; the
+kinetic normal-setting flow is incomplete.
+
+### Powered bearing feasibility checkpoint (2026-11-23)
+
+The latest APP-2165 probe was tested as a bounded moving feasibility slice on
+the same frozen pin, without claiming full contraption or train migration. The
+actual compile dependency closure was the existing kinetic-probe module set
+(motor registration and `ScrollValue`, kinetic adapters/content, menu and
+Millstone registration) plus the APP-2165 moving-bearing Part and the production
+`mechanical_bearing.json` block definition. A motion-only mod did not have the
+motor block-entity registration; its first launch correctly followed the idle
+path. The combined probe reuses the existing kinetic modules instead of pulling
+in unrelated machinery families. This launcher build compiles one combined
+probe mod, not the final whole Create pack.
+
+Normal optimized SDK validation passed on launcher 0.2.105 / Rust 1.99.1 / MC
+26.3 / Horizon `0a875da91dbb0fdcb7ba8c42c11341aa229af51a` / unchanged mixins.
+It reused the Nov 20 prebuilt API route and selected
+`native-0a875da-cc05729f9304`; launcher reported one second. The artifact's
+`native-mods.json` SHA-256 is
+`5c4473beeb89a702bcf306af13f8baebce4926fedadeee695a6b820bc3b4f249`, and
+`libmod_create_kinetic_probe.dylib` SHA-256 is
+`bb06d4bce80803cb638646d1295089c45cd8fcc2934e9a3844fbfa6040da17bd`. It used
+the unchanged Create pack SHA-256
+`b185423f64c75cfae3c24a31cfc17de72257447eb43998520fcef89b8bc9775a`. The
+staged root registration was based on `migration/kinetic-probe/src/lib.rs`
+(staged SHA-256
+`ba7ece5eb3d61fce535134dbe4ff1c525999eac2bb53ee7977669ad44e2bac24`). The
+moving Part implementation came from APP-2165 PR #195 head `4fdeb64`, source
+`migration/motion-probe/src/lib.rs` (SHA-256
+`1412d6b57f9b28e52e74dca957c0bfd571ac42ce161d6d23228288c60ea1f6cb`); for the
+combined crate, only its package-level Hooks tail was replaced with a
+`register` function. The compiled staged `moving_probe.rs` SHA-256 is
+`a67b67f5eb7b1398feea4750e8f2764e4a195e4aa87bc178dbe57e7efcb4e03f`.
+
+The headless command was
+`TMPDIR=/private/tmp/hc-fixtures PYTHONPATH=tools python3
+.local/sdk-check/app2165-83d2e97/tools/test-typed-bearing-rotation.py
+.local/sdk-check/home/versions/native-0a875da-cc05729f9304/horizon-ctl
+.local/sdk-check/home/versions/native-0a875da-cc05729f9304/horizon-client
+'<26.3 resource directory>' --pack .local/create.hmod`; the test source hash is
+`18923242721ead7b7fbb5f3929b39baae3107ce7c5590733c25c4c0f073ab58f`. It
+passed both powered and blocked worlds: a 20 RPM motor advanced angle to about
+90° in 15 controlled ticks; the chest rotated to `(0,101,-1)`; the rider
+followed within fixture tolerance; seven iron ingots were conserved; active
+save/reopen retained the payload and angle progression; zero power and an
+occupied target both ended motion with safe dismount. The initial rider run
+exposed a real defect: rounded angular steps with no block-coordinate movement
+were treated as a dismount and teleported the rider to `(0,0,0)`. APP-2165
+fixed this by distinguishing no positional delta from an explicit dismount.
+The passing reopen check measures `MotionOffset` delta and checks six degrees
+per actual Part tick; world startup clock ticks differ from bearing Part ticks.
+The fixture used headless clients and the approved local-socket filesystem
+escalation; no visible client was opened.
+
+On the same artifact, three kinetic regressions also passed in about 20 seconds
+batch wall time: motor settings/speeds persisted through reopen; equal/weaker/
+stronger sources, merge/split and active/idle reopen passed; and the motor/
+Millstone graph published capacity `262144`, stress `64`, and speed `16` at 16
+RPM. Their scripts were `test-creative-motor-reload.py`,
+`test-kinetic-network-sources.py`, and `test-typed-kinetic-stress.py`.
+
+This is feasibility evidence for one up-facing bearing, an adjacent creative
+motor and one immediately adjacent chest. Server payload relocation is discrete
+block movement; continuous client pose is a separate rendering path. It does
+not prove arbitrary glue/BFS payload capture, multiple blocks or entities,
+complete item restoration, general collision restoration, LAN guest rider
+safety, or trains. Those limitations and the typed screen artifact provenance
+mismatch remain open. The source-matched typed motor board screen has not yet
+passed; APP-2164's latest candidate must stage `native/motor_board.rs` and
+match generated SDK metadata to its runtime.
+
+Measured since the previous kinetic checkpoint: three optimized launcher build
+attempts completed in about one second each after staging corrections; the
+successful powered fixture and three kinetic regressions together used roughly
+35 seconds of headless test runtime. Wall-clock implementation time was not
+instrumented; this investigation/integration cycle took about 25 minutes by
+elapsed work. The earlier 4–7 engineer-day estimate is not a measured rate and
+should be replaced with scoped estimates after board source/runtime provenance
+is resolved. No processing or train expansion was performed in this cycle.

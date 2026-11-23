@@ -36,6 +36,14 @@ def main():
                     "super::create_millstone_processing", "super::millstone_processing"
                 )
             )
+        if name == "kinetic_adapter.rs":
+            # The production mixin names this sibling `create_kinetic_slice`;
+            # the bounded standalone crate keeps the shorter module name.
+            destination.write_text(
+                destination.read_text().replace(
+                    "super::create_kinetic_slice", "super::kinetic_slice"
+                )
+            )
     copy2(SOURCE / "src/moving_probe.rs", OUTPUT / "src/moving_probe.rs")
     menu = OUTPUT / "data/create/horizon/menu"
     menu.mkdir(parents=True, exist_ok=True)
