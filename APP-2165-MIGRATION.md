@@ -70,6 +70,15 @@ fixture is `tools/test-typed-bearing-rotation.py`; it is a bounded one-chest
 rotation check, not full glue graph, actor, guest, or legacy `MovedBlocks`
 parity.
 
+The typed client seam now also has a continuous render bridge: the bearing's
+`block_entity_submit` reads synchronized angle/RPM, applies the partial-tick
+angular phase with `BlockEntityDrawContext::rotate_about`, and submits the
+captured chest model through `block`. This is the smallest supported visual
+closure for the retained slice. The public surface does not expose arbitrary
+moving-payload collision geometry or a server-side contraption entity graph to
+the client renderer, so collision/restoration remains authoritative and
+discrete until that broader bridge exists.
+
 ## Evidence and remaining work
 
 - Pure lifecycle: assembly, motion, rider landing, and conservation pass.
