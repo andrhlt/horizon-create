@@ -90,6 +90,71 @@ impl BlockPart for MotorBoard {
 
 #[mod_api::horizon_part]
 impl BlockEntityPart for MotorBoard {
+    fn screen(
+        &self,
+        _host: &dyn mod_api::Host,
+        event: &mut mod_api::ScreenEvent<'_>,
+    ) -> Option<mod_api::Screen> {
+        (event.block == "create:creative_motor").then(|| mod_api::Screen {
+            width: 334.0,
+            height: 166.0,
+            slots: vec![Some([8.0, 84.0])],
+            inventory_y: 80.0,
+            inventory_x: 8.0,
+            own_labels: true,
+            own_background: true,
+            ..Default::default()
+        })
+    }
+
+    fn screen_draw(
+        &self,
+        _host: &dyn mod_api::ClientHost,
+        event: &mut mod_api::ScreenDrawEvent<'_>,
+    ) {
+        if event.block != "create:creative_motor" {
+            return;
+        }
+        const ROWS: [&str; 2] = ["Counterclockwise RPM", "Clockwise RPM"];
+        for (row, label) in ROWS.into_iter().enumerate() {
+            let y = event.origin[1] + 19.0 + row as f32 * 11.0;
+            let _ = event.draw.widget_button(
+                [event.origin[0] + 25.0, y, 294.0, 11.0],
+                &mod_api::Text::literal(label),
+                true,
+                false,
+            );
+        }
+    }
+
+    fn screen_click(
+        &self,
+        _host: &dyn mod_api::ClientHost,
+        event: &mut mod_api::ScreenClickEvent<'_>,
+    ) -> Option<i32> {
+        if event.block != "create:creative_motor" || event.right {
+            return None;
+        }
+        let [x, y] = event.at;
+        let row = (0..2).find(|row| {
+            let top = 19.0 + *row as f32 * 11.0;
+            (top..top + 11.0).contains(&y) && (25.0..319.0).contains(&x)
+        })?;
+        let value = (0i32..=256i32)
+            .min_by_key(|value| {
+                let milestone = (*value).saturating_sub(1) / 32 * 4;
+                let marker = 25
+                    + milestone
+                    + *value
+                    + 1
+                    + i32::from(*value % 32 == 0) * 2
+                    + i32::from(*value > 0) * 4;
+                (marker as f32 - x).abs().to_bits()
+            })
+            .unwrap_or(0);
+        Some(if row == 0 { 256 - value } else { 256 + value })
+    }
+
     fn menu_button(&self, host: &mut dyn ServerHost, event: &mut mod_api::MenuButtonEvent<'_>) {
         let Some(player) = host.player(event.context.player) else {
             return;
