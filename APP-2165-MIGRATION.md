@@ -61,14 +61,17 @@ safety behavior as `tools/test-bearing-player-collision.py`.
 
 The next bounded slice reads `ScrollValue` from a creative motor directly
 below an up-facing bearing. When present, the probe uses the legacy angular
-step (`rpm * 360 / 60 / 20`), captures a chest in the bearing's immediate
-glued footprint, rounds its Y-axis transform to world blocks, and carries the
-captured rider by the same discrete delta. A zero motor setting terminates at
-the current rotated position and uses the existing safe-dismount path. The
-linear no-motor path remains unchanged as a regression. The focused runtime
-fixture is `tools/test-typed-bearing-rotation.py`; it is a bounded one-chest
-rotation check, not full glue graph, actor, guest, or legacy `MovedBlocks`
-parity.
+step (`rpm * 360 / 60 / 20`), captures a bounded adjacent payload footprint,
+rounds each block's Y-axis transform to world blocks, and carries the captured
+rider by the first block's discrete delta. Each captured block keeps its
+canonical typed state string and block-entity NBT (including container items),
+and restore writes all target states only after duplicate/occupied-target
+checks. A zero motor setting terminates at the current rotated position and
+uses the existing safe-dismount path. The linear no-motor path remains
+unchanged as a regression. The focused runtime fixture is
+`tools/test-typed-bearing-rotation.py`; it now uses a chest plus barrel and
+checks both inventories, but it is still not full glue graph, actor, guest, or
+legacy `MovedBlocks` parity.
 
 The typed client seam now also has a continuous render bridge: the bearing's
 `block_entity_submit` reads synchronized angle/RPM, applies the partial-tick
