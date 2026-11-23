@@ -17,9 +17,14 @@ pub fn setting_from_button(id: i32) -> i32 {
 pub struct MotorBoard;
 
 fn menu_key(host: &dyn ServerHost) -> Option<mod_api::MenuKey> {
-    host.menu_keys()
+    let keys = host.menu_keys();
+    let found = keys
         .into_iter()
-        .find(|key| mod_api::__private::menu_key_id(*key).as_deref() == Some(MENU_ID))
+        .find(|key| mod_api::__private::menu_key_id(*key).as_deref() == Some(MENU_ID));
+    if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+        eprintln!("CREATE_MOTOR_BOARD_MENU key={}", found.is_some());
+    }
+    found
 }
 
 pub fn register(registrar: &mut dyn mod_api::Registrar) {
@@ -38,17 +43,26 @@ pub fn open_with_menu(
         return None;
     }
     let player = host.player(click.player)?;
-    let opened = player
-        .open_mod_menu(
-            host,
-            menu,
-            Text::literal("Creative Motor"),
-            Vec::new(),
-            Some(click.pos),
-            MenuReplace::InPlace,
-        )
-        .ok()?
-        .is_some();
+    let result = match player.open_mod_menu(
+        host,
+        menu,
+        Text::literal("Creative Motor"),
+        Vec::new(),
+        Some(click.pos),
+        MenuReplace::InPlace,
+    ) {
+        Ok(result) => result,
+        Err(error) => {
+            if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+                eprintln!("CREATE_MOTOR_BOARD_OPEN error={error:?}");
+            }
+            return None;
+        }
+    };
+    if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+        eprintln!("CREATE_MOTOR_BOARD_OPEN result={result:?}");
+    }
+    let opened = result.is_some();
     opened.then_some(InteractionResult::SuccessServer)
 }
 
@@ -59,6 +73,13 @@ impl BlockPart for MotorBoard {
         host: &mut dyn ServerHost,
         event: &mut UseWithoutItemEvent<'_>,
     ) -> Option<InteractionResult> {
+        if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+            eprintln!(
+                "CREATE_MOTOR_BOARD_USE pos={:?} block={:?} expected={MENU_ID}",
+                event.click.pos,
+                host.block_key(MENU_ID),
+            );
+        }
         if host.block_key(MENU_ID) != Some(event.state.block()) {
             return None;
         }
