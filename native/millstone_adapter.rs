@@ -63,10 +63,31 @@ fn recipe_for(host: &dyn Host, input: &ItemStack) -> Option<(i32, Arc<mod_api::R
     host.recipes_of_type(RECIPE_KIND).iter().find_map(|recipe| {
         let ingredients = recipe.json["ingredients"].as_array()?;
         let ingredient = ingredients.first()?;
-        let ingredient = host
-            .recipe_ingredient(&ingredient.to_string())
-            .ok()
-            .flatten()?;
+        // Create recipes serialize Ingredient as `{item: id}` / `{tag: id}`;
+        // the pinned Host recipe helper accepts a bare id or `#tag` string.
+        let ingredient_json = if ingredient.is_string() {
+            ingredient.to_string()
+        } else if let Some(item) = ingredient.get("item").and_then(|value| value.as_str()) {
+            format!("{item:?}")
+        } else if let Some(tag) = ingredient.get("tag").and_then(|value| value.as_str()) {
+            format!("{:?}", format!("#{tag}"))
+        } else if let Some(items) = ingredient.get("items").and_then(|value| value.as_array()) {
+            let alternatives = items
+                .iter()
+                .filter_map(|value| {
+                    value
+                        .as_str()
+                        .map(str::to_owned)
+                        .or_else(|| value.get("item")?.as_str().map(str::to_owned))
+                        .or_else(|| value.get("tag")?.as_str().map(|tag| format!("#{tag}")))
+                })
+                .map(|value| format!("{value:?}"))
+                .collect::<Vec<_>>();
+            (!alternatives.is_empty()).then(|| format!("[{}]", alternatives.join(",")))?
+        } else {
+            return None;
+        };
+        let ingredient = host.recipe_ingredient(&ingredient_json).ok().flatten()?;
         ingredient.test(host, input).then(|| {
             let time = recipe.json["processing_time"]
                 .as_i64()
