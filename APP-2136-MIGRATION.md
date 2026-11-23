@@ -1151,3 +1151,58 @@ tree is an override set; `tools/prepare.py` imports generated Java milling
 recipes into a full production pack. The minimal `.local/create.hmod` used for
 this probe is not that full pack. This temporary recipe is test input and is
 not a product resource change.
+
+### Isolated source compile and moving-probe correction (2026-11-23)
+
+I integrated APP-2165's bounded adjacent-block bearing source (PR #195
+`f0d05fe`) into the central probe and fixed its actual pinned API usage. The
+probe snapshots canonical state strings and block-entity NBT for the five
+immediate blocks around the bearing, rotates/restores those states, and
+preserves their inventories. It is not a glue/BFS contraption traversal; the
+client draw path still submits one chest model, and only server payload state
+is covered by the current fixture. The fixture's barrel was moved from two
+blocks east (outside the probe closure) to the immediate south neighbor; it
+now checks two actual captured inventories without claiming glue behavior.
+
+A private target-directory `cargo check --offline` compiled the complete
+central probe (kinetic adapter/slice, typed motor board, Millstone matcher and
+processing logic, and moving bearing) against Horizon source-generated API from
+`e9e32af90a8661c61a65be3e5ecb05a3dd9aabab`. Relevant API source differs from
+frozen `0a875da91dbb0fdcb7ba8c42c11341aa229af51a` only in
+`horizon-mod-vocab/src/host/menus.rs`; screen-hook declarations are unchanged.
+The build first identified `block_state_id`/`block_state_string` as direct
+`ServerHost` methods rather than `BlockStates` methods, plus the lossless NBT
+`JavaString` conversions. The corrected code passes; only the existing unused
+`Network::speed` warning remains. Initial dependency compilation took about
+21 seconds; the incremental check took 0.36 seconds. This is a source compile,
+not launcher `native-build` or client/runtime validation. The isolated
+`native-build --server-output` route separately refused this macOS host because
+Horizon has no game package for its system.
+
+The exact source hashes are: moving Part
+`e0853afb7cbccf271f59b2174011e6cd8c2d5b374b62d265db236cc5e22969a8`, rotation
+fixture `35e341f0f0df29faeed7b489bdfa06c42d467e2b4daf70f2371df8d5428bad00`,
+Millstone fixture `9593fbce2c3caa4c33c11a84c9bcdae5a80f4b68bc9fa65efd14ea0b0d46af30`,
+and Java-backed recipe
+`c90d2e53533cc896d76f76054dc4eea3506406b905feccada49d8d8cde8ca1dc47`.
+The matching runtime fixtures remain blocked before world start by managed
+launcher preparation/lease requirements; no runtime result is claimed for the
+new multi-block source or the production Millstone recipe.
+
+The integrated movement fixture was corrected after checking the capture closure:
+the chest and barrel now occupy two immediate neighbors of the bearing, rather
+than placing the barrel two blocks out. It verifies two inventories and rider
+position but does not claim glue detection; the probe snapshots the five
+immediate positions only. The bearing draw hook currently renders one chest,
+so multi-block visible rendering is still open. The Millstone assertion now
+accepts the guaranteed flour regardless of the optional 25% extra-flour roll.
+Its repeatable pack builder removes the synthetic bread recipe, retains a
+production wheat-milling recipe when present, and otherwise injects the
+Java-backed fixture recipe. Pure pack assertions passed with `.local/create.hmod`:
+synthetic recipe absent, fixture recipe present; generated test pack SHA-256
+`6acac7cf0c44399d74fd9af240a8ba3d21b88ca4b6db69481ec42b23d6b590f4`.
+Updated fixture hashes: bearing
+`35e341f0f0df29faeed7b489bdfa06c42d467e2b4daf70f2371df8d5428bad00` and
+Millstone `15696ea4ecfe9e3d76020d7d9c1c4320d9e0d9ef0f2cca98d170100fad0a3fa1`.
+The pack-builder check is not a Horizon gameplay result; both runtime fixtures
+still await a runnable matching registered candidate.
