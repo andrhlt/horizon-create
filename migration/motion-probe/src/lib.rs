@@ -1,7 +1,6 @@
 use mod_api::{
     BlockEntityOnLoadEvent, BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent,
-    BlockPart, BlockState, BlockUpdateFlags, ClientHost, Compound, HostBlockStates, HostSide,
-    ServerHost, Tag,
+    BlockPart, BlockState, BlockUpdateFlags, ClientHost, Compound, HostSide, ServerHost, Tag,
 };
 
 const BEARING: &str = "create:mechanical_bearing";
@@ -217,7 +216,7 @@ impl MovingPart {
         let Some(Tag::String(state)) = snapshot.get(&"State".into()) else {
             return None;
         };
-        host.block_states().block_state_id(state)
+        host.block_state_id(&state.to_string_lossy())
     }
 
     fn snapshot_entity(snapshot: &Compound) -> Option<Compound> {
@@ -265,7 +264,7 @@ impl MovingPart {
             let Some(state) = level.block_state(host, candidate) else {
                 continue;
             };
-            let Some(state) = host.block_states().block_state_string(state) else {
+            let Some(state) = host.block_state_string(state) else {
                 continue;
             };
             let mut snapshot = Compound::from([
@@ -279,7 +278,7 @@ impl MovingPart {
                             .collect(),
                     ),
                 ),
-                ("State".into(), Tag::String(state.into())),
+                ("State".into(), Tag::String(state.as_str().into())),
             ]);
             if let Some(block_entity) = host.block_entity_identity(level, candidate)
                 && let Some(data) = block_entity.data(host)
