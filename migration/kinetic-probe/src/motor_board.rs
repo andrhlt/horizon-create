@@ -27,6 +27,11 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
     registrar
         .block_entity_part(&kind, MotorBoard)
         .expect("creative motor board part registration");
+    // BlockEntityPart is a BlockPart trait bound, but its registration table
+    // is separate. Attach the interaction callback to the concrete block key
+    // so empty-hand use reaches the board opener.
+    let block = registrar.block_key(MENU_ID);
+    registrar.block_part(block, MotorBoard);
 }
 
 pub fn open_with_menu(
