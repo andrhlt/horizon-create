@@ -358,8 +358,7 @@ pub(super) fn set_value(
     block: ValueBlock,
     selection: Selection,
 ) {
-    let speed =
-        selection.value.clamp(1, MAX_ROTATION_SPEED) * if selection.row == 0 { -1 } else { 1 };
+    let speed = signed_speed(selection);
     let changed = game.native_with_mod_block_entity(pos, |entity| {
         if block.speed_entity() != Some(entity.id.as_str()) || target(Some(entity)) == speed as f32
         {
@@ -378,6 +377,22 @@ pub(super) fn set_value(
         _ => {}
     }
     game.native_block_entity_sync(pos);
+}
+
+/// Convert the board's row/column selection into Create's signed setting.
+///
+/// Zero is the center detent, not the smallest non-zero RPM. Keeping this
+/// conversion here makes client board clicks and server-side replay share the
+/// same bounded rule (including the ±256 limit).
+pub(super) fn signed_speed(selection: Selection) -> i32 {
+    let magnitude = selection.value.clamp(0, MAX_ROTATION_SPEED);
+    if magnitude == 0 {
+        0
+    } else if selection.row == 0 {
+        -magnitude
+    } else {
+        magnitude
+    }
 }
 
 pub(super) fn setting_feedback(game: &mut Game<'_>, pos: [i32; 3]) {
@@ -555,6 +570,26 @@ impl ValueBoard {
             0x442000,
             false,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn board_center_is_zero_and_directions_keep_their_sign() {
+        assert_eq!(signed_speed(Selection { row: 0, value: 0 }), 0);
+        assert_eq!(signed_speed(Selection { row: 1, value: 0 }), 0);
+        assert_eq!(signed_speed(Selection { row: 0, value: 24 }), -24);
+        assert_eq!(signed_speed(Selection { row: 1, value: 64 }), 64);
+    }
+
+    #[test]
+    fn board_values_are_bounded_before_authoritative_apply() {
+        assert_eq!(signed_speed(Selection { row: 0, value: 999 }), -256);
+        assert_eq!(signed_speed(Selection { row: 1, value: 999 }), 256);
+        assert_eq!(signed_speed(Selection { row: 1, value: -12 }), 0);
     }
 }
 
