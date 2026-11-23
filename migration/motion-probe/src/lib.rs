@@ -31,6 +31,91 @@ fn payload() -> Compound {
 }
 
 impl MovingPart {
+    fn uuid_tag(uuid: u128) -> Tag {
+        Tag::IntArray(
+            [
+                (uuid >> 96) as i32,
+                (uuid >> 64) as i32,
+                (uuid >> 32) as i32,
+                uuid as i32,
+            ]
+            .to_vec(),
+        )
+    }
+
+    fn rider_uuid(entity: &Compound) -> Option<u128> {
+        let Some(Tag::IntArray(uuid)) = entity.get(&"RiderUuid".into()) else {
+            return None;
+        };
+        (uuid.len() == 4).then(|| {
+            (u128::from(uuid[0] as u32) << 96)
+                | (u128::from(uuid[1] as u32) << 64)
+                | (u128::from(uuid[2] as u32) << 32)
+                | u128::from(uuid[3] as u32)
+        })
+    }
+
+    fn capture_standing_rider(
+        &self,
+        host: &dyn mod_api::Host,
+        level: mod_api::LevelRef,
+        payload_pos: [i32; 3],
+        entity: &mut Compound,
+    ) {
+        if entity.contains_key(&"RiderUuid".into()) {
+            return;
+        }
+        let Some(players) = host.level_online_players(level) else {
+            return;
+        };
+        let x = f64::from(payload_pos[0]);
+        let y = f64::from(payload_pos[1] + 1);
+        let z = f64::from(payload_pos[2]);
+        for player in players {
+            let Some([px, py, pz]) = host.entity_position(player.entity()) else {
+                continue;
+            };
+            if px >= x && px < x + 1.0 && pz >= z && pz < z + 1.0 && py >= y && py < y + 1.25 {
+                entity.insert("RiderUuid".into(), Self::uuid_tag(player.uuid()));
+                entity.insert("RiderCaptured".into(), Tag::Byte(1));
+                return;
+            }
+        }
+    }
+
+    fn move_rider(
+        &self,
+        host: &mut dyn ServerHost,
+        entity: &mut Compound,
+        delta_y: f64,
+        dismount_at: [f64; 3],
+    ) {
+        let Some(uuid) = Self::rider_uuid(entity) else {
+            return;
+        };
+        let Some(player) = host.player(uuid) else {
+            return;
+        };
+        let player_entity = player.entity();
+        let Some([px, py, pz]) = host.entity_position(player_entity) else {
+            return;
+        };
+        let target = if delta_y == 0.0 {
+            dismount_at
+        } else {
+            [px, py + delta_y, pz]
+        };
+        if host.entity_teleport_to(player_entity, target, None) {
+            entity.insert(
+                "RiderLastPosition".into(),
+                Tag::List(target.into_iter().map(Tag::Double).collect()),
+            );
+            if delta_y == 0.0 {
+                entity.insert("RiderSafeDismount".into(), Tag::Byte(1));
+            }
+        }
+    }
+
     fn ensure_payload(
         &self,
         host: &dyn mod_api::Host,
@@ -63,6 +148,7 @@ impl MovingPart {
         entity.insert("PayloadPos".into(), Tag::IntArray(attached.to_vec()));
         entity.insert("PayloadEntity".into(), Tag::Compound(chest_data));
         entity.insert("PayloadSource".into(), Tag::String("world_chest".into()));
+        self.capture_standing_rider(host, level, attached, entity);
     }
 }
 
@@ -107,6 +193,7 @@ impl BlockEntityPart for MovingPart {
             Some(Tag::IntArray(pos)) if pos.len() == 3 => [pos[0], pos[1], pos[2]],
             _ => [event.pos[0], event.pos[1] + 1, event.pos[2]],
         };
+        self.capture_standing_rider(host, level, payload_pos, &mut data);
         let next_pos = [payload_pos[0], payload_pos[1] + 1, payload_pos[2]];
         let blocked = host
             .level_has_collisions(
@@ -158,10 +245,20 @@ impl BlockEntityPart for MovingPart {
             }
             data.insert("PayloadPos".into(), Tag::IntArray(next_pos.to_vec()));
             data.insert("MotionOffset".into(), Tag::Int(offset + 1));
+            self.move_rider(host, &mut data, 1.0, [0.0, 0.0, 0.0]);
         } else {
             data.insert("Moving".into(), Tag::Byte(0));
             data.insert("Disassembled".into(), Tag::Byte(1));
-            data.insert("RiderSafeDismount".into(), Tag::Byte(1));
+            self.move_rider(
+                host,
+                &mut data,
+                0.0,
+                [
+                    f64::from(payload_pos[0]) + 0.5,
+                    f64::from(payload_pos[1] + 1),
+                    f64::from(payload_pos[2]) + 0.5,
+                ],
+            );
         }
         event.entity.nbt = data;
     }
