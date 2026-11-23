@@ -5,7 +5,7 @@ fn motor_board_screen_click(
     right: bool,
     button: &mut Option<i32>,
 ) {
-    if block == crate::game::create_motor_board::BLOCK {
-        crate::game::create_motor_board::screen_click(at, right, button);
+    if block == crate::game::create_motor_board_screen::BLOCK {
+        crate::game::create_motor_board_screen::screen_click(at, right, button);
     }
 }
