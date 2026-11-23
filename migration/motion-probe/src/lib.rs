@@ -31,6 +31,43 @@ fn payload() -> Compound {
 }
 
 impl MovingPart {
+    fn rotate_position(origin: [i32; 3], anchor: [i32; 3], angle: f64) -> [i32; 3] {
+        let dx = f64::from(origin[0] - anchor[0]);
+        let dz = f64::from(origin[2] - anchor[2]);
+        let (sin, cos) = angle.sin_cos();
+        [
+            (f64::from(anchor[0]) + dx * cos + dz * sin).round() as i32,
+            origin[1],
+            (f64::from(anchor[2]) - dx * sin + dz * cos).round() as i32,
+        ]
+    }
+
+    fn motor_scroll(
+        &self,
+        host: &dyn ServerHost,
+        level: mod_api::LevelRef,
+        bearing: [i32; 3],
+    ) -> Option<i32> {
+        let motor = [bearing[0], bearing[1] - 1, bearing[2]];
+        let motor_key = host.block_key("create:creative_motor")?;
+        if level.block(host, motor) != Some(motor_key) {
+            return None;
+        }
+        let motor_entity = host.block_entity_identity(level, motor)?;
+        match motor_entity.data(host)?.get(&"ScrollValue".into()) {
+            Some(Tag::Int(value)) => Some(*value),
+            _ => Some(0),
+        }
+    }
+
+    fn angle(data: &Compound) -> f64 {
+        match data.get(&"Angle".into()) {
+            Some(Tag::Float(bits)) => f64::from(f32::from_bits(*bits)),
+            Some(Tag::Double(bits)) => f64::from_bits(*bits),
+            _ => 0.0,
+        }
+    }
+
     fn uuid_tag(uuid: u128) -> Tag {
         Tag::IntArray(
             [
@@ -90,7 +127,7 @@ impl MovingPart {
         &self,
         host: &mut dyn ServerHost,
         entity: &mut Compound,
-        delta_y: f64,
+        delta: [f64; 3],
         dismount_at: [f64; 3],
     ) {
         let Some(uuid) = Self::rider_uuid(entity) else {
@@ -103,10 +140,10 @@ impl MovingPart {
         let Some([px, py, pz]) = player_entity.position(host) else {
             return;
         };
-        let target = if delta_y == 0.0 {
+        let target = if delta == [0.0; 3] {
             dismount_at
         } else {
-            [px, py + delta_y, pz]
+            [px + delta[0], py + delta[1], pz + delta[2]]
         };
         if player_entity.teleport_to(host, target, None) {
             entity.insert(
@@ -118,7 +155,7 @@ impl MovingPart {
                         .collect(),
                 ),
             );
-            if delta_y == 0.0 {
+            if delta == [0.0; 3] {
                 entity.insert("RiderSafeDismount".into(), Tag::Byte(1));
             }
         }
@@ -143,10 +180,19 @@ impl MovingPart {
         let Some(chest) = host.block_key("minecraft:chest") else {
             return;
         };
-        let attached = [pos[0], pos[1] + 1, pos[2]];
-        if level.block(host, attached) != Some(chest) {
+        let candidates = [
+            [pos[0], pos[1] + 1, pos[2]],
+            [pos[0] + 1, pos[1] + 1, pos[2]],
+            [pos[0] - 1, pos[1] + 1, pos[2]],
+            [pos[0], pos[1] + 1, pos[2] + 1],
+            [pos[0], pos[1] + 1, pos[2] - 1],
+        ];
+        let Some(attached) = candidates
+            .into_iter()
+            .find(|candidate| level.block(host, *candidate) == Some(chest))
+        else {
             return;
-        }
+        };
         let Some(block_entity) = host.block_entity_identity(level, attached) else {
             return;
         };
@@ -154,6 +200,8 @@ impl MovingPart {
             return;
         };
         entity.insert("PayloadPos".into(), Tag::IntArray(attached.to_vec()));
+        entity.insert("PayloadOrigin".into(), Tag::IntArray(attached.to_vec()));
+        entity.insert("PayloadAnchor".into(), Tag::IntArray(pos.to_vec()));
         entity.insert("PayloadEntity".into(), Tag::Compound(chest_data));
         entity.insert("PayloadSource".into(), Tag::String("world_chest".into()));
         if let Some(dimension) = level.dimension().id(host) {
@@ -226,7 +274,27 @@ impl BlockEntityPart for MovingPart {
             _ => [event.pos[0], event.pos[1] + 1, event.pos[2]],
         };
         self.capture_standing_rider(host, level, payload_pos, &mut data);
-        let next_pos = [payload_pos[0], payload_pos[1] + 1, payload_pos[2]];
+        let scroll = self.motor_scroll(host, level, event.pos);
+        let powered = scroll.is_some();
+        let angle = Self::angle(&data);
+        let next_angle = match scroll {
+            Some(value) if value != 0 => angle + f64::from(value) * 360.0 / 60.0 / 20.0,
+            Some(_) => angle,
+            None => angle,
+        };
+        let next_pos = if powered {
+            let origin = match data.get(&"PayloadOrigin".into()) {
+                Some(Tag::IntArray(pos)) if pos.len() == 3 => [pos[0], pos[1], pos[2]],
+                _ => payload_pos,
+            };
+            let anchor = match data.get(&"PayloadAnchor".into()) {
+                Some(Tag::IntArray(pos)) if pos.len() == 3 => [pos[0], pos[1], pos[2]],
+                _ => event.pos,
+            };
+            Self::rotate_position(origin, anchor, next_angle.to_radians())
+        } else {
+            [payload_pos[0], payload_pos[1] + 1, payload_pos[2]]
+        };
         let blocked = level
             .has_collisions(
                 host,
@@ -241,7 +309,8 @@ impl BlockEntityPart for MovingPart {
             )
             .unwrap_or(false);
         data.insert("CollisionBlocked".into(), Tag::Byte(blocked as i8));
-        if !blocked && offset < 8 && data.contains_key(&"PayloadPos".into()) {
+        let moving = scroll.is_some_and(|value| value != 0) || (!powered && offset < 8);
+        if !blocked && moving && data.contains_key(&"PayloadPos".into()) {
             let Some(chest) = host.block_key("minecraft:chest") else {
                 return;
             };
@@ -277,14 +346,26 @@ impl BlockEntityPart for MovingPart {
             }
             data.insert("PayloadPos".into(), Tag::IntArray(next_pos.to_vec()));
             data.insert("MotionOffset".into(), Tag::Int(offset + 1));
-            self.move_rider(host, &mut data, 1.0, [0.0, 0.0, 0.0]);
+            if powered {
+                data.insert("Angle".into(), Tag::Float((next_angle as f32).to_bits()));
+            }
+            self.move_rider(
+                host,
+                &mut data,
+                [
+                    f64::from(next_pos[0] - payload_pos[0]),
+                    f64::from(next_pos[1] - payload_pos[1]),
+                    f64::from(next_pos[2] - payload_pos[2]),
+                ],
+                [0.0, 0.0, 0.0],
+            );
         } else {
             data.insert("Moving".into(), Tag::Byte(0));
             data.insert("Disassembled".into(), Tag::Byte(1));
             self.move_rider(
                 host,
                 &mut data,
-                0.0,
+                [0.0; 3],
                 [
                     f64::from(payload_pos[0]) + 0.5,
                     f64::from(payload_pos[1] + 1),

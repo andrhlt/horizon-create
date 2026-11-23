@@ -57,6 +57,19 @@ has been migrated. The coordinated headless build must still establish that
 the typed hook compiles and that a world fixture observes the same host/guest
 safety behavior as `tools/test-bearing-player-collision.py`.
 
+## Powered rotation slice
+
+The next bounded slice reads `ScrollValue` from a creative motor directly
+below an up-facing bearing. When present, the probe uses the legacy angular
+step (`rpm * 360 / 60 / 20`), captures a chest in the bearing's immediate
+glued footprint, rounds its Y-axis transform to world blocks, and carries the
+captured rider by the same discrete delta. A zero motor setting terminates at
+the current rotated position and uses the existing safe-dismount path. The
+linear no-motor path remains unchanged as a regression. The focused runtime
+fixture is `tools/test-typed-bearing-rotation.py`; it is a bounded one-chest
+rotation check, not full glue graph, actor, guest, or legacy `MovedBlocks`
+parity.
+
 ## Evidence and remaining work
 
 - Pure lifecycle: assembly, motion, rider landing, and conservation pass.
