@@ -104,6 +104,15 @@ attachment snapshot/actor layer that supplies the existing `MovedBlocks`,
 probe with more hard-coded block cases would not establish arbitrary payload
 parity.
 
+The attempted typed glue traversal confirms the first missing operation in a
+real offline world: `/data` can show a `minecraft:marker` with
+`CreateSuperGlue`, `From`, and `To`, but the pinned `LevelRef::entities_in`
+contract explicitly excludes markers and other special entities from its entity
+walk. The focused marker fixture therefore carried only the seed chest and
+did not capture the glued extension block. No traversal code is retained from
+that attempt; this is a concrete SDK/fork-owner request for a server-side
+special-entity query or attachment graph, not a claimed glue implementation.
+
 The retained Java flow gives that bridge a finite shape: seed the controller and
 attached source, breadth-first follow chassis/sticker edges and glue-area
 contacts, snapshot each relative block state, block-entity/item data and
