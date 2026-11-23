@@ -6,9 +6,10 @@
 
 use std::sync::Arc;
 
+use horizon_core::random::RandomSource;
 use mod_api::{
     BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent, Compound, Host, ItemStack,
-    ModContainer, Registrar, ServerHost, Tag,
+    LevelRef, ModContainer, Registrar, ServerHost, Tag,
 };
 
 use super::create_millstone_processing::{self, Tick};
@@ -76,7 +77,7 @@ fn recipe_for(host: &dyn Host, input: &ItemStack) -> Option<(i32, Arc<serde_json
     })
 }
 
-fn insert_output(host: &dyn Host, slots: &mut [Option<ItemStack>], mut output: ItemStack) {
+fn insert_output(host: &dyn Host, slots: &mut [Option<ItemStack>], mut output: ItemStack) -> bool {
     let limit = host.max_stack_size(output.item()).unwrap_or(64);
     for slot in slots.iter_mut().flatten() {
         if slot.item() == output.item() {
@@ -86,7 +87,7 @@ fn insert_output(host: &dyn Host, slots: &mut [Option<ItemStack>], mut output: I
                 let _ = slot.grow(moved);
                 output = output.shrink(moved).expect("moved output was nonzero");
                 if output.count() == 0 {
-                    return;
+                    return true;
                 }
             }
         }
@@ -94,15 +95,22 @@ fn insert_output(host: &dyn Host, slots: &mut [Option<ItemStack>], mut output: I
     for slot in slots.iter_mut() {
         if slot.is_none() {
             *slot = Some(output);
-            return;
+            return true;
         }
     }
+    false
 }
 
-fn finish(host: &dyn Host, slots: &mut [Option<ItemStack>], recipe: &serde_json::Value) {
+fn finish(
+    host: &mut dyn ServerHost,
+    slots: &mut [Option<ItemStack>],
+    recipe: &serde_json::Value,
+    level: Option<LevelRef>,
+) -> bool {
     let Some(results) = recipe["results"].as_array() else {
-        return;
+        return false;
     };
+    let mut pending = Vec::new();
     for result in results {
         let Ok(json) = serde_json::to_string(result) else {
             continue;
@@ -110,8 +118,43 @@ fn finish(host: &dyn Host, slots: &mut [Option<ItemStack>], recipe: &serde_json:
         let Some(output) = host.recipe_result(&json).ok().flatten() else {
             continue;
         };
-        insert_output(host, slots, output);
+        let chance = result["chance"].as_f64().unwrap_or(1.0) as f32;
+        let count = output.count();
+        let kept = if chance >= 1.0 {
+            count
+        } else {
+            let Some(level) = level else {
+                return false;
+            };
+            (0..count)
+                .filter(|_| {
+                    level
+                        .with_random(host, |random| random.next_float() <= chance)
+                        .unwrap_or(false)
+                })
+                .count() as u32
+        };
+        if kept == 0 {
+            continue;
+        }
+        if kept < count {
+            let Some(output) = output.shrink(count - kept) else {
+                continue;
+            };
+            pending.push(output);
+        } else {
+            pending.push(output);
+        }
     }
+
+    let mut shadow = slots.to_vec();
+    for output in pending {
+        if !insert_output(host, &mut shadow, output) {
+            return false;
+        }
+    }
+    slots.clone_from_slice(&shadow);
+    true
 }
 
 #[mod_api::horizon_part]
@@ -130,13 +173,6 @@ impl BlockEntityPart for MillstonePart {
         };
         let speed = float(&event.entity.nbt, "Speed");
         let timer = int(&event.entity.nbt, "Timer");
-        let outputs_full = event.entity.items[OUTPUTS.clone()]
-            .iter()
-            .flatten()
-            .any(|stack| stack.count() >= host.max_stack_size(stack.item()).unwrap_or(64));
-        if outputs_full {
-            return;
-        }
         match millstone_processing::tick(timer, speed, Some(recipe_time), input.is_some()) {
             Tick::Idle => {}
             Tick::Started { timer }
@@ -150,12 +186,17 @@ impl BlockEntityPart for MillstonePart {
                 timer,
                 finished: true,
             } => {
-                set_timer(&mut event.entity.nbt, timer);
-                if let Some(stack) = event.entity.items[INPUT].take() {
-                    event.entity.items[INPUT] = stack.shrink(1);
-                    let (left, right) = event.entity.items.split_at_mut(INPUT + 1);
-                    finish(host, &mut right[..], &recipe);
-                    let _ = left;
+                let level = event.entity.level(host);
+                let (left, right) = event.entity.items.split_at_mut(INPUT + 1);
+                if finish(host, right, &recipe, level) {
+                    set_timer(&mut event.entity.nbt, timer);
+                    if let Some(stack) = left[INPUT].take() {
+                        left[INPUT] = stack.shrink(1);
+                    }
+                } else {
+                    // Keep the input and retry without dropping any result when
+                    // the complete result set cannot fit in the output slots.
+                    set_timer(&mut event.entity.nbt, 1);
                 }
             }
         }
