@@ -9,7 +9,7 @@ adapter handoff is PR #192 commit `9009897f5461d3e0662b7114dd2a87ac42d417f4`.
 
 The first implementation seam is the existing Millstone path. Its pure timer
 transition is now factored as `millstone_processing::tick` in
-`native/machines.rs`; the legacy world/inventory code remains authoritative for
+`native/millstone_processing.rs`; the legacy world/inventory code remains authoritative for
 item movement, recipes, chance rolls, NBT migration, and sync. The future typed
 Part should call this transition after reading the connected `Speed` from the
 APP-2136 entity NBT rather than calculating kinetic state itself.
@@ -45,6 +45,22 @@ No kinetic graph walk, source arbitration, or duplicate speed calculation is
 needed in this lane. The first Millstone adapter can preserve the existing ten
 slots (`0` input, `1..9` output), `Timer`, `InputInventory`, and
 `OutputInventory` save keys while the typed entity stores the live item slots.
+
+### Registration handoff (not applied here)
+
+The shared manifest owner should add this lane-owned source alongside the
+existing `machines` module:
+
+```toml
+[[module]]
+id = "millstone_processing"
+file = "crates/horizon-client/src/game.rs"
+name = "create_millstone_processing"
+source = "millstone_processing.rs"
+```
+
+`machines.rs` already references the file with an explicit `#[path]`, so the
+generated module can use the same source without a second implementation.
 
 ## This checkpoint
 
