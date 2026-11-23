@@ -277,13 +277,15 @@ runtime-observed**; initial signed speed propagation **partially verified**;
 full interruption/restoration **failed**; motor setting interaction, guest
 configuration, save/reopen and rotation animation **not implemented or tested**.
 The adapter currently reads `minecraft:overworld` directly, so other dimensions
-are also unverified. No missing engine capability has been established: the
-remaining failures are currently adapter/event-lifecycle and feature work, not a
-proven SDK blocker. The exact restore path must be debugged before this can be
+are also unverified. The adapter compiles and initial propagation works. The replacement reproduction
+is concrete evidence of a runtime tick-lifecycle blocker in this candidate, but
+not yet proof that the pinned SDK lacks a required API; normal player placement
+needs a separate check before assigning the defect to the engine. The exact restore path must be debugged before this can be
 called viable as a complete motor slice.
 
 Measured work in this resumed implementation: the focused edit/build/fixture
-cycle took about **5 minutes wall-clock** by the local run timestamps; the
+and replacement reproduction took about **8 minutes wall-clock** by the local run
+timestamps; the
 successful mod compile itself took **1 second**; the two offscreen fixture runs
 took about **18 and 28 seconds** from command start through comparison. The
 pure Rust tests passed **2/2**. These figures cover only the bounded work above,
@@ -294,7 +296,7 @@ Estimate from evidence: reserve **1–2 days** to make the bounded graph lifecyc
 integrate it reproducibly into the source generator; **1–2 days** for motor
 setting input, guest sync and save/reopen; and **1–2 days** for content schema
 compatibility, selected client rotation and final normal validation. Total
-remaining kinetic slice estimate is **3–6 engineer-days**, assuming the pinned
+remaining kinetic slice estimate is **4–7 engineer-days**, assuming the pinned
 SDK's existing typed Part event and persistence APIs suffice. The motor board's
 guest action path and persistent speed state remain uncertain. If they cannot be
 implemented with existing Part APIs, stop at a minimal reproduction and reassess
