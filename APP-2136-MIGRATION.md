@@ -1206,3 +1206,15 @@ Updated fixture hashes: bearing
 Millstone `15696ea4ecfe9e3d76020d7d9c1c4320d9e0d9ef0f2cca98d170100fad0a3fa1`.
 The pack-builder check is not a Horizon gameplay result; both runtime fixtures
 still await a runnable matching registered candidate.
+
+### Remaining migration inventory size
+
+The ownership table contains 174 entries: 163 FEATURE-MATRIX gameplay-family
+rows and 11 exact-ID registry/inventory rows. Primary ownership is APP-2136 29
+entries, APP-2163 49, APP-2164 61, and APP-2165 34, plus one shared registry
+state row. These are assignments, not 174 uniformly missing or unverified
+families: the feature matrix currently has 119 `Yes` and 44 `Partial` gameplay
+rows, with Full 1:1 still tracked separately. This APP-2136 probe is feasibility
+coverage for a bounded kinetic/motor/shaft/cogwheel path, one Millstone matcher,
+and an immediate-neighbor bearing path. It does not complete any broad family
+row or justify declaring the remaining ownership table migrated.
