@@ -108,7 +108,12 @@ impl MovingPart {
         if player_entity.teleport_to(host, target, None) {
             entity.insert(
                 "RiderLastPosition".into(),
-                Tag::List(target.into_iter().map(Tag::Double).collect()),
+                Tag::List(
+                    target
+                        .into_iter()
+                        .map(|value| Tag::Double(value.to_bits()))
+                        .collect(),
+                ),
             );
             if delta_y == 0.0 {
                 entity.insert("RiderSafeDismount".into(), Tag::Byte(1));
@@ -158,6 +163,7 @@ impl MovingPart {
     }
 }
 
+#[mod_api::horizon_part]
 impl BlockPart for MovingPart {}
 
 #[mod_api::horizon_part]
