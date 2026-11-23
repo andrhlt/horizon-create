@@ -306,4 +306,136 @@ remaining kinetic slice estimate is **4–7 engineer-days**, assuming the pinned
 SDK's existing typed Part event and persistence APIs suffice. The motor board's
 guest action path and persistent speed state remain uncertain. If they cannot be
 implemented with existing Part APIs, stop at a minimal reproduction and reassess
-before expanding scope. Processing and train flows remain untouched.
+
+## Kinetic adapter acceptance checkpoint (2026-11-23)
+
+### Usable adapter and measured dependency closure
+
+native/kinetic_slice.rs retains the three-kind kinetic topology and speed
+rules, without Horizon access. native/kinetic_adapter.rs owns typed
+BlockPart/BlockEntityPart registration and host IO for only the Creative
+Motor, shaft, and small/large cogwheel entities. Its concrete slice closure is
+their block/entity registrations and state properties, initial placement and
+load callbacks, server tick/network traversal, saved NBT/sync, and the selected
+gear edge calculations. The adapter no longer reads the current tick entity
+back from the world while the SDK temporarily removes it for its callback; it
+uses that callback's current NBT for the source. On-load stores the actual
+dimension supplied by the event and ticking resolves that level, with a
+state-based fallback for older saves. This removes the hardcoded Overworld path.
+
+The 22 machinery siblings remain out of this dependency closure. machines.rs
+and visuals.rs are monolithic legacy modules; importing either wholesale
+would pull unrelated machine behavior into this slice. The source code is
+bounded to the two adapter modules, but it is not yet integrated into the
+complete Create package generator/central content registry.
+
+### Verified source and commands
+
+Source base before this checkpoint: 36cfe1cb017aac83ecf11defb6ca6b82f2e2f680.
+The current candidate adds the described server-side adapter changes on that
+base. SDK build: Horizon 0a875da91dbb0fdcb7ba8c42c11341aa229af51a, matching
+Nov 20 SDK and mixin pin, launcher 0.2.105, Rust 1.99.1, optimized native
+profile. The first normal native-build succeeded in 1.15 seconds, producing
+native-0a875da-cf76fc2f4db2. After shaping the lane handoff as the free
+set_motor_setting(host, level, pos, setting) entry point and exposing the
+adapter module to sibling code in the probe crate root, the normal native-build
+succeeded again in 1 second, producing native-0a875da-a3e0d9e82002. The full
+package generator still needs its central module registration integrated.
+
+Using the source-matched probe package and .local/create.hmod, the existing
+fixture commands reported:
+
+* tools/test-shaft-and-cogwheel.py: all 36/36 Java trace rows passed,
+  including gear ratio/sign propagation and motor break/replacement restore.
+* tools/test-creative-motor-placement.py: all 7/7 facing and item-use
+  rows passed.
+* tools/test-creative-motor-reload.py: connected horizontal/vertical motors
+  and a disconnected idle motor retained ScrollValue and regenerated speed
+  after save/reopen.
+* tools/test-multiplayer-creative-motor.py: failed at the existing normal
+  board action; the typed-Part probe has not migrated the motor menu/input
+  route, so this does not test the new setting method or guest replication.
+* tools/test-creative-motor-render.py: failed at the frame assertion.
+  The offscreen client loaded and rendered, but emitted no
+  CREATE_MOTOR_FRAME record.
+
+Tests used horizon-ctl and horizon-client from the built pinned runtime,
+prepared 26.3 resources from the installed matching-pinned client, unique
+fixture worlds under /private/tmp/hc-fixtures, and the existing Java CSVs.
+Behavioral clients were headless; the placement, gear-trace, and visual checks
+used the supported --offscreen path. The source content/data still declares
+waterlogging. The ignored test pack omits the schema-rejected
+properties.waterloggable field to load this selected content under SDK 0.2;
+the omission is not represented as equivalent behavior and waterlogging is
+unverified in the migrated package.
+
+The exact existing placement, propagation, and reload fixtures pass on the
+compiled candidate. The new public set_motor_setting(host, level, pos, setting)
+entry point persists a clamped setting and recomputes/syncs its connected
+graph, but it is compile-verified only: the existing board and guest action do
+not call it yet. Therefore the kinetic flow is partially viable, not a
+complete playable/guest-verified slice.
+
+After adding the free entry point and probe crate's sibling-visible module
+export for the lane handoff, the exact 36-row, seven-case placement, and
+save/reopen fixtures were rerun on native-0a875da-a3e0d9e82002 and all passed
+again. Their measured command
+durations were 29.4, 7.8, and 8.1 seconds respectively.
+
+### Concrete remaining SDK/API seams
+
+The SDK Part surface supports the server work verified above. Its
+BlockEntityPart API has no client block-entity draw callback. The minimal
+reproduction is this typed motor entity build plus the existing
+test-creative-motor-render.py: with CREATE_MOTOR_RENDER=1, the pinned
+offscreen runtime loads the pack and draws frames, but no Part receives the
+motor render event and no motor frame trace appears. The old motor draw is in
+the broad native/visuals.rs dispatcher alongside many unrelated renderers.
+This establishes a missing typed-Part renderer entry point for a behavior-
+preserving bounded migration; it does not show that the Horizon renderer
+cannot render or that a broad engine rewrite is required. Preserve the old
+render path as the reference and resolve through a narrow rendering adapter or
+leave this acceptance gate open; do not port the monolithic visuals module.
+
+The normal board, its setting gesture, and its client-to-server guest path are
+also not part of this adapter. APP-2164 owns those interactions and common
+networking. The tested setter is the shared server operation to wire once that
+lane adapts the board. No guest configuration pass is claimed. The old SDK
+content schema's rejection of properties.waterloggable is a separate,
+reproduced content compatibility gap. No broad engine rewrite, SDK pin update,
+or upstream change is warranted by these findings.
+
+### Interface handoff and estimate
+
+For APP-2164, the usable shared source is this checkpoint commit on top of
+36cfe1cb017aac83ecf11defb6ca6b82f2e2f680; shared files are
+native/kinetic_adapter.rs and native/kinetic_slice.rs. Add the lane's
+settings interaction around the registered KineticPart and call
+KineticPart::set_motor_setting on the authoritative ServerHost, passing
+the typed LevelRef, motor position, and selected signed RPM. The operation
+persists the clamped ScrollValue, records the dimension, recomputes the graph,
+and syncs speeds. Keep all board/input/network files in APP-2164; send any
+shared lib.rs/manifest registration as a small integration patch. Reuse
+tools/test-creative-motor.py, tools/test-multiplayer-creative-motor.py,
+tools/test-creative-motor-reload.py, and the existing Java evidence. Build
+with the pinned launcher command recorded in the Linear handoff; test headless
+and use --offscreen only for visual frames.
+
+Implementation has not been integrated into the full package, and the setting
+setter is not yet called by normal UI. The successful build and three
+server-side fixture gates revise the remaining motor work to 1–3 engineer-
+days: about 0.5–1 day to wire normal board/guest setting through APP-2164 and
+prove it, 0.5–1 day to preserve/render rotation through a bounded client
+adapter, and 0.5–1 day for content waterlogging compatibility, integrated
+package validation, and regressions. This range assumes a narrow supported
+rendering path or a deliberately open visual gate; inability to add custom
+block-entity rendering within the pinned API raises that scope and requires a
+decision before an engine-side adapter. It is evidence-based from the passing
+server slice, not measured throughput.
+
+Active work in this resumed focused cycle is approximately 14 minutes:
+about 6 minutes source/API work, 1.2 seconds successful native compilation,
+roughly 1 minute across the passing gear/placement/reopen fixtures, and about
+1.5 minutes across the failed render and guest checks. Fixture startup includes
+resource loading; these are command durations, not counted as implementation
+time. No processing or train flow has been started.
