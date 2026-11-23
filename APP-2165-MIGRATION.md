@@ -30,6 +30,23 @@ draw submission, and collision queries. This probe is the minimal compile/runtim
 candidate for binding the existing bearing capture/restore path; it does not
 claim train, passenger, or LAN parity yet.
 
+## Retained bearing acceptance mapping
+
+The existing `tools/test-bearing-player-collision.py` is the world-level
+acceptance fixture. It checks the real legacy fields and entities: `MovedBlocks`
+and `Angle` while active, seven copper ingots after save/reopen and disassembly,
+host/guest players remaining on ground through rotation, and restoration after
+power removal. It is not silently counted as proof for the new Part.
+
+The new `migration/motion-probe` has a deliberately smaller bridge: it captures
+one real chest directly above a bearing into `PayloadPos` and `PayloadEntity`,
+moves that chest one block per server tick after the pinned collision query,
+merges its saved block-entity data at the destination, and records a safe
+terminal state. Its `PayloadBlocks`/`PayloadItems` fields are probe evidence;
+the old `MovedBlocks`/`MountedItems` path remains the production bridge still
+to be reconciled for arbitrary glued payloads, rider entities, rotation, and
+train carriage state.
+
 ## Evidence and remaining work
 
 - Pure lifecycle: assembly, motion, rider landing, and conservation pass.
