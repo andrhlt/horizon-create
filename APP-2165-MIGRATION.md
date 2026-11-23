@@ -104,24 +104,21 @@ attachment snapshot/actor layer that supplies the existing `MovedBlocks`,
 probe with more hard-coded block cases would not establish arbitrary payload
 parity.
 
-The attempted typed glue traversal confirms the first missing operation in a
-real offline world: `/data` can show a `minecraft:marker` with
-`CreateSuperGlue`, `From`, and `To`, but the pinned `LevelRef::entities_in`
-contract explicitly excludes markers and other special entities from its entity
-walk. The same source contract excludes markers from `entity_join_level` and
-`entity_leave_level`, while `entity_constructing` provides no live entity
-handle or position. The focused marker fixture therefore carried only the
-seed chest and did not capture the glued extension block. No traversal code is
-retained from that attempt; this is a concrete SDK/fork-owner request for a
-server-side special-entity query or attachment graph, not a claimed glue
-implementation.
+The first typed attempt exposed a real API gap: `/data` could show a
+`minecraft:marker` with `CreateSuperGlue`, `From`, and `To`, but the pinned
+`LevelRef::entities_in` contract excluded markers and other special entities.
+Horizon PR4 `98a0fff291b65f8098700f08e9dd0f29df2985b4` now supplies the narrow
+server-only `LevelRef::special_entities_in(host, min, max)` query. The probe
+uses that query to parse marker/super-glue boxes and feed the retained BFS;
+runtime acceptance is still pending a candidate built from this matching API
+and engine cohort.
 
 The retained graph rule is now isolated in `native/moving_slice.rs` as
 `expand_glued_payload`: it follows six-sided solid neighbors only when both
 cells lie in the same normalized glue area, preserves breadth-first order, and
-does not cross air or unattached cells. Six pure lifecycle/graph tests pass;
-the runtime adapter remains intentionally unconnected until the special-entity
-query exists.
+does not cross air or unattached cells. Six pure lifecycle/graph tests pass.
+The runtime adapter is now connected to the PR4 API, but no pre-PR4 candidate
+is being used to claim gameplay support.
 
 The retained Java flow gives that bridge a finite shape: seed the controller and
 attached source, breadth-first follow chassis/sticker edges and glue-area
