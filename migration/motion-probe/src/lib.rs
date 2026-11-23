@@ -8,6 +8,12 @@ const BEARING: &str = "create:mechanical_bearing";
 #[derive(Clone, Copy)]
 struct MovingPart;
 
+#[derive(Clone, Copy)]
+struct GlueBox {
+    low: [f64; 3],
+    high: [f64; 3],
+}
+
 fn payload() -> Compound {
     Compound::from([
         (
@@ -31,6 +37,57 @@ fn payload() -> Compound {
 }
 
 impl MovingPart {
+    fn glue_vector(tag: Option<&Tag>) -> Option<[f64; 3]> {
+        let Some(Tag::List(values)) = tag else {
+            return None;
+        };
+        let [Tag::Double(x), Tag::Double(y), Tag::Double(z)] = values.as_slice() else {
+            return None;
+        };
+        Some([f64::from_bits(*x), f64::from_bits(*y), f64::from_bits(*z)])
+    }
+
+    fn glue_boxes(
+        host: &mut dyn ServerHost,
+        level: mod_api::LevelRef,
+        anchor: [i32; 3],
+    ) -> Vec<GlueBox> {
+        let Some(entities) = level.special_entities_in(
+            host,
+            [
+                f64::from(anchor[0] - 4),
+                f64::from(anchor[1] - 4),
+                f64::from(anchor[2] - 4),
+            ],
+            [
+                f64::from(anchor[0] + 5),
+                f64::from(anchor[1] + 5),
+                f64::from(anchor[2] + 5),
+            ],
+        ) else {
+            return Vec::new();
+        };
+        entities
+            .into_iter()
+            .filter_map(|entity| {
+                let kind = entity.kind(host).map(|kind| kind.id(host));
+                let data = entity.nbt(host)?;
+                let is_marker = kind.as_deref() == Some("minecraft:marker")
+                    && data.get(&"CreateSuperGlue".into()) == Some(&Tag::Byte(1));
+                if kind.as_deref() != Some("create:super_glue") && !is_marker {
+                    return None;
+                }
+                let from = Self::glue_vector(data.get(&"From".into()))?;
+                let to = Self::glue_vector(data.get(&"To".into()))?;
+                let position = entity.position(host)?;
+                Some(GlueBox {
+                    low: std::array::from_fn(|axis| position[axis] + from[axis].min(to[axis])),
+                    high: std::array::from_fn(|axis| position[axis] + from[axis].max(to[axis])),
+                })
+            })
+            .collect()
+    }
+
     fn rotate_position(origin: [i32; 3], anchor: [i32; 3], angle: f64) -> [i32; 3] {
         let dx = f64::from(origin[0] - anchor[0]);
         let dz = f64::from(origin[2] - anchor[2]);
@@ -226,9 +283,38 @@ impl MovingPart {
         }
     }
 
+    fn snapshot_block(
+        host: &dyn ServerHost,
+        level: mod_api::LevelRef,
+        position: [i32; 3],
+        anchor: [i32; 3],
+    ) -> Option<Compound> {
+        let state = level.block_state(host, position)?;
+        let state = host.block_state_string(state)?;
+        let mut snapshot = Compound::from([
+            (
+                "Pos".into(),
+                Tag::IntArray(
+                    position
+                        .into_iter()
+                        .zip(anchor)
+                        .map(|(value, origin)| value - origin)
+                        .collect(),
+                ),
+            ),
+            ("State".into(), Tag::String(state.as_str().into())),
+        ]);
+        if let Some(block_entity) = host.block_entity_identity(level, position)
+            && let Some(data) = block_entity.data(host)
+        {
+            snapshot.insert("Entity".into(), Tag::Compound(data));
+        }
+        Some(snapshot)
+    }
+
     fn ensure_payload(
         &self,
-        host: &dyn ServerHost,
+        host: &mut dyn ServerHost,
         level: mod_api::LevelRef,
         pos: [i32; 3],
         entity: &mut Compound,
@@ -252,6 +338,7 @@ impl MovingPart {
             [pos[0], pos[1] + 1, pos[2] + 1],
             [pos[0], pos[1] + 1, pos[2] - 1],
         ];
+        let glue = Self::glue_boxes(host, level, pos);
         let mut snapshots = Vec::new();
         let mut positions = Vec::new();
         for candidate in candidates {
@@ -261,32 +348,48 @@ impl MovingPart {
             if block == air {
                 continue;
             }
-            let Some(state) = level.block_state(host, candidate) else {
-                continue;
-            };
-            let Some(state) = host.block_state_string(state) else {
-                continue;
-            };
-            let mut snapshot = Compound::from([
-                (
-                    "Pos".into(),
-                    Tag::IntArray(
-                        candidate
-                            .into_iter()
-                            .zip(pos)
-                            .map(|(value, anchor)| value - anchor)
-                            .collect(),
-                    ),
-                ),
-                ("State".into(), Tag::String(state.as_str().into())),
-            ]);
-            if let Some(block_entity) = host.block_entity_identity(level, candidate)
-                && let Some(data) = block_entity.data(host)
-            {
-                snapshot.insert("Entity".into(), Tag::Compound(data));
+            if let Some(snapshot) = Self::snapshot_block(host, level, candidate, pos) {
+                positions.push(candidate);
+                snapshots.push(snapshot);
             }
-            snapshots.push(snapshot);
-            positions.push(candidate);
+        }
+        let mut index = 0;
+        while index < positions.len() {
+            let current = positions[index];
+            for neighbor in [
+                [current[0] + 1, current[1], current[2]],
+                [current[0] - 1, current[1], current[2]],
+                [current[0], current[1] + 1, current[2]],
+                [current[0], current[1] - 1, current[2]],
+                [current[0], current[1], current[2] + 1],
+                [current[0], current[1], current[2] - 1],
+            ] {
+                if positions.contains(&neighbor)
+                    || !glue.iter().any(|area| {
+                        let contains = |position: [i32; 3]| {
+                            (0..3).all(|axis| {
+                                let center = f64::from(position[axis]) + 0.5;
+                                center >= area.low[axis] && center < area.high[axis]
+                            })
+                        };
+                        contains(current) && contains(neighbor)
+                    })
+                {
+                    continue;
+                }
+                let Some(block) = level.block(host, neighbor) else {
+                    continue;
+                };
+                if block == air {
+                    continue;
+                }
+                let Some(snapshot) = Self::snapshot_block(host, level, neighbor, pos) else {
+                    continue;
+                };
+                positions.push(neighbor);
+                snapshots.push(snapshot);
+            }
+            index += 1;
         }
         let Some(first) = positions.first().copied() else {
             return;
