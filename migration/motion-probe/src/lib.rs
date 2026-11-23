@@ -1,6 +1,6 @@
 use mod_api::{
-    BlockEntityOnLoadEvent, BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent, Compound,
-    HostSide, ServerHost, Tag,
+    BlockEntityOnLoadEvent, BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent,
+    BlockState, BlockUpdateFlags, Compound, HostBlockStates, HostSide, ServerHost, Tag,
 };
 
 const BEARING: &str = "create:mechanical_bearing";
@@ -31,13 +31,38 @@ fn payload() -> Compound {
 }
 
 impl MovingPart {
-    fn ensure_payload(&self, entity: &mut Compound) {
+    fn ensure_payload(
+        &self,
+        host: &dyn mod_api::Host,
+        level: mod_api::LevelRef,
+        pos: [i32; 3],
+        entity: &mut Compound,
+    ) {
         if !entity.contains_key(&"PayloadBlocks".into()) {
             let initial = payload();
             for (key, value) in initial {
                 entity.insert(key, value);
             }
         }
+        if entity.contains_key(&"PayloadPos".into()) {
+            return;
+        }
+        let Some(chest) = host.block_key("minecraft:chest") else {
+            return;
+        };
+        let attached = [pos[0], pos[1] + 1, pos[2]];
+        if level.block(host, attached) != Some(chest) {
+            return;
+        }
+        let Some(block_entity) = host.block_entity_identity(level, attached) else {
+            return;
+        };
+        let Some(chest_data) = block_entity.data(host) else {
+            return;
+        };
+        entity.insert("PayloadPos".into(), Tag::IntArray(attached.to_vec()));
+        entity.insert("PayloadEntity".into(), Tag::Compound(chest_data));
+        entity.insert("PayloadSource".into(), Tag::String("world_chest".into()));
     }
 }
 
@@ -53,7 +78,13 @@ impl BlockEntityPart for MovingPart {
     fn block_entity_on_load(&self, side: HostSide<'_>, event: &mut BlockEntityOnLoadEvent) {
         let HostSide::Server(host) = side else { return };
         let mut data = event.entity.nbt.clone();
-        self.ensure_payload(&mut data);
+        let Some(level) = event.entity.level(host) else {
+            return;
+        };
+        let Some(pos) = event.entity.position(host) else {
+            return;
+        };
+        self.ensure_payload(host, level, pos, &mut data);
         event.entity.nbt = data.clone();
         let _ = event.entity.merge_data(host, data);
     }
@@ -67,26 +98,64 @@ impl BlockEntityPart for MovingPart {
             return;
         };
         let mut data = event.entity.nbt.clone();
-        self.ensure_payload(&mut data);
+        self.ensure_payload(host, level, event.pos, &mut data);
         let offset = match data.get(&"MotionOffset".into()) {
             Some(Tag::Int(value)) => *value,
             _ => 0,
         };
+        let payload_pos = match data.get(&"PayloadPos".into()) {
+            Some(Tag::IntArray(pos)) if pos.len() == 3 => [pos[0], pos[1], pos[2]],
+            _ => [event.pos[0], event.pos[1] + 1, event.pos[2]],
+        };
+        let next_pos = [payload_pos[0], payload_pos[1] + 1, payload_pos[2]];
         let blocked = host
             .level_has_collisions(
                 level,
                 [
-                    f64::from(event.pos[0]) + 0.1,
-                    f64::from(event.pos[1]) + f64::from(offset) * 0.05,
-                    f64::from(event.pos[2]) + 0.1,
-                    f64::from(event.pos[0]) + 1.9,
-                    f64::from(event.pos[1]) + 1.9 + f64::from(offset) * 0.05,
-                    f64::from(event.pos[2]) + 1.9,
+                    f64::from(next_pos[0]),
+                    f64::from(next_pos[1]),
+                    f64::from(next_pos[2]),
+                    f64::from(next_pos[0] + 1),
+                    f64::from(next_pos[1] + 1),
+                    f64::from(next_pos[2] + 1),
                 ],
             )
             .unwrap_or(false);
         data.insert("CollisionBlocked".into(), Tag::Byte(blocked as i8));
-        if !blocked && offset < 8 {
+        if !blocked && offset < 8 && data.contains_key(&"PayloadPos".into()) {
+            let Some(chest) = host.block_key("minecraft:chest") else {
+                return;
+            };
+            let Ok(chest_state) = BlockState::of(&host.block_states(), chest, &[]) else {
+                return;
+            };
+            let Some(Tag::Compound(chest_data)) = data.get(&"PayloadEntity".into()) else {
+                return;
+            };
+            if !host.level_remove_block(level, payload_pos, true) {
+                return;
+            }
+            if !host
+                .level_set_block(
+                    level,
+                    next_pos,
+                    chest_state,
+                    BlockUpdateFlags::NEIGHBORS | BlockUpdateFlags::CLIENTS,
+                )
+                .is_ok_and(|changed| changed)
+            {
+                let _ = host.level_set_block(
+                    level,
+                    payload_pos,
+                    chest_state,
+                    BlockUpdateFlags::NEIGHBORS | BlockUpdateFlags::CLIENTS,
+                );
+                return;
+            }
+            if let Some(next_entity) = host.block_entity_identity(level, next_pos) {
+                let _ = next_entity.merge_data(host, chest_data.clone());
+            }
+            data.insert("PayloadPos".into(), Tag::IntArray(next_pos.to_vec()));
             data.insert("MotionOffset".into(), Tag::Int(offset + 1));
         } else {
             data.insert("Moving".into(), Tag::Byte(0));
