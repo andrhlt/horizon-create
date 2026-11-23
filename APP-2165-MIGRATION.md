@@ -47,6 +47,16 @@ the old `MovedBlocks`/`MountedItems` path remains the production bridge still
 to be reconciled for arbitrary glued payloads, rider entities, rotation, and
 train carriage state.
 
+The rider bridge uses the pinned API's real server handles: a player standing
+in the captured chest footprint is recorded by UUID, transported with each
+successful payload step, and teleported to the old payload footprint when
+collision or the motion bound ends the run. `RiderCaptured`,
+`RiderLastPosition`, and `RiderSafeDismount` are probe-owned acceptance state,
+not a claim that the legacy bearing's complete passenger-attachment contract
+has been migrated. The coordinated headless build must still establish that
+the typed hook compiles and that a world fixture observes the same host/guest
+safety behavior as `tools/test-bearing-player-collision.py`.
+
 ## Evidence and remaining work
 
 - Pure lifecycle: assembly, motion, rider landing, and conservation pass.
