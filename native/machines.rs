@@ -66,6 +66,7 @@ use super::create_hand_crank::{self, CRANK};
 use super::create_speed_controller::{self, CONTROLLER as SPEED_CONTROLLER};
 use super::create_train_signal::{self, SIGNAL};
 use super::create_valve::{self, HANDLE_ENTITY, VALVE};
+use super::create_millstone_processing as millstone_processing;
 
 const DEPLOYER: &str = "create:deployer";
 const SCHEMATIC_TABLE: &str = "create:schematic_table";
@@ -86,9 +87,6 @@ fn deployer_rotation_axis(facing: Direction, along_first: bool) -> u8 {
         _ => unreachable!(),
     }
 }
-
-#[path = "millstone_processing.rs"]
-pub(super) mod millstone_processing;
 
 pub(super) const DIRECTIONS: [[i32; 3]; 6] = [
     [1, 0, 0],

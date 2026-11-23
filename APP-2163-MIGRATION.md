@@ -59,8 +59,26 @@ name = "create_millstone_processing"
 source = "millstone_processing.rs"
 ```
 
-`machines.rs` already references the file with an explicit `#[path]`, so the
-generated module can use the same source without a second implementation.
+`machines.rs` and `millstone_adapter.rs` reference the generated module as
+`super::create_millstone_processing`; the central root should register both
+lane-owned sources and attach the adapter from its `Hooks::register` method:
+
+```toml
+[[module]]
+id = "millstone_adapter"
+file = "crates/horizon-client/src/game.rs"
+name = "create_millstone_adapter"
+source = "millstone_adapter.rs"
+```
+
+```rust
+pub(crate) mod millstone_adapter;
+pub(crate) mod millstone_processing;
+
+fn register(&self, registrar: &mut dyn mod_api::Registrar, _: &mod_api::RegistrationContext) {
+    millstone_adapter::register(registrar);
+}
+```
 
 ## This checkpoint
 
