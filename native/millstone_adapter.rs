@@ -6,10 +6,9 @@
 
 use std::sync::Arc;
 
-use horizon_core::random::RandomSource;
 use mod_api::{
-    BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent, Compound, Host, ItemStack,
-    LevelRef, ModContainer, Registrar, ServerHost, Tag,
+    BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent, BlockPart, Compound, Host,
+    ItemStack, LevelRef, ModContainer, RandomSource, Registrar, ServerHost, Tag,
 };
 
 use super::create_millstone_processing::{self, Tick};
@@ -60,19 +59,21 @@ fn set_timer(nbt: &mut Compound, timer: i32) {
     nbt.insert("Timer".into(), Tag::Int(timer));
 }
 
-fn recipe_for(host: &dyn Host, input: &ItemStack) -> Option<(i32, Arc<serde_json::Value>)> {
+fn recipe_for(host: &dyn Host, input: &ItemStack) -> Option<(i32, Arc<mod_api::Recipe>)> {
     host.recipes_of_type(RECIPE_KIND).iter().find_map(|recipe| {
         let ingredients = recipe.json["ingredients"].as_array()?;
         let ingredient = ingredients.first()?;
-        let json = serde_json::to_string(ingredient).ok()?;
-        let ingredient = host.recipe_ingredient(&json).ok().flatten()?;
+        let ingredient = host
+            .recipe_ingredient(&ingredient.to_string())
+            .ok()
+            .flatten()?;
         ingredient.test(host, input).then(|| {
             let time = recipe.json["processing_time"]
                 .as_i64()
                 .map_or(millstone_processing::DEFAULT_PROCESSING_TIME, |value| {
                     value as i32
                 });
-            (time, recipe.json.clone())
+            (time, Arc::new(recipe.clone()))
         })
     })
 }
@@ -104,7 +105,7 @@ fn insert_output(host: &dyn Host, slots: &mut [Option<ItemStack>], mut output: I
 fn finish(
     host: &mut dyn ServerHost,
     slots: &mut [Option<ItemStack>],
-    recipe: &serde_json::Value,
+    recipe: &mod_api::Recipe,
     level: Option<LevelRef>,
 ) -> bool {
     let Some(results) = recipe["results"].as_array() else {
@@ -112,10 +113,7 @@ fn finish(
     };
     let mut pending = Vec::new();
     for result in results {
-        let Ok(json) = serde_json::to_string(result) else {
-            continue;
-        };
-        let Some(output) = host.recipe_result(&json).ok().flatten() else {
+        let Some(output) = host.recipe_result(&result.to_string()).ok().flatten() else {
             continue;
         };
         let chance = result["chance"].as_f64().unwrap_or(1.0) as f32;
@@ -158,6 +156,9 @@ fn finish(
 }
 
 #[mod_api::horizon_part]
+impl BlockPart for MillstonePart {}
+
+#[mod_api::horizon_part]
 impl BlockEntityPart for MillstonePart {
     fn block_entity_ticks(&self, _: &dyn Host, event: &mut BlockEntityTicksEvent<'_>) {
         event.ticks = true;
@@ -186,7 +187,19 @@ impl BlockEntityPart for MillstonePart {
                 timer,
                 finished: true,
             } => {
-                let level = event.entity.level(host);
+                let dimension = match event.entity.nbt.get(&"KineticDimension".into()) {
+                    Some(Tag::String(value)) => value.to_string_lossy(),
+                    _ => String::new(),
+                };
+                let level = (!dimension.is_empty())
+                    .then(|| host.level(&dimension))
+                    .flatten()
+                    .or_else(|| {
+                        host.levels()
+                            .list_levels()
+                            .into_iter()
+                            .find(|level| level.block(host, event.pos).is_some())
+                    });
                 let (left, right) = event.entity.items.split_at_mut(INPUT + 1);
                 if finish(host, right, &recipe, level) {
                     set_timer(&mut event.entity.nbt, timer);
@@ -201,13 +214,4 @@ impl BlockEntityPart for MillstonePart {
             }
         }
     }
-}
-
-/// Hook adapter for the central Hooks implementation. Kept separate so the
-/// integration owner can attach it without changing the kinetic registry.
-pub fn block_entity_container_hook(
-    _: &dyn Host,
-    event: &mut mod_api::BlockEntityContainerEvent<'_>,
-) -> Option<ModContainer> {
-    container(event.block)
 }
