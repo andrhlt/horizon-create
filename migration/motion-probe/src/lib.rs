@@ -1,6 +1,7 @@
 use mod_api::{
     BlockEntityOnLoadEvent, BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent,
-    BlockPart, BlockState, BlockUpdateFlags, Compound, HostBlockStates, HostSide, ServerHost, Tag,
+    BlockPart, BlockState, BlockUpdateFlags, ClientHost, Compound, HostBlockStates, HostSide,
+    ServerHost, Tag,
 };
 
 const BEARING: &str = "create:mechanical_bearing";
@@ -66,6 +67,15 @@ impl MovingPart {
             Some(Tag::Double(bits)) => f64::from_bits(*bits),
             _ => 0.0,
         }
+    }
+
+    fn render_angle(data: &Compound, partial: f32) -> f32 {
+        let angle = Self::angle(data) as f32;
+        let rpm = match data.get(&"BearingRPM".into()) {
+            Some(Tag::Float(bits)) => f32::from_bits(*bits),
+            _ => 0.0,
+        };
+        angle + rpm * 0.3 * partial
     }
 
     fn uuid_tag(uuid: u128) -> Tag {
@@ -226,6 +236,39 @@ impl BlockEntityPart for MovingPart {
         Some(event.entity.nbt.clone())
     }
 
+    fn block_entity_submit(
+        &self,
+        host: &dyn ClientHost,
+        event: &mut mod_api::BlockEntitySubmitEvent<'_>,
+    ) {
+        if event.block != BEARING {
+            return;
+        }
+        let Some(chest) = host.block_key("minecraft:chest") else {
+            return;
+        };
+        let Some(Tag::IntArray(origin)) = event.entity.nbt.get(&"PayloadOrigin".into()) else {
+            return;
+        };
+        if origin.len() != 3 {
+            return;
+        }
+        let relative = [
+            (origin[0] - event.pos[0]) as f32,
+            (origin[1] - event.pos[1]) as f32,
+            (origin[2] - event.pos[2]) as f32,
+        ];
+        event.draw.push();
+        event.draw.rotate_about(
+            [0.0, 1.0, 0.0],
+            Self::render_angle(&event.entity.nbt, event.draw.partial()),
+            [0.5; 3],
+        );
+        event.draw.translate(relative);
+        let _ = event.draw.block(chest, &[]);
+        event.draw.pop();
+    }
+
     fn block_entity_on_load(&self, side: HostSide<'_>, event: &mut BlockEntityOnLoadEvent) {
         let HostSide::Server(host) = side else { return };
         let mut data = event.entity.data(host).unwrap_or_default();
@@ -276,6 +319,10 @@ impl BlockEntityPart for MovingPart {
         self.capture_standing_rider(host, level, payload_pos, &mut data);
         let scroll = self.motor_scroll(host, level, event.pos);
         let powered = scroll.is_some();
+        data.insert(
+            "BearingRPM".into(),
+            Tag::Float((scroll.unwrap_or(0) as f32).to_bits()),
+        );
         let angle = Self::angle(&data);
         let next_angle = match scroll {
             Some(value) if value != 0 => angle + f64::from(value) * 360.0 / 60.0 / 20.0,
