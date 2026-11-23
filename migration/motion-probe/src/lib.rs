@@ -129,8 +129,9 @@ impl BlockEntityPart for MovingPart {
             let Ok(chest_state) = BlockState::of(&host.block_states(), chest, &[]) else {
                 return;
             };
-            let Some(Tag::Compound(chest_data)) = data.get(&"PayloadEntity".into()) else {
-                return;
+            let chest_data = match data.get(&"PayloadEntity".into()) {
+                Some(Tag::Compound(chest_data)) => chest_data.clone(),
+                _ => return,
             };
             if !host.level_remove_block(level, payload_pos, true) {
                 return;
@@ -153,7 +154,7 @@ impl BlockEntityPart for MovingPart {
                 return;
             }
             if let Some(next_entity) = host.block_entity_identity(level, next_pos) {
-                let _ = next_entity.merge_data(host, chest_data.clone());
+                let _ = next_entity.merge_data(host, chest_data);
             }
             data.insert("PayloadPos".into(), Tag::IntArray(next_pos.to_vec()));
             data.insert("MotionOffset".into(), Tag::Int(offset + 1));
