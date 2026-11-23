@@ -20,6 +20,12 @@ pub fn setting_from_button(id: i32) -> i32 {
 #[derive(Clone, Copy, Default)]
 pub struct MotorBoard;
 
+fn menu_key(host: &dyn ServerHost) -> Option<mod_api::MenuKey> {
+    host.menu_keys()
+        .into_iter()
+        .find(|key| mod_api::__private::menu_key_id(*key).as_deref() == Some(MENU_ID))
+}
+
 pub fn register(registrar: &mut dyn mod_api::Registrar) {
     let kind = registrar.block_entity_type_key("create:motor");
     registrar
@@ -67,9 +73,8 @@ impl BlockPart for MotorBoard {
         // from the content id declared in creative_motor.json. Keep the empty
         // hand hook installed so the integration owner can pass the resolved
         // key without changing the authority/hand contract.
-        let _ = host;
-        let _ = event;
-        None
+        let menu = menu_key(host)?;
+        open_with_menu(host, &event.click, menu)
     }
 }
 
