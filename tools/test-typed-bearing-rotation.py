@@ -10,7 +10,7 @@ from fixture_world import fixture_world
 BEARING = (0, 100, 0)
 MOTOR = (0, 99, 0)
 CHEST = (1, 101, 0)
-BARREL = (2, 101, 0)
+BARREL = (0, 101, 1)
 
 
 def xyz(pos):
@@ -88,7 +88,7 @@ def verify(args):
             or len(rotated_positions) != 2
             or number(active, "RiderCaptured") != 1
         ):
-            raise RuntimeError(f"Powered bearing did not rotate/capture glued payload: {active}")
+            raise RuntimeError(f"Powered bearing did not rotate/capture adjacent payload: {active}")
         if sorted(carried_items(control, position) for position in rotated_positions) != [3, 7]:
             raise RuntimeError("Rotated multi-block payload inventories were not conserved.")
         expected_rider = (0.5, 102.0, -0.5)
