@@ -258,10 +258,18 @@ ratio where the old graph walk divides by it. After correction, measured speeds
 for ticks 1–10 match the Java trace, including the small/large gear ratio and
 rotation sign. Breaking power at tick 10 clears that train as expected. The
 fixture still fails its restoration phase: after replacing the motor at tick 24,
-ticks 25–35 retain zero speed in that train (11 mismatching rows). The second
-independent train remains powered. An offscreen screenshot was captured, but
-rotation animation was not asserted. The full 36-row fixture therefore does not
-pass and is not counted as complete propagation verification.
+ticks 25–35 retain zero speed in that train (11 mismatching rows). A short
+headless reproduction reads motor and shaft data around removal and re-placement:
+the original motor ticks and writes speed 16, but the recreated motor remains at
+`Speed: 0.0f` and its shaft remains zero through four more ticks. The second
+independent train remains powered. This isolates a runtime lifecycle defect in
+the selected candidate, not a proven SDK limitation. The probe package omits the
+existing `create_machines` placement/event hooks. The normal player-placement
+fixture was run offscreen and failed six orientation cases, consistent with that
+omission; it cannot attribute a placement defect to the SDK. An offscreen
+screenshot was captured, but rotation animation was not asserted. The full 36-row
+fixture therefore does not pass. Rerun the replacement lifecycle with the old
+placement/event hooks integrated before declaring a pinned-SDK/API blocker.
 
 The harness required a local Unix control socket; its first sandboxed attempt
 was denied. Running the same isolated offscreen command with filesystem/socket
@@ -277,11 +285,9 @@ runtime-observed**; initial signed speed propagation **partially verified**;
 full interruption/restoration **failed**; motor setting interaction, guest
 configuration, save/reopen and rotation animation **not implemented or tested**.
 The adapter currently reads `minecraft:overworld` directly, so other dimensions
-are also unverified. The adapter compiles and initial propagation works. The replacement reproduction
-is concrete evidence of a runtime tick-lifecycle blocker in this candidate, but
-not yet proof that the pinned SDK lacks a required API; normal player placement
-needs a separate check before assigning the defect to the engine. The exact restore path must be debugged before this can be
-called viable as a complete motor slice.
+are also unverified. No missing engine capability has been established. The exact
+restore path must be debugged before this can be called viable as a complete motor
+slice.
 
 Measured work in this resumed implementation: the focused edit/build/fixture
 and replacement reproduction took about **8 minutes wall-clock** by the local run
