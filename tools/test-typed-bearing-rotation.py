@@ -35,37 +35,60 @@ def carried_items(control, pos):
     return sum(map(int, re.findall(r"count: (\d+)", data)))
 
 
+def player_position(control):
+    return tuple(control.call("state")["player"]["position"][:3])
+
+
+def close(actual, expected, tolerance=0.3):
+    return all(abs(a - e) <= tolerance for a, e in zip(actual, expected))
+
+
 def advance(control, ticks):
     for _ in range(ticks):
         control.step_to(control.clock() + 1)
 
 
+def setup(control, *, blocked=False):
+    commands = [
+        "/fill -3 97 -3 3 105 3 minecraft:air",
+        f"/setblock {xyz(BEARING)} create:mechanical_bearing[facing=up]",
+        f"/setblock {xyz(MOTOR)} create:creative_motor[facing=up]{{ScrollValue:20}}",
+        f"/setblock {xyz(CHEST)} minecraft:chest",
+        f"/item replace block {xyz(CHEST)} container.0 with minecraft:iron_ingot 7",
+        "/tp @s 1.5 102 0.5",
+    ]
+    if blocked:
+        commands.insert(4, "/setblock 0 101 -1 minecraft:stone")
+    control.commands(tuple(commands))
+
+
 def verify(args):
     with fixture_world(args, "TypedBearingRotation", pack=args.pack) as control:
-        control.commands((
-            "/fill -3 97 -3 3 105 3 minecraft:air",
-            f"/setblock {xyz(BEARING)} create:mechanical_bearing[facing=up]",
-            f"/setblock {xyz(MOTOR)} create:creative_motor[facing=up]{{ScrollValue:20}}",
-            f"/setblock {xyz(CHEST)} minecraft:chest",
-            f"/item replace block {xyz(CHEST)} container.0 with minecraft:iron_ingot 7",
-            "/tp @s 1.5 102 0.5",
-        ))
+        setup(control)
         advance(control, 15)
         active = block_data(control, BEARING)
         rotated = payload_pos(active)
-        if number(active, "Angle") is None or number(active, "Angle") <= 60:
+        angle = number(active, "Angle")
+        if angle is None or abs(angle - 90.0) > 8.0:
             raise RuntimeError(f"Powered bearing did not accumulate source-matched angle: {active}")
         if rotated is None or rotated == CHEST or number(active, "RiderCaptured") != 1:
             raise RuntimeError(f"Powered bearing did not rotate/capture glued payload: {active}")
         if carried_items(control, rotated) != 7:
             raise RuntimeError("Rotated chest inventory was not conserved.")
+        expected_rider = (0.5, 102.0, -0.5)
+        rider = player_position(control)
+        if not close(rider, expected_rider):
+            raise RuntimeError(f"Rider did not follow the powered bearing transform: {rider} != {expected_rider}")
 
         control.call("save")
         control.restart()
         reopened = block_data(control, BEARING)
         reopened_pos = payload_pos(reopened)
+        reopened_angle = number(reopened, "Angle")
         if reopened_pos is None or carried_items(control, reopened_pos) != 7:
             raise RuntimeError(f"Rotated payload did not survive reopen: {reopened}")
+        if reopened_angle is None or abs(reopened_angle - angle) > 8.0:
+            raise RuntimeError(f"Powered bearing angle did not survive reopen: {reopened}")
 
         control.command(f"/data merge block {xyz(MOTOR)} {{ScrollValue:0}}")
         advance(control, 1)
@@ -74,6 +97,18 @@ def verify(args):
             raise RuntimeError(f"Rotated bearing did not dismount safely: {finished}")
         if carried_items(control, reopened_pos) != 7:
             raise RuntimeError("Rotated chest inventory was not conserved at dismount.")
+
+    with fixture_world(args, "TypedBearingRotationBlocked", pack=args.pack) as control:
+        setup(control, blocked=True)
+        advance(control, 15)
+        blocked = block_data(control, BEARING)
+        blocked_pos = payload_pos(blocked)
+        if number(blocked, "CollisionBlocked") != 1 or number(blocked, "Moving") != 0:
+            raise RuntimeError(f"Powered bearing ignored a solid target collision: {blocked}")
+        if number(blocked, "RiderSafeDismount") != 1:
+            raise RuntimeError(f"Blocked bearing did not safely dismount its rider: {blocked}")
+        if blocked_pos is None or carried_items(control, blocked_pos) != 7:
+            raise RuntimeError("Blocked bearing did not conserve the payload inventory.")
     print("Powered bearing rotated a glued chest, carried a rider, survived reopen, and dismounted safely.")
 
 
