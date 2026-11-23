@@ -80,22 +80,25 @@ def verify(args):
         if not close(rider, expected_rider):
             raise RuntimeError(f"Rider did not follow the powered bearing transform: {rider} != {expected_rider}")
 
-        saved_tick = control.clock()
+        saved_offset = number(active, "MotionOffset")
         control.call("save")
         control.restart()
-        reload_ticks = max(0, control.clock() - saved_tick)
         reopened = block_data(control, BEARING)
         reopened_pos = payload_pos(reopened)
         reopened_angle = number(reopened, "Angle")
+        reopened_offset = number(reopened, "MotionOffset")
         if reopened_pos is None or carried_items(control, reopened_pos) != 7:
             raise RuntimeError(f"Rotated payload did not survive reopen: {reopened}")
         # fixture_world freezes after launch; measure the ticks that happened
-        # before that freeze and allow exactly the commanded 6 degrees/tick.
-        expected_reopened_angle = angle + reload_ticks * 6.0
+        # before that freeze using the Part's persisted motion counter. The
+        # world clock also advances during startup, but not every world tick
+        # runs this block entity Part.
+        motion_ticks = max(0, (reopened_offset or 0) - (saved_offset or 0))
+        expected_reopened_angle = angle + motion_ticks * 6.0
         if reopened_angle is None or reopened_angle < angle or abs(reopened_angle - expected_reopened_angle) > 8.0:
             raise RuntimeError(
                 f"Powered bearing angle did not preserve measured reload continuity "
-                f"({reload_ticks} ticks, expected {expected_reopened_angle}): {reopened}"
+                f"({motion_ticks} Part ticks, expected {expected_reopened_angle}): {reopened}"
             )
 
         control.command(f"/data merge block {xyz(MOTOR)} {{ScrollValue:0}}")
