@@ -101,6 +101,18 @@ attachment snapshot/actor layer that supplies the existing `MovedBlocks`,
 probe with more hard-coded block cases would not establish arbitrary payload
 parity.
 
+The retained Java flow gives that bridge a finite shape: seed the controller and
+attached source, breadth-first follow chassis/sticker edges and glue-area
+contacts, snapshot each relative block state, block-entity/item data and
+vanilla entity data, then snapshot each block's local collision boxes. On
+restore, rotate and round every relative position, reject occupied targets,
+write the rotated state, merge block-entity NBT/items, restore vanilla entity
+data, and remove temporary display/control entities. The typed Part currently
+has the individual block/state/NBT/collision reads and writes, but no operation
+that owns this graph as one moving actor or preserves its temporary entities
+and rotated collision shapes. This is the exact next bridge, not a reason to
+broaden the current chest probe.
+
 ## Evidence and remaining work
 
 - Pure lifecycle: assembly, motion, rider landing, and conservation pass.
