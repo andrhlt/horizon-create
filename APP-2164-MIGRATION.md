@@ -9,8 +9,8 @@ player-facing board/input path and the ordinary interaction families below.
 
 | Family | APP-2164 files/evidence | Boundary |
 | --- | --- | --- |
-| Creative Motor settings board | `native/speed_controller_controls.rs`, `native/speed_controller.rs`, `tools/test-creative-motor.py` | Server mutation remains authoritative; the typed adapter's `set_motor_setting(host, level, pos, setting)` is the migration target. |
-| Host/guest board action | `native/speed_controller_input_server.rs`, `tools/test-multiplayer-creative-motor.py` | Guest sends the existing action once; APP-2136 owns typed transport and graph sync. |
+| Creative Motor settings board | `migration/kinetic-probe/src/motor_board.rs`, `native/motor_board.rs` | Server mutation remains authoritative; `menu_button` resolves the acting player level and calls the typed adapter setter. |
+| Host/guest board action | `migration/kinetic-probe/data/create/horizon/menu/creative_motor.json` | The menu declaration and server button mapping are compiled. The pinned SDK still lacks a supported content-id to opaque `MenuKey` lookup, so ordinary empty-hand opening is an explicit seam for APP-2136 integration. |
 | Menus, filters, tools, static content | Existing `native/*screen*`, `native/*editor*`, `native/wrench.rs`, `content/` | Stationary processing state stays with APP-2163; moving targets and train lifecycle stay with APP-2165. |
 
 ## Finite acceptance cases
@@ -20,6 +20,13 @@ including host and guest actions, rejection of a non-motor target, and the
 existing active/idle save/reopen checks. The board's zero detent must remain
 zero; it must not become `+1` through a lower-bound clamp.
 
-Exact pixel and packet-arrival parity remain follow-ups. A typed SDK menu/screen
-adapter will be supplied as a small integration patch against APP-2136's
-central package once the board route is connected to the shared adapter.
+Exact pixel and packet-arrival parity remain follow-ups. The typed board/menu
+module compiles against the pinned prebuilt API using the 9009897 adapter
+sources. Runtime board opening and screen clicks remain blocked by the missing
+supported `String -> MenuKey` lookup: `PlayerRef::open_mod_menu` requires an
+opaque `MenuKey`, while `KeysHost::menu_keys` does not expose names and the
+only name helper is hidden. Do not index or zip opaque keys to ids. APP-2136
+must supply the narrow central resolution seam (or expose a supported
+content-menu key) before board-open/host64/guest24/zero acceptance. The compile
+candidate still proves the server-side target identity, player-level selection,
+signed button mapping, and shared setter call.
