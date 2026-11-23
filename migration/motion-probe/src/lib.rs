@@ -1,6 +1,6 @@
 use mod_api::{
     BlockEntityOnLoadEvent, BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent,
-    BlockState, BlockUpdateFlags, Compound, HostBlockStates, HostSide, ServerHost, Tag,
+    BlockPart, BlockState, BlockUpdateFlags, Compound, HostBlockStates, HostSide, ServerHost, Tag,
 };
 
 const BEARING: &str = "create:mechanical_bearing";
@@ -57,7 +57,7 @@ impl MovingPart {
 
     fn capture_standing_rider(
         &self,
-        host: &dyn mod_api::Host,
+        host: &dyn ServerHost,
         level: mod_api::LevelRef,
         payload_pos: [i32; 3],
         entity: &mut Compound,
@@ -65,14 +65,14 @@ impl MovingPart {
         if entity.contains_key(&"RiderUuid".into()) {
             return;
         }
-        let Some(players) = host.level_online_players(level) else {
+        let Some(players) = level.online_players(host) else {
             return;
         };
         let x = f64::from(payload_pos[0]);
         let y = f64::from(payload_pos[1] + 1);
         let z = f64::from(payload_pos[2]);
         for player in players {
-            let Some([px, py, pz]) = host.entity_position(player.entity()) else {
+            let Some([px, py, pz]) = player.entity().position(host) else {
                 continue;
             };
             if px >= x && px < x + 1.0 && pz >= z && pz < z + 1.0 && py >= y && py < y + 1.25 {
@@ -97,7 +97,7 @@ impl MovingPart {
             return;
         };
         let player_entity = player.entity();
-        let Some([px, py, pz]) = host.entity_position(player_entity) else {
+        let Some([px, py, pz]) = player_entity.position(host) else {
             return;
         };
         let target = if delta_y == 0.0 {
@@ -105,7 +105,7 @@ impl MovingPart {
         } else {
             [px, py + delta_y, pz]
         };
-        if host.entity_teleport_to(player_entity, target, None) {
+        if player_entity.teleport_to(host, target, None) {
             entity.insert(
                 "RiderLastPosition".into(),
                 Tag::List(target.into_iter().map(Tag::Double).collect()),
@@ -118,7 +118,7 @@ impl MovingPart {
 
     fn ensure_payload(
         &self,
-        host: &dyn mod_api::Host,
+        host: &dyn ServerHost,
         level: mod_api::LevelRef,
         pos: [i32; 3],
         entity: &mut Compound,
@@ -148,9 +148,17 @@ impl MovingPart {
         entity.insert("PayloadPos".into(), Tag::IntArray(attached.to_vec()));
         entity.insert("PayloadEntity".into(), Tag::Compound(chest_data));
         entity.insert("PayloadSource".into(), Tag::String("world_chest".into()));
+        if let Some(dimension) = level.dimension().id(host) {
+            entity.insert(
+                "PayloadDimension".into(),
+                Tag::String(dimension.as_str().into()),
+            );
+        }
         self.capture_standing_rider(host, level, attached, entity);
     }
 }
+
+impl BlockPart for MovingPart {}
 
 #[mod_api::horizon_part]
 impl BlockEntityPart for MovingPart {
@@ -163,7 +171,7 @@ impl BlockEntityPart for MovingPart {
 
     fn block_entity_on_load(&self, side: HostSide<'_>, event: &mut BlockEntityOnLoadEvent) {
         let HostSide::Server(host) = side else { return };
-        let mut data = event.entity.nbt.clone();
+        let mut data = event.entity.data(host).unwrap_or_default();
         let Some(level) = event.entity.level(host) else {
             return;
         };
@@ -171,7 +179,14 @@ impl BlockEntityPart for MovingPart {
             return;
         };
         self.ensure_payload(host, level, pos, &mut data);
-        event.entity.nbt = data.clone();
+        if !data.contains_key(&"PayloadDimension".into()) {
+            if let Some(dimension) = level.dimension().id(host) {
+                data.insert(
+                    "PayloadDimension".into(),
+                    Tag::String(dimension.as_str().into()),
+                );
+            }
+        }
         let _ = event.entity.merge_data(host, data);
     }
 
@@ -180,9 +195,17 @@ impl BlockEntityPart for MovingPart {
     }
 
     fn block_entity_tick(&self, host: &mut dyn ServerHost, event: &mut BlockEntityTickEvent<'_>) {
-        let Some(level) = event.entity.level(host) else {
-            return;
+        let dimension = match event.entity.nbt.get(&"PayloadDimension".into()) {
+            Some(Tag::String(value)) => value.to_string_lossy(),
+            _ => String::new(),
         };
+        let level = host.level(&dimension).or_else(|| {
+            host.levels()
+                .list_levels()
+                .into_iter()
+                .find(|level| level.block(host, event.pos) == host.block_key(BEARING))
+        });
+        let Some(level) = level else { return };
         let mut data = event.entity.nbt.clone();
         self.ensure_payload(host, level, event.pos, &mut data);
         let offset = match data.get(&"MotionOffset".into()) {
@@ -195,9 +218,9 @@ impl BlockEntityPart for MovingPart {
         };
         self.capture_standing_rider(host, level, payload_pos, &mut data);
         let next_pos = [payload_pos[0], payload_pos[1] + 1, payload_pos[2]];
-        let blocked = host
-            .level_has_collisions(
-                level,
+        let blocked = level
+            .has_collisions(
+                host,
                 [
                     f64::from(next_pos[0]),
                     f64::from(next_pos[1]),
@@ -220,20 +243,20 @@ impl BlockEntityPart for MovingPart {
                 Some(Tag::Compound(chest_data)) => chest_data.clone(),
                 _ => return,
             };
-            if !host.level_remove_block(level, payload_pos, true) {
+            if !level.remove_block(host, payload_pos, true) {
                 return;
             }
-            if !host
-                .level_set_block(
-                    level,
+            if !level
+                .set_block(
+                    host,
                     next_pos,
                     chest_state,
                     BlockUpdateFlags::NEIGHBORS | BlockUpdateFlags::CLIENTS,
                 )
                 .is_ok_and(|changed| changed)
             {
-                let _ = host.level_set_block(
-                    level,
+                let _ = level.set_block(
+                    host,
                     payload_pos,
                     chest_state,
                     BlockUpdateFlags::NEIGHBORS | BlockUpdateFlags::CLIENTS,
