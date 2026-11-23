@@ -984,7 +984,18 @@ motor block/position, `CREATE_MOTOR_BOARD_MENU key=true`, and
 was returned. The client nevertheless stayed at `screen=playing`,
 `menu=None`, with an empty buttons list. This isolates server callback dispatch,
 menu-key resolution and server open success; it does not pass client menu
-presentation or button interaction. The current pinned typed client click hook
-still lacks a mutable `ClientHost` path, and the APP-2164 engine helper is
-checking a minimal hook fix. The stager now sources the menu JSON from
+presentation or button interaction. The stager now sources the menu JSON from
 production `content/` so subsequent probes use the real resource.
+
+The frozen SDK source documents scoped `screen` and `screen_draw` hooks for
+block menus, plus a separate mod-owned widget screen (`mod_screen_open`,
+`screen_render_post`, and read-only mouse/key hooks). `MotorBoard` currently
+implements only the server `menu_button` callback; it does not provide a
+`screen` layout/draw implementation. That is the next bounded client-side
+transition to test, not evidence of a server open or MenuKey failure. For
+clicks on a server-owned menu, the pinned surface still has no `screen_click`
+hook and its `MenuRef::click_button` needs mutable `ClientHost`, unavailable to
+the existing pressed-pre callback. A widget-owned screen has usable input hooks,
+but its click-to-server transport is not wired yet. Do not mark ordinary
+host/guest setting changes complete until a visible controls path invokes the
+shared setter exactly once.
