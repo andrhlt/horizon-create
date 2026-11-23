@@ -1146,6 +1146,8 @@ to account for the start tick and 150 timer decrements. Its run was blocked
 before world startup: direct `horizon-ctl` launch returned exit 78 for
 unregistered managed cache leases; the registered-version route said the
 candidate was not prepared in the selected home. No processing, persistence,
-or backpressure result is claimed from that attempt. The ordinary production
-pack has no milling recipe directory yet, so this temporary recipe tests the
-matcher only; it is not shipped gameplay content.
+or backpressure result is claimed from that attempt. The tracked `content/`
+tree is an override set; `tools/prepare.py` imports generated Java milling
+recipes into a full production pack. The minimal `.local/create.hmod` used for
+this probe is not that full pack. This temporary recipe is test input and is
+not a product resource change.
