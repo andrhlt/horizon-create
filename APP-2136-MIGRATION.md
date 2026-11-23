@@ -241,3 +241,61 @@ attempting isolated SDK validation. Production implementation time: **0**;
 compiler time is not available because the launcher stopped before compilation;
 gameplay/test time: **0**. The earlier 24-minute diagnostic/checkpoint record
 remains separate and is not counted as implementation time.
+
+## Kinetic adapter runtime evidence (2026-11-23)
+
+The frozen launcher route is now reproducible in the isolated `.local/sdk-check`
+homes. `launcher@0.2.105 native-build --instance 'APP-2136 SDK Probe'
+--trust-native-code --profile optimized` compiled the selected typed-Part adapter
+against the pinned Nov 20 SDK in **1 second** (`native-0a875da-128150ca3ffb`).
+This is the normal SDK compile path and does not change the shared SDK/mixin pin.
+Two pure kinetic calculation tests also pass (2/2) with managed Rust 1.99.1.
+
+The existing offscreen `shaft-and-cogwheel` fixture now starts with the staged
+motor/shaft/cogwheel Part set and exercises server ticking. The first comparison
+exposed a speed conversion bug in the adapter: it multiplied the relative gear
+ratio where the old graph walk divides by it. After correction, measured speeds
+for ticks 1–10 match the Java trace, including the small/large gear ratio and
+rotation sign. Breaking power at tick 10 clears that train as expected. The
+fixture still fails its restoration phase: after replacing the motor at tick 24,
+ticks 25–35 retain zero speed in that train (11 mismatching rows). The second
+independent train remains powered. An offscreen screenshot was captured, but
+rotation animation was not asserted. The full 36-row fixture therefore does not
+pass and is not counted as complete propagation verification.
+
+The harness required a local Unix control socket; its first sandboxed attempt
+was denied. Running the same isolated offscreen command with filesystem/socket
+access succeeded. It uses the existing Java fixture and trace copied from the
+original checkout's ignored evidence directory. For the temporary content pack,
+the selected four block definitions had `waterloggable` removed because the
+pinned content schema rejects that property. This is a demonstrated content API
+compatibility gap; waterlogging is not verified and the workaround is only in
+ignored test artifacts, not source content.
+
+Stages: typed block/entity registration and initial server tick **compile and
+runtime-observed**; initial signed speed propagation **partially verified**;
+full interruption/restoration **failed**; motor setting interaction, guest
+configuration, save/reopen and rotation animation **not implemented or tested**.
+The adapter currently reads `minecraft:overworld` directly, so other dimensions
+are also unverified. No missing engine capability has been established: the
+remaining failures are currently adapter/event-lifecycle and feature work, not a
+proven SDK blocker. The exact restore path must be debugged before this can be
+called viable as a complete motor slice.
+
+Measured work in this resumed implementation: the focused edit/build/fixture
+cycle took about **5 minutes wall-clock** by the local run timestamps; the
+successful mod compile itself took **1 second**; the two offscreen fixture runs
+took about **18 and 28 seconds** from command start through comparison. The
+pure Rust tests passed **2/2**. These figures cover only the bounded work above,
+not the earlier 24-minute and 4-minute-51-second diagnostic checkpoints.
+
+Estimate from evidence: reserve **1–2 days** to make the bounded graph lifecycle
+(including motor removal/replacement and reconnection) match the Java trace and
+integrate it reproducibly into the source generator; **1–2 days** for motor
+setting input, guest sync and save/reopen; and **1–2 days** for content schema
+compatibility, selected client rotation and final normal validation. Total
+remaining kinetic slice estimate is **3–6 engineer-days**, assuming the pinned
+SDK's existing typed Part event and persistence APIs suffice. The motor board's
+guest action path and persistent speed state remain uncertain. If they cannot be
+implemented with existing Part APIs, stop at a minimal reproduction and reassess
+before expanding scope. Processing and train flows remain untouched.

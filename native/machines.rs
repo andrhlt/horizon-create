@@ -599,6 +599,16 @@ enum Kinetic {
 }
 
 impl Kinetic {
+    fn kinetic_slice(self) -> Option<super::create_kinetic_slice::Node> {
+        use super::create_kinetic_slice::Node;
+        match self {
+            Self::Motor(facing) => Some(Node::Motor { facing }),
+            Self::Shaft(axis) => Some(Node::Shaft { axis }),
+            Self::Cog(axis, large) => Some(Node::Cogwheel { axis, large }),
+            _ => None,
+        }
+    }
+
     fn at(game: &Game<'_>, pos: [i32; 3]) -> Option<Self> {
         match game.native_block(pos).as_str() {
             MOTOR => {
@@ -902,6 +912,9 @@ impl Kinetic {
     }
 
     fn ratio_to(self, other: Self, offset: [i32; 3]) -> Option<f32> {
+        if let (Some(from), Some(to)) = (self.kinetic_slice(), other.kinetic_slice()) {
+            return from.ratio_to(to, offset);
+        }
         let adjacent = offset.iter().map(|value| value.abs()).sum::<i32>() == 1;
         if adjacent && self.shaft(offset) && other.shaft(offset.map(|v| -v)) {
             return Some(1.0);
