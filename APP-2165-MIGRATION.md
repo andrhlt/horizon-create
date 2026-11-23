@@ -116,6 +116,13 @@ retained from that attempt; this is a concrete SDK/fork-owner request for a
 server-side special-entity query or attachment graph, not a claimed glue
 implementation.
 
+The retained graph rule is now isolated in `native/moving_slice.rs` as
+`expand_glued_payload`: it follows six-sided solid neighbors only when both
+cells lie in the same normalized glue area, preserves breadth-first order, and
+does not cross air or unattached cells. Six pure lifecycle/graph tests pass;
+the runtime adapter remains intentionally unconnected until the special-entity
+query exists.
+
 The retained Java flow gives that bridge a finite shape: seed the controller and
 attached source, breadth-first follow chassis/sticker edges and glue-area
 contacts, snapshot each relative block state, block-entity/item data and
