@@ -1253,7 +1253,13 @@ calculation.
 
 The pinned offline `native-build` succeeded in 2 seconds as candidate
 `native-0a875da-06927c0aa6c7` (Horizon `0a875da`, Rust `1.99.1`); its
-`native-mods.json` and library hashes are in the isolated launcher home.
+`native-mods.json` SHA-256 is
+`1d6fcc8395aa1b7302b4c7bf61c49b66b5f79dd0fc6eef004316333d22b176b5` and
+`libmod_create_kinetic_probe.dylib` SHA-256 is
+`6b5aa63f6f29238031c9f8b9ef7a267846c37e4a750a46d26dc9c7acd8ce8e31`. The
+staged `kinetic_adapter.rs` and `motor_board.rs` SHA-256 values are
+`6661b9809b8a8f5287af9f97865ef845f39750e04430a5bcbb9d30517b95c11a` and
+`b8c8123e484d5995bcefb60f03dd0e0c9d711a5c4d37aec99417ea5d877be105`.
 `cargo test --offline` on the staged typed project passed 7/7 logic tests.
 The seven-case ordinary placement fixture was attempted headless/offscreen but
 exited before world startup because direct `horizon-ctl` launch rejected
