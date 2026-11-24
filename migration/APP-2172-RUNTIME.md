@@ -147,9 +147,9 @@ marker-query behavior has not been separately verified against this package;
 small rendering/audio variants and optional integrations absent from the pack
 remain follow-up coverage rather than claimed passes. The later converter
 cleanup described above still needs incorporation into a fresh runtime build
-and route run. Keep the issue open until the updated package is reviewed and
-the user-requested `/close`/PR delivery can proceed through an authorized
-GitHub route.
+and route run. PR #206 is open for review; no checks have reported yet. Keep the
+issue open through review and resolve it through the agreed `/close` workflow
+after the remaining acceptance notes are dispositioned.
 
 ## Historical 3fa build attempt
 
