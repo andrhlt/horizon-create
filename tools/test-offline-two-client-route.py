@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove the supported pinned offline dedicated-server route with two UUIDs."""
+"""Verify a production Create package on a loopback two-client server."""
 from __future__ import annotations
 
 import argparse
