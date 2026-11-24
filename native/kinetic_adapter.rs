@@ -22,16 +22,40 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         .block_entity_type("create:simple_kinetic")
         .blocks(&["create:shaft", "create:cogwheel", "create:large_cogwheel"])
         .build();
+    let flywheel = registrar
+        .block_entity_type("create:flywheel")
+        .blocks(&["create:flywheel"])
+        .build();
+    let gearbox = registrar
+        .block_entity_type("create:gearbox")
+        .blocks(&["create:gearbox"])
+        .build();
+    let clutch = registrar
+        .block_entity_type("create:clutch")
+        .blocks(&["create:clutch"])
+        .build();
+    let gearshift = registrar
+        .block_entity_type("create:gearshift")
+        .blocks(&["create:gearshift"])
+        .build();
     let part = KineticPart {
         motor: registrar.block_key("create:creative_motor"),
         shaft: registrar.block_key("create:shaft"),
         cogwheel: registrar.block_key("create:cogwheel"),
         large_cogwheel: registrar.block_key("create:large_cogwheel"),
         millstone: registrar.block_key("create:millstone"),
+        flywheel: registrar.block_key("create:flywheel"),
+        gearbox: registrar.block_key("create:gearbox"),
+        clutch: registrar.block_key("create:clutch"),
+        gearshift: registrar.block_key("create:gearshift"),
     };
     let _ = KINETIC_PART.set(part);
     registrar.block_entity_part(&motor, part).unwrap();
     registrar.block_entity_part(&kinetic, part).unwrap();
+    registrar.block_entity_part(&flywheel, part).unwrap();
+    registrar.block_entity_part(&gearbox, part).unwrap();
+    registrar.block_entity_part(&clutch, part).unwrap();
+    registrar.block_entity_part(&gearshift, part).unwrap();
 }
 
 #[derive(Clone, Copy)]
@@ -41,6 +65,10 @@ pub struct KineticPart {
     cogwheel: BlockKey,
     large_cogwheel: BlockKey,
     millstone: BlockKey,
+    flywheel: BlockKey,
+    gearbox: BlockKey,
+    clutch: BlockKey,
+    gearshift: BlockKey,
 }
 
 impl KineticPart {
@@ -375,6 +403,28 @@ fn node(
     if block == part.millstone {
         return Some(Node::Millstone);
     }
+    if block == part.flywheel {
+        return Some(Node::Flywheel {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+        });
+    }
+    if block == part.gearbox {
+        return Some(Node::Gearbox {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+        });
+    }
+    if block == part.clutch {
+        return Some(Node::Clutch {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+            powered: level.block_property(host, pos, "powered")? == "true",
+        });
+    }
+    if block == part.gearshift {
+        return Some(Node::Gearshift {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+            powered: level.block_property(host, pos, "powered")? == "true",
+        });
+    }
     None
 }
 
@@ -389,9 +439,9 @@ fn network(
         return HashMap::new();
     };
     let mut ratios = HashMap::from([(start, 1.0f32)]);
-    let mut pending = VecDeque::from([(start, start_node)]);
+    let mut pending = VecDeque::from([(start, start_node, [0; 3])]);
     let mut order = Vec::new();
-    while let Some((pos, block)) = pending.pop_front() {
+    while let Some((pos, block, entered)) = pending.pop_front() {
         order.push(pos);
         let ratio = ratios[&pos];
         for delta in block.neighbors() {
@@ -408,9 +458,13 @@ fn network(
             if edge == 0.0 {
                 continue;
             }
-            let next_ratio = ratio / edge;
+            let direction = block.direction_ratio(entered, delta);
+            if direction == 0.0 {
+                continue;
+            }
+            let next_ratio = ratio * direction / edge;
             ratios.insert(next, next_ratio);
-            pending.push_back((next, other));
+            pending.push_back((next, other, delta.map(|value| -value)));
         }
     }
     let mut sources = Vec::new();

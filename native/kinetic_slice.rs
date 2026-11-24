@@ -9,13 +9,22 @@ pub enum Node {
     Shaft { axis: usize },
     Cogwheel { axis: usize, large: bool },
     Millstone,
+    Flywheel { axis: usize },
+    Gearbox { axis: usize },
+    Clutch { axis: usize, powered: bool },
+    Gearshift { axis: usize, powered: bool },
 }
 
 impl Node {
     fn shaft(self, face: [i32; 3]) -> bool {
         match self {
             Self::Motor { facing } => face == facing,
-            Self::Shaft { axis } | Self::Cogwheel { axis, .. } => face[axis] != 0,
+            Self::Shaft { axis }
+            | Self::Cogwheel { axis, .. }
+            | Self::Flywheel { axis }
+            | Self::Clutch { axis, .. }
+            | Self::Gearshift { axis, .. } => face[axis] != 0,
+            Self::Gearbox { axis } => face[axis] == 0,
             Self::Millstone => face == [0, -1, 0],
         }
     }
@@ -90,6 +99,33 @@ impl Node {
             (false, false) if adjacent && axis == other_axis && offset[axis] == 0 => Some(-1.0),
             _ => None,
         }
+    }
+
+    /// Direction-dependent transmission modifier from the incoming face to
+    /// an outgoing neighbor. `entered` points from this node back to its
+    /// predecessor, matching Create's `getRotationSpeedModifier` convention.
+    pub fn direction_ratio(self, entered: [i32; 3], outgoing: [i32; 3]) -> f32 {
+        if entered == [0; 3] || entered == outgoing {
+            return 1.0;
+        }
+        match self {
+            Self::Clutch { powered: true, .. } => 0.0,
+            Self::Gearshift { powered: true, .. } => -1.0,
+            Self::Gearbox { .. } => gearbox_multiplier(entered, outgoing),
+            _ => 1.0,
+        }
+    }
+}
+
+pub fn gearbox_multiplier(from: [i32; 3], to: [i32; 3]) -> f32 {
+    if from == [0; 3] || from == to {
+        return 1.0;
+    }
+    if from == to.map(|component| -component) || from.iter().sum::<i32>() == to.iter().sum::<i32>()
+    {
+        -1.0
+    } else {
+        1.0
     }
 }
 
@@ -250,5 +286,55 @@ mod tests {
         assert_eq!(motor_speed([-1, 0, 0], 64), -64.0);
         assert_eq!(motor_speed([1, 0, 0], -24), -24.0);
         assert_eq!(motor_speed([1, 0, 0], 999), 256.0);
+    }
+
+    #[test]
+    fn transmissions_apply_powered_clutch_and_gearshift_only_across_the_output() {
+        let input = [1, 0, 0];
+        let output = [0, 0, 1];
+        assert_eq!(
+            Node::Clutch {
+                axis: 0,
+                powered: true
+            }
+            .direction_ratio(input, output),
+            0.0
+        );
+        assert_eq!(
+            Node::Gearshift {
+                axis: 0,
+                powered: true
+            }
+            .direction_ratio(input, output),
+            -1.0
+        );
+        assert_eq!(
+            Node::Gearshift {
+                axis: 0,
+                powered: true
+            }
+            .direction_ratio(input, input),
+            1.0
+        );
+        assert_eq!(gearbox_multiplier([1, 0, 0], [0, 0, 1]), -1.0);
+        assert_eq!(gearbox_multiplier([1, 0, 0], [0, 0, -1]), 1.0);
+    }
+
+    #[test]
+    fn gearbox_connects_matching_perpendicular_shafts() {
+        let gearbox = Node::Gearbox { axis: 1 };
+        assert_eq!(
+            gearbox.ratio_to(Node::Shaft { axis: 0 }, [1, 0, 0]),
+            Some(1.0)
+        );
+        assert_eq!(gearbox.ratio_to(Node::Shaft { axis: 1 }, [0, 1, 0]), None);
+        assert_eq!(
+            Node::Clutch {
+                axis: 2,
+                powered: false
+            }
+            .ratio_to(Node::Flywheel { axis: 2 }, [0, 0, 1]),
+            Some(1.0)
+        );
     }
 }

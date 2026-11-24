@@ -73,7 +73,8 @@ def main():
     blocks.mkdir(parents=True, exist_ok=True)
     for name in (
         "creative_motor", "shaft", "cogwheel", "large_cogwheel",
-        "millstone", "mechanical_bearing",
+        "millstone", "mechanical_bearing", "flywheel", "gearbox",
+        "clutch", "gearshift",
     ):
         source = ROOT / f"content/data/create/horizon/block/{name}.json"
         definition = json.loads(source.read_text())
