@@ -1,0 +1,605 @@
+{
+  "source": "/private/tmp/horizon-app-2172/.local/create.hmod",
+  "output": "/private/tmp/create-0a-content-v9.hmod",
+  "target_horizon": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "removed_property_count": 203,
+  "removed_properties_by_file": {
+    "data/create/horizon/block/acacia_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/acacia_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/andesite_belt_funnel.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/andesite_funnel.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/bamboo_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/bamboo_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/belt.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/birch_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/birch_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/black_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/black_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/black_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/black_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/black_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/blue_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/blue_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/blue_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/blue_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/blue_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/brass_belt_funnel.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/brass_funnel.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/brown_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/brown_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/brown_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/brown_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/brown_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/cart_assembler.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/chain_conveyor.json": [
+      "skylight_down"
+    ],
+    "data/create/horizon/block/cherry_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/cherry_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/chute.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/clipboard.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/cogwheel.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/contraption_controls.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/controller_rail.json": [
+      "straight_rail",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/controls.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/copper_backtank.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/copper_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/copycat_panel.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/copycat_step.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/crimson_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/crimson_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/cyan_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/cyan_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/cyan_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/cyan_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/cyan_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/dark_oak_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/dark_oak_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/depot.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/desk_bell.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/display_board.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/factory_gauge.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/fake_track.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/fluid_pipe.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/fluid_valve.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/framed_glass.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/framed_glass_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/framed_glass_trapdoor.json": [
+      "trapdoor_sound_source",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/gearbox.json": [
+      "piston_push_only"
+    ],
+    "data/create/horizon/block/glass_fluid_pipe.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/gray_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/gray_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/gray_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/gray_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/gray_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/green_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/green_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/green_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/green_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/green_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/hand_crank.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/horizontal_framed_glass.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/horizontal_framed_glass_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/industrial_iron_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/industrial_iron_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/item_hatch.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/jungle_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/jungle_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/large_bogey.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/large_cogwheel.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/light_blue_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/light_blue_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/light_blue_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/light_blue_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/light_blue_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/light_gray_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/light_gray_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/light_gray_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/light_gray_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/light_gray_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/lime_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/lime_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/lime_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/lime_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/lime_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/magenta_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/magenta_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/magenta_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/magenta_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/magenta_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/mangrove_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/mangrove_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/mechanical_drill.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/mechanical_harvester.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/mechanical_piston_head.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/mechanical_plough.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/mechanical_pump.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/mechanical_roller.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/netherite_backtank.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/oak_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/oak_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/orange_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/orange_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/orange_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/orange_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/ornate_iron_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/ornate_iron_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/pink_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/pink_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/pink_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/pink_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/pink_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/piston_extension_pole.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/placard.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/powered_shaft.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/pulley_magnet.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/purple_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/purple_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/purple_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/purple_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/purple_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/red_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/red_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/red_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/red_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/red_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/rope.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/shaft.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/small_bogey.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/smart_fluid_pipe.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/spruce_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/spruce_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/steam_engine.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/sticker.json": [
+      "legacy_bounce_facing",
+      "legacy_bounce_restitution"
+    ],
+    "data/create/horizon/block/stock_link.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/track.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/track_station.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/train_trapdoor.json": [
+      "trapdoor_sound_source",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/vertical_framed_glass.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/vertical_framed_glass_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/warped_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/warped_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/weathered_iron_window.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/weathered_iron_window_pane.json": [
+      "face_culling"
+    ],
+    "data/create/horizon/block/weighted_ejector.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/white_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/white_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/white_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/white_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/white_valve_handle.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/yellow_nixie_tube.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/yellow_postbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/yellow_seat.json": [
+      "fall_distance_reduction",
+      "legacy_bounce_restitution",
+      "waterloggable"
+    ],
+    "data/create/horizon/block/yellow_toolbox.json": [
+      "waterloggable"
+    ],
+    "data/create/horizon/block/yellow_valve_handle.json": [
+      "waterloggable"
+    ]
+  },
+  "translated_fields_by_file": {
+    "data/create/horizon/creative_tab/base.json": {
+      "search_items": "items (merged, de-duplicated)"
+    },
+    "data/create/horizon/creative_tab/palettes.json": {
+      "search_items": "items (merged, de-duplicated)"
+    },
+    "data/create/horizon/fluid/chocolate.json": {
+      "template": "sprite=still",
+      "tick_rate": "world.tick_delay",
+      "level_decrease_per_block": "world.drop_off",
+      "can_convert_to_source": "world.source_conversion",
+      "bucket": "world.bucket",
+      "viscosity": "omitted (not represented by Horizon 0a)",
+      "density": "omitted (not represented by Horizon 0a)",
+      "explosion_resistance": "omitted (not represented by Horizon 0a)",
+      "flowing": "omitted (uses the still sprite for this fluid look)"
+    },
+    "data/create/horizon/fluid/honey.json": {
+      "template": "sprite=still",
+      "tick_rate": "world.tick_delay",
+      "level_decrease_per_block": "world.drop_off",
+      "can_convert_to_source": "world.source_conversion",
+      "bucket": "world.bucket",
+      "viscosity": "omitted (not represented by Horizon 0a)",
+      "density": "omitted (not represented by Horizon 0a)",
+      "explosion_resistance": "omitted (not represented by Horizon 0a)",
+      "flowing": "omitted (uses the still sprite for this fluid look)"
+    },
+    "data/create/horizon/item/copper_backtank.json": {
+      "place_block": "block"
+    },
+    "data/create/horizon/item/copper_backtank_placeable.json": {
+      "place_block": "block"
+    },
+    "data/create/horizon/item/netherite_backtank.json": {
+      "place_block": "block"
+    },
+    "data/create/horizon/item/netherite_backtank_placeable.json": {
+      "place_block": "block"
+    },
+    "data/create/horizon/item/vertical_gearbox.json": {
+      "place_block": "block"
+    }
+  },
+  "added_menu_files": [
+    "data/create/horizon/menu/sequenced_gearshift.json",
+    "data/create/horizon/menu/rotation_speed_controller.json"
+  ],
+  "removed_duplicate_fluid_blocks": [
+    "data/create/horizon/block/chocolate.json",
+    "data/create/horizon/block/honey.json"
+  ],
+  "removed_duplicate_fluid_items": [
+    "data/create/horizon/item/chocolate_bucket.json",
+    "data/create/horizon/item/honey_bucket.json"
+  ],
+  "loot_condition_arrays_normalized": [
+    "data/create/loot_table/blocks/bound_cardboard_block.json/pools/1/condition"
+  ]
+}

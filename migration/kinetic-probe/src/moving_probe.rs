@@ -52,7 +52,7 @@ impl MovingPart {
         level: mod_api::LevelRef,
         anchor: [i32; 3],
     ) -> Vec<GlueBox> {
-        let Some(entities) = level.special_entities_in(
+        let Some(entities) = level.entities_in(
             host,
             [
                 f64::from(anchor[0] - 4),

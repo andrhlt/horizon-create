@@ -26,8 +26,10 @@ def main():
     for name in ("Cargo.toml", "horizon-mod.toml"):
         copy2(SOURCE / name, output / name)
     copy2(SOURCE / "src/lib.rs", output / "src/lib.rs")
+    copy2(SOURCE / "src/moving_probe.rs", output / "src/moving_probe.rs")
     for name in (
         "kinetic_adapter.rs",
+        "kinetic_controls.rs",
         "kinetic_slice.rs",
         "millstone_processing.rs",
         "millstone_adapter.rs",
@@ -52,12 +54,13 @@ def main():
                     "super::create_kinetic_slice", "super::kinetic_slice"
                 )
             )
-    copy2(SOURCE / "src/moving_probe.rs", output / "src/moving_probe.rs")
     menu = output / "data/create/horizon/menu"
     menu.mkdir(parents=True, exist_ok=True)
     menu_source = ROOT / "content/data/create/horizon/menu/creative_motor.json"
     menu_target = menu / "creative_motor.json"
     copy2(menu_source, menu_target)
+    for name in ("sequenced_gearshift", "rotation_speed_controller"):
+        (menu / f"{name}.json").write_text('{"slots": 1, "data_slots": 0}\n')
     if hashlib.sha256(menu_source.read_bytes()).digest() != hashlib.sha256(menu_target.read_bytes()).digest():
         raise RuntimeError("Creative Motor menu differs from the production resource")
     recipes = output / "data/create/recipe"
@@ -73,19 +76,34 @@ def main():
     blocks.mkdir(parents=True, exist_ok=True)
     for name in (
         "creative_motor", "shaft", "cogwheel", "large_cogwheel",
-        "millstone", "mechanical_bearing",
+        "millstone", "mechanical_bearing", "flywheel", "gearbox",
+        "clutch", "gearshift", "encased_chain_drive",
+        "adjustable_chain_gearshift", "andesite_encased_shaft",
+        "brass_encased_shaft", "metal_girder_encased_shaft",
+        "brass_encased_cogwheel", "sequenced_gearshift",
+        "rotation_speed_controller",
     ):
         source = ROOT / f"content/data/create/horizon/block/{name}.json"
         definition = json.loads(source.read_text())
         # The pinned SDK rejects this BlockProperties field. The test package
         # is a compile/runtime adapter probe, not waterlogging-equivalent.
         definition.get("properties", {}).pop("waterloggable", None)
+        definition.get("properties", {}).pop("piston_push_only", None)
         (blocks / f"{name}.json").write_text(
             json.dumps(definition, indent=2) + "\n"
         )
+    encased_cogwheel = json.loads((blocks / "brass_encased_cogwheel.json").read_text())
+    for name in (
+        "andesite_encased_cogwheel",
+        "andesite_encased_large_cogwheel",
+        "brass_encased_large_cogwheel",
+    ):
+        (blocks / f"{name}.json").write_text(
+            json.dumps(encased_cogwheel, indent=2) + "\n"
+        )
     print(
-        "Explicitly omitted unsupported BlockProperties.waterloggable in the "
-        "probe; waterlogging behavior remains unverified."
+        "Explicitly omitted unsupported waterloggable and piston_push_only "
+        "content fields in the probe."
     )
     print(f"Prepared kinetic probe from tracked native sources at {output}")
 
