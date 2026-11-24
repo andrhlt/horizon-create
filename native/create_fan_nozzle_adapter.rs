@@ -216,12 +216,9 @@ fn recipe_outputs(
         }
         Process::Splashing | Process::Haunting => {
             let recipes = host.recipes_of_type(process.id());
-            let recipe = recipes.iter().find(|recipe| {
-                recipe
-                    .ingredients
-                    .first()
-                    .is_some_and(|ingredient| ingredient.test(host, input))
-            })?;
+            let recipe = recipes
+                .iter()
+                .find(|recipe| recipe_ingredient_matches(host, recipe, input))?;
             let results = recipe.json["results"].as_array()?;
             for result in results {
                 let output = host.recipe_result(&result.to_string()).ok().flatten()?;
@@ -230,6 +227,26 @@ fn recipe_outputs(
         }
     }
     (!outputs.is_empty()).then_some(outputs)
+}
+
+fn recipe_ingredient_matches(host: &dyn Host, recipe: &mod_api::Recipe, input: &ItemStack) -> bool {
+    // Create's custom recipe types publish vanilla ingredient objects in their
+    // JSON (`{"item":"..."}` / `{"tag":"..."}`). The typed SDK helper
+    // accepts the engine's normalized string/array form instead.
+    let Some(json) = recipe.json["ingredients"].as_array().and_then(|v| v.first()) else {
+        return false;
+    };
+    let normalized = if let Some(item) = json["item"].as_str() {
+        format!("{item:?}")
+    } else if let Some(tag) = json["tag"].as_str() {
+        format!("{:?}", format!("#{tag}"))
+    } else {
+        json.to_string()
+    };
+    host.recipe_ingredient(&normalized)
+        .ok()
+        .flatten()
+        .is_some_and(|ingredient| ingredient.test(host, input))
 }
 
 fn outputs_for_kind(
@@ -453,7 +470,11 @@ pub(super) fn tick_fan(
                 max[axis] += 0.5;
             } else {
                 min[axis] += f64::from(direction[axis]) * 0.5;
-                max[axis] += f64::from(direction[axis]) * f64::from(distance);
+                // The collision distance ends at a block face. Entity
+                // positions in the final intersected cell remain in the
+                // windbox, including a centered item a fraction past that
+                // face due to its own width or the preceding tick's impulse.
+                max[axis] += f64::from(direction[axis]) * (f64::from(distance) + 0.5);
                 if min[axis] > max[axis] {
                     std::mem::swap(&mut min[axis], &mut max[axis]);
                 }
@@ -806,6 +827,7 @@ fn nozzle_tick(
     );
     let mut item_ids = saved_entities(data, "CreateNozzleItems");
     let mut entity_ids = saved_entities(data, "CreateNozzleEntities");
+    let players = level.online_players(host).unwrap_or_default();
     if scan && old_range > 0.0 {
         let half = f64::from(old_range / 2.0);
         let entities = level
@@ -835,8 +857,29 @@ fn nozzle_tick(
                 entity_ids.push(uuid);
             }
         }
+        // Online players are supplied by the server player list and are not
+        // guaranteed to appear in the general entity AABB query.
+        for player in &players {
+            let entity = player.entity();
+            let Some(uuid) = entity.uuid(host) else {
+                continue;
+            };
+            let Some(position) = entity.position(host) else {
+                continue;
+            };
+            let distance = (0..3)
+                .map(|axis| (position[axis] - center[axis]).powi(2))
+                .sum::<f64>()
+                .sqrt();
+            if distance <= reach
+                && nozzle_visible(host, level, center, position)
+                && !entity_ids.contains(&uuid)
+            {
+                entity_ids.push(uuid);
+            }
+        }
     }
-    let candidates = level
+    let mut candidates = level
         .entities_in(host, center.map(|v| v - reach), center.map(|v| v + reach))
         .unwrap_or_default();
     let ids = item_ids
@@ -844,13 +887,20 @@ fn nozzle_tick(
         .chain(entity_ids.iter())
         .copied()
         .collect::<Vec<_>>();
+    for player in &players {
+        let entity = player.entity();
+        if entity.uuid(host).is_some_and(|uuid| ids.contains(&uuid))
+            && !candidates.contains(&entity)
+        {
+            candidates.push(entity);
+        }
+    }
     let mut active = Vec::new();
     for entity in candidates.iter().copied() {
         if entity.uuid(host).is_some_and(|uuid| ids.contains(&uuid)) {
             active.push(entity);
         }
     }
-    let players = level.online_players(host).unwrap_or_default();
     for entity in active {
         let Some(position) = entity.position(host) else {
             continue;
