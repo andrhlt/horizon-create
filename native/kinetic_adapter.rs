@@ -21,7 +21,12 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         .build();
     let kinetic = registrar
         .block_entity_type("create:simple_kinetic")
-        .blocks(&["create:shaft", "create:cogwheel", "create:large_cogwheel"])
+        .blocks(&[
+            "create:shaft",
+            "create:cogwheel",
+            "create:large_cogwheel",
+            "create:encased_fan",
+        ])
         .build();
     let encased_cogwheel = registrar
         .block_entity_type("create:encased_cogwheel")
@@ -96,6 +101,7 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         chain_gearshift: registrar.block_key("create:adjustable_chain_gearshift"),
         sequencer: registrar.block_key("create:sequenced_gearshift"),
         speed_controller: registrar.block_key("create:rotation_speed_controller"),
+        fan: registrar.block_key("create:encased_fan"),
     };
     let _ = KINETIC_PART.set(part);
     registrar.block_entity_part(&motor, part).unwrap();
@@ -138,6 +144,7 @@ pub struct KineticPart {
     chain_gearshift: BlockKey,
     sequencer: BlockKey,
     speed_controller: BlockKey,
+    fan: BlockKey,
 }
 
 impl KineticPart {
@@ -440,6 +447,14 @@ impl BlockEntityPart for KineticPart {
         if graph.is_empty() {
             return;
         }
+        // A shared network may have several motors, but its fan work must run
+        // only once per server tick. Use the lowest-position motor as the
+        // deterministic tick owner.
+        let fan_tick_owner = graph
+            .keys()
+            .copied()
+            .filter(|pos| matches!(node(host, level, *pos, *self), Some(Node::Motor { .. })))
+            .min();
         for (pos, state) in graph {
             let generated_speed = if pos == event.pos {
                 motor_generated_speed(host, level, pos, Some(&event.entity.nbt), *self)
@@ -449,8 +464,19 @@ impl BlockEntityPart for KineticPart {
             if pos == event.pos {
                 persist_network(&mut event.entity.nbt, state, generated_speed);
             } else if let Some(entity) = host.block_entity_identity(level, pos) {
-                let mut data = Compound::new();
+                let mut data = entity.data(host).unwrap_or_default();
                 persist_network(&mut data, state, generated_speed);
+                if fan_tick_owner == Some(event.pos)
+                    && matches!(node(host, level, pos, *self), Some(Node::Fan { .. }))
+                {
+                    super::create_fan_nozzle_adapter::tick_fan(
+                        host,
+                        level,
+                        pos,
+                        &mut data,
+                        state.speed(),
+                    );
+                }
                 let _ = entity.merge_data(host, data);
             }
         }
@@ -562,6 +588,16 @@ fn node(
     }
     if block == part.millstone {
         return Some(Node::Millstone);
+    }
+    if block == part.fan {
+        let facing = level.block_property(host, pos, "facing")?;
+        let axis = match facing.as_str() {
+            "east" | "west" => 0,
+            "up" | "down" => 1,
+            "north" | "south" => 2,
+            _ => return None,
+        };
+        return Some(Node::Fan { axis });
     }
     if block == part.flywheel {
         return Some(Node::Flywheel {
@@ -749,6 +785,9 @@ fn network(
         };
         if matches!(block, Node::Millstone) {
             impact_per_rpm += 4.0 / ratio.abs();
+        }
+        if matches!(block, Node::Fan { .. }) {
+            impact_per_rpm += 2.0 / ratio.abs();
         }
         let Node::Motor { facing } = block else {
             continue;

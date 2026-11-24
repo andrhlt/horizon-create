@@ -22,6 +22,9 @@ pub enum Node {
         bottom_shaft: bool,
     },
     Millstone,
+    Fan {
+        axis: usize,
+    },
     Flywheel {
         axis: usize,
     },
@@ -64,6 +67,7 @@ impl Node {
             | Self::Gearshift { axis, .. }
             | Self::SequencedGearshift { axis, .. }
             | Self::RotationSpeedController { axis, .. } => face[axis] != 0,
+            Self::Fan { axis } => face[axis] != 0,
             Self::EncasedCogwheel {
                 axis,
                 top_shaft,
