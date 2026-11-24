@@ -13,8 +13,5 @@
   },
   "default_state": {
     "axis": "y"
-  },
-  "properties": {
-    "piston_push_only": true
   }
 }

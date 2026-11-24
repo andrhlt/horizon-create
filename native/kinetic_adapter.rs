@@ -65,6 +65,14 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         .block_entity_type("create:adjustable_chain_gearshift")
         .blocks(&["create:adjustable_chain_gearshift"])
         .build();
+    let sequencer = registrar
+        .block_entity_type("create:sequenced_gearshift")
+        .blocks(&["create:sequenced_gearshift"])
+        .build();
+    let speed_controller = registrar
+        .block_entity_type("create:rotation_speed_controller")
+        .blocks(&["create:rotation_speed_controller"])
+        .build();
     let part = KineticPart {
         motor: registrar.block_key("create:creative_motor"),
         shaft: registrar.block_key("create:shaft"),
@@ -85,6 +93,8 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         girder_shaft: registrar.block_key("create:metal_girder_encased_shaft"),
         chain_drive: registrar.block_key("create:encased_chain_drive"),
         chain_gearshift: registrar.block_key("create:adjustable_chain_gearshift"),
+        sequencer: registrar.block_key("create:sequenced_gearshift"),
+        speed_controller: registrar.block_key("create:rotation_speed_controller"),
     };
     let _ = KINETIC_PART.set(part);
     registrar.block_entity_part(&motor, part).unwrap();
@@ -101,6 +111,8 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
     registrar.block_entity_part(&clutch, part).unwrap();
     registrar.block_entity_part(&gearshift, part).unwrap();
     registrar.block_entity_part(&chain_gearshift, part).unwrap();
+    registrar.block_entity_part(&sequencer, part).unwrap();
+    registrar.block_entity_part(&speed_controller, part).unwrap();
 }
 
 #[derive(Clone, Copy)]
@@ -123,6 +135,8 @@ pub struct KineticPart {
     girder_shaft: BlockKey,
     chain_drive: BlockKey,
     chain_gearshift: BlockKey,
+    sequencer: BlockKey,
+    speed_controller: BlockKey,
 }
 
 impl KineticPart {
@@ -335,8 +349,39 @@ impl BlockEntityPart for KineticPart {
             data.insert("ScrollValue".into(), Tag::Int(16));
             changed = true;
         }
+        if node(host, level, pos, *self)
+            .is_some_and(|n| matches!(n, Node::SequencedGearshift { .. }))
+        {
+            if !data.contains_key(&"Instructions".into()) {
+                data.insert("Instructions".into(), Tag::List(vec![
+                    Tag::Compound(Compound::from([
+                        ("Type".into(), Tag::String("TURN_ANGLE".into())),
+                        ("Modifier".into(), Tag::String("FORWARD".into())),
+                        ("Value".into(), Tag::Int(90)),
+                    ])),
+                    Tag::Compound(Compound::from([
+                        ("Type".into(), Tag::String("END".into())),
+                        ("Modifier".into(), Tag::String("FORWARD".into())),
+                        ("Value".into(), Tag::Int(0)),
+                    ])),
+                ]));
+                data.insert("InstructionIndex".into(), Tag::Int(-1));
+                data.insert("InstructionDuration".into(), Tag::Int(-1));
+                data.insert("Timer".into(), Tag::Int(0));
+                changed = true;
+            }
+        }
         if changed {
             let _ = event.entity.merge_data(host, data.clone());
+        }
+        // A kinetic network has a meaningful direction only from its source.
+        // Resolving on load from every shaft/consumer loses directional
+        // transmission context and lets whichever BE loads last overwrite the
+        // motor-root result.
+        if !node(host, level, pos, *self)
+            .is_some_and(|node| matches!(node, Node::Motor { .. }))
+        {
+            return;
         }
         let graph = network(host, level, pos, Some(&data), *self);
         if graph.get(&pos).is_some_and(|state| state.source_conflict) {
@@ -370,6 +415,26 @@ impl BlockEntityPart for KineticPart {
         let Some(level) = level else {
             return;
         };
+        let node_here = node(host, level, event.pos, *self);
+        if node_here.is_some_and(|node| matches!(node, Node::ChainDrive { .. }))
+            && level.block(host, event.pos) == Some(self.chain_gearshift)
+        {
+            let signal = level.best_neighbor_signal(host, event.pos).unwrap_or(0).clamp(0, 15);
+            event.entity.nbt.insert("Signal".into(), Tag::Int(signal));
+        }
+        if node_here.is_some_and(|node| matches!(node, Node::SequencedGearshift { .. })) {
+            super::kinetic_controls::tick_sequencer(
+                host,
+                level,
+                event.pos,
+                &mut event.entity.nbt,
+            );
+        }
+        // Directional ratios and source arbitration must be evaluated from a
+        // motor, never from an arbitrary block entity in the network.
+        if !node_here.is_some_and(|node| matches!(node, Node::Motor { .. })) {
+            return;
+        }
         let graph = network(host, level, event.pos, Some(&event.entity.nbt), *self);
         if graph.is_empty() {
             return;
@@ -519,6 +584,30 @@ fn node(
             powered: level.block_property(host, pos, "powered")? == "true",
         });
     }
+    if block == part.sequencer {
+        let axis = if level.block_property(host, pos, "vertical").as_deref() == Some("true") {
+            1
+        } else {
+            kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?
+        };
+        let data = host.block_entity(level, pos).and_then(|entity| entity.data(host));
+        let input_side = data.as_ref().and_then(|data| int(data, "InputSide")).unwrap_or(0);
+        let active = data.as_ref().and_then(|data| int(data, "InstructionIndex")).unwrap_or(-1);
+        let modifier = data.as_ref().and_then(|data| instruction_modifier(data, active)).unwrap_or(0);
+        return Some(Node::SequencedGearshift { axis, input_side, modifier });
+    }
+    if block == part.speed_controller {
+        let target = host
+            .block_entity(level, pos)
+            .and_then(|entity| entity.data(host))
+            .and_then(|data| int(&data, "ScrollValue"))
+            .unwrap_or(16)
+            .clamp(-256, 256);
+        return Some(Node::RotationSpeedController {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+            target,
+        });
+    }
     if block == part.chain_drive || block == part.chain_gearshift {
         let shaft_axis = kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?;
         let first = level.block_property(host, pos, "axis_along_first")? == "true";
@@ -556,6 +645,38 @@ fn node(
     None
 }
 
+fn int(data: &Compound, key: &str) -> Option<i32> {
+    match data.get(&key.into()) {
+        Some(Tag::Int(value)) => Some(*value),
+        Some(Tag::Byte(value)) => Some(i32::from(*value)),
+        _ => None,
+    }
+}
+
+fn instruction_modifier(data: &Compound, index: i32) -> Option<i32> {
+    let rows = match data.get(&"Instructions".into()) {
+        Some(Tag::List(rows)) => rows,
+        _ => return (index == 0).then_some(1),
+    };
+    let row = match rows.get(usize::try_from(index).ok()?)? {
+        Tag::Compound(row) => row,
+        _ => return None,
+    };
+    let text = |key: &str| match row.get(&key.into()) {
+        Some(Tag::String(value)) => Some(value.to_string_lossy()),
+        _ => None,
+    };
+    match text("Type")?.as_str() {
+        "TURN_ANGLE" | "TURN_DISTANCE" => Some(match text("Modifier").as_deref() {
+            Some("FORWARD_FAST") => 2,
+            Some("BACK") => -1,
+            Some("BACK_FAST") => -2,
+            _ => 1,
+        }),
+        _ => Some(0),
+    }
+}
+
 fn network(
     host: &mut dyn ServerHost,
     level: LevelRef,
@@ -566,7 +687,14 @@ fn network(
     let Some(start_node) = node(host, level, start, part) else {
         return HashMap::new();
     };
+    let root_speed = match start_node {
+        Node::Motor { facing } => current_data
+            .map(|data| kinetic_slice::motor_speed(facing, scroll_value(data)))
+            .unwrap_or(0.0),
+        _ => 0.0,
+    };
     let mut ratios = HashMap::from([(start, 1.0f32)]);
+    let mut parents = HashMap::from([(start, None)]);
     let mut pending = VecDeque::from([(start, start_node, [0; 3])]);
     let mut order = Vec::new();
     let mut topology_conflict = false;
@@ -578,23 +706,33 @@ fn network(
             let Some(other) = node(host, level, next, part) else {
                 continue;
             };
-            let Some(edge) = block.ratio_to(other, delta) else {
-                continue;
-            };
+            let controller_link =
+                kinetic_slice::controller_links_large_cog(block, other, delta);
+            let edge = if controller_link { Some(1.0) } else { block.ratio_to(other, delta) };
+            let Some(edge) = edge else { continue };
             if edge == 0.0 {
                 continue;
             }
-            let direction = block.direction_ratio(entered, delta);
-            if direction == 0.0 {
+            if parents.get(&pos).copied().flatten() == Some(next) {
                 continue;
             }
-            let next_ratio = ratio * direction / edge;
+            let direction = block.direction_ratio(entered, delta);
+            let next_ratio = if controller_link {
+                let Node::RotationSpeedController { target, .. } = block else { unreachable!() };
+                let Some(output_ratio) = kinetic_slice::controller_output_ratio(root_speed, target) else {
+                    continue;
+                };
+                output_ratio
+            } else {
+                ratio * direction / edge
+            };
             if let Some(previous_ratio) = ratios.get(&next).copied() {
                 topology_conflict |=
                     kinetic_slice::inconsistent_loop_ratio(next_ratio, previous_ratio);
                 continue;
             }
             ratios.insert(next, next_ratio);
+            parents.insert(next, Some(pos));
             pending.push_back((next, other, delta.map(|value| -value)));
         }
     }
@@ -602,6 +740,9 @@ fn network(
     let mut impact_per_rpm = 0.0;
     for pos in order {
         let ratio = ratios[&pos];
+        if ratio == 0.0 {
+            continue;
+        }
         let Some(block) = node(host, level, pos, part) else {
             continue;
         };
@@ -634,6 +775,9 @@ fn network(
     ratios
         .into_iter()
         .map(|(pos, ratio)| {
+            if ratio == 0.0 {
+                return (pos, kinetic_slice::Network::default());
+            }
             let mut state = resolved;
             state.rpm /= ratio;
             state.topology_conflict = topology_conflict;

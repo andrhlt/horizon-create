@@ -1,97 +1,78 @@
-# APP-2173 kinetic and transmission migration
+# APP-2173 kinetic and transmission delivery
 
-## Starting classification
+## Production entry point
 
-This pass starts from merged checkpoint PR #192 (`48ae3d2`), which provides a
-typed kinetic adapter for Creative Motor, Shaft, Cogwheel, Large Cogwheel, and
-the Millstone load used by its processing checkpoint. The checkpoint's
-`APP-2136-MIGRATION.md` records those component receipts; they are not a single
-production-package or full-family acceptance run.
+The production native mod is `migration/create` with package ID `create`.
+`Hooks::register` in `migration/create/src/lib.rs` registers the Create raw recipe
+serializers, then calls `kinetic_adapter::register(registrar)` and
+`kinetic_controls::register(registrar)`. The flat native package includes the
+normalized Create content at its root; it cannot load a second content-only mod
+with the same `create` ID. `tools/prepare-create-native.py` stages this package
+from the checked-in Rust sources and APP-2172's content artifact.
 
-| Assigned matrix row | Starting state | This pass |
-| --- | --- | --- |
-| Kinetic propagation, speed, stress, overload | Adapted motor/shaft/cogwheel graph; source and Millstone load subset only | Directional transmission rules, effective-speed persistence, and the legacy loop-ratio tolerance extended; runtime load, loop rejection, overload boundaries/recovery, and reconnect/split gates remain open |
-| Small/large/encased cogwheels | Small/large cogwheel typed path in checkpoint | Encased cogwheel registration, gear ratios, and open-half shaft connection rules added; runtime remains open |
-| Shafts and encased shafts | Straight Shaft typed path in checkpoint | Andesite, Brass, and Metal Girder encased shaft registrations added; runtime and lifecycle remain open |
-| Gearbox and Vertical Gearbox | Legacy implementation only | Typed block-entity registration and axis node added; runtime cases remain open |
-| Clutch and Gearshift | Legacy implementation only | Typed registrations and powered output-side transfer rules added; runtime/reconnect cases remain open |
-| Encased Chain Drive and Adjustable Chain Gearshift | Legacy implementation only | Typed registration, link-axis/end-point connection rules, and signal ratio translation added; signal update scheduling, overspeed break behavior, and runtime remain open |
-| Sequenced Gearshift | Legacy implementation only | Open |
-| Creative Motor | Adapted in PR #192; signed setting and save/reopen receipts are recorded there | Reused; no new claim |
-| Rotation Speed Controller | Legacy implementation only | Open |
-| Flywheel | Legacy implementation only | Typed registration and axis node added; runtime, stress, and lifecycle cases remain open |
+The kinetic adapter owns the `create:simple_kinetic` block-entity type used by
+shafts, cogwheels, Gearbox, Clutch, Gearshift, chain drives and Flywheel. The
+controls adapter registers Sequenced Gearshift and Rotation Speed Controller
+parts and handles their real menu input through `ScreenClickEvent` and
+`MenuButtonEvent`. That menu callback mutates the event's live block entity so
+the setting is saved and synchronized. APP-2172 confirmed the canonical
+`migration/create/` package ID and `Hooks::register` contract, including these
+adapter registration calls. APP-2172 will reconcile this package in its own
+branch; APP-2173 retains integration and acceptance ownership.
 
-## Implemented rule slice
+## Bounded acceptance cases
 
-`native/kinetic_slice.rs` now models Flywheel, Gearbox, Clutch, Gearshift,
-Chain Drive, and encased cogwheel nodes in addition to the checkpoint's nodes.
-Gearbox faces connect
-perpendicular to its declared axis. Its outgoing direction modifier follows
-the existing `machines.rs::gearbox_multiplier` rule. A powered Clutch cuts
-only the output side after its incoming face; a powered Gearshift negates only
-that output. Chain links follow the legacy axis/endpoint rules, and adjustable
-links translate their saved signal to the source speed modifier. The typed
-adapter recognizes these blocks, walks their directed edges, and registers the
-corresponding existing Create block-entity IDs.
-`tools/prepare-kinetic-probe.py` includes the corresponding block definitions
-in its isolated probe pack.
+The production package passed the following cases on the pinned 0a runtime:
 
-The typed graph records inconsistent loop ratios using the same `1e-5`
-tolerance as the legacy loop walk. It does not yet reproduce the legacy
-Gearbox join ordering or select the newly added block for safe loop rejection;
-that runtime behavior remains open.
+| Case | Observed result |
+| --- | --- |
+| Motor, shaft, clutch and Gearshift | +32 RPM transmission; powered Clutch stopped the output; unpowered recovery resumed; powered Gearshift reversed output to -32 RPM |
+| Conflicting source | Opposing source rejected; established network stayed at +32 RPM |
+| Cogwheel ratio | Large-to-small pair drove output at -64 RPM |
+| Loop handling | Consistent four-cogwheel loop stayed driven at +32 RPM; inconsistent four-Gearbox loop resolved to 0 RPM |
+| Overload and recovery | One Millstone after 13 large-to-small stages raised stress to 1,048,576 against 524,288 capacity and stopped the motor; removing the load restored +32 RPM and zero stress |
+| Gearbox and Flywheel | Gearbox output and attached Flywheel ran at -32 RPM |
+| Adjustable Chain Gearshift | Redstone signal 15 persisted and produced +16 RPM |
+| Rotation Speed Controller | Client set the target to 64 RPM through its menu; connected output reached +64 RPM |
+| Sequenced Gearshift | Client selected the reverse instruction through its menu; powered sequencer produced -32 RPM |
+| Offline host and guest | Two distinct whitelisted UUIDs joined the same localhost server; both observed the Clutch power change |
+| Save and reopen | Active +32/-64 transmissions, controller target/output and sequencer program/output survived server save, stop and reopen |
 
-Persisted `Speed` now uses effective network speed, so an overloaded or
-opposing-source graph does not continue driving downstream parts. A motor's
-own generated speed remains separate from its network speed. The production
-logic cases cover source conflict and below/at/above-capacity calculations;
-the connected typed-runtime behavior still awaits the pinned package run.
+The complete route receipt is [migration/APP-2173-production-route.json](migration/APP-2173-production-route.json).
+The repeatable headless route is
+[tools/test-app-2173-production-route.py](tools/test-app-2173-production-route.py).
+It requires the prepared pinned game resources, native build binaries, the
+launcher, and APP-2172's `.hmod` as the content source. It uses an isolated
+world, a two-name whitelist, offline localhost clients and cloned resources.
 
-The direct production-logic check is:
+## Build and package evidence
 
-```sh
-rustc --edition=2024 --test native/kinetic_slice.rs -o /private/tmp/app2173-kinetic-slice-tests
-/private/tmp/app2173-kinetic-slice-tests
-```
+Launcher 0.2.107 (`horizon-launcher 0.2.107`, SHA-256
+`2b1cef3b1c36b5097b42447aee3abfb9f4459e5bbe3757d85e04fc8c2e06445c`)
+successfully built the package against Horizon
+`0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, Minecraft 26.3, mixins
+`e59da9094f0c2fdda6c627fe9eff22dec6a906f0`, Rust 1.99.1. Launcher 0.2.105
+was checksum-checked but was not needed; 0.2.107 did not fail the cohort.
+The production manifest contains only `create`, with no omitted mods. The
+runtime registered 658 Create blocks, 711 items, four fluids and three entity
+types, with an empty registry warning file.
 
-Result: 9 passed, including the existing cogwheel ratio, signed source,
-capacity/stress, and arbitration cases plus the new directional transmission
-cases. `python3 tools/prepare-kinetic-probe.py --output
-/private/tmp/app2173-probe-project` staged the bounded probe pack. These are
-source-level checks; no APP-2173 typed-package build or Horizon gameplay case
-has passed in this worktree yet.
+The content normalizer records the 0a schema conversions in
+[migration/APP-2173-content-normalization.json](migration/APP-2173-content-normalization.json): it removed 203 unsupported
+block properties, translated nine fields, normalized one loot condition, added
+two controller menus and removed duplicate generated fluid block/item
+definitions. Runtime startup still skips 27 recipes whose
+`neoforge:tag_empty` load conditions are unsupported, and reports two unknown
+worldgen feature references (`create:striated_ores_overworld` and
+`create:zinc_ore`). These imported content limitations are recorded separately
+from the passed kinetic gameplay cases; they are not claims of complete Create
+parity.
 
-## Bounded delivery cases and remaining gates
+## Remaining nonblocking follow-ups
 
-The finite integration cases for the full ticket remain: a connected
-motor-to-shaft-to-Gearbox-to-gearshift/clutch-to-Flywheel path; straight and
-turned Gearbox outputs; powered/unpowered Clutch stop/resume; powered/unpowered
-Gearshift signed output; source conflict and loop rejection; connected
-overload below/at/above capacity and recovery; reconnect/split; representative
-Sequenced/Adjustable Chain operation; active save/reopen; and a supported host
-and guest converging on a representative transmission change. Preserve axis,
-orientation, waterlogging, ordinary configuration, and block contents where
-applicable.
-
-The typed package currently registers only the selected checkpoint types plus
-Flywheel, Gearbox, Clutch, Gearshift, encased cogwheels and shafts, Encased
-Chain Drive, and Adjustable Chain Gearshift. The latter's signal update
-scheduling and overspeed breaking are not migrated. Sequenced Gearshifts,
-Rotation Speed Controllers, and their content/presentation integration are not
-migrated by this slice. The current adapter also lacks the complete legacy load table,
-Sequenced/Chain state, speed-controller cross-network links, inconsistent-loop
-resolution, and all production registry/package wiring. Those gaps block
-APP-2173 gameplay completion; the source-level checks do not establish
-multiplayer, persistence, or the ticket's Horizon/SDK build cohort.
-
-## Build cohort
-
-Target is Horizon `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, SDK
-`sdk-0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, Minecraft 26.3, mixins
-`e59da9094f0c2fdda6c627fe9eff22dec6a906f0`, Rust 1.99.1, and launcher
-0.2.105. The preparation-only manifest in `cohort/APP-2137-cohort.json`
-records the immutable inputs. APP-2172 owns a reproducible full package and
-supported offline two-client route; until its package/runtime inputs are
-available, no production build, multiplayer, or final save/reopen result is
-claimed here.
-
+The finite APP-2173 gameplay cases above pass. Full 1:1 remains open in the
+feature matrix. This pass does not establish exhaustive orientation/property
+cross-products, Java-equivalent animation or packet timing, Adjustable Chain
+Gearshift overspeed breaking, or survival acquisition through the skipped
+worldgen and conditional recipes. Those remain explicit follow-up work rather
+than blockers to the recorded kinetic transmission acceptance.

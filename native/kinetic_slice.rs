@@ -36,6 +36,15 @@ pub enum Node {
         axis: usize,
         powered: bool,
     },
+    SequencedGearshift {
+        axis: usize,
+        input_side: i32,
+        modifier: i32,
+    },
+    RotationSpeedController {
+        axis: usize,
+        target: i32,
+    },
     ChainDrive {
         shaft_axis: usize,
         link_axis: usize,
@@ -52,7 +61,9 @@ impl Node {
             | Self::Cogwheel { axis, .. }
             | Self::Flywheel { axis }
             | Self::Clutch { axis, .. }
-            | Self::Gearshift { axis, .. } => face[axis] != 0,
+            | Self::Gearshift { axis, .. }
+            | Self::SequencedGearshift { axis, .. }
+            | Self::RotationSpeedController { axis, .. } => face[axis] != 0,
             Self::EncasedCogwheel {
                 axis,
                 top_shaft,
@@ -175,6 +186,17 @@ impl Node {
         match self {
             Self::Clutch { powered: true, .. } => 0.0,
             Self::Gearshift { powered: true, .. } => -1.0,
+            Self::SequencedGearshift { axis, input_side, modifier }
+                if axis < 3 && entered[axis] != 0 =>
+            {
+                if modifier == 0 {
+                    0.0
+                } else if entered[axis] == input_side {
+                    1.0 / modifier as f32
+                } else {
+                    modifier as f32
+                }
+            }
             Self::Gearbox { .. } => gearbox_multiplier(entered, outgoing),
             _ => 1.0,
         }
@@ -197,6 +219,21 @@ pub fn inconsistent_loop_ratio(expected: f32, existing: f32) -> bool {
     (expected - existing).abs() > 1e-5
 }
 
+/// Ratio from a motor's root speed to a speed controller's configured output.
+pub fn controller_output_ratio(root_speed: f32, target: i32) -> Option<f32> {
+    (root_speed != 0.0 && target != 0).then_some(root_speed / target as f32)
+}
+
+pub fn controller_links_large_cog(controller: Node, cog: Node, offset: [i32; 3]) -> bool {
+    let Node::RotationSpeedController { axis, .. } = controller else {
+        return false;
+    };
+    if offset != [0, 1, 0] {
+        return false;
+    }
+    cog.gear().is_some_and(|(gear_axis, large)| large && gear_axis != 1 && gear_axis != axis)
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Source {
     pub speed: f32,
@@ -214,7 +251,7 @@ pub struct Network {
 
 impl Network {
     pub fn speed(self) -> f32 {
-        if self.source_conflict {
+        if self.source_conflict || self.topology_conflict {
             0.0
         } else {
             effective_speed(self.rpm, self.capacity, self.stress)
@@ -468,5 +505,30 @@ mod tests {
     fn loop_validation_uses_the_existing_ratio_tolerance() {
         assert!(!inconsistent_loop_ratio(2.0, 2.0 + 5e-6));
         assert!(inconsistent_loop_ratio(2.0, 2.0 + 2e-5));
+    }
+
+    #[test]
+    fn controller_ratio_and_loop_conflicts_are_safe() {
+        assert_eq!(controller_output_ratio(32.0, 64), Some(0.5));
+        assert_eq!(controller_output_ratio(32.0, -64), Some(-0.5));
+        assert_eq!(controller_output_ratio(-32.0, 64), Some(-0.5));
+        assert_eq!(controller_output_ratio(0.0, 64), None);
+        assert_eq!(controller_output_ratio(32.0, 0), None);
+        let stopped = Network { rpm: 32.0, capacity: 4096.0, stress: 64.0,
+            topology_conflict: true, ..Network::default() };
+        assert_eq!(stopped.speed(), 0.0);
+    }
+
+    #[test]
+    fn speed_controller_links_only_to_perpendicular_horizontal_large_cogs() {
+        let controller = Node::RotationSpeedController { axis: 0, target: 32 };
+        assert!(controller_links_large_cog(controller,
+            Node::Cogwheel { axis: 2, large: true }, [0, 1, 0]));
+        assert!(!controller_links_large_cog(controller,
+            Node::Cogwheel { axis: 0, large: true }, [0, 1, 0]));
+        assert!(!controller_links_large_cog(controller,
+            Node::Cogwheel { axis: 2, large: false }, [0, 1, 0]));
+        assert!(!controller_links_large_cog(controller,
+            Node::Cogwheel { axis: 2, large: true }, [0, -1, 0]));
     }
 }

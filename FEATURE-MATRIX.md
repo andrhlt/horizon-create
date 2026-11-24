@@ -21,9 +21,10 @@ the two measure different levels of evidence.
 
 ## Kinetic power and transmission
 
-The kinetic-family passes below are historical `9f42064` gameplay evidence;
-they do not establish the frozen `0a875da` SDK migration. Current migration
-classification, adapted typed-part scope, and open gates are recorded in
+The kinetic-family passes below are historical `9f42064` Java-comparison evidence.
+APP-2173 also records a bounded production-package gameplay baseline on the frozen
+`0a875da` SDK; it does not establish exhaustive Java parity. Current migration
+classification and acceptance evidence are recorded in
 [APP-2173-MIGRATION.md](APP-2173-MIGRATION.md).
 
 | Feature | In game | Basic tested | Java comparison | Full 1:1 | Remaining work |
