@@ -66,6 +66,7 @@ use super::create_hand_crank::{self, CRANK};
 use super::create_speed_controller::{self, CONTROLLER as SPEED_CONTROLLER};
 use super::create_train_signal::{self, SIGNAL};
 use super::create_valve::{self, HANDLE_ENTITY, VALVE};
+use super::create_millstone_processing as millstone_processing;
 
 const DEPLOYER: &str = "create:deployer";
 const SCHEMATIC_TABLE: &str = "create:schematic_table";

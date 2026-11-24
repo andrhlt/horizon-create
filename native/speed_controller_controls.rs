@@ -3,7 +3,7 @@ use std::sync::OnceLock;
 
 use horizon_client::hud::HudBatch;
 use horizon_client::keybinds;
-use horizon_client::mod_api::NativeScreenView;
+use horizon_client::mod_api::{NativeScreenView, ServerHost};
 use serde::{Deserialize, Serialize};
 use winit::dpi::PhysicalPosition;
 use winit::event::MouseButton;
@@ -189,7 +189,7 @@ impl ValueBlock {
         }
     }
 
-    fn apply(self, game: &mut Game<'_>, setting: Setting) {
+    fn apply(self, game: &mut Game<'_>, setting: Setting, player: Option<u128>) {
         let at = setting.target.pos;
         if self == Self::Windmill {
             create_bearing::windmill_setting(game, at, setting.selection.value);
@@ -220,6 +220,26 @@ impl ValueBlock {
             create_ejector::set_stack_size(game, at, setting.selection.value);
         } else if self.chassis() {
             create_chassis_range::set(game, at, setting.selection.value, setting.bulk);
+        } else if self == Self::Motor
+            && player.is_some_and(|player| {
+                let host: &mut dyn ServerHost = game;
+                let Some(player) = host.player(player) else {
+                    return false;
+                };
+                let Some(level) = host.player_level(player) else {
+                    return false;
+                };
+                super::create_kinetic_adapter::set_motor_setting(
+                    host,
+                    level,
+                    at,
+                    create_speed_controller::signed_speed(setting.selection),
+                )
+            })
+        {
+            // The typed adapter owns the authoritative graph update for network
+            // input. A false result keeps the pre-adapter native route usable
+            // in older staged builds and for a stale player/level.
         } else {
             create_speed_controller::set_value(game, at, self, setting.selection);
         }
@@ -315,6 +335,7 @@ pub(super) fn apply_clipboard_setting(
             bulk: false,
             short: false,
         },
+        None,
     );
 }
 
@@ -783,7 +804,7 @@ pub(super) fn receive(game: &mut Game<'_>, uuid: u128, channel: &str, data: &[u8
             })
             .sum::<f64>();
         if distance <= (actor.reach() + 20.0).powi(2) {
-            block.apply(actor, setting);
+            block.apply(actor, setting, Some(uuid));
         }
     });
 }

@@ -9,7 +9,7 @@ adapter handoff is PR #192 commit `9009897f5461d3e0662b7114dd2a87ac42d417f4`.
 
 The first implementation seam is the existing Millstone path. Its pure timer
 transition is now factored as `millstone_processing::tick` in
-`native/machines.rs`; the legacy world/inventory code remains authoritative for
+`native/millstone_processing.rs`; the legacy world/inventory code remains authoritative for
 item movement, recipes, chance rolls, NBT migration, and sync. The future typed
 Part should call this transition after reading the connected `Speed` from the
 APP-2136 entity NBT rather than calculating kinetic state itself.
@@ -46,6 +46,40 @@ needed in this lane. The first Millstone adapter can preserve the existing ten
 slots (`0` input, `1..9` output), `Timer`, `InputInventory`, and
 `OutputInventory` save keys while the typed entity stores the live item slots.
 
+### Registration handoff (not applied here)
+
+The shared manifest owner should add this lane-owned source alongside the
+existing `machines` module:
+
+```toml
+[[module]]
+id = "millstone_processing"
+file = "crates/horizon-client/src/game.rs"
+name = "create_millstone_processing"
+source = "millstone_processing.rs"
+```
+
+`machines.rs` and `millstone_adapter.rs` reference the generated module as
+`super::create_millstone_processing`; the central root should register both
+lane-owned sources and attach the adapter from its `Hooks::register` method:
+
+```toml
+[[module]]
+id = "millstone_adapter"
+file = "crates/horizon-client/src/game.rs"
+name = "create_millstone_adapter"
+source = "millstone_adapter.rs"
+```
+
+```rust
+pub(crate) mod millstone_adapter;
+pub(crate) mod millstone_processing;
+
+fn register(&self, registrar: &mut dyn mod_api::Registrar, _: &mod_api::RegistrationContext) {
+    millstone_adapter::register(registrar);
+}
+```
+
 ## This checkpoint
 
 Source base: `origin/main` at `87ae37f`. Adapter reference: PR #192 at
@@ -56,3 +90,26 @@ or empty inputs. `git diff --check` passes. A full pinned native build and
 runtime wheat/LAN/reopen replay are still required after the typed Part and
 central registration are integrated by APP-2136; this checkpoint does not claim
 the migration or the APP-2163 lane complete.
+
+## Post-Millstone follow-up inventory
+
+The pinned runtime already has representative ordinary gameplay evidence for
+Mechanical Press, Crushing Wheels, Basin/Mixer heating and rejection, Encased
+Fan washing, belts/funnels/chutes and Depots, fluid pipes/pumps/tanks/valves,
+and Mechanical Crafters/Arms. That evidence is retained rather than rerun.
+Those rows still need typed-Part adaptation; the historical checks do not claim
+every recipe or multiplayer permutation.
+
+| Family | Existing pinned evidence | Remaining adaptation |
+| --- | --- | --- |
+| Millstone | Shipped: wheat processing, active reopen, full-output recovery | None for the bounded checkpoint |
+| Press / Crushing / Basin / Mixer / Fan | Representative processing and heating checks pass | Pure timing/conservation seams, typed block entities, recipe/fluid endpoints |
+| Belts / Funnels / Chutes / Depots / Vaults | Transport, filters and capacity checks pass | Typed inventory endpoints, persistence and guest authority |
+| Fluid tank / pipe / pump / valve / spout / drain | Transfer, fill/drain and reopen checks pass | Typed fluid storage/transport and capacity/filter persistence |
+| Crafters / arms / packager / stock logistics | Focused family checks are partial | Typed inventory handoff and stationary logistics integration |
+
+This follow-up starts with the Mechanical Press timing seam. Legacy recipe,
+basin/world effects and sync remain authoritative while the pure speed-dependent
+cycle transition becomes reusable by a typed adapter. The inventory, logistics
+and fluid rows remain open until their typed endpoints and ordinary flows are
+delivered.
