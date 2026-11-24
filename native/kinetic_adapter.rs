@@ -547,14 +547,12 @@ fn network(
     let mut ratios = HashMap::from([(start, 1.0f32)]);
     let mut pending = VecDeque::from([(start, start_node, [0; 3])]);
     let mut order = Vec::new();
+    let mut topology_conflict = false;
     while let Some((pos, block, entered)) = pending.pop_front() {
         order.push(pos);
         let ratio = ratios[&pos];
         for delta in block.neighbors() {
             let next = [pos[0] + delta[0], pos[1] + delta[1], pos[2] + delta[2]];
-            if ratios.contains_key(&next) {
-                continue;
-            }
             let Some(other) = node(host, level, next, part) else {
                 continue;
             };
@@ -569,6 +567,11 @@ fn network(
                 continue;
             }
             let next_ratio = ratio * direction / edge;
+            if let Some(previous_ratio) = ratios.get(&next).copied() {
+                topology_conflict |=
+                    kinetic_slice::inconsistent_loop_ratio(next_ratio, previous_ratio);
+                continue;
+            }
             ratios.insert(next, next_ratio);
             pending.push_back((next, other, delta.map(|value| -value)));
         }
@@ -611,6 +614,7 @@ fn network(
         .map(|(pos, ratio)| {
             let mut state = resolved;
             state.rpm /= ratio;
+            state.topology_conflict = topology_conflict;
             (pos, state)
         })
         .collect()

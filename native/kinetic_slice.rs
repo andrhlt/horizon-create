@@ -193,6 +193,10 @@ pub fn gearbox_multiplier(from: [i32; 3], to: [i32; 3]) -> f32 {
     }
 }
 
+pub fn inconsistent_loop_ratio(expected: f32, existing: f32) -> bool {
+    (expected - existing).abs() > 1e-5
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Source {
     pub speed: f32,
@@ -205,6 +209,7 @@ pub struct Network {
     pub capacity: f32,
     pub stress: f32,
     pub source_conflict: bool,
+    pub topology_conflict: bool,
 }
 
 impl Network {
@@ -452,5 +457,11 @@ mod tests {
             ),
             Some(-2.0)
         );
+    }
+
+    #[test]
+    fn loop_validation_uses_the_existing_ratio_tolerance() {
+        assert!(!inconsistent_loop_ratio(2.0, 2.0 + 5e-6));
+        assert!(inconsistent_loop_ratio(2.0, 2.0 + 2e-5));
     }
 }

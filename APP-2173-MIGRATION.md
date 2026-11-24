@@ -10,7 +10,7 @@ production-package or full-family acceptance run.
 
 | Assigned matrix row | Starting state | This pass |
 | --- | --- | --- |
-| Kinetic propagation, speed, stress, overload | Adapted motor/shaft/cogwheel graph; source and load subset only | Directional transmission rules extended; full load, loop, overload, reconnect/split gates remain open |
+| Kinetic propagation, speed, stress, overload | Adapted motor/shaft/cogwheel graph; source and load subset only | Directional transmission rules and the legacy loop-ratio tolerance extended; full load, loop rejection, overload, reconnect/split gates remain open |
 | Small/large/encased cogwheels | Small/large cogwheel typed path in checkpoint | Encased cogwheel registration, gear ratios, and open-half shaft connection rules added; runtime remains open |
 | Shafts and encased shafts | Straight Shaft typed path in checkpoint | Andesite, Brass, and Metal Girder encased shaft registrations added; runtime and lifecycle remain open |
 | Gearbox and Vertical Gearbox | Legacy implementation only | Typed block-entity registration and axis node added; runtime cases remain open |
@@ -36,6 +36,11 @@ corresponding existing Create block-entity IDs.
 `tools/prepare-kinetic-probe.py` includes the corresponding block definitions
 in its isolated probe pack.
 
+The typed graph records inconsistent loop ratios using the same `1e-5`
+tolerance as the legacy loop walk. It does not yet reproduce the legacy
+Gearbox join ordering or select the newly added block for safe loop rejection;
+that runtime behavior remains open.
+
 The direct production-logic check is:
 
 ```sh
@@ -43,7 +48,7 @@ rustc --edition=2024 --test native/kinetic_slice.rs -o /private/tmp/app2173-kine
 /private/tmp/app2173-kinetic-slice-tests
 ```
 
-Result: 8 passed, including the existing cogwheel ratio, signed source,
+Result: 9 passed, including the existing cogwheel ratio, signed source,
 capacity/stress, and arbitration cases plus the new directional transmission
 cases. `python3 tools/prepare-kinetic-probe.py --output
 /private/tmp/app2173-probe-project` staged the bounded probe pack. These are
@@ -83,3 +88,4 @@ records the immutable inputs. APP-2172 owns a reproducible full package and
 supported offline two-client route; until its package/runtime inputs are
 available, no production build, multiplayer, or final save/reopen result is
 claimed here.
+
