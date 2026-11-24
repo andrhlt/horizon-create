@@ -15,6 +15,9 @@ pub enum Node {
         axis: usize,
         large: bool,
     },
+    CrushingWheel {
+        axis: usize,
+    },
     EncasedCogwheel {
         axis: usize,
         large: bool,
@@ -22,6 +25,8 @@ pub enum Node {
         bottom_shaft: bool,
     },
     Millstone,
+    MechanicalPress,
+    Mixer,
     Gauge {
         axis: usize,
     },
@@ -63,6 +68,7 @@ impl Node {
             Self::Motor { facing } => face == facing,
             Self::Shaft { axis }
             | Self::Cogwheel { axis, .. }
+            | Self::CrushingWheel { axis }
             | Self::Flywheel { axis }
             | Self::Clutch { axis, .. }
             | Self::Gearshift { axis, .. }
@@ -77,6 +83,8 @@ impl Node {
             Self::ChainDrive { shaft_axis, .. } => face[shaft_axis] != 0,
             Self::Gearbox { axis } => face[axis] == 0,
             Self::Millstone => face == [0, -1, 0],
+            Self::MechanicalPress => face == [0, 1, 0],
+            Self::Mixer => face[1] != 0,
             Self::Gauge { axis } => face[axis] != 0,
             Self::Turntable => face == [0, -1, 0],
         }
@@ -86,7 +94,7 @@ impl Node {
         match self {
             Self::Cogwheel { axis, large } => Some((axis, large)),
             Self::EncasedCogwheel { axis, large, .. } => Some((axis, large)),
-            Self::Millstone => Some((1, false)),
+            Self::Millstone | Self::Mixer => Some((1, false)),
             _ => None,
         }
     }
@@ -119,7 +127,9 @@ impl Node {
             self,
             Self::Cogwheel { .. }
                 | Self::EncasedCogwheel { .. }
+                | Self::CrushingWheel { .. }
                 | Self::Millstone
+                | Self::Mixer
                 | Self::Turntable
         ) {
             result.extend(DIAGONALS);

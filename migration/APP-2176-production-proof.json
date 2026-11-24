@@ -1,0 +1,442 @@
+{
+  "route": "supported localhost offline dedicated server",
+  "client_mode": "offscreen",
+  "gameplay": {
+    "host_press_output": "Iron Sheet has the following entity data: {count: 1, id: \"create:iron_sheet\"}",
+    "guest_inventory": {
+      "armor": [
+        {
+          "item": null,
+          "part": "head",
+          "slot": 500
+        },
+        {
+          "item": null,
+          "part": "chest",
+          "slot": 501
+        },
+        {
+          "item": null,
+          "part": "legs",
+          "slot": 502
+        },
+        {
+          "item": null,
+          "part": "feet",
+          "slot": 503
+        }
+      ],
+      "carried": null,
+      "counts": {
+        "create:iron_sheet": 1
+      },
+      "held": {
+        "count": 1,
+        "item": "create:iron_sheet"
+      },
+      "hotbar": [
+        {
+          "count": 1,
+          "item": "create:iron_sheet",
+          "slot": 0
+        },
+        {
+          "item": null,
+          "slot": 1
+        },
+        {
+          "item": null,
+          "slot": 2
+        },
+        {
+          "item": null,
+          "slot": 3
+        },
+        {
+          "item": null,
+          "slot": 4
+        },
+        {
+          "item": null,
+          "slot": 5
+        },
+        {
+          "item": null,
+          "slot": 6
+        },
+        {
+          "item": null,
+          "slot": 7
+        },
+        {
+          "item": null,
+          "slot": 8
+        }
+      ],
+      "main": [
+        {
+          "item": null,
+          "slot": 9
+        },
+        {
+          "item": null,
+          "slot": 10
+        },
+        {
+          "item": null,
+          "slot": 11
+        },
+        {
+          "item": null,
+          "slot": 12
+        },
+        {
+          "item": null,
+          "slot": 13
+        },
+        {
+          "item": null,
+          "slot": 14
+        },
+        {
+          "item": null,
+          "slot": 15
+        },
+        {
+          "item": null,
+          "slot": 16
+        },
+        {
+          "item": null,
+          "slot": 17
+        },
+        {
+          "item": null,
+          "slot": 18
+        },
+        {
+          "item": null,
+          "slot": 19
+        },
+        {
+          "item": null,
+          "slot": 20
+        },
+        {
+          "item": null,
+          "slot": 21
+        },
+        {
+          "item": null,
+          "slot": 22
+        },
+        {
+          "item": null,
+          "slot": 23
+        },
+        {
+          "item": null,
+          "slot": 24
+        },
+        {
+          "item": null,
+          "slot": 25
+        },
+        {
+          "item": null,
+          "slot": 26
+        },
+        {
+          "item": null,
+          "slot": 27
+        },
+        {
+          "item": null,
+          "slot": 28
+        },
+        {
+          "item": null,
+          "slot": 29
+        },
+        {
+          "item": null,
+          "slot": 30
+        },
+        {
+          "item": null,
+          "slot": 31
+        },
+        {
+          "item": null,
+          "slot": 32
+        },
+        {
+          "item": null,
+          "slot": 33
+        },
+        {
+          "item": null,
+          "slot": 34
+        },
+        {
+          "item": null,
+          "slot": 35
+        }
+      ],
+      "offhand": {
+        "item": null,
+        "slot": 504
+      },
+      "selected": 1
+    },
+    "basin_mixing": "0, 102, 0 has the following block data: [{count: 1, Slot: 9b, id: \"create:andesite_alloy\"}]",
+    "basin_compacting": "10, 102, 0 has the following block data: [{count: 1, Slot: 9b, id: \"minecraft:ice\"}]",
+    "basin_backpressure": {
+      "blocked": "20, 102, 0 has the following block data: [{count: 9, Slot: 0b, id: \"minecraft:snow_block\"}, {count: 64, Slot: 9b, id: \"minecraft:stone\"}, {count: 64, Slot: 10b, id: \"minecraft:stone\"}, {count: 64, Slot: 11b, id: \"minecraft:stone\"}, {count: 64, Slot: 12b, id: \"minecraft:stone\"}, {count: 64, Slot: 13b, id: \"minecraft:stone\"}, {count: 64, Slot: 14b, id: \"minecraft:stone\"}, {count: 64, Slot: 15b, id: \"minecraft:stone\"}, {count: 64, Slot: 16b, id: \"minecraft:stone\"}, {count: 64, Slot: 17b, id: \"minecraft:stone\"}]",
+      "recovered": "20, 102, 0 has the following block data: [{count: 1, Slot: 9b, id: \"minecraft:ice\"}, {count: 64, Slot: 10b, id: \"minecraft:stone\"}, {count: 64, Slot: 11b, id: \"minecraft:stone\"}, {count: 64, Slot: 12b, id: \"minecraft:stone\"}, {count: 64, Slot: 13b, id: \"minecraft:stone\"}, {count: 64, Slot: 14b, id: \"minecraft:stone\"}, {count: 64, Slot: 15b, id: \"minecraft:stone\"}, {count: 64, Slot: 16b, id: \"minecraft:stone\"}, {count: 64, Slot: 17b, id: \"minecraft:stone\"}]"
+    },
+    "crushing": "50, 102, 0 has the following block data: [{count: 1, Slot: 1b, id: \"minecraft:sand\"}]",
+    "crushing_backpressure": {
+      "blocked": "70, 102, 0 has the following block data: [{count: 1, Slot: 0b, id: \"minecraft:gravel\"}, {count: 64, Slot: 1b, id: \"minecraft:stone\"}, {count: 64, Slot: 2b, id: \"minecraft:stone\"}, {count: 64, Slot: 3b, id: \"minecraft:stone\"}, {count: 64, Slot: 4b, id: \"minecraft:stone\"}, {count: 64, Slot: 5b, id: \"minecraft:stone\"}, {count: 64, Slot: 6b, id: \"minecraft:stone\"}, {count: 64, Slot: 7b, id: \"minecraft:stone\"}, {count: 64, Slot: 8b, id: \"minecraft:stone\"}, {count: 64, Slot: 9b, id: \"minecraft:stone\"}, {count: 64, Slot: 10b, id: \"minecraft:stone\"}, {count: 64, Slot: 11b, id: \"minecraft:stone\"}, {count: 64, Slot: 12b, id: \"minecraft:stone\"}, {count: 64, Slot: 13b, id: \"minecraft:stone\"}, {count: 64, Slot: 14b, id: \"minecraft:stone\"}, {count: 64, Slot: 15b, id: \"minecraft:stone\"}]",
+      "recovered": "70, 102, 0 has the following block data: [{count: 1, Slot: 1b, id: \"minecraft:sand\"}]"
+    },
+    "burner_coal": "30, 102, 0 has the following block data: {fuelLevel: 1, burnTimeRemaining: 1600, x: 30, y: 102, z: 0, id: \"create:blaze_burner\"}",
+    "burner_brass": {
+      "basin": "40, 103, 0 has the following block data: [{count: 2, Slot: 9b, id: \"create:brass_ingot\"}]",
+      "burner": "40, 102, 0 has the following block data: {fuelLevel: 2, burnTimeRemaining: 3171, x: 40, y: 102, z: 0, id: \"create:blaze_burner\"}"
+    },
+    "cold_mixer_rejection": "60, 103, 0 has the following block data: [{count: 1, Slot: 0b, id: \"minecraft:copper_ingot\"}, {count: 1, Slot: 1b, id: \"create:zinc_ingot\"}]"
+  },
+  "players": {
+    "APP2176Guest": "d79fc2d4-8f78-3a03-85a2-c9ac6a4852c0",
+    "APP2176Host": "22f818d4-d1ab-3929-aadc-814c2b8580cb"
+  },
+  "save_reopen": {
+    "basin_alloy": "0, 102, 0 has the following block data: [{count: 1, Slot: 9b, id: \"create:andesite_alloy\"}]",
+    "basin_ice": "10, 102, 0 has the following block data: [{count: 1, Slot: 9b, id: \"minecraft:ice\"}]",
+    "crushing_sand": "50, 102, 0 has the following block data: [{count: 1, Slot: 1b, id: \"minecraft:sand\"}]",
+    "crushing_recovered_sand": "70, 102, 0 has the following block data: [{count: 1, Slot: 1b, id: \"minecraft:sand\"}]",
+    "burner": "40, 102, 0 has the following block data: {fuelLevel: 2, burnTimeRemaining: 3104, x: 40, y: 102, z: 0, id: \"create:blaze_burner\"}",
+    "guest_inventory": {
+      "armor": [
+        {
+          "item": null,
+          "part": "head",
+          "slot": 500
+        },
+        {
+          "item": null,
+          "part": "chest",
+          "slot": 501
+        },
+        {
+          "item": null,
+          "part": "legs",
+          "slot": 502
+        },
+        {
+          "item": null,
+          "part": "feet",
+          "slot": 503
+        }
+      ],
+      "carried": null,
+      "counts": {
+        "create:iron_sheet": 1
+      },
+      "held": {
+        "count": 1,
+        "item": "create:iron_sheet"
+      },
+      "hotbar": [
+        {
+          "count": 1,
+          "item": "create:iron_sheet",
+          "slot": 0
+        },
+        {
+          "item": null,
+          "slot": 1
+        },
+        {
+          "item": null,
+          "slot": 2
+        },
+        {
+          "item": null,
+          "slot": 3
+        },
+        {
+          "item": null,
+          "slot": 4
+        },
+        {
+          "item": null,
+          "slot": 5
+        },
+        {
+          "item": null,
+          "slot": 6
+        },
+        {
+          "item": null,
+          "slot": 7
+        },
+        {
+          "item": null,
+          "slot": 8
+        }
+      ],
+      "main": [
+        {
+          "item": null,
+          "slot": 9
+        },
+        {
+          "item": null,
+          "slot": 10
+        },
+        {
+          "item": null,
+          "slot": 11
+        },
+        {
+          "item": null,
+          "slot": 12
+        },
+        {
+          "item": null,
+          "slot": 13
+        },
+        {
+          "item": null,
+          "slot": 14
+        },
+        {
+          "item": null,
+          "slot": 15
+        },
+        {
+          "item": null,
+          "slot": 16
+        },
+        {
+          "item": null,
+          "slot": 17
+        },
+        {
+          "item": null,
+          "slot": 18
+        },
+        {
+          "item": null,
+          "slot": 19
+        },
+        {
+          "item": null,
+          "slot": 20
+        },
+        {
+          "item": null,
+          "slot": 21
+        },
+        {
+          "item": null,
+          "slot": 22
+        },
+        {
+          "item": null,
+          "slot": 23
+        },
+        {
+          "item": null,
+          "slot": 24
+        },
+        {
+          "item": null,
+          "slot": 25
+        },
+        {
+          "item": null,
+          "slot": 26
+        },
+        {
+          "item": null,
+          "slot": 27
+        },
+        {
+          "item": null,
+          "slot": 28
+        },
+        {
+          "item": null,
+          "slot": 29
+        },
+        {
+          "item": null,
+          "slot": 30
+        },
+        {
+          "item": null,
+          "slot": 31
+        },
+        {
+          "item": null,
+          "slot": 32
+        },
+        {
+          "item": null,
+          "slot": 33
+        },
+        {
+          "item": null,
+          "slot": 34
+        },
+        {
+          "item": null,
+          "slot": 35
+        }
+      ],
+      "offhand": {
+        "item": null,
+        "slot": 504
+      },
+      "selected": 1
+    }
+  },
+  "build": {
+    "base": "developer-e05268bea02f4384b113d9b9b02f0ce6310883561ccc41fea947e097148ade16",
+    "horizon": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+    "horizon_mixins": "e59da9094f0c2fdda6c627fe9eff22dec6a906f0",
+    "rust": "1.99.1",
+    "profile": "optimized",
+    "route": "prebuilt-api",
+    "left_out": [],
+    "target": "client",
+    "rust_target": null,
+    "secs": 6,
+    "mods": [
+      {
+        "id": "create",
+        "version": "0.1.0",
+        "sha256": "ba3db6523425a3dc6579a77fbf84df53d7993587cdca569614caa2df6c2b56f6",
+        "internals": []
+      }
+    ],
+    "libraries": [
+      {
+        "file": "libmod_create.dylib",
+        "sha256": "a7d5f65676c243bbab78fd7ed9a43b92a287262ad0e250eba5ca78811854f9bc",
+        "kind": "mod",
+        "mod": "create",
+        "identity": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a create 0.1.0 1.99.1"
+      }
+    ]
+  },
+  "sha256": {
+    "server": "50cfae57221e4af69c520145db739bd5ab05ea0fe48b314c749430226d37a172",
+    "client": "012bf6dbfecb095bfb27f9b84452105639501cc5444aca15517360cd90547935",
+    "ctl": "44b290fff505a4962ca93b701a257da22f60f65290efb732b28f80e742c249cb",
+    "native_mods": "e91e3c47ed3b68e2195bc92777d0ac5e0a6443a8ceb388f1ffae6e71533a45c0"
+  }
+}

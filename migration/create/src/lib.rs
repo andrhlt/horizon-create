@@ -3,6 +3,13 @@ pub(crate) mod gauge_logic;
 pub(crate) mod gauge_readout;
 pub(crate) mod kinetic_adapter;
 pub(crate) mod kinetic_controls;
+pub(crate) mod create_millstone_processing;
+pub(crate) mod millstone_adapter;
+pub(crate) mod press_processing;
+pub(crate) mod press_adapter;
+pub(crate) mod crushing_adapter;
+pub(crate) mod basin_adapter;
+pub(crate) mod burner_adapter;
 pub(crate) mod turntable_motion;
 pub(crate) mod fan_airflow_math;
 pub(crate) mod create_fan_nozzle_adapter;
@@ -42,8 +49,17 @@ impl mod_api::Hooks for Create {
         }
         kinetic_adapter::register(registrar);
         kinetic_controls::register(registrar);
+        millstone_adapter::register(registrar);
+        press_adapter::register(registrar);
+        crushing_adapter::register(registrar);
+        basin_adapter::register(registrar);
+        burner_adapter::register(registrar);
         gauge_readout::register(registrar);
         create_fan_nozzle_adapter::register(registrar);
+        if let Some(container) = millstone_adapter::container("create:millstone") {
+            let block = registrar.block_key("create:millstone");
+            registrar.block_container(&block, container);
+        }
     }
 
     fn gui_render_post(
@@ -52,5 +68,13 @@ impl mod_api::Hooks for Create {
         event: &mut mod_api::GuiRenderPostEvent<'_>,
     ) {
         gauge_readout::draw(host, event);
+    }
+
+    fn scheduled_task(
+        &self,
+        host: &mut dyn mod_api::ServerHost,
+        event: &mut mod_api::ScheduledTaskEvent<'_>,
+    ) {
+        press_adapter::scheduled_task(host, event);
     }
 }

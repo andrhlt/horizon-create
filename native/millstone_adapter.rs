@@ -11,7 +11,8 @@ use mod_api::{
     ItemStack, LevelRef, ModContainer, RandomSource, Registrar, ServerHost, Tag,
 };
 
-use super::create_millstone_processing::{self, Tick};
+use super::create_millstone_processing as millstone_processing;
+use super::create_millstone_processing::Tick;
 
 pub const BLOCK: &str = "create:millstone";
 const RECIPE_KIND: &str = "create:milling";

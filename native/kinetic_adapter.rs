@@ -71,12 +71,27 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         .block_entity_type("create:rotation_speed_controller")
         .blocks(&["create:rotation_speed_controller"])
         .build();
+    let mixer = registrar
+        .block_entity_type("create:mechanical_mixer")
+        .blocks(&["create:mechanical_mixer"])
+        .build();
+    let crushing_wheel = registrar
+        .block_entity_type("create:crushing_wheel")
+        .blocks(&["create:crushing_wheel"])
+        .build();
+    let press = registrar
+        .block_entity_type("create:mechanical_press")
+        .blocks(&["create:mechanical_press"])
+        .build();
     let part = KineticPart {
         motor: registrar.block_key("create:creative_motor"),
         shaft: registrar.block_key("create:shaft"),
         cogwheel: registrar.block_key("create:cogwheel"),
         large_cogwheel: registrar.block_key("create:large_cogwheel"),
         millstone: registrar.block_key("create:millstone"),
+        mixer: registrar.block_key("create:mechanical_mixer"),
+        crushing_wheel: registrar.block_key("create:crushing_wheel"),
+        press: registrar.block_key("create:mechanical_press"),
         flywheel: registrar.block_key("create:flywheel"),
         gearbox: registrar.block_key("create:gearbox"),
         clutch: registrar.block_key("create:clutch"),
@@ -107,6 +122,12 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
     registrar.block_entity_part(&chain_gearshift, part).unwrap();
     registrar.block_entity_part(&sequencer, part).unwrap();
     registrar.block_entity_part(&speed_controller, part).unwrap();
+    registrar.block_entity_part(&mixer, part).unwrap();
+    registrar.block_entity_part(&crushing_wheel, part).unwrap();
+    registrar.block_entity_part(&press, part).unwrap();
+    registrar
+        .block_entity_part(&press, super::press_adapter::PressPart)
+        .unwrap();
 }
 
 #[derive(Clone, Copy)]
@@ -116,6 +137,9 @@ pub struct KineticPart {
     cogwheel: BlockKey,
     large_cogwheel: BlockKey,
     millstone: BlockKey,
+    mixer: BlockKey,
+    crushing_wheel: BlockKey,
+    press: BlockKey,
     flywheel: BlockKey,
     gearbox: BlockKey,
     clutch: BlockKey,
@@ -716,6 +740,17 @@ fn node(
     if block == part.millstone {
         return Some(Node::Millstone);
     }
+    if block == part.mixer {
+        return Some(Node::Mixer);
+    }
+    if block == part.crushing_wheel {
+        return Some(Node::CrushingWheel {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+        });
+    }
+    if block == part.press {
+        return Some(Node::MechanicalPress);
+    }
     if block == part.flywheel {
         return Some(Node::Flywheel {
             axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
@@ -902,6 +937,12 @@ fn network(
         };
         if matches!(block, Node::Millstone | Node::Turntable) {
             impact_per_rpm += 4.0 / ratio.abs();
+        }
+        if matches!(block, Node::MechanicalPress) {
+            impact_per_rpm += 4.0 / ratio.abs();
+        }
+        if matches!(block, Node::CrushingWheel { .. }) {
+            impact_per_rpm += 8.0 / ratio.abs();
         }
         let Node::Motor { facing } = block else {
             continue;

@@ -14,6 +14,13 @@ SOURCES = {
     "gauge_readout.rs": ROOT / "native/gauge_readout.rs",
     "kinetic_adapter.rs": ROOT / "native/kinetic_adapter.rs",
     "kinetic_controls.rs": ROOT / "native/kinetic_controls.rs",
+    "create_millstone_processing.rs": ROOT / "native/millstone_processing.rs",
+    "millstone_adapter.rs": ROOT / "native/millstone_adapter.rs",
+    "press_processing.rs": ROOT / "native/press_processing.rs",
+    "press_adapter.rs": ROOT / "native/press_adapter.rs",
+    "crushing_adapter.rs": ROOT / "native/crushing_adapter.rs",
+    "basin_adapter.rs": ROOT / "native/basin_adapter.rs",
+    "burner_adapter.rs": ROOT / "native/burner_adapter.rs",
     "turntable_motion.rs": ROOT / "native/turntable_motion.rs",
     "fan_airflow_math.rs": ROOT / "native/fan_airflow_math.rs",
     "create_fan_nozzle_adapter.rs": ROOT / "native/create_fan_nozzle_adapter.rs",
@@ -39,6 +46,10 @@ def main() -> None:
             destination.write_text(destination.read_text().replace(
                 "use super::create_kinetic_slice::{self, Node};",
                 "use super::create_kinetic_slice as kinetic_slice;\nuse super::create_kinetic_slice::Node;",
+            ))
+        elif name == "millstone_adapter.rs":
+            destination.write_text(destination.read_text().replace(
+                "super::millstone_processing", "super::create_millstone_processing",
             ))
     with ZipFile(args.content_pack.resolve(strict=True)) as archive:
         for entry in archive.infolist():
