@@ -7,10 +7,10 @@ import re
 
 from fixture_world import fixture_world
 
-BEARING = (0, 100, 0)
-MOTOR = (0, 99, 0)
-CHEST = (1, 101, 0)
-EXTENSION = (2, 101, 0)
+BEARING = (0, 150, 0)
+MOTOR = (0, 149, 0)
+CHEST = (1, 151, 0)
+EXTENSION = (-1, 151, 0)
 
 
 def xyz(pos):
@@ -43,18 +43,22 @@ def main():
         parser.add_argument(name, type=lambda value: Path(value).resolve(strict=True))
     parser.add_argument("--pack", type=Path)
     args = parser.parse_args()
-    with fixture_world(args, "TypedBearingGlue", pack=args.pack) as control:
+    with fixture_world(args, "TypedBearingGlue", pack=args.pack, terrain_seed=0) as control:
         control.commands((
-            "/fill -3 97 -3 4 105 3 minecraft:air",
-            f"/summon minecraft:marker 0 101 0 {{CreateSuperGlue:1b,From:[0d,0d,-1d],To:[3d,1d,2d]}}",
+            "/fill -3 147 -3 4 155 3 minecraft:air",
+            f"/summon minecraft:armor_stand 0 151 0 {{Marker:1b,Invisible:1b,NoGravity:1b,NoCollision:1b,CreateSuperGlue:1b,From:[-2d,0d,-1d],To:[3d,1d,2d]}}",
+        ))
+        # Let the authoritative special-entity index observe the marker before
+        # the bearing's load hook captures its finite glued neighborhood.
+        control.command("/tick step 2")
+        control.commands((
             f"/setblock {xyz(BEARING)} create:mechanical_bearing[facing=up]",
             f"/setblock {xyz(MOTOR)} create:creative_motor[facing=up]{{ScrollValue:20}}",
             f"/setblock {xyz(CHEST)} minecraft:chest",
             f"/setblock {xyz(EXTENSION)} minecraft:barrel[facing=north]",
             f"/item replace block {xyz(CHEST)} container.0 with minecraft:iron_ingot 7",
-            "/tp @s 1.5 102 0.5",
         ))
-        marker = control.command("/data get entity @e[type=minecraft:marker,limit=1]")
+        marker = control.command("/data get entity @e[type=minecraft:armor_stand,limit=1]")
         if "CreateSuperGlue: 1b" not in marker:
             raise RuntimeError(f"Glue marker fixture was not created: {marker}")
         for _ in range(15):
