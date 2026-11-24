@@ -75,7 +75,9 @@ def main():
         "creative_motor", "shaft", "cogwheel", "large_cogwheel",
         "millstone", "mechanical_bearing", "flywheel", "gearbox",
         "clutch", "gearshift", "encased_chain_drive",
-        "adjustable_chain_gearshift",
+        "adjustable_chain_gearshift", "andesite_encased_shaft",
+        "brass_encased_shaft", "metal_girder_encased_shaft",
+        "brass_encased_cogwheel",
     ):
         source = ROOT / f"content/data/create/horizon/block/{name}.json"
         definition = json.loads(source.read_text())

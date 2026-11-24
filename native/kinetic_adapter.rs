@@ -22,6 +22,29 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         .block_entity_type("create:simple_kinetic")
         .blocks(&["create:shaft", "create:cogwheel", "create:large_cogwheel"])
         .build();
+    let encased_cogwheel = registrar
+        .block_entity_type("create:encased_cogwheel")
+        .blocks(&[
+            "create:brass_encased_cogwheel",
+            "create:andesite_encased_cogwheel",
+        ])
+        .build();
+    let encased_large_cogwheel = registrar
+        .block_entity_type("create:encased_large_cogwheel")
+        .blocks(&[
+            "create:brass_encased_large_cogwheel",
+            "create:andesite_encased_large_cogwheel",
+        ])
+        .build();
+    let encased_shaft = registrar
+        .block_entity_type("create:encased_shaft")
+        .blocks(&[
+            "create:andesite_encased_shaft",
+            "create:brass_encased_shaft",
+            "create:metal_girder_encased_shaft",
+            "create:encased_chain_drive",
+        ])
+        .build();
     let flywheel = registrar
         .block_entity_type("create:flywheel")
         .blocks(&["create:flywheel"])
@@ -38,10 +61,6 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         .block_entity_type("create:gearshift")
         .blocks(&["create:gearshift"])
         .build();
-    let chain_drive = registrar
-        .block_entity_type("create:encased_shaft")
-        .blocks(&["create:encased_chain_drive"])
-        .build();
     let chain_gearshift = registrar
         .block_entity_type("create:adjustable_chain_gearshift")
         .blocks(&["create:adjustable_chain_gearshift"])
@@ -56,17 +75,31 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         gearbox: registrar.block_key("create:gearbox"),
         clutch: registrar.block_key("create:clutch"),
         gearshift: registrar.block_key("create:gearshift"),
+        encased_cogwheel: registrar.block_key("create:brass_encased_cogwheel"),
+        encased_andesite_cogwheel: registrar.block_key("create:andesite_encased_cogwheel"),
+        encased_large_cogwheel: registrar.block_key("create:brass_encased_large_cogwheel"),
+        encased_andesite_large_cogwheel: registrar
+            .block_key("create:andesite_encased_large_cogwheel"),
+        andesite_shaft: registrar.block_key("create:andesite_encased_shaft"),
+        brass_shaft: registrar.block_key("create:brass_encased_shaft"),
+        girder_shaft: registrar.block_key("create:metal_girder_encased_shaft"),
         chain_drive: registrar.block_key("create:encased_chain_drive"),
         chain_gearshift: registrar.block_key("create:adjustable_chain_gearshift"),
     };
     let _ = KINETIC_PART.set(part);
     registrar.block_entity_part(&motor, part).unwrap();
     registrar.block_entity_part(&kinetic, part).unwrap();
+    registrar
+        .block_entity_part(&encased_cogwheel, part)
+        .unwrap();
+    registrar
+        .block_entity_part(&encased_large_cogwheel, part)
+        .unwrap();
+    registrar.block_entity_part(&encased_shaft, part).unwrap();
     registrar.block_entity_part(&flywheel, part).unwrap();
     registrar.block_entity_part(&gearbox, part).unwrap();
     registrar.block_entity_part(&clutch, part).unwrap();
     registrar.block_entity_part(&gearshift, part).unwrap();
-    registrar.block_entity_part(&chain_drive, part).unwrap();
     registrar.block_entity_part(&chain_gearshift, part).unwrap();
 }
 
@@ -81,6 +114,13 @@ pub struct KineticPart {
     gearbox: BlockKey,
     clutch: BlockKey,
     gearshift: BlockKey,
+    encased_cogwheel: BlockKey,
+    encased_andesite_cogwheel: BlockKey,
+    encased_large_cogwheel: BlockKey,
+    encased_andesite_large_cogwheel: BlockKey,
+    andesite_shaft: BlockKey,
+    brass_shaft: BlockKey,
+    girder_shaft: BlockKey,
     chain_drive: BlockKey,
     chain_gearshift: BlockKey,
 }
@@ -412,6 +452,24 @@ fn node(
         return Some(Node::Cogwheel {
             axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
             large: block == part.large_cogwheel,
+        });
+    }
+    if block == part.encased_cogwheel
+        || block == part.encased_andesite_cogwheel
+        || block == part.encased_large_cogwheel
+        || block == part.encased_andesite_large_cogwheel
+    {
+        return Some(Node::EncasedCogwheel {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+            large: block == part.encased_large_cogwheel
+                || block == part.encased_andesite_large_cogwheel,
+            top_shaft: level.block_property(host, pos, "top_shaft")? == "true",
+            bottom_shaft: level.block_property(host, pos, "bottom_shaft")? == "true",
+        });
+    }
+    if block == part.andesite_shaft || block == part.brass_shaft || block == part.girder_shaft {
+        return Some(Node::Shaft {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
         });
     }
     if block == part.millstone {

@@ -11,8 +11,8 @@ production-package or full-family acceptance run.
 | Assigned matrix row | Starting state | This pass |
 | --- | --- | --- |
 | Kinetic propagation, speed, stress, overload | Adapted motor/shaft/cogwheel graph; source and load subset only | Directional transmission rules extended; full load, loop, overload, reconnect/split gates remain open |
-| Small/large/encased cogwheels | Small/large cogwheel typed path in checkpoint | Encased cogwheels remain open |
-| Shafts and encased shafts | Straight Shaft typed path in checkpoint | Andesite/Brass encased shaft paths remain open |
+| Small/large/encased cogwheels | Small/large cogwheel typed path in checkpoint | Encased cogwheel registration, gear ratios, and open-half shaft connection rules added; runtime remains open |
+| Shafts and encased shafts | Straight Shaft typed path in checkpoint | Andesite, Brass, and Metal Girder encased shaft registrations added; runtime and lifecycle remain open |
 | Gearbox and Vertical Gearbox | Legacy implementation only | Typed block-entity registration and axis node added; runtime cases remain open |
 | Clutch and Gearshift | Legacy implementation only | Typed registrations and powered output-side transfer rules added; runtime/reconnect cases remain open |
 | Encased Chain Drive and Adjustable Chain Gearshift | Legacy implementation only | Typed registration, link-axis/end-point connection rules, and signal ratio translation added; signal update scheduling, overspeed break behavior, and runtime remain open |
@@ -23,8 +23,9 @@ production-package or full-family acceptance run.
 
 ## Implemented rule slice
 
-`native/kinetic_slice.rs` now models Flywheel, Gearbox, Clutch, Gearshift, and
-Chain Drive nodes in addition to the checkpoint's nodes. Gearbox faces connect
+`native/kinetic_slice.rs` now models Flywheel, Gearbox, Clutch, Gearshift,
+Chain Drive, and encased cogwheel nodes in addition to the checkpoint's nodes.
+Gearbox faces connect
 perpendicular to its declared axis. Its outgoing direction modifier follows
 the existing `machines.rs::gearbox_multiplier` rule. A powered Clutch cuts
 only the output side after its incoming face; a powered Gearshift negates only
@@ -42,7 +43,7 @@ rustc --edition=2024 --test native/kinetic_slice.rs -o /private/tmp/app2173-kine
 /private/tmp/app2173-kinetic-slice-tests
 ```
 
-Result: 7 passed, including the existing cogwheel ratio, signed source,
+Result: 8 passed, including the existing cogwheel ratio, signed source,
 capacity/stress, and arbitration cases plus the new directional transmission
 cases. `python3 tools/prepare-kinetic-probe.py --output
 /private/tmp/app2173-probe-project` staged the bounded probe pack. These are
@@ -62,11 +63,11 @@ orientation, waterlogging, ordinary configuration, and block contents where
 applicable.
 
 The typed package currently registers only the selected checkpoint types plus
-Flywheel, Gearbox, Clutch, Gearshift, Encased Chain Drive, and Adjustable Chain
-Gearshift. The latter's signal update scheduling and overspeed breaking are not
-migrated. Sequenced Gearshifts, Rotation Speed Controllers, encased cogwheels
-and shafts, and their content/presentation integration are not migrated by
-this slice. The current adapter also lacks the complete legacy load table,
+Flywheel, Gearbox, Clutch, Gearshift, encased cogwheels and shafts, Encased
+Chain Drive, and Adjustable Chain Gearshift. The latter's signal update
+scheduling and overspeed breaking are not migrated. Sequenced Gearshifts,
+Rotation Speed Controllers, and their content/presentation integration are not
+migrated by this slice. The current adapter also lacks the complete legacy load table,
 Sequenced/Chain state, speed-controller cross-network links, inconsistent-loop
 resolution, and all production registry/package wiring. Those gaps block
 APP-2173 gameplay completion; the source-level checks do not establish

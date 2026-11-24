@@ -15,6 +15,12 @@ pub enum Node {
         axis: usize,
         large: bool,
     },
+    EncasedCogwheel {
+        axis: usize,
+        large: bool,
+        top_shaft: bool,
+        bottom_shaft: bool,
+    },
     Millstone,
     Flywheel {
         axis: usize,
@@ -47,6 +53,12 @@ impl Node {
             | Self::Flywheel { axis }
             | Self::Clutch { axis, .. }
             | Self::Gearshift { axis, .. } => face[axis] != 0,
+            Self::EncasedCogwheel {
+                axis,
+                top_shaft,
+                bottom_shaft,
+                ..
+            } => face[axis] > 0 && top_shaft || face[axis] < 0 && bottom_shaft,
             Self::ChainDrive { shaft_axis, .. } => face[shaft_axis] != 0,
             Self::Gearbox { axis } => face[axis] == 0,
             Self::Millstone => face == [0, -1, 0],
@@ -56,6 +68,7 @@ impl Node {
     fn gear(self) -> Option<(usize, bool)> {
         match self {
             Self::Cogwheel { axis, large } => Some((axis, large)),
+            Self::EncasedCogwheel { axis, large, .. } => Some((axis, large)),
             Self::Millstone => Some((1, false)),
             _ => None,
         }
@@ -85,7 +98,10 @@ impl Node {
             [0, 1, 1],
         ];
         let mut result = DIRECTIONS.to_vec();
-        if matches!(self, Self::Cogwheel { .. } | Self::Millstone) {
+        if matches!(
+            self,
+            Self::Cogwheel { .. } | Self::EncasedCogwheel { .. } | Self::Millstone
+        ) {
             result.extend(DIAGONALS);
         }
         result
@@ -413,6 +429,28 @@ mod tests {
                 [0, 1, 0]
             ),
             None
+        );
+    }
+
+    #[test]
+    fn encased_cogwheel_shaft_connections_follow_open_halves() {
+        let cog = Node::EncasedCogwheel {
+            axis: 1,
+            large: true,
+            top_shaft: false,
+            bottom_shaft: true,
+        };
+        assert!(!cog.shaft([0, 1, 0]));
+        assert!(cog.shaft([0, -1, 0]));
+        assert_eq!(
+            cog.ratio_to(
+                Node::Cogwheel {
+                    axis: 1,
+                    large: false
+                },
+                [1, 0, 1]
+            ),
+            Some(-2.0)
         );
     }
 }
