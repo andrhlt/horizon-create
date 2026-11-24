@@ -1,0 +1,14 @@
+id = "create_motion_probe"
+name = "Create Moving Payload Probe"
+version = "0.1.0"
+description = "Bounded moving bearing payload lifecycle probe"
+authors = ["Create port"]
+api = "0.2"
+side = "both"
+capabilities = ["registries"]
+namespaces = ["create"]
+
+[native]
+game = "26.3"
+horizon = "a3b165e05c023c1eb0fd1d7407b5f32636ab3655"
+mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
