@@ -90,3 +90,26 @@ or empty inputs. `git diff --check` passes. A full pinned native build and
 runtime wheat/LAN/reopen replay are still required after the typed Part and
 central registration are integrated by APP-2136; this checkpoint does not claim
 the migration or the APP-2163 lane complete.
+
+## Post-Millstone follow-up inventory
+
+The pinned runtime already has representative ordinary gameplay evidence for
+Mechanical Press, Crushing Wheels, Basin/Mixer heating and rejection, Encased
+Fan washing, belts/funnels/chutes and Depots, fluid pipes/pumps/tanks/valves,
+and Mechanical Crafters/Arms. That evidence is retained rather than rerun.
+Those rows still need typed-Part adaptation; the historical checks do not claim
+every recipe or multiplayer permutation.
+
+| Family | Existing pinned evidence | Remaining adaptation |
+| --- | --- | --- |
+| Millstone | Shipped: wheat processing, active reopen, full-output recovery | None for the bounded checkpoint |
+| Press / Crushing / Basin / Mixer / Fan | Representative processing and heating checks pass | Pure timing/conservation seams, typed block entities, recipe/fluid endpoints |
+| Belts / Funnels / Chutes / Depots / Vaults | Transport, filters and capacity checks pass | Typed inventory endpoints, persistence and guest authority |
+| Fluid tank / pipe / pump / valve / spout / drain | Transfer, fill/drain and reopen checks pass | Typed fluid storage/transport and capacity/filter persistence |
+| Crafters / arms / packager / stock logistics | Focused family checks are partial | Typed inventory handoff and stationary logistics integration |
+
+This follow-up starts with the Mechanical Press timing seam. Legacy recipe,
+basin/world effects and sync remain authoritative while the pure speed-dependent
+cycle transition becomes reusable by a typed adapter. The inventory, logistics
+and fluid rows remain open until their typed endpoints and ordinary flows are
+delivered.
