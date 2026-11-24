@@ -215,7 +215,7 @@ impl BlockEntityPart for MotorBoard {
         let Some(player) = host.player(event.context.player) else {
             return;
         };
-        let Some(level): Option<LevelRef> = host.player_level(player) else {
+        let Some(level): Option<LevelRef> = player.entity().level(host) else {
             return;
         };
         let setting = setting_from_button(event.context.id);
