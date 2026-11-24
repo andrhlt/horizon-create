@@ -146,6 +146,10 @@ and `native/fan_airflow_math.rs`. `migration/create/src/lib.rs` declares both
 modules and registers the Nozzle block-entity part; the package builder copies
 both canonical source files into the package's `src/` directory. The Fan tick
 callback is exposed for the kinetic part to call after graph recomputation.
+The adapter source is refreshed from APP-2177 commit
+`402e4489314cc64b3b0f75285565aba4d7364b9a` (SHA-1
+`4bd7b95692e9e3c222b1c8b3d897840f78892354`), which stores Depot processing on
+the Depot entity, splits output stacks, and tracks affected entities by UUID.
 This adapter addition has not yet been exercised in the captured APP-2172
 two-client proof above; its runtime behavior remains open until the combined
 package is rebuilt and checked.

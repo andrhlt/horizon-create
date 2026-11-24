@@ -230,13 +230,7 @@ fn insert_output(host: &dyn Host, slots: &mut [Option<ItemStack>], mut output: I
     }
 }
 
-fn process_depot(
-    host: &mut dyn ServerHost,
-    level: LevelRef,
-    pos: [i32; 3],
-    data: &mut Compound,
-    process: Process,
-) {
+fn process_depot(host: &mut dyn ServerHost, level: LevelRef, pos: [i32; 3], process: Process) {
     let depot_pos = pos;
     if block_id(host, level, depot_pos).as_deref() != Some(DEPOT) {
         return;
@@ -244,41 +238,46 @@ fn process_depot(
     let Some(entity) = host.block_entity_identity(level, depot_pos) else {
         return;
     };
+    let Some(mut depot_data) = entity.data(host) else {
+        return;
+    };
     let Ok(Some(input)) = entity.item_slot(host, 0) else {
-        data.remove(&"FanProcessingType".into());
-        data.remove(&"FanProcessingTime".into());
-        data.remove(&"FanProcessingItem".into());
+        clear_processing(&mut depot_data);
+        let _ = entity.merge_data(host, depot_data);
         return;
     };
     let input_id = input.item().id(host);
-    let same = string(data, "FanProcessingItem").as_deref() == Some(input_id.as_str())
-        && string(data, "FanProcessingType").as_deref() == Some(process.id());
-    let timer = int(data, "FanProcessingTime").unwrap_or(-1);
+    let same = string(&depot_data, "FanProcessingItem").as_deref() == Some(input_id.as_str())
+        && string(&depot_data, "FanProcessingType").as_deref() == Some(process.id());
+    let timer = int(&depot_data, "FanProcessingTime").unwrap_or(-1);
     if !same {
         if outputs_for_kind(host, level, process, &input).is_some() {
-            data.insert(
+            depot_data.insert(
                 "FanProcessingItem".into(),
                 Tag::String(input_id.as_str().into()),
             );
-            data.insert("FanProcessingType".into(), Tag::String(process.id().into()));
-            data.insert(
+            depot_data.insert("FanProcessingType".into(), Tag::String(process.id().into()));
+            depot_data.insert(
                 "FanProcessingTime".into(),
                 Tag::Int(rules::processing_duration(input.count())),
             );
         } else {
-            clear_processing(data);
+            clear_processing(&mut depot_data);
         }
+        let _ = entity.merge_data(host, depot_data);
         return;
     }
     if timer < 0 {
         return;
     }
     if timer > 0 {
-        data.insert("FanProcessingTime".into(), Tag::Int(timer - 1));
+        depot_data.insert("FanProcessingTime".into(), Tag::Int(timer - 1));
+        let _ = entity.merge_data(host, depot_data);
         return;
     }
     let Some(mut results) = outputs_for_kind(host, level, process, &input) else {
-        clear_processing(data);
+        clear_processing(&mut depot_data);
+        let _ = entity.merge_data(host, depot_data);
         return;
     };
     let level_ref = level;
@@ -295,27 +294,32 @@ fn process_depot(
                 }
             }
         }
-        if let Some(stack) = ItemStack::new(one.item(), count) {
-            produced.push(stack);
+        let max = host.max_stack_size(one.item()).unwrap_or(64).max(1);
+        let mut remaining = count;
+        while remaining > 0 {
+            let moved = remaining.min(max);
+            if let Some(stack) = ItemStack::new(one.item(), moved) {
+                produced.push(stack);
+            }
+            remaining -= moved;
         }
     }
     host.transaction(|host, tx| {
-        let mut outputs = (1..9)
-            .map(|slot| entity.item_slot(host, slot).ok().flatten())
-            .collect::<Vec<_>>();
+        let mut outputs = vec![None];
+        outputs.extend((1..9).map(|slot| entity.item_slot(host, slot).ok().flatten()));
         if !produced
             .iter()
             .all(|stack| insert_output(host, &mut outputs, stack.clone()))
         {
-            data.insert("FanProcessingTime".into(), Tag::Int(1));
+            depot_data.insert("FanProcessingTime".into(), Tag::Int(1));
+            entity.merge_data(host, depot_data.clone()).ok();
             return Ok::<_, ()>(());
         }
         for (index, stack) in outputs.into_iter().enumerate() {
-            entity.set_item_slot(host, tx, index as u32 + 1, stack).ok();
+            entity.set_item_slot(host, tx, index as u32, stack).ok();
         }
-        let remaining = input.shrink(1);
-        entity.set_item_slot(host, tx, 0, remaining).ok();
-        clear_processing(data);
+        clear_processing(&mut depot_data);
+        entity.merge_data(host, depot_data.clone()).ok();
         Ok(())
     })
     .ok();
@@ -347,14 +351,28 @@ fn clear_processing(data: &mut Compound) {
     }
 }
 
-fn fan_records(data: &Compound) -> Vec<(i32, i32, i32)> {
-    let Some(Tag::IntArray(values)) = data.get(&"CreateFanAirItems".into()) else {
+fn fan_records(data: &Compound) -> Vec<(u128, i32, i32)> {
+    let Some(Tag::LongArray(values)) = data.get(&"CreateFanAirItems".into()) else {
         return Vec::new();
     };
     values
-        .chunks_exact(3)
-        .map(|record| (record[0], record[1], record[2]))
+        .chunks_exact(4)
+        .map(|record| {
+            (
+                join_uuid(record[0], record[1]),
+                record[2] as i32,
+                record[3] as i32,
+            )
+        })
         .collect()
+}
+
+fn split_uuid(value: u128) -> (i64, i64) {
+    ((value >> 64) as u64 as i64, value as u64 as i64)
+}
+
+fn join_uuid(high: i64, low: i64) -> u128 {
+    (u128::from(high as u64) << 64) | u128::from(low as u64)
 }
 
 /// Called by APP-2173 after graph recompute with the node's signed effective RPM.
@@ -370,7 +388,7 @@ pub(super) fn tick_fan(
         return;
     };
     if speed == 0.0 {
-        data.insert("CreateFanAirItems".into(), Tag::IntArray(Vec::new()));
+        data.insert("CreateFanAirItems".into(), Tag::LongArray(Vec::new()));
         return;
     }
     let direction = if rules::pushing(speed, along) {
@@ -398,7 +416,6 @@ pub(super) fn tick_fan(
         let center = pos.map(|n| f64::from(n) + 0.5);
         let entities = level.entities_in(host, min, max).unwrap_or_default();
         let old = fan_records(data);
-        let old_ids = old.iter().map(|record| record.0).collect::<Vec<_>>();
         let mut next_records = Vec::new();
         for reference in entities {
             let Some(item) = host.item_entity(reference) else {
@@ -407,14 +424,14 @@ pub(super) fn tick_fan(
             let Some(at) = reference.position(host) else {
                 continue;
             };
+            let Some(uuid) = reference.uuid(host) else {
+                continue;
+            };
             let radial = (0..3)
                 .map(|axis| (at[axis] - center[axis]).powi(2))
                 .sum::<f64>()
                 .sqrt();
-            let old_timer = old
-                .iter()
-                .find(|entry| entry.0 == reference.id() as i32)
-                .copied();
+            let old_timer = old.iter().find(|entry| entry.0 == uuid).copied();
             let mut next_timer = old_timer.map_or(-1, |entry| entry.2);
             let mut kind_code = old_timer.map_or(0, |entry| entry.1);
             if let Some(kind) = process_at(host, level, at.map(|v| v.floor() as i32)) {
@@ -432,7 +449,7 @@ pub(super) fn tick_fan(
                             if let Some(outputs) = outputs_for_kind(host, level, kind, &stack) {
                                 let mut spawned = Vec::new();
                                 for (output, chance) in outputs {
-                                    let count = (0..output.count())
+                                    let count = (0..output.count() * stack.count())
                                         .filter(|_| {
                                             level
                                                 .with_random(host, |rng| rng.next_float() <= chance)
@@ -440,8 +457,15 @@ pub(super) fn tick_fan(
                                         })
                                         .count()
                                         as u32;
-                                    if let Some(out) = ItemStack::new(output.item(), count) {
-                                        spawned.push(out);
+                                    let max =
+                                        host.max_stack_size(output.item()).unwrap_or(64).max(1);
+                                    let mut remaining = count;
+                                    while remaining > 0 {
+                                        let moved = remaining.min(max);
+                                        if let Some(out) = ItemStack::new(output.item(), moved) {
+                                            spawned.push(out);
+                                        }
+                                        remaining -= moved;
                                     }
                                 }
                                 if let Some(first) = spawned.first().cloned() {
@@ -461,28 +485,27 @@ pub(super) fn tick_fan(
                 }
             }
             if let Some(velocity) = reference.velocity(host) {
-                let axis = direction.iter().position(|n| *n != 0).unwrap_or(1);
                 let flow = if rules::pushing(speed, along) {
                     along
                 } else {
                     along.map(|n| -n)
                 };
-                let _ = axis;
                 let new_velocity =
                     rules::fan_item_velocity(velocity, flow, speed, radial, distance);
                 let _ = reference.set_velocity(host, new_velocity);
                 let _ = reference.reset_fall_distance(host);
             }
-            if old_ids.contains(&(reference.id() as i32)) || distance > 0.25 {
-                next_records.push((reference.id() as i32, kind_code, next_timer));
-            }
+            next_records.push((uuid, kind_code, next_timer));
         }
         data.insert(
             "CreateFanAirItems".into(),
-            Tag::IntArray(
+            Tag::LongArray(
                 next_records
                     .into_iter()
-                    .flat_map(|(id, kind, timer)| [id, kind, timer])
+                    .flat_map(|(uuid, kind, timer)| {
+                        let (high, low) = split_uuid(uuid);
+                        [high, low, i64::from(kind), i64::from(timer)]
+                    })
                     .collect(),
             ),
         );
@@ -496,7 +519,7 @@ pub(super) fn tick_fan(
         let at = offset(pos, direction, d);
         if block_id(host, level, at).as_deref() == Some(DEPOT) {
             if let Some(kind) = active_process {
-                process_depot(host, level, at, data, kind);
+                process_depot(host, level, at, kind);
             }
             break;
         }
@@ -525,15 +548,39 @@ fn process_from_code(code: i32) -> Option<Process> {
     })
 }
 
-fn saved_entities(data: &Compound, key: &str) -> Vec<i32> {
+fn saved_entities(data: &Compound, key: &str) -> Vec<u128> {
     match data.get(&key.into()) {
-        Some(Tag::IntArray(ids)) => ids.clone(),
+        Some(Tag::LongArray(ids)) => ids
+            .chunks_exact(2)
+            .map(|pair| join_uuid(pair[0], pair[1]))
+            .collect(),
         _ => Vec::new(),
     }
 }
 
-fn set_saved_entities(data: &mut Compound, key: &str, values: Vec<i32>) {
-    data.insert(key.into(), Tag::IntArray(values));
+fn set_saved_entities(data: &mut Compound, key: &str, values: Vec<u128>) {
+    data.insert(
+        key.into(),
+        Tag::LongArray(
+            values
+                .into_iter()
+                .flat_map(|uuid| {
+                    let (high, low) = split_uuid(uuid);
+                    [high, low]
+                })
+                .collect(),
+        ),
+    );
+}
+
+fn nozzle_visible(host: &dyn Host, level: LevelRef, center: [f64; 3], position: [f64; 3]) -> bool {
+    let toward = std::array::from_fn::<_, 3, _>(|axis| center[axis] - position[axis]);
+    let largest = toward.iter().map(|value| value.abs()).fold(0.0, f64::max);
+    if largest <= 0.5 {
+        return true;
+    }
+    let edge = std::array::from_fn(|axis| center[axis] - toward[axis] * (0.5 / largest));
+    level.line_of_sight(host, position, edge).unwrap_or(false)
 }
 
 impl NozzlePart {
@@ -719,6 +766,9 @@ fn nozzle_tick(
             .entities_in(host, center.map(|v| v - half), center.map(|v| v + half))
             .unwrap_or_default();
         for entity in entities {
+            let Some(uuid) = entity.uuid(host) else {
+                continue;
+            };
             let Some(position) = entity.position(host) else {
                 continue;
             };
@@ -726,40 +776,40 @@ fn nozzle_tick(
                 .map(|axis| (position[axis] - center[axis]).powi(2))
                 .sum::<f64>()
                 .sqrt();
-            if distance > reach
-                || level.line_of_sight(host, position, center).unwrap_or(false) == false
-            {
-                item_ids.retain(|id| *id != entity.id() as i32);
-                entity_ids.retain(|id| *id != entity.id() as i32);
+            if distance > reach || !nozzle_visible(host, level, center, position) {
+                item_ids.retain(|id| *id != uuid);
+                entity_ids.retain(|id| *id != uuid);
                 continue;
             }
             if host.item_entity(entity).is_some() {
-                if !item_ids.contains(&(entity.id() as i32)) {
-                    item_ids.push(entity.id() as i32);
+                if !item_ids.contains(&uuid) {
+                    item_ids.push(uuid);
                 }
-            } else if host.living(entity).is_some() && !entity_ids.contains(&(entity.id() as i32)) {
-                entity_ids.push(entity.id() as i32);
+            } else if host.living(entity).is_some() && !entity_ids.contains(&uuid) {
+                entity_ids.push(uuid);
             }
         }
     }
+    let candidates = level
+        .entities_in(host, center.map(|v| v - reach), center.map(|v| v + reach))
+        .unwrap_or_default();
     let ids = item_ids
         .iter()
         .chain(entity_ids.iter())
         .copied()
         .collect::<Vec<_>>();
-    let candidates = level
-        .entities_in(host, center.map(|v| v - reach), center.map(|v| v + reach))
-        .unwrap_or_default();
+    let mut active = Vec::new();
+    for entity in candidates.iter().copied() {
+        if entity.uuid(host).is_some_and(|uuid| ids.contains(&uuid)) {
+            active.push(entity);
+        }
+    }
     let players = level.online_players(host).unwrap_or_default();
-    for entity in candidates
-        .iter()
-        .copied()
-        .filter(|entity| ids.contains(&(entity.id() as i32)))
-    {
+    for entity in active {
         let Some(position) = entity.position(host) else {
             continue;
         };
-        if level.line_of_sight(host, position, center).unwrap_or(false) == false {
+        if !nozzle_visible(host, level, center, position) {
             continue;
         }
         let distance = (0..3)
@@ -792,8 +842,14 @@ fn nozzle_tick(
         let _ = entity.reset_fall_distance(host);
         let _ = distance;
     }
-    item_ids.retain(|id| candidates.iter().any(|entity| entity.id() as i32 == *id));
-    entity_ids.retain(|id| candidates.iter().any(|entity| entity.id() as i32 == *id));
+    let mut live_ids = Vec::new();
+    for entity in candidates.iter().copied() {
+        if let Some(uuid) = entity.uuid(host) {
+            live_ids.push(uuid);
+        }
+    }
+    item_ids.retain(|id| live_ids.contains(id));
+    entity_ids.retain(|id| live_ids.contains(id));
     set_saved_entities(data, "CreateNozzleItems", item_ids);
     set_saved_entities(data, "CreateNozzleEntities", entity_ids);
 }
