@@ -20,7 +20,10 @@
     },
     "content_package": {
       "id": "create",
-      "sha256": "6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678",
+      "built_with": "python3 tools/prepare.py /path/to/Create-at-ac0c444d9828da3453ae8cc65338e8de063286fb",
+      "source_revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+      "sha256": "253311260017a64c37c2b1506fa6e7cd9010c280beaa0970167a15ae08b6e7be",
+      "archive_entries": 9262,
       "server_copy_matches": true,
       "host_copy_matches": true,
       "guest_copy_matches": true
@@ -29,7 +32,7 @@
       "create_blocks": 658,
       "create_items": 711,
       "create_fluids": 4,
-      "create_entity_types": 2,
+      "create_entity_types": 3,
       "warnings": 0
     },
     "route": {
@@ -47,6 +50,7 @@
       "host_inventory_converged": true,
       "placed": "create:shaft[axis=y] at 0 64 -16",
       "guest_observed_state": "create:shaft[axis=y,waterlogged=false]",
+      "guest_block_converged": true,
       "saved_block_entity": "create:simple_kinetic with Speed=0, Network.Capacity=0, Network.Stress=0",
       "block_entity_after_clean_reopen": "same create:simple_kinetic NBT present",
       "config_after_reopen": {
@@ -61,7 +65,7 @@
         "game_mode": "survival"
       }
     },
-    "proof_directory": "/private/tmp/app-2172-production-final2"
+    "proof_directory": "/private/tmp/app-2172-production-rebuilt"
   },
   "pinned_0a_route": {
     "result": "two distinct whitelisted clients joined; production package not loaded",

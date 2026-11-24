@@ -38,11 +38,13 @@ Rust 1.99.1, mixins `5a64af938ec86b00d53d16a408aabc0038fb3e57`). Its
 revision pinned by the current `native/horizon-mixin.toml`; it is not the
 APP-2172 0a/3fa candidate.
 
-The package SHA-256 was
-`6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678` on the
+The package was freshly built with `python3 tools/prepare.py` from Create
+commit `ac0c444d9828da3453ae8cc65338e8de063286fb`. Its 9,262 archive entries
+had SHA-256
+`253311260017a64c37c2b1506fa6e7cd9010c280beaa0970167a15ae08b6e7be` on the
 source file, server copy, host copy, and guest copy. On clean startup the
 server generated Create content registrations with zero content warnings:
-658 blocks, 711 items, four fluids, and two entity types. The host received
+658 blocks, 711 items, four fluids, and three entity types. The host received
 four Create shafts, placed one at `0 64 -16`, and the server reported its
 `create:simple_kinetic` block entity with `Speed`, `Network.Capacity`, and
 `Network.Stress`. After `/save-all flush`, both clients disconnected, and the
@@ -52,9 +54,11 @@ at the same coordinates with state `create:shaft[axis=y,waterlogged=false]`.
 The reopened config retained loopback binding, whitelist enforcement,
 two-player limit, view/simulation distances, world name, seed, and survival mode.
 
-The proof and exact binary, native-mod manifest, and package hashes are in
+The generated package is at `/private/tmp/horizon-app-2172/.local/create.hmod`
+on the validation host. The proof and exact binary, native-mod manifest, and
+package hashes are in
 `migration/APP-2172-route-proof.json`. The server logs and isolated world are at
-`/private/tmp/app-2172-production-final2` on the validation host. Reproduce
+`/private/tmp/app-2172-production-rebuilt` on the validation host. Reproduce
 with the runner command below, substituting the matching 9f binaries and
 package path:
 
