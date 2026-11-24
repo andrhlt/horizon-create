@@ -19,7 +19,8 @@ def main():
     lib = lib.replace('#[path = "../../../native/kinetic_slice.rs"]\n', "")
     lib = lib.replace('#[path = "../../../native/kinetic_adapter.rs"]\n', "")
     (OUTPUT / "src/lib.rs").write_text(lib)
-    copy2(SOURCE / "src/motor_board.rs", OUTPUT / "src/motor_board.rs")
+    for name in ("motor_board.rs", "analog_lever.rs"):
+        copy2(SOURCE / "src" / name, OUTPUT / "src" / name)
     for name in ("kinetic_adapter.rs", "kinetic_slice.rs"):
         copy2(ROOT / "native" / name, OUTPUT / "src" / name)
     menu = OUTPUT / "data/create/horizon/menu"

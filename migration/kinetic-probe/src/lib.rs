@@ -1,9 +1,9 @@
-#[path = "../../../native/kinetic_slice.rs"]
-pub(crate) mod kinetic_slice;
+pub(crate) mod analog_lever;
 #[path = "../../../native/kinetic_adapter.rs"]
 pub(crate) mod kinetic_adapter;
+#[path = "../../../native/kinetic_slice.rs"]
+pub(crate) mod kinetic_slice;
 pub(crate) mod motor_board;
-
 
 #[derive(Default)]
 struct Mod;
@@ -13,6 +13,7 @@ impl mod_api::Hooks for Mod {
     fn register(&self, registrar: &mut dyn mod_api::Registrar, _: &mod_api::RegistrationContext) {
         kinetic_adapter::register(registrar);
         motor_board::register(registrar);
+        analog_lever::register(registrar);
     }
 
     fn scheduled_task(
@@ -22,6 +23,4 @@ impl mod_api::Hooks for Mod {
     ) {
         motor_board::scheduled_task(host, event);
     }
-
 }
-
