@@ -71,15 +71,10 @@ impl KineticPart {
             );
             return false;
         };
-        let Some(mut data) = entity.data(host) else {
-            setter_trace(
-                host,
-                format!("CREATE_KINETIC_SET_FALSE branch=data pos={pos:?}"),
-            );
-            return false;
-        };
         let value = setting.clamp(-256, 256);
-        if scroll_value(&data) == value {
+        let mut data = entity.data(host).unwrap_or_default();
+        let had_scroll_value = data.contains_key(&"ScrollValue".into());
+        if had_scroll_value && scroll_value(&data) == value {
             setter_trace(
                 host,
                 format!(
@@ -95,7 +90,14 @@ impl KineticPart {
                 Tag::String(dimension.as_str().into()),
             );
         }
-        let _ = entity.merge_data(host, data.clone());
+        let merged = entity.merge_data(host, data.clone());
+        setter_trace(
+            host,
+            format!(
+                "CREATE_KINETIC_MERGE pos={pos:?} result={:?}",
+                merged.as_ref().map(|changed| *changed).unwrap_or(false)
+            ),
+        );
         let graph = network(host, level, pos, Some(&data), *self);
         apply_speeds(host, level, graph, *self);
         setter_trace(

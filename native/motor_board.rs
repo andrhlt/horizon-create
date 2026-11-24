@@ -4,6 +4,9 @@
 //! interaction event all the way to the shared kinetic setter.  That makes
 //! LAN guests and non-overworld dimensions use the same path as the host.
 
+use std::collections::VecDeque;
+use std::sync::{Mutex, OnceLock};
+
 use mod_api::{
     BlockEntityPart, BlockPart, InteractionResult, LevelRef, MenuReplace, ServerHost, Text,
     UseWithoutItemEvent,
@@ -12,6 +15,19 @@ use mod_api::{
 use crate::kinetic_adapter;
 
 const MENU_ID: &str = "create:creative_motor";
+const MOTOR_SETTING_TASK: u64 = 0x4352_4541_5445_2164;
+
+struct PendingSetting {
+    dimension: String,
+    pos: [i32; 3],
+    setting: i32,
+}
+
+static PENDING_SETTINGS: OnceLock<Mutex<VecDeque<PendingSetting>>> = OnceLock::new();
+
+fn pending_settings() -> &'static Mutex<VecDeque<PendingSetting>> {
+    PENDING_SETTINGS.get_or_init(|| Mutex::new(VecDeque::new()))
+}
 
 pub fn setting_from_button(id: i32) -> i32 {
     (id - 256).clamp(-256, 256)
@@ -41,6 +57,14 @@ fn control_trace_setting(host: &dyn ServerHost, pos: [i32; 3], setting: i32, upd
     if std::env::var_os("CREATE_MOTOR_BOARD_CONTROL_TRACE").is_some() {
         host.messages().broadcast(Text::literal(format!(
             "CREATE_MOTOR_BOARD_SETTING pos={pos:?} setting={setting} updated={updated}"
+        )));
+    }
+}
+
+fn control_trace_queued(host: &dyn ServerHost, pos: [i32; 3], setting: i32, scheduled: bool) {
+    if std::env::var_os("CREATE_MOTOR_BOARD_CONTROL_TRACE").is_some() {
+        host.messages().broadcast(Text::literal(format!(
+            "CREATE_MOTOR_BOARD_SETTING_QUEUED pos={pos:?} setting={setting} scheduled={scheduled}"
         )));
     }
 }
@@ -232,8 +256,38 @@ impl BlockEntityPart for MotorBoard {
         // Button ids are the signed board value shifted into the menu's
         // non-negative protocol range. The shared adapter clamps again.
         let setting = setting_from_button(event.context.id);
-        let updated = kinetic_adapter::set_motor_setting(host, level, event.context.pos, setting);
-        control_trace_setting(host, event.context.pos, setting, updated);
+        let Some(dimension) = level.dimension().id(host) else {
+            return;
+        };
+        pending_settings()
+            .lock()
+            .expect("motor setting queue")
+            .push_back(PendingSetting {
+                dimension: dimension.to_string(),
+                pos: event.context.pos,
+                setting,
+            });
+        let scheduled = host.schedule_task(0, MOTOR_SETTING_TASK).is_ok();
+        control_trace_queued(host, event.context.pos, setting, scheduled);
+    }
+}
+
+pub fn scheduled_task(host: &mut dyn ServerHost, event: &mut mod_api::ScheduledTaskEvent<'_>) {
+    if event.token != MOTOR_SETTING_TASK {
+        return;
+    }
+    let pending = pending_settings()
+        .lock()
+        .expect("motor setting queue")
+        .drain(..)
+        .collect::<Vec<_>>();
+    for request in pending {
+        let Some(level) = host.level(&request.dimension) else {
+            control_trace(host, "CREATE_MOTOR_BOARD_SETTING_LEVEL_MISSING");
+            continue;
+        };
+        let updated = kinetic_adapter::set_motor_setting(host, level, request.pos, request.setting);
+        control_trace_setting(host, request.pos, request.setting, updated);
     }
 }
 
