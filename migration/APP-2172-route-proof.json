@@ -1,37 +1,85 @@
 {
   "ticket": "APP-2172",
-  "result": "supported offline localhost route passed",
-  "tested_at": "2026-11-23",
-  "engine": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
-  "sdk": "1.99.1",
-  "launcher_build": "native-0a875da-4388e6fde41d",
-  "mixins": "e59da9094f0c2fdda6c627fe9eff22dec6a906f0",
-  "rust": "1.99.1",
-  "route": {
-    "server": "horizon-server run",
-    "clients": "horizon-ctl launch --headless with horizon-client --server",
-    "server_bind": "127.0.0.1",
-    "offline_mode": true,
-    "whitelist": true,
-    "credential_or_lease_changes": false
+  "tested_at": "2026-11-24",
+  "production_package_route": {
+    "result": "production package loaded; registration, gameplay, save/reopen, config persistence, and two-client route passed",
+    "engine": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+    "mixins": "5a64af938ec86b00d53d16a408aabc0038fb3e57",
+    "rust": "1.99.1",
+    "native_build": "native-9f42064-6bdf8691aa42",
+    "native_mods_json_sha256": "2c1fd3621ad99ae54edba4e3af8f0845222f4fe3829528b6b92f50b68f32a205",
+    "native_create_mod": {
+      "id": "create",
+      "version": "0.1.0",
+      "sha256": "4e77322220d09ddbeedcbc87fccdf409833d07367e4b943423494e3f4871526b"
+    },
+    "binaries": {
+      "horizon-server_sha256": "85ed4d7333b8739d0f7c698858ea5de90b4584838b19bef272f7276d0c9b4557",
+      "horizon-client_sha256": "703e42791612c8c1673a37cdd73385a588854e6e3d4c9a71f22fbfd39e98e1fe",
+      "horizon-ctl_sha256": "1cca267a26d8e85ed00e07fa9148fa6d3c5125313cca4b8eed8dd00bc3d0b1d8"
+    },
+    "content_package": {
+      "id": "create",
+      "sha256": "6925a9a1e4c1a01acbdc6a72f3b40bcb8e88f4d75e9dce103b747591b0b7c678",
+      "server_copy_matches": true,
+      "host_copy_matches": true,
+      "guest_copy_matches": true
+    },
+    "registries": {
+      "create_blocks": 658,
+      "create_items": 711,
+      "create_fluids": 4,
+      "create_entity_types": 2,
+      "warnings": 0
+    },
+    "route": {
+      "server_bind": "127.0.0.1",
+      "offline_mode": true,
+      "whitelist": true,
+      "distinct_uuid_players": {
+        "Create2172Host": "799b198e-b7b6-3d66-a793-3cf3375643a2",
+        "Create2172Guest": "eb0e20a5-f85d-3404-84a7-e4b4f64ae0ae"
+      },
+      "credential_or_lease_changes": false
+    },
+    "gameplay": {
+      "host_received": "4 create:shaft",
+      "host_inventory_converged": true,
+      "placed": "create:shaft[axis=y] at 0 64 -16",
+      "guest_observed_state": "create:shaft[axis=y,waterlogged=false]",
+      "saved_block_entity": "create:simple_kinetic with Speed=0, Network.Capacity=0, Network.Stress=0",
+      "block_entity_after_clean_reopen": "same create:simple_kinetic NBT present",
+      "config_after_reopen": {
+        "bind": "127.0.0.1",
+        "whitelist": true,
+        "enforce_whitelist": true,
+        "max_players": 2,
+        "view_distance": 3,
+        "simulation_distance": 3,
+        "world": "APP2172",
+        "seed": "2172",
+        "game_mode": "survival"
+      }
+    },
+    "proof_directory": "/private/tmp/app-2172-production-final2"
   },
-  "players": {
-    "Create2172Host": "799b198e-b7b6-3d66-a793-3cf3375643a2",
-    "Create2172Guest": "eb0e20a5-f85d-3404-84a7-e4b4f64ae0ae"
-  },
-  "artifacts": {
-    "horizon-server_sha256": "2b0f3d7bd318f52a8385b7d7b28db78d13f7752d25fd30d824d487aef5fe1f1d",
-    "horizon-client_sha256": "012bf6dbfecb095bfb27f9b84452105639501cc5444aca15517360cd90547935",
-    "horizon-ctl_sha256": "61ab9be5b1f232446f1d6d5be4b296b954d538986bbac38dc5f54ba8c7e11372",
-    "native-mods_json_sha256": "6787909799c342d75d26f5e925ac9b1168ed4a611924fe805dff95a4cbd7192d",
+  "pinned_0a_route": {
+    "result": "two distinct whitelisted clients joined; production package not loaded",
+    "engine": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+    "sdk": "1.99.1",
+    "launcher_build": "native-0a875da-4388e6fde41d",
+    "mixins": "e59da9094f0c2fdda6c627fe9eff22dec6a906f0",
     "loaded_mod": "create_kinetic_probe",
-    "loaded_mod_package_sha256": "b4ee29d1d040851f615bbe53856e62aac0889257b218e4a757091fff9649725f"
+    "selected_engine_fix": {
+      "commit": "3fa53d4b99ca22bba5897c6544b9515fd5521948",
+      "present_in_tested_build": false,
+      "behavior_verified": false
+    },
+    "server_log": "/private/tmp/app-2172-offline-route-final/server.log"
   },
-  "selected_engine_fix": {
-    "commit": "3fa53d4b99ca22bba5897c6544b9515fd5521948",
-    "present_in_tested_build": false,
-    "behavior_verified": false
-  },
-  "production_create_package_verified": false,
-  "server_log": "retained under /private/tmp/app-2172-offline-route-final/server.log on this host"
+  "limitations": [
+    "The production route uses the existing compatible 9f native Create build, not the issue's pinned 0a/3fa fork runtime.",
+    "Optional integration failure handling and hot configuration reload were not tested.",
+    "The 0a/3fa full production native package build remains open."
+  ]
 }
