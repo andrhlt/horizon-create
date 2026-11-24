@@ -53,6 +53,7 @@ def main():
                 )
             )
     copy2(SOURCE / "src/moving_probe.rs", output / "src/moving_probe.rs")
+    copy2(SOURCE / "src/power_sources.rs", output / "src/power_sources.rs")
     menu = output / "data/create/horizon/menu"
     menu.mkdir(parents=True, exist_ok=True)
     menu_source = ROOT / "content/data/create/horizon/menu/creative_motor.json"
@@ -77,13 +78,25 @@ def main():
         "clutch", "gearshift", "encased_chain_drive",
         "adjustable_chain_gearshift", "andesite_encased_shaft",
         "brass_encased_shaft", "metal_girder_encased_shaft",
-        "brass_encased_cogwheel",
+        "brass_encased_cogwheel", "andesite_encased_cogwheel",
+        "brass_encased_large_cogwheel", "andesite_encased_large_cogwheel",
+        "hand_crank", "copper_valve_handle", "white_valve_handle",
+        "orange_valve_handle", "magenta_valve_handle", "light_blue_valve_handle",
+        "yellow_valve_handle", "lime_valve_handle", "pink_valve_handle",
+        "gray_valve_handle", "light_gray_valve_handle", "cyan_valve_handle",
+        "purple_valve_handle", "blue_valve_handle", "brown_valve_handle",
+        "green_valve_handle", "red_valve_handle", "black_valve_handle",
+        "water_wheel", "large_water_wheel", "powered_shaft", "steam_engine",
+        "fluid_tank", "creative_fluid_tank", "steam_whistle",
+        "steam_whistle_extension",
     ):
         source = ROOT / f"content/data/create/horizon/block/{name}.json"
         definition = json.loads(source.read_text())
         # The pinned SDK rejects this BlockProperties field. The test package
         # is a compile/runtime adapter probe, not waterlogging-equivalent.
         definition.get("properties", {}).pop("waterloggable", None)
+        # This content field was added after the frozen 0a875da block schema.
+        definition.get("properties", {}).pop("piston_push_only", None)
         (blocks / f"{name}.json").write_text(
             json.dumps(definition, indent=2) + "\n"
         )

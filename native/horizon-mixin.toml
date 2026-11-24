@@ -3,7 +3,7 @@ id = "create"
 version = "0.1.0"
 
 [compatibility]
-horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
+horizon_revision = "0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
 
 [[module]]
 id = "press_processing"
@@ -28,6 +28,18 @@ id = "kinetic_slice"
 file = "crates/horizon-client/src/game.rs"
 name = "create_kinetic_slice"
 source = "kinetic_slice.rs"
+
+[[module]]
+id = "kinetic_adapter"
+file = "crates/horizon-client/src/game.rs"
+name = "create_kinetic_adapter"
+source = "kinetic_adapter.rs"
+
+[[module]]
+id = "power_sources"
+file = "crates/horizon-client/src/game.rs"
+name = "power_sources"
+source = "power_sources.rs"
 
 [[module]]
 id = "chain_conveyor"

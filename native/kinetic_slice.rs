@@ -42,6 +42,12 @@ pub enum Node {
         part: i8,
         modifier: f32,
     },
+    /// An adapter-owned source. Manual generators expose one shaft face;
+    /// wheels and powered shafts expose both ends of their axis.
+    Generator {
+        shaft_axis: usize,
+        shaft_face: Option<[i32; 3]>,
+    },
 }
 
 impl Node {
@@ -60,6 +66,10 @@ impl Node {
                 ..
             } => face[axis] > 0 && top_shaft || face[axis] < 0 && bottom_shaft,
             Self::ChainDrive { shaft_axis, .. } => face[shaft_axis] != 0,
+            Self::Generator {
+                shaft_axis,
+                shaft_face,
+            } => shaft_face.map_or(face[shaft_axis] != 0, |facing| face == facing),
             Self::Gearbox { axis } => face[axis] == 0,
             Self::Millstone => face == [0, -1, 0],
         }

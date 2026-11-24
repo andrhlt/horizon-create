@@ -1,0 +1,151 @@
+{
+  "template": "minecraft:stone",
+  "item": true,
+  "properties": {
+    "sounds": "minecraft:oak_planks",
+    "occludes": false
+  },
+  "state_properties": {
+    "axis": {
+      "type": "enum",
+      "values": [
+        "x",
+        "y",
+        "z"
+      ]
+    },
+    "waterlogged": {
+      "type": "boolean"
+    },
+    "top_shaft": {
+      "type": "boolean"
+    },
+    "bottom_shaft": {
+      "type": "boolean"
+    }
+  },
+  "default_state": {
+    "axis": "y",
+    "waterlogged": "false",
+    "top_shaft": "false",
+    "bottom_shaft": "false"
+  },
+  "shapes": {
+    "property": "axis",
+    "values": {
+      "x": [
+        [
+          0.375,
+          0,
+          0,
+          0.625,
+          1,
+          1
+        ],
+        [
+          0,
+          0.3125,
+          0.3125,
+          1,
+          0.6875,
+          0.6875
+        ]
+      ],
+      "y": [
+        [
+          0,
+          0.375,
+          0,
+          1,
+          0.625,
+          1
+        ],
+        [
+          0.3125,
+          0,
+          0.3125,
+          0.6875,
+          1,
+          0.6875
+        ]
+      ],
+      "z": [
+        [
+          0,
+          0,
+          0.375,
+          1,
+          1,
+          0.625
+        ],
+        [
+          0.3125,
+          0.3125,
+          0,
+          0.6875,
+          0.6875,
+          1
+        ]
+      ]
+    }
+  },
+  "collision_shapes": {
+    "property": "axis",
+    "values": {
+      "x": [
+        [
+          0.375,
+          0,
+          0,
+          0.625,
+          1,
+          1
+        ],
+        [
+          0,
+          0.3125,
+          0.3125,
+          1,
+          0.6875,
+          0.6875
+        ]
+      ],
+      "y": [
+        [
+          0,
+          0.375,
+          0,
+          1,
+          0.625,
+          1
+        ],
+        [
+          0.3125,
+          0,
+          0.3125,
+          0.6875,
+          1,
+          0.6875
+        ]
+      ],
+      "z": [
+        [
+          0,
+          0,
+          0.375,
+          1,
+          1,
+          0.625
+        ],
+        [
+          0.3125,
+          0.3125,
+          0,
+          0.6875,
+          0.6875,
+          1
+        ]
+      ]
+    }
+  }
+}

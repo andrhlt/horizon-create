@@ -107,11 +107,31 @@ def main():
             original = source / directory
             if original.is_dir():
                 shutil.copytree(original, out / directory)
-    (out / "src/lib.rs").write_text(
-        "//! Create's frozen-SDK native entry point.\n"
-        "#[derive(Default)]\nstruct Mod;\n\n"
-        "#[mod_api::horizon_mod]\nimpl mod_api::Hooks for Mod {}\n"
-    )
+    # These kinetic modules form the production registration path for the
+    # source families migrated by APP-2174. They must be part of the crate and
+    # explicitly registered from Hooks; manifest inclusion alone only adds
+    # engine-side source and does not register block entity parts.
+    kinetic_modules = {
+        module["id"]: module
+        for module in legacy.get("module", [])
+        if module["id"] in {"kinetic_adapter", "kinetic_slice", "power_sources"}
+        and (not args.include_module_id or module["id"] in args.include_module_id)
+        and module["id"] not in args.skip_module_id
+    }
+    lib_lines = ["//! Create's frozen-SDK native entry point."]
+    for module in kinetic_modules.values():
+        lib_lines.append(
+            f'#[path = "modules/{module["source"]}"] mod {module["name"]};'
+        )
+    lib_lines += ["", "#[derive(Default)]", "struct Mod;", "", "#[mod_api::horizon_mod]", "impl mod_api::Hooks for Mod {"]
+    if "kinetic_adapter" in kinetic_modules:
+        lib_lines += [
+            "    fn register(&self, registrar: &mut dyn mod_api::Registrar, _: &mod_api::RegistrationContext) {",
+            "        create_kinetic_adapter::register(registrar);",
+            "    }",
+        ]
+    lib_lines += ["}", ""]
+    (out / "src/lib.rs").write_text("\n".join(lib_lines))
     (out / ".gitignore").write_text("/.horizon/\n/target/\n")
     (out / "migration-exclusions.txt").write_text(
         "Excluded rows require Parts/native mixin translation or fall outside Stage 1.\n"
