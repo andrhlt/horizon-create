@@ -10,5 +10,5 @@ namespaces = ["create"]
 
 [native]
 game = "26.3"
-horizon = "98a0fff291b65f8098700f08e9dd0f29df2985b4"
+horizon = "3fa53d4b99ca22bba5897c6544b9515fd5521948"
 mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
