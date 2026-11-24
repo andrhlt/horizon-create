@@ -1280,3 +1280,65 @@ rows, with Full 1:1 still tracked separately. This APP-2136 probe is feasibility
 coverage for a bounded kinetic/motor/shaft/cogwheel path, one Millstone matcher,
 and an immediate-neighbor bearing path. It does not complete any broad family
 row or justify declaring the remaining ownership table migrated.
+
+
+### Corrected kinetic candidate verification (2026-11-23)
+
+This section supersedes the pending placement/build statements in the earlier
+“Block-part registration correction” section. The correction was built and
+verified through the documented managed offline Play route; it did not alter
+the frozen Horizon/SDK pin.
+
+Candidate `native-0a875da-2a695bda7345` was built with launcher 0.2.105,
+Horizon `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, matching Nov 20 SDK and
+mixins, and Rust 1.99.1. The managed offline instance was
+`app-2136-motor-offline-base`; the Create pack SHA-256 was
+`b185423f64c75cfae3c24a31cfc17de72257447eb43998520fcef89b8bc9775a`.
+Candidate `native-mods.json` SHA-256 is
+`a3b1206d53cd48b71f6886cfc86359ca7b4455791e6134bb4c58a57902cbb4e6`;
+`libmod_create_kinetic_probe.dylib` SHA-256 is
+`22b71ea5e7082c46c0618e614e80085af9fa0a0cc720a74169c85239f76eef3f`.
+The adapter source SHA-256 is
+`8a70fe1ae6250cdd4a7770cb676602dc11b8ae8005cc063065449839965dcc50`; the
+MotorBoard source SHA-256 is
+`35334512c81638ef26b70c39b3695245f86e74cde6858e4a9e00835b48ab0ba2`.
+The normal optimized build completed in about 1 second.
+
+Headless/offscreen results on that candidate:
+
+* `tools/test-creative-motor-placement.py`: 7/7 Java placement cases passed;
+  player placement matched facing and held-item use.
+* `tools/test-shaft-and-cogwheel.py`: 36/36 Java trace rows passed, including
+  ratio/sign propagation and motor break/replacement restoration.
+* `tools/test-creative-motor-reload.py`: connected signed settings and idle
+  motor setting/speed survived save/reopen.
+* `tools/test-creative-motor-render.py`: six facings at both signed settings
+  passed the bounded offscreen pose checks.
+* `tools/test-typed-kinetic-flow.py` passed in about 5.5 seconds: motor, shaft,
+  and cogwheel propagated +32, -16, 0, then +24 RPM; active +24 RPM and
+  `ScrollValue` survived save/reopen. This fixture changes the setting with a
+  server command; it does not substitute for ordinary board input.
+
+The ordinary board-opening fixture remains failed: after placement and right
+click, the client reports `screen=playing`, `menu=None`, and no controls. Thus
+normal motor setting input and distinct offline host/guest convergence remain
+open. The production Millstone runtime is also unverified. The bounded bearing
+probe passed separately, but does not establish the full glued train/contraption
+flow. These results establish a working typed server-side kinetic graph and
+placement/render/persistence baseline, not completion of APP-2136's normal
+player/multiplayer gates.
+
+The reproducible command for the new managed-flow fixture is:
+
+```sh
+python3 tools/test-typed-kinetic-flow.py \
+  '/Users/andrewholt/Library/Application Support/horizon-launcher/versions/native-0a875da-2a695bda7345' \
+  --instance app-2136-motor-offline-base \
+  --instance-dir '/Users/andrewholt/Library/Application Support/horizon/instances/app-2136-motor-offline-base' \
+  --launcher '/Applications/Horizon.app/Contents/MacOS/horizon-launcher' \
+  --launcher-home '/Users/andrewholt/Library/Application Support/horizon-launcher' \
+  --pack .local/create.hmod
+```
+
+The runtime and instance paths are local to this workstation; the candidate,
+pack hashes, fixture and result above identify the tested inputs.
