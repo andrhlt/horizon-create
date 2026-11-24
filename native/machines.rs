@@ -66,6 +66,7 @@ use super::create_hand_crank::{self, CRANK};
 use super::create_speed_controller::{self, CONTROLLER as SPEED_CONTROLLER};
 use super::create_train_signal::{self, SIGNAL};
 use super::create_valve::{self, HANDLE_ENTITY, VALVE};
+use super::create_millstone_processing as millstone_processing;
 
 const DEPLOYER: &str = "create:deployer";
 const SCHEMATIC_TABLE: &str = "create:schematic_table";
@@ -2443,50 +2444,61 @@ fn tick_mill(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEntity) {
     read_inventory(&mut fields.nbt, "OutputInventory", outputs);
     collect_landed_items(game, pos, &mut input[0], MILL);
 
-    if rpm == 0.0
-        || outputs
-            .iter()
-            .flatten()
-            .any(|stack| stack.count == game.native_max_stack_size(&stack.item).unwrap_or(64))
+    if outputs
+        .iter()
+        .flatten()
+        .any(|stack| stack.count == game.native_max_stack_size(&stack.item).unwrap_or(64))
     {
         return;
     }
     let mut timer = int(&fields.nbt, "Timer").unwrap_or(0);
-    if timer > 0 {
-        timer -= ((rpm / 16.0).abs() as i32).clamp(1, 512);
-        fields.nbt.insert("Timer".into(), Tag::Int(timer));
-        if timer <= 0
-            && let Some(stack) = &mut input[0]
-        {
-            let Some(recipe) = milling_recipe(game, stack).cloned() else {
-                return;
-            };
-            stack.count -= 1;
-            if stack.count == 0 {
-                input[0] = None;
-            }
-            let Some(results) = recipe["results"].as_array() else {
-                return;
-            };
-            for result in results {
-                let Some(mut output) = game.native_recipe_result(result) else {
-                    continue;
+    let recipe = input[0]
+        .as_ref()
+        .and_then(|stack| milling_recipe(game, stack))
+        .map(|recipe| {
+            recipe["processing_time"]
+                .as_i64()
+                .map_or(millstone_processing::DEFAULT_PROCESSING_TIME, |time| {
+                    time as i32
+                })
+        });
+    match millstone_processing::tick(timer, rpm, recipe, input[0].is_some()) {
+        millstone_processing::Tick::Idle => {}
+        millstone_processing::Tick::Started { timer: started } => {
+            fields.nbt.insert("Timer".into(), Tag::Int(started));
+        }
+        millstone_processing::Tick::Progressed {
+            timer: next,
+            finished,
+        } => {
+            timer = next;
+            fields.nbt.insert("Timer".into(), Tag::Int(timer));
+            if finished && let Some(stack) = &mut input[0] {
+                let Some(recipe) = milling_recipe(game, stack).cloned() else {
+                    return;
                 };
-                let chance = result["chance"].as_f64().unwrap_or(1.0) as f32;
-                if chance < 1.0 {
-                    output.count = (0..output.count)
-                        .filter(|_| recipe_roll(game, pos) <= chance)
-                        .count() as u32;
+                stack.count -= 1;
+                if stack.count == 0 {
+                    input[0] = None;
                 }
-                let limit = game.native_max_stack_size(&output.item).unwrap_or(64);
-                insert(outputs, &output, limit);
+                let Some(results) = recipe["results"].as_array() else {
+                    return;
+                };
+                for result in results {
+                    let Some(mut output) = game.native_recipe_result(result) else {
+                        continue;
+                    };
+                    let chance = result["chance"].as_f64().unwrap_or(1.0) as f32;
+                    if chance < 1.0 {
+                        output.count = (0..output.count)
+                            .filter(|_| recipe_roll(game, pos) <= chance)
+                            .count() as u32;
+                    }
+                    let limit = game.native_max_stack_size(&output.item).unwrap_or(64);
+                    insert(outputs, &output, limit);
+                }
             }
         }
-    } else if let Some(stack) = &input[0] {
-        timer = milling_recipe(game, stack)
-            .and_then(|recipe| recipe["processing_time"].as_i64())
-            .unwrap_or(100) as i32;
-        fields.nbt.insert("Timer".into(), Tag::Int(timer));
     }
 }
 
