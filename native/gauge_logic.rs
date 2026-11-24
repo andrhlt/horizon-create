@@ -115,11 +115,19 @@ mod tests {
         assert_eq!(speed_target(256.0), 1.125);
         assert_eq!(
             advance_dial(
-                DialState { previous: 0.0, current: 0.0, target: 0.0 },
+                DialState {
+                    previous: 0.0,
+                    current: 0.0,
+                    target: 0.0
+                },
                 0.45,
                 0.45
             ),
-            DialState { previous: 0.0, current: 0.05625, target: 0.45 }
+            DialState {
+                previous: 0.0,
+                current: 0.05625,
+                target: 0.45
+            }
         );
     }
 }

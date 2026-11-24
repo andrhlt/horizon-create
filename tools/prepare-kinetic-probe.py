@@ -32,6 +32,9 @@ def main():
         "millstone_processing.rs",
         "millstone_adapter.rs",
         "motor_board.rs",
+        "gauge_logic.rs",
+        "turntable_motion.rs",
+        "gauge_readout.rs",
     ):
         source = ROOT / "native" / name
         destination = output / "src" / name
@@ -78,12 +81,14 @@ def main():
         "adjustable_chain_gearshift", "andesite_encased_shaft",
         "brass_encased_shaft", "metal_girder_encased_shaft",
         "brass_encased_cogwheel",
+        "speedometer", "stressometer", "turntable",
     ):
         source = ROOT / f"content/data/create/horizon/block/{name}.json"
         definition = json.loads(source.read_text())
         # The pinned SDK rejects this BlockProperties field. The test package
         # is a compile/runtime adapter probe, not waterlogging-equivalent.
         definition.get("properties", {}).pop("waterloggable", None)
+        definition.get("properties", {}).pop("piston_push_only", None)
         (blocks / f"{name}.json").write_text(
             json.dumps(definition, indent=2) + "\n"
         )

@@ -1,62 +1,64 @@
 # APP-2175: gauges and Turntable SDK migration
 
-## Current disposition
+## Bounded gameplay disposition
 
-This branch adds source-derived, host-independent gauge and Turntable math for
-the frozen SDK adapter. It is a partial implementation; it does not yet make
-these blocks work in the typed production package.
+Speedometer, Stressometer, and Turntable are integrated on the frozen Horizon
+SDK and passed the ticket's practical offline gameplay baseline. This evidence
+is specific to the final `native-0a875da-d99bfac77285` build and does not
+replace the historical Java comparison evidence for the family.
 
-| Family row | Classification | Evidence and remaining work |
+| Family row | Baseline result | Evidence and remaining work |
 | --- | --- | --- |
-| Speedometer and Stressometer | Adapted logic; SDK integration open | `native/gauge_logic.rs` carries Java's speed bands, stress bands, strict overload comparison, speed-to-dial scale, and 1/8 needle easing. `tools/test-gauge-turntable-logic.py` checks boundaries. Typed block-entity registration, saved/synchronized network readings, model submission, normal Goggles readout, overload observation, and idle/active reopen are not verified on the frozen SDK. |
-| Turntable | Adapted math; SDK integration open | `native/turntable_motion.rs` carries Java's player camera falloff and edge-vector motion. The edge rotation uses standard `sin_cos`; Java's float sine-table approximation is not reproduced yet and needs comparison against the existing trace. Existing old-runtime Turntable traces remain useful regression inputs, but do not verify this SDK route. Typed kinetic graph registration, rotating model submission, player/mob contact, guest behavior, and idle/active reopen remain open. |
+| Speedometer and Stressometer | Pass | Both gauges joined a powered millstone network and reported `Speed: 16.0 RPM` and `Stress: 64.0 / 262144.0` in the live HUD; persisted block data held the same speed, stress, and capacity. Offscreen screenshots show usable dials and readable overlays. The network was saved and cold-reopened; both values remained and continued updating. |
+| Turntable | Pass | A powered table rotated a grounded host player and a LAN guest player. Setting motor speed to zero stopped both; the final repeated yaw samples remained unchanged while table speed, capacity, and stress were zero. Active save/reopen preserved the powered table's `16 RPM`, `64 SU` load, and `262144 SU` capacity, and host movement resumed after reopen. |
 
-No row is classified as SDK gameplay verified. The historical matrix's “Pass”
-entries refer to the earlier `native-9f42064` runtime and must not be read as
-proof of this migration.
+The bounded baseline passed with the offline account route only; no Microsoft
+sign-in was used. Multiplayer evidence demonstrates representative guest action
+and state convergence on a local host/guest session. It does not claim packet
+arrival or interpolation parity. The matrix's **Full 1:1** column remains Open.
 
-## Bounded acceptance cases
+## Runtime and commands
 
-1. Gauge readings: idle; positive and negative RPM; 1, 30, and 100 RPM
-   display boundaries; stress at 50%, 75%, exactly 100%, and above capacity;
-   save/reopen idle and active readings.
-2. Turntable: idle, positive drive, reversal, stop/removal, and loaded stress;
-   player at center and edge; pig contact and removal; meaningful active
-   save/reopen; host/guest convergence where the supported offline route allows.
-3. Reuse the existing original Java traces and compare every sampled field.
-   Re-run the affected fixtures on a single identified frozen-SDK build after
-   typed package registration is available.
+The final native build used Horizon SDK
+`0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, Minecraft 26.3, launcher 0.2.107,
+Rust 1.99.1, and mixins `e59da9094f0c2fdda6c627fe9eff22dec6a906f0`. The
+isolated prepared client assets and game data lived under
+`/private/tmp/horizon-app2175`; the final mod version was
+`native-0a875da-d99bfac77285`.
 
-## Dependencies
-
-The current `migration/kinetic-probe` registers only the Creative Motor,
-shaft, cogwheels, and Millstone. It does not register either gauge or the
-Turntable. The shared graph adapter also has no gauge or Turntable node yet.
-APP-2173 owns network/transmission rules and APP-2172 owns production root and
-registry integration. This branch leaves those shared roots untouched. Their
-registration must attach these blocks to the completed adapter; the product
-Goggles/render contracts must then consume the saved readings and visual state.
-
-The typed runtime does not yet expose a verified Turntable player-camera hook
-in the staged probe. Do not approximate the original camera contact by
-teleporting a standing player. The existing `native/turntable_player_math.rs`
-remains the source reference for the eventual supported contact callback.
-
-## Commands and result
-
-Run the source-only check with:
+The logic check passed 15/15:
 
 ```sh
 python3 tools/test-gauge-turntable-logic.py
 ```
 
-This check exercises production math only. It does not prove block registration,
-server authority, rendering, multiplayer, save/reopen, or compatibility with a
-particular SDK/runtime artifact. Those gates remain pending the shared adapter
-and package integration.
+The exact SDK probe was staged and built with the compatible launcher:
 
-On 2026-11-23, `python3 tools/test-gauge-turntable-logic.py` passed 5/5 checks
-with local `rustc 1.100.0 (0ef1bc386 2026-11-09)`. This is not the required
-Rust/SDK 1.99.1 cohort. The worktree has no `.horizon/sdk` source tree or
-matching Horizon runtime inputs, so no native build receipt or SDK gameplay
-run was produced.
+```sh
+python3 tools/prepare-kinetic-probe.py --output /private/tmp/horizon-app2175/project
+HORIZON_LAUNCHER_HOME=/private/tmp/horizon-app2175/launcher-home \
+HORIZON_HOME=/private/tmp/horizon-app2175/game-home \
+/Applications/Horizon.app/Contents/MacOS/horizon-launcher native-build \
+  /private/tmp/horizon-app2175/project --instance app-2175-build \
+  --version native-0a875da-d99bfac77285 --trust-native-code
+```
+
+Gameplay used `horizon-ctl` against isolated offline host and guest clients.
+The final build loaded the resource pack (35,903 block states and 1,677 items),
+then exercised the powered network, readouts, stop state, active save/quit/cold
+reopen, and a local LAN guest on a separately powered Turntable. On reopen,
+the host gauge and table values were still `16 RPM`, `64 SU`, and `262144 SU`;
+the host then resumed motion. On the guest table, yaw changed while powered and
+remained fixed over two later samples after power was removed.
+
+## Remaining comparison scope
+
+The runtime cases above establish ordinary playability for the requested
+baseline. Negative RPM, exact 1/30/100 RPM display boundaries, stress at 50%,
+75%, exactly 100% and above capacity, center-versus-edge velocity, pig contact,
+and all removal variants were not run on this frozen-SDK build. Existing pinned
+Java traces remain useful reference evidence, but were not replayed as a full
+cross-product here. The gauge pointer currently uses a redstone-torch model;
+exact cosmetic parity, Java float sine-table output, and Goggles-only readout
+gating remain follow-ups. These limits do not prevent ordinary powered reading
+or player motion. No gameplay failure was observed in the scoped offline checks.

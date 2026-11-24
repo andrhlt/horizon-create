@@ -2,13 +2,7 @@
 
 /// Camera turn in degrees for one client frame. The caller supplies the
 /// runtime's tick rate, frame delta, partial tick, and player offset.
-pub fn camera_turn(
-    rpm: f32,
-    tick_rate: f32,
-    realtime: f32,
-    partial: f32,
-    offset: [f64; 3],
-) -> f32 {
+pub fn camera_turn(rpm: f32, tick_rate: f32, realtime: f32, partial: f32, offset: [f64; 3]) -> f32 {
     let mut speed = rpm * (2.0 / 3.0) * (tick_rate / 20.0) * realtime;
     let distance = offset.iter().map(|n| n * n).sum::<f64>().sqrt();
     if distance > 0.25 {
@@ -23,11 +17,7 @@ pub fn edge_velocity(rpm: f32, offset: [f64; 3]) -> [f64; 3] {
     let radians = f64::from(degrees).to_radians();
     let (sin, cos) = radians.sin_cos();
     let [x, _, z] = offset;
-    [
-        x * cos + z * sin - x,
-        0.0,
-        z * cos - x * sin - z,
-    ]
+    [x * cos + z * sin - x, 0.0, z * cos - x * sin - z]
 }
 
 #[cfg(test)]

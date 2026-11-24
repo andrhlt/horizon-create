@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-modules = ("gauge_logic", "turntable_motion")
+modules = ("gauge_logic", "turntable_motion", "kinetic_slice")
 program = "\n".join(
     f"#[path = {json.dumps(str(ROOT / f'native/{name}.rs'))}]\nmod {name};"
     for name in modules
