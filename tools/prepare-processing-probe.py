@@ -147,6 +147,9 @@ def main():
     # production family recipes in the staged native package as well as the
     # Create content pack used by the managed fixture.
     with zipfile.ZipFile(pack) as bundle:
+        names = set(bundle.namelist())
+        required_items = set()
+        pending_tags = set()
         for family in ("pressing", "crushing", "mixing", "compacting"):
             prefix = f"data/create/recipe/{family}/"
             for path in bundle.namelist():
@@ -155,19 +158,51 @@ def main():
                 target = recipes / family / Path(path).name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(bundle.read(path))
-                recipe = json.loads(target.read_text())
+                recipe = json.loads(bundle.read(path))
+                def collect(value):
+                    if isinstance(value, str):
+                        (pending_tags if value.startswith("#") else required_items).add(value[1:] if value.startswith("#") else value)
+                    elif isinstance(value, dict):
+                        for key in ("item", "tag"):
+                            if isinstance(value.get(key), str):
+                                collect(("#" if key == "tag" else "") + value[key])
+                        if isinstance(value.get("items"), list):
+                            for entry in value["items"]:
+                                collect(entry)
+                for ingredient in recipe.get("ingredients", []):
+                    collect(ingredient)
                 for result in recipe.get("results", []):
                     item_id = result.get("id") if isinstance(result, dict) else None
-                    if not item_id or not item_id.startswith("create:"):
-                        continue
-                    item_name = item_id.split(":", 1)[1]
-                    item_file = processing_items / f"{item_name}.json"
-                    bundled_item = f"data/create/horizon/item/{item_name}.json"
-                    source_item = source_content / f"horizon/item/{item_name}.json"
-                    if not item_file.exists() and bundled_item in bundle.namelist():
-                        item_file.write_bytes(bundle.read(bundled_item))
-                    elif not item_file.exists() and source_item.is_file():
-                        copy2(source_item, item_file)
+                    if item_id:
+                        required_items.add(item_id)
+        staged_tags = set()
+        while pending_tags:
+            tag = pending_tags.pop()
+            namespace, _, name = tag.partition(":")
+            path = f"data/{namespace}/tags/item/{name}.json"
+            if path not in names or path in staged_tags:
+                continue
+            staged_tags.add(path)
+            tag_json = json.loads(bundle.read(path))
+            for entry in tag_json.get("values", []):
+                if isinstance(entry, str):
+                    (pending_tags if entry.startswith("#") else required_items).add(entry[1:] if entry.startswith("#") else entry)
+                elif isinstance(entry, dict) and isinstance(entry.get("id"), str):
+                    ident = entry["id"]
+                    (pending_tags if ident.startswith("#") else required_items).add(ident[1:] if ident.startswith("#") else ident)
+        for path in staged_tags:
+            target = output / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(bundle.read(path))
+        for item_id in required_items:
+            namespace, _, name = item_id.partition(":")
+            if namespace != "create":
+                continue
+            bundled_item = f"data/create/horizon/item/{name}.json"
+            if bundled_item in names:
+                target = output / bundled_item
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(bundle.read(bundled_item))
     print(f"Prepared processing probe from tracked sources at {output}")
 
 

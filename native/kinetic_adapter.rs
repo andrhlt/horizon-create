@@ -22,16 +22,35 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         .block_entity_type("create:simple_kinetic")
         .blocks(&["create:shaft", "create:cogwheel", "create:large_cogwheel"])
         .build();
+    let mixer = registrar
+        .block_entity_type("create:mechanical_mixer")
+        .blocks(&["create:mechanical_mixer"])
+        .build();
+    let crushing_wheel = registrar
+        .block_entity_type("create:crushing_wheel")
+        .blocks(&["create:crushing_wheel"])
+        .build();
+    let motor_key = registrar.block_key("create:creative_motor");
+    let shaft_key = registrar.block_key("create:shaft");
+    let cogwheel_key = registrar.block_key("create:cogwheel");
+    let large_cogwheel_key = registrar.block_key("create:large_cogwheel");
+    let millstone_key = registrar.block_key("create:millstone");
+    let mixer_key = registrar.block_key("create:mechanical_mixer");
+    let wheel_key = registrar.block_key("create:crushing_wheel");
     let part = KineticPart {
-        motor: registrar.block_key("create:creative_motor"),
-        shaft: registrar.block_key("create:shaft"),
-        cogwheel: registrar.block_key("create:cogwheel"),
-        large_cogwheel: registrar.block_key("create:large_cogwheel"),
-        millstone: registrar.block_key("create:millstone"),
+        motor: motor_key,
+        shaft: shaft_key,
+        cogwheel: cogwheel_key,
+        large_cogwheel: large_cogwheel_key,
+        millstone: millstone_key,
+        mixer: mixer_key,
+        crushing_wheel: wheel_key,
     };
     let _ = KINETIC_PART.set(part);
     registrar.block_entity_part(&motor, part).unwrap();
     registrar.block_entity_part(&kinetic, part).unwrap();
+    registrar.block_entity_part(&mixer, part).unwrap();
+    registrar.block_entity_part(&crushing_wheel, part).unwrap();
 }
 
 #[derive(Clone, Copy)]
@@ -41,6 +60,8 @@ pub struct KineticPart {
     cogwheel: BlockKey,
     large_cogwheel: BlockKey,
     millstone: BlockKey,
+    mixer: BlockKey,
+    crushing_wheel: BlockKey,
 }
 
 impl KineticPart {
@@ -375,6 +396,14 @@ fn node(
     if block == part.millstone {
         return Some(Node::Millstone);
     }
+    if block == part.mixer {
+        return Some(Node::Mixer);
+    }
+    if block == part.crushing_wheel {
+        return Some(Node::CrushingWheel {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+        });
+    }
     None
 }
 
@@ -422,6 +451,9 @@ fn network(
         };
         if matches!(block, Node::Millstone) {
             impact_per_rpm += 4.0 / ratio.abs();
+        }
+        if matches!(block, Node::CrushingWheel { .. }) {
+            impact_per_rpm += 8.0 / ratio.abs();
         }
         let Node::Motor { facing } = block else {
             continue;

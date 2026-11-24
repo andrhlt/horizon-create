@@ -8,22 +8,25 @@ pub enum Node {
     Motor { facing: [i32; 3] },
     Shaft { axis: usize },
     Cogwheel { axis: usize, large: bool },
+    CrushingWheel { axis: usize },
     Millstone,
+    Mixer,
 }
 
 impl Node {
     fn shaft(self, face: [i32; 3]) -> bool {
         match self {
             Self::Motor { facing } => face == facing,
-            Self::Shaft { axis } | Self::Cogwheel { axis, .. } => face[axis] != 0,
+            Self::Shaft { axis } | Self::Cogwheel { axis, .. } | Self::CrushingWheel { axis } => face[axis] != 0,
             Self::Millstone => face == [0, -1, 0],
+            Self::Mixer => face[1] != 0,
         }
     }
 
     fn gear(self) -> Option<(usize, bool)> {
         match self {
             Self::Cogwheel { axis, large } => Some((axis, large)),
-            Self::Millstone => Some((1, false)),
+            Self::Millstone | Self::Mixer => Some((1, false)),
             _ => None,
         }
     }
@@ -52,7 +55,7 @@ impl Node {
             [0, 1, 1],
         ];
         let mut result = DIRECTIONS.to_vec();
-        if matches!(self, Self::Cogwheel { .. } | Self::Millstone) {
+        if matches!(self, Self::Cogwheel { .. } | Self::CrushingWheel { .. } | Self::Millstone | Self::Mixer) {
             result.extend(DIAGONALS);
         }
         result

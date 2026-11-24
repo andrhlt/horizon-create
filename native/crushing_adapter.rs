@@ -8,6 +8,7 @@ use mod_api::{
 const CONTROLLER: &str = "create:crushing_wheel_controller";
 const SLOT_COUNT: usize = 16;
 const INPUT: usize = 0;
+const WHEEL: &str = "create:crushing_wheel";
 
 #[derive(Clone, Copy, Default)]
 pub struct CrushingPart;
@@ -43,6 +44,36 @@ fn float(nbt: &Compound, key: &str) -> f32 {
         Some(Tag::Double(value)) => f64::from_bits(*value) as f32,
         _ => 0.0,
     }
+}
+
+fn wheel_speed(host: &dyn ServerHost, level: mod_api::LevelRef, pos: [i32; 3]) -> Option<f32> {
+    let entity = host.block_entity_identity(level, pos)?;
+    let nbt = entity.data(host)?;
+    Some(float(&nbt, "Speed"))
+}
+
+/// The controller is valid only between a same-axis wheel pair whose speeds
+/// oppose. A stopped or co-rotating pair holds its input and timer.
+fn pair_speed(host: &dyn ServerHost, level: mod_api::LevelRef, pos: [i32; 3]) -> Option<f32> {
+    let wheel = host.block_key(WHEEL)?;
+    for (span, step) in [[1, 0, 0], [0, 1, 0], [0, 0, 1]].into_iter().enumerate() {
+        let negative = [pos[0] - step[0], pos[1] - step[1], pos[2] - step[2]];
+        let positive = [pos[0] + step[0], pos[1] + step[1], pos[2] + step[2]];
+        if level.block(host, negative) != Some(wheel) || level.block(host, positive) != Some(wheel) {
+            continue;
+        }
+        let axle = level.block_property(host, negative, "axis")?;
+        if axle != level.block_property(host, positive, "axis")? { continue; }
+        let axle = match axle.as_str() { "x" => 0, "y" => 1, "z" => 2, _ => continue };
+        if axle == span { continue; }
+        let first = wheel_speed(host, level, negative)?;
+        let second = wheel_speed(host, level, positive)?;
+        if first == 0.0 || second == 0.0 || first.signum() == second.signum() {
+            return Some(0.0);
+        }
+        return Some(first.abs());
+    }
+    None
 }
 
 fn recipe_for(host: &dyn Host, input: &ItemStack) -> Option<(i32, mod_api::Recipe)> {
@@ -118,15 +149,22 @@ impl BlockEntityPart for CrushingPart {
 
     fn block_entity_tick(&self, host: &mut dyn ServerHost, event: &mut BlockEntityTickEvent<'_>) {
         if event.entity.items.len() < SLOT_COUNT { event.entity.items.resize(SLOT_COUNT, None); }
+        let Some(level) = host.levels().list_levels().into_iter().find(|level| level.block(host, event.pos).is_some()) else { return };
+        let Some(speed) = pair_speed(host, level, event.pos) else {
+            let _ = host.set_block_property_with(event.pos, "valid", "false", 2);
+            event.entity.nbt.insert("ProcessingTime".into(), Tag::Float(0.0f32.to_bits()));
+            return;
+        };
+        let _ = host.set_block_property_with(event.pos, "valid", if speed > 0.0 { "true" } else { "false" }, 2);
+        event.entity.nbt.insert("Speed".into(), Tag::Float(speed.to_bits()));
         let Some(input) = event.entity.items[INPUT].as_ref() else { return };
         let Some((duration, recipe)) = recipe_for(host, input) else {
             event.entity.nbt.insert("ProcessingTime".into(), Tag::Float(0.0f32.to_bits()));
             return;
         };
-        let speed = float(&event.entity.nbt, "Speed");
         if speed == 0.0 { return; }
         let progress = float(&event.entity.nbt, "ProcessingTime");
-        let next = progress + speed.abs().max(1.0);
+        let next = progress + speed.abs();
         if next < duration as f32 {
             event.entity.nbt.insert("ProcessingTime".into(), Tag::Float(next.to_bits()));
             return;
