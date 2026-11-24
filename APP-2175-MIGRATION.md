@@ -61,4 +61,21 @@ Java traces remain useful reference evidence, but were not replayed as a full
 cross-product here. The gauge pointer currently uses a redstone-torch model;
 exact cosmetic parity, Java float sine-table output, and Goggles-only readout
 gating remain follow-ups. These limits do not prevent ordinary powered reading
-or player motion. No gameplay failure was observed in the scoped offline checks.
+or player motion. No failure was observed in the original scoped probe checks.
+
+## Production-package merge follow-up
+
+After main advanced through APP-2173, this branch was merged with commit
+`88bcb60f1d642bb66e6c49f8f6a64747cd45aa13`. The gauge and Turntable adapter is
+now also staged in the combined `migration/create` production package. The
+combined package compiled against the same pinned SDK as
+`native-0a875da-ffa02e1d76d0`, using the APP-2173-normalized content pack. The
+17 source logic cases pass on the combined source. The live gauge/Turntable
+cases above were run on the earlier `native-0a875da-d99bfac77285` probe build;
+they have not been repeated on the combined production package.
+
+The APP-2173 production-route regression was also attempted on the combined
+build. It reached its overload case but observed `16 RPM` and `0` stress where
+that route expects `32 RPM` and overload. The repository's prior APP-2173 route
+receipt records the expected overloaded state. This mismatch remains an open
+regression result; it is not counted as a pass by this ticket.
