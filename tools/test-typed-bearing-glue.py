@@ -127,6 +127,8 @@ def main():
             raise RuntimeError(f"Powered glued bearing did not rotate: {active}")
         if len(carried) != 2 or EXTENSION in carried:
             raise RuntimeError(f"Special-entity glue traversal missed the extension: {active}")
+        if number(active, "RiderCaptured") != 1:
+            raise RuntimeError(f"Standing payload rider was not captured: {active}")
         if sorted(items(control, position) for position in carried) != [0, 7]:
             raise RuntimeError(f"Glued payload inventory was not conserved: {active}")
         control.call("save")
@@ -134,11 +136,15 @@ def main():
         reopened = data(control, BEARING)
         if len(positions(reopened)) != 2 or sorted(items(control, position) for position in positions(reopened)) != [0, 7]:
             raise RuntimeError(f"Active glued payload or inventory was lost on reopen: {reopened}")
+        if number(reopened, "RiderCaptured") != 1:
+            raise RuntimeError(f"Saved rider state was lost on reopen: {reopened}")
         control.command(f"/data merge block {xyz(MOTOR)} {{ScrollValue:0}}")
         control.command("/tick step 1")
         stopped = data(control, BEARING)
         if "Moving: 0b" not in stopped or sorted(items(control, position) for position in positions(stopped)) != [0, 7]:
             raise RuntimeError(f"Glued payload did not disassemble safely: {stopped}")
+        if number(stopped, "RiderSafeDismount") != 1:
+            raise RuntimeError(f"Rider was not safely dismounted: {stopped}")
     print("Super-glue traversal moved chest+extension, preserved seven ingots through active save/reopen, and disassembled safely.")
 
 
