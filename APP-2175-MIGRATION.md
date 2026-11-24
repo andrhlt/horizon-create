@@ -9,7 +9,7 @@ these blocks work in the typed production package.
 | Family row | Classification | Evidence and remaining work |
 | --- | --- | --- |
 | Speedometer and Stressometer | Adapted logic; SDK integration open | `native/gauge_logic.rs` carries Java's speed bands, stress bands, strict overload comparison, speed-to-dial scale, and 1/8 needle easing. `tools/test-gauge-turntable-logic.py` checks boundaries. Typed block-entity registration, saved/synchronized network readings, model submission, normal Goggles readout, overload observation, and idle/active reopen are not verified on the frozen SDK. |
-| Turntable | Adapted math; SDK integration open | `native/turntable_motion.rs` carries Java's player camera falloff and edge-vector motion. Existing old-runtime Turntable traces remain useful regression inputs, but do not verify this SDK route. Typed kinetic graph registration, rotating model submission, player/mob contact, guest behavior, and idle/active reopen remain open. |
+| Turntable | Adapted math; SDK integration open | `native/turntable_motion.rs` carries Java's player camera falloff and edge-vector motion. The edge rotation uses standard `sin_cos`; Java's float sine-table approximation is not reproduced yet and needs comparison against the existing trace. Existing old-runtime Turntable traces remain useful regression inputs, but do not verify this SDK route. Typed kinetic graph registration, rotating model submission, player/mob contact, guest behavior, and idle/active reopen remain open. |
 
 No row is classified as SDK gameplay verified. The historical matrix's “Pass”
 entries refer to the earlier `native-9f42064` runtime and must not be read as
