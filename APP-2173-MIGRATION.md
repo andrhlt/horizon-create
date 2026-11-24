@@ -15,7 +15,7 @@ production-package or full-family acceptance run.
 | Shafts and encased shafts | Straight Shaft typed path in checkpoint | Andesite/Brass encased shaft paths remain open |
 | Gearbox and Vertical Gearbox | Legacy implementation only | Typed block-entity registration and axis node added; runtime cases remain open |
 | Clutch and Gearshift | Legacy implementation only | Typed registrations and powered output-side transfer rules added; runtime/reconnect cases remain open |
-| Encased Chain Drive and Adjustable Chain Gearshift | Legacy implementation only | Open |
+| Encased Chain Drive and Adjustable Chain Gearshift | Legacy implementation only | Typed registration, link-axis/end-point connection rules, and signal ratio translation added; signal update scheduling, overspeed break behavior, and runtime remain open |
 | Sequenced Gearshift | Legacy implementation only | Open |
 | Creative Motor | Adapted in PR #192; signed setting and save/reopen receipts are recorded there | Reused; no new claim |
 | Rotation Speed Controller | Legacy implementation only | Open |
@@ -23,13 +23,15 @@ production-package or full-family acceptance run.
 
 ## Implemented rule slice
 
-`native/kinetic_slice.rs` now models Flywheel, Gearbox, Clutch, and Gearshift
-nodes in addition to the checkpoint's nodes. Gearbox faces connect
+`native/kinetic_slice.rs` now models Flywheel, Gearbox, Clutch, Gearshift, and
+Chain Drive nodes in addition to the checkpoint's nodes. Gearbox faces connect
 perpendicular to its declared axis. Its outgoing direction modifier follows
 the existing `machines.rs::gearbox_multiplier` rule. A powered Clutch cuts
 only the output side after its incoming face; a powered Gearshift negates only
-that output. The typed adapter recognizes these blocks, walks their directed
-edges, and registers the corresponding existing Create block-entity IDs.
+that output. Chain links follow the legacy axis/endpoint rules, and adjustable
+links translate their saved signal to the source speed modifier. The typed
+adapter recognizes these blocks, walks their directed edges, and registers the
+corresponding existing Create block-entity IDs.
 `tools/prepare-kinetic-probe.py` includes the corresponding block definitions
 in its isolated probe pack.
 
@@ -40,7 +42,7 @@ rustc --edition=2024 --test native/kinetic_slice.rs -o /private/tmp/app2173-kine
 /private/tmp/app2173-kinetic-slice-tests
 ```
 
-Result: 6 passed, including the existing cogwheel ratio, signed source,
+Result: 7 passed, including the existing cogwheel ratio, signed source,
 capacity/stress, and arbitration cases plus the new directional transmission
 cases. `python3 tools/prepare-kinetic-probe.py --output
 /private/tmp/app2173-probe-project` staged the bounded probe pack. These are
@@ -60,10 +62,11 @@ orientation, waterlogging, ordinary configuration, and block contents where
 applicable.
 
 The typed package currently registers only the selected checkpoint types plus
-the four transmission types listed above. Chain Drives, Adjustable Chain
-Gearshifts, Sequenced Gearshifts, Rotation Speed Controllers, encased kinetic
-parts, and their content/presentation integration are not migrated by this
-slice. The current adapter also lacks the complete legacy load table,
+Flywheel, Gearbox, Clutch, Gearshift, Encased Chain Drive, and Adjustable Chain
+Gearshift. The latter's signal update scheduling and overspeed breaking are not
+migrated. Sequenced Gearshifts, Rotation Speed Controllers, encased cogwheels
+and shafts, and their content/presentation integration are not migrated by
+this slice. The current adapter also lacks the complete legacy load table,
 Sequenced/Chain state, speed-controller cross-network links, inconsistent-loop
 resolution, and all production registry/package wiring. Those gaps block
 APP-2173 gameplay completion; the source-level checks do not establish

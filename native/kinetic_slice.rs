@@ -3,16 +3,39 @@
 //! This module has no Horizon host access. The caller supplies block identity,
 //! orientation, positions and motor setting, which keeps the SDK adapter thin.
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Node {
-    Motor { facing: [i32; 3] },
-    Shaft { axis: usize },
-    Cogwheel { axis: usize, large: bool },
+    Motor {
+        facing: [i32; 3],
+    },
+    Shaft {
+        axis: usize,
+    },
+    Cogwheel {
+        axis: usize,
+        large: bool,
+    },
     Millstone,
-    Flywheel { axis: usize },
-    Gearbox { axis: usize },
-    Clutch { axis: usize, powered: bool },
-    Gearshift { axis: usize, powered: bool },
+    Flywheel {
+        axis: usize,
+    },
+    Gearbox {
+        axis: usize,
+    },
+    Clutch {
+        axis: usize,
+        powered: bool,
+    },
+    Gearshift {
+        axis: usize,
+        powered: bool,
+    },
+    ChainDrive {
+        shaft_axis: usize,
+        link_axis: usize,
+        part: i8,
+        modifier: f32,
+    },
 }
 
 impl Node {
@@ -24,6 +47,7 @@ impl Node {
             | Self::Flywheel { axis }
             | Self::Clutch { axis, .. }
             | Self::Gearshift { axis, .. } => face[axis] != 0,
+            Self::ChainDrive { shaft_axis, .. } => face[shaft_axis] != 0,
             Self::Gearbox { axis } => face[axis] == 0,
             Self::Millstone => face == [0, -1, 0],
         }
@@ -73,6 +97,30 @@ impl Node {
         let adjacent = offset.iter().map(|v| v.abs()).sum::<i32>() == 1;
         if adjacent && self.shaft(offset) && other.shaft(offset.map(|v| -v)) {
             return Some(1.0);
+        }
+        if let (
+            Self::ChainDrive {
+                link_axis,
+                part,
+                modifier,
+                ..
+            },
+            Self::ChainDrive {
+                link_axis: other_link_axis,
+                part: other_part,
+                modifier: other_modifier,
+                ..
+            },
+        ) = (self, other)
+            && adjacent
+            && link_axis == other_link_axis
+            && offset[link_axis] != 0
+            && part != 2
+            && other_part != 2
+            && (part == 0 || i32::from(part) == offset[link_axis])
+            && (other_part == 0 || i32::from(other_part) == -offset[link_axis])
+        {
+            return Some(modifier / other_modifier);
         }
         let (Some((axis, large)), Some((other_axis, other_large))) = (self.gear(), other.gear())
         else {
@@ -335,6 +383,36 @@ mod tests {
             }
             .ratio_to(Node::Flywheel { axis: 2 }, [0, 0, 1]),
             Some(1.0)
+        );
+    }
+
+    #[test]
+    fn chain_links_require_matching_axis_and_open_endpoints() {
+        let start = Node::ChainDrive {
+            shaft_axis: 0,
+            link_axis: 1,
+            part: 1,
+            modifier: 1.0,
+        };
+        let end = Node::ChainDrive {
+            shaft_axis: 0,
+            link_axis: 1,
+            part: -1,
+            modifier: 1.5,
+        };
+        assert_eq!(start.ratio_to(end, [0, 1, 0]), Some(1.0 / 1.5));
+        assert_eq!(start.ratio_to(end, [0, -1, 0]), None);
+        assert_eq!(
+            start.ratio_to(
+                Node::ChainDrive {
+                    shaft_axis: 0,
+                    link_axis: 2,
+                    part: -1,
+                    modifier: 1.5,
+                },
+                [0, 1, 0]
+            ),
+            None
         );
     }
 }

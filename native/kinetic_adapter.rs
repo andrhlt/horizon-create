@@ -38,6 +38,14 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         .block_entity_type("create:gearshift")
         .blocks(&["create:gearshift"])
         .build();
+    let chain_drive = registrar
+        .block_entity_type("create:encased_shaft")
+        .blocks(&["create:encased_chain_drive"])
+        .build();
+    let chain_gearshift = registrar
+        .block_entity_type("create:adjustable_chain_gearshift")
+        .blocks(&["create:adjustable_chain_gearshift"])
+        .build();
     let part = KineticPart {
         motor: registrar.block_key("create:creative_motor"),
         shaft: registrar.block_key("create:shaft"),
@@ -48,6 +56,8 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         gearbox: registrar.block_key("create:gearbox"),
         clutch: registrar.block_key("create:clutch"),
         gearshift: registrar.block_key("create:gearshift"),
+        chain_drive: registrar.block_key("create:encased_chain_drive"),
+        chain_gearshift: registrar.block_key("create:adjustable_chain_gearshift"),
     };
     let _ = KINETIC_PART.set(part);
     registrar.block_entity_part(&motor, part).unwrap();
@@ -56,6 +66,8 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
     registrar.block_entity_part(&gearbox, part).unwrap();
     registrar.block_entity_part(&clutch, part).unwrap();
     registrar.block_entity_part(&gearshift, part).unwrap();
+    registrar.block_entity_part(&chain_drive, part).unwrap();
+    registrar.block_entity_part(&chain_gearshift, part).unwrap();
 }
 
 #[derive(Clone, Copy)]
@@ -69,6 +81,8 @@ pub struct KineticPart {
     gearbox: BlockKey,
     clutch: BlockKey,
     gearshift: BlockKey,
+    chain_drive: BlockKey,
+    chain_gearshift: BlockKey,
 }
 
 impl KineticPart {
@@ -423,6 +437,40 @@ fn node(
         return Some(Node::Gearshift {
             axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
             powered: level.block_property(host, pos, "powered")? == "true",
+        });
+    }
+    if block == part.chain_drive || block == part.chain_gearshift {
+        let shaft_axis = kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?;
+        let first = level.block_property(host, pos, "axis_along_first")? == "true";
+        let link_axis = [0, 1, 2]
+            .into_iter()
+            .filter(|candidate| *candidate != shaft_axis)
+            .nth(usize::from(!first))?;
+        let part = match level.block_property(host, pos, "part")?.as_str() {
+            "start" => 1,
+            "middle" => 0,
+            "end" => -1,
+            _ => 2,
+        };
+        let signal = host
+            .block_entity(level, pos)
+            .and_then(|entity| entity.data(host))
+            .and_then(|data| match data.get(&"Signal".into()) {
+                Some(Tag::Int(value)) => Some(*value),
+                _ => None,
+            })
+            .unwrap_or(0)
+            .clamp(0, 15);
+        let modifier = if signal == 0 {
+            1.0
+        } else {
+            1.0 + (signal + 1) as f32 / 16.0
+        };
+        return Some(Node::ChainDrive {
+            shaft_axis,
+            link_axis,
+            part,
+            modifier,
         });
     }
     None

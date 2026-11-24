@@ -74,7 +74,8 @@ def main():
     for name in (
         "creative_motor", "shaft", "cogwheel", "large_cogwheel",
         "millstone", "mechanical_bearing", "flywheel", "gearbox",
-        "clutch", "gearshift",
+        "clutch", "gearshift", "encased_chain_drive",
+        "adjustable_chain_gearshift",
     ):
         source = ROOT / f"content/data/create/horizon/block/{name}.json"
         definition = json.loads(source.read_text())
