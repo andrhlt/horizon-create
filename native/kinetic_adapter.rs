@@ -89,9 +89,10 @@ pub fn set_motor_setting(
     pos: [i32; 3],
     setting: i32,
 ) -> bool {
-    KINETIC_PART
-        .get()
-        .is_some_and(|part| part.set_motor_setting(host, level, pos, setting))
+    match KINETIC_PART.get() {
+        Some(part) => part.set_motor_setting(host, level, pos, setting),
+        None => false,
+    }
 }
 
 #[mod_api::horizon_part]

@@ -4,6 +4,10 @@
 //! interaction event all the way to the shared kinetic setter.  That makes
 //! LAN guests and non-overworld dimensions use the same path as the host.
 
+use std::collections::VecDeque;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
+
 use mod_api::{
     BlockEntityPart, BlockPart, InteractionResult, LevelRef, MenuReplace, ServerHost, Text,
     UseWithoutItemEvent,
@@ -12,6 +16,21 @@ use mod_api::{
 use super::kinetic_adapter;
 
 const MENU_ID: &str = "create:creative_motor";
+const MOTOR_SETTING_TASK_PREFIX: u64 = 0x4352_4541_5400_0000;
+static NEXT_MOTOR_SETTING_TASK: AtomicU64 = AtomicU64::new(MOTOR_SETTING_TASK_PREFIX);
+
+struct PendingSetting {
+    token: u64,
+    dimension: String,
+    pos: [i32; 3],
+    setting: i32,
+}
+
+static PENDING_SETTINGS: OnceLock<Mutex<VecDeque<PendingSetting>>> = OnceLock::new();
+
+fn pending_settings() -> &'static Mutex<VecDeque<PendingSetting>> {
+    PENDING_SETTINGS.get_or_init(|| Mutex::new(VecDeque::new()))
+}
 
 pub fn setting_from_button(id: i32) -> i32 {
     (id - 256).clamp(-256, 256)
@@ -33,6 +52,17 @@ fn menu_key(host: &dyn ServerHost) -> Option<mod_api::MenuKey> {
 
 pub fn register(registrar: &mut dyn mod_api::Registrar) {
     let kind = registrar.block_entity_type_key("create:motor");
+    let block = registrar.block_key(MENU_ID);
+    registrar.block_container(
+        &block,
+        mod_api::ModContainer {
+            slots: 1,
+            faces: std::array::from_fn(|_| vec![0]),
+            inputs: vec![0],
+            outputs: vec![0],
+            menu: Some(MENU_ID.to_owned()),
+        },
+    );
     registrar
         .block_entity_part(&kind, MotorBoard)
         .expect("creative motor board part registration");
@@ -139,7 +169,7 @@ impl BlockEntityPart for MotorBoard {
         _host: &dyn mod_api::ClientHost,
         event: &mut mod_api::ScreenClickEvent<'_>,
     ) -> Option<i32> {
-        if event.block != MENU_ID || event.right {
+        if event.block != MENU_ID {
             return None;
         }
         let [x, y] = event.at;
@@ -172,7 +202,63 @@ impl BlockEntityPart for MotorBoard {
         // Button ids are the signed board value shifted into the menu's
         // non-negative protocol range. The shared adapter clamps again.
         let setting = setting_from_button(event.context.id);
-        let _ = kinetic_adapter::set_motor_setting(host, level, event.context.pos, setting);
+        if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+            let _ = host.messages().broadcast(Text::literal(format!(
+                "CREATE_MOTOR_BOARD_MENU_BUTTON_QUEUED pos={:?} setting={setting}",
+                event.context.pos
+            )));
+        }
+        let Some(dimension) = level.dimension().id(host) else {
+            return;
+        };
+        let token = NEXT_MOTOR_SETTING_TASK.fetch_add(1, Ordering::Relaxed);
+        pending_settings()
+            .lock()
+            .expect("motor setting queue")
+            .push_back(PendingSetting {
+                token,
+                dimension: dimension.to_string(),
+                pos: event.context.pos,
+                setting,
+            });
+        let scheduled = host.schedule_task(0, token).is_ok();
+        if !scheduled {
+            pending_settings()
+                .lock()
+                .expect("motor setting queue")
+                .retain(|item| item.token != token);
+        }
+        if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+            let _ = host.messages().broadcast(Text::literal(format!(
+                "CREATE_MOTOR_BOARD_SETTING_SCHEDULED scheduled={scheduled}"
+            )));
+        }
+    }
+}
+
+pub fn scheduled_task(host: &mut dyn ServerHost, event: &mut mod_api::ScheduledTaskEvent<'_>) {
+    if event.token & 0xffff_ffff_ffff_0000 != MOTOR_SETTING_TASK_PREFIX {
+        return;
+    }
+    let request = {
+        let mut pending = pending_settings().lock().expect("motor setting queue");
+        pending
+            .iter()
+            .position(|item| item.token == event.token)
+            .and_then(|index| pending.remove(index))
+    };
+    let Some(request) = request else {
+        return;
+    };
+    let Some(level) = host.level(&request.dimension) else {
+        return;
+    };
+    let updated = kinetic_adapter::set_motor_setting(host, level, request.pos, request.setting);
+    if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+        let _ = host.messages().broadcast(Text::literal(format!(
+            "CREATE_MOTOR_BOARD_SETTING_APPLIED pos={:?} setting={} updated={updated}",
+            request.pos, request.setting
+        )));
     }
 }
 

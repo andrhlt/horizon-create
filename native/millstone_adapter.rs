@@ -71,15 +71,19 @@ fn set_timer(nbt: &mut Compound, timer: i32) {
     nbt.insert("Timer".into(), Tag::Int(timer));
 }
 
-fn recipe_for(host: &dyn Host, input: &ItemStack) -> Option<(i32, Arc<mod_api::Recipe>)> {
+fn recipe_for(host: &dyn ServerHost, input: &ItemStack) -> Option<(i32, Arc<mod_api::Recipe>)> {
     host.recipes_of_type(RECIPE_KIND).iter().find_map(|recipe| {
         let ingredients = recipe.json["ingredients"].as_array()?;
         let ingredient = ingredients.first()?;
         // Create recipes serialize Ingredient as `{item: id}` / `{tag: id}`;
         // the pinned Host recipe helper accepts a bare id or `#tag` string.
+        let direct_item = ingredient
+            .get("item")
+            .and_then(|value| value.as_str())
+            .map(str::to_owned);
         let ingredient_json = if ingredient.is_string() {
             ingredient.to_string()
-        } else if let Some(item) = ingredient.get("item").and_then(|value| value.as_str()) {
+        } else if let Some(item) = direct_item.as_deref() {
             format!("{item:?}")
         } else if let Some(tag) = ingredient.get("tag").and_then(|value| value.as_str()) {
             format!("{:?}", format!("#{tag}"))
@@ -99,8 +103,18 @@ fn recipe_for(host: &dyn Host, input: &ItemStack) -> Option<(i32, Arc<mod_api::R
         } else {
             return None;
         };
-        let ingredient = host.recipe_ingredient(&ingredient_json).ok().flatten()?;
-        ingredient.test(host, input).then(|| {
+        let matches = if let Some(item) = direct_item {
+            mod_api::Identifier::parse(&item)
+                .ok()
+                .and_then(|id| host.item_key(&id))
+                == Some(input.item())
+        } else {
+            host.recipe_ingredient(&ingredient_json)
+                .ok()
+                .flatten()
+                .is_some_and(|ingredient| ingredient.test(host, input))
+        };
+        matches.then(|| {
             let time = recipe.json["processing_time"]
                 .as_i64()
                 .map_or(millstone_processing::DEFAULT_PROCESSING_TIME, |value| {
@@ -119,10 +133,12 @@ fn insert_output(host: &dyn Host, slots: &mut [Option<ItemStack>], mut output: I
             let moved = room.min(output.count());
             if moved > 0 {
                 let _ = slot.grow(moved);
-                output = output.shrink(moved).expect("moved output was nonzero");
-                if output.count() == 0 {
+                if moved == output.count() {
                     return true;
                 }
+                output = output
+                    .shrink(moved)
+                    .expect("partial output move leaves a remainder");
             }
         }
     }

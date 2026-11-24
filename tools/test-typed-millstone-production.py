@@ -2,18 +2,76 @@
 """Exercise the real Create wheat milling recipe and output backpressure."""
 
 import argparse
-import hashlib
-import json
+from contextlib import contextmanager
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from zipfile import ZIP_DEFLATED, ZipFile
+from shutil import copy2
+import tempfile
 
-from fixture_world import fixture_world
+from fixture_world import FixtureWorld, install_pack
+from launcher_managed import launch_managed
 
-ROOT = Path(__file__).resolve().parents[1]
 
 MILL = (0, 100, 0)
 PROCESSING_TICKS = 155
+
+
+@contextmanager
+def managed_fixture(args, pack):
+    with tempfile.TemporaryDirectory(prefix="hc-managed-millstone-") as tmp:
+        scratch = Path(tmp)
+        socket = scratch / "ctl.sock"
+        game = scratch / "game"
+        install_pack(game, pack)
+        mods = args.instance_dir / "horizon-mods"
+        mods.mkdir(parents=True, exist_ok=True)
+        copy2(pack, mods / "create.hmod")
+        (args.instance_dir / "horizon-mods.txt").write_text(
+            "mod.create:true\n", encoding="utf-8"
+        )
+        process, log, log_path, world = launch_managed(
+            args.client.parent,
+            socket,
+            game,
+            "TypedMillstoneProduction",
+            instance=args.instance,
+            launcher=args.launcher,
+            launcher_home=args.launcher_home,
+            resources=args.resources,
+            creative=True,
+        )
+        control = FixtureWorld(args.ctl, socket, {}, launch=())
+        def reopen():
+            nonlocal process, log, log_path, control
+            control.stop()
+            process.wait(timeout=30)
+            if not log.closed:
+                log.close()
+            process, log, log_path, _ = launch_managed(
+                args.client.parent, socket, game, world,
+                instance=args.instance, launcher=args.launcher,
+                launcher_home=args.launcher_home, resources=args.resources,
+                creative=True, append_world=False,
+            )
+            control = FixtureWorld(args.ctl, socket, {}, launch=())
+            control.call("script", script='command "/tick freeze"\n')
+            return control
+        control.reopen = reopen
+        try:
+            control.call("script", script='command "/tick freeze"\n')
+            yield control
+        finally:
+            if socket.exists():
+                control.stop()
+            process.wait(timeout=30)
+            if not log.closed:
+                log.close()
+            args.evidence_dir.mkdir(parents=True, exist_ok=True)
+            for source, name in (
+                (log_path, "managed-play.log"),
+                (args.instance_dir / "logs/latest.log", "latest.log"),
+            ):
+                if source.is_file():
+                    copy2(source, args.evidence_dir / name)
 
 
 def xyz(pos):
@@ -26,89 +84,71 @@ def block_data(control):
 
 def advance(control, ticks):
     for _ in range(ticks):
-        control.step_to(control.clock() + 1)
+        control.call("command", "/tick step 1")
 
 
 def require_flour(data):
-    if "create:wheat_flour" not in data:
-        raise RuntimeError(f"Java-backed wheat milling did not produce its guaranteed flour: {data}")
-
-
-def recipe_matches_wheat_milling(path, contents):
-    if not path.startswith("data/create/recipe/") or not path.endswith(".json"):
-        return False
-    try:
-        recipe = json.loads(contents)
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return False
-    if recipe.get("type") != "create:milling":
-        return False
-    for ingredient in recipe.get("ingredients", []):
-        if isinstance(ingredient, dict) and ingredient.get("item") == "minecraft:wheat":
-            return True
-    return False
-
-
-def prepare_test_pack(base, output):
-    recipe_path = ROOT / "fixtures/typed-millstone-production/data/create/recipe/app2163_wheat_milling.json"
-    fallback = recipe_path.read_bytes()
-    found_production_recipe = False
-    with ZipFile(base) as source, ZipFile(output, "w", ZIP_DEFLATED) as target:
-        for entry in source.infolist():
-            if entry.filename == "data/create/recipe/migration_probe_wheat_to_bread.json":
-                continue
-            contents = source.read(entry.filename)
-            found_production_recipe |= recipe_matches_wheat_milling(entry.filename, contents)
-            if entry.filename != "data/create/recipe/app2163_wheat_milling.json":
-                target.writestr(entry, contents)
-        if not found_production_recipe:
-            target.write(recipe_path, "data/create/recipe/app2163_wheat_milling.json")
-    digest = hashlib.sha256(output.read_bytes()).hexdigest()
-    recipe_source = "production pack" if found_production_recipe else "Java-backed fixture fallback"
-    print(f"Millstone test pack: {recipe_source}; synthetic bread recipe removed; sha256={digest}")
+    if "create:wheat_flour" not in data or "count: 1" not in data:
+        raise RuntimeError(f"Real wheat milling did not produce one flour: {data}")
 
 
 def verify(args):
-    base = args.pack or ROOT / ".local/create.hmod"
-    with TemporaryDirectory(prefix="hc-millstone-test-pack-") as tmp:
-        test_pack = Path(tmp) / "create-millstone-test.hmod"
-        prepare_test_pack(base, test_pack)
-        with fixture_world(args, "TypedMillstoneProduction", pack=test_pack) as control:
-            control.commands((
-                f"/setblock {xyz(MILL)} create:millstone",
-                f"/data merge block {xyz(MILL)} {{Speed:16.0f}}",
-                f"/item replace block {xyz(MILL)} container.0 with minecraft:wheat 1",
-            ))
-            advance(control, PROCESSING_TICKS)
-            completed = block_data(control)
-            if "minecraft:wheat" in completed:
-                raise RuntimeError(f"Real wheat input was not consumed: {completed}")
-            require_flour(completed)
+    with managed_fixture(args, args.pack) as control:
+        control.command("/forceload add 0 0")
+        flour_probe = control.command("/give @s create:wheat_flour 1")
+        if "unknown item" in flour_probe.lower():
+            raise RuntimeError(f"Wheat Flour was not registered: {flour_probe}")
+        control.command("/clear @s create:wheat_flour")
+        control.commands((
+            f"/setblock {xyz(MILL)} create:millstone",
+            f"/data merge block {xyz(MILL)} {{Speed:16.0f}}",
+            f"/item replace block {xyz(MILL)} container.0 with minecraft:wheat 1",
+        ))
+        advance(control, PROCESSING_TICKS)
+        completed = block_data(control)
+        if 'id: "minecraft:wheat"' in completed:
+            raise RuntimeError(f"Real wheat input was not consumed: {completed}")
+        require_flour(completed)
 
-            control.call("save")
-            control.restart()
-            reopened = block_data(control)
-            require_flour(reopened)
+        control.call("save")
+        control = control.reopen()
+        reopened = block_data(control)
+        require_flour(reopened)
 
-            control.commands((
-                f"/item replace block {xyz(MILL)} container.1 with create:wheat_flour 64",
-                f"/item replace block {xyz(MILL)} container.0 with minecraft:wheat 1",
-            ))
-            advance(control, PROCESSING_TICKS)
-            blocked = block_data(control)
-            if "minecraft:wheat" not in blocked:
-                raise RuntimeError(f"Full output slot caused input loss: {blocked}")
-            if "create:wheat_flour" not in blocked or "count: 64" not in blocked:
-                raise RuntimeError(f"Full output slot changed unexpectedly: {blocked}")
+        control.commands(tuple(
+            f"/item replace block {xyz(MILL)} container.{slot} with create:wheat_flour 64"
+            for slot in range(1, 10)
+        ) + (f"/item replace block {xyz(MILL)} container.0 with minecraft:wheat 1",))
+        advance(control, PROCESSING_TICKS)
+        blocked = block_data(control)
+        if 'id: "minecraft:wheat"' not in blocked:
+            raise RuntimeError(f"Full output slot caused input loss: {blocked}")
+        if "create:wheat_flour" not in blocked or "count: 64" not in blocked:
+            raise RuntimeError(f"Full output slot changed unexpectedly: {blocked}")
 
-    print("Typed Millstone processed Java-backed wheat milling, retained output across reopen, and conserved input under full output.")
+        control.command(f"/item replace block {xyz(MILL)} container.1 with air")
+        advance(control, PROCESSING_TICKS)
+        recovered = block_data(control)
+        if 'id: "minecraft:wheat"' in recovered:
+            raise RuntimeError(f"Cleared output did not allow recovery: {recovered}")
+        if "create:wheat_flour" not in recovered:
+            raise RuntimeError(f"Recovery produced no flour: {recovered}")
+
+    print("Typed Millstone matched real wheat milling, retained output across reopen, and conserved input under full output.")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("ctl", "client", "resources"):
+    for name in ("ctl", "client"):
         parser.add_argument(name, type=lambda value: Path(value).resolve(strict=True))
+    parser.add_argument("resources", nargs="?", type=lambda value: Path(value).resolve(strict=True))
     parser.add_argument("--pack", type=Path)
+    parser.add_argument("--instance", required=True)
+    parser.add_argument("--instance-dir", type=Path, required=True)
+    parser.add_argument("--launcher", type=Path, required=True)
+    parser.add_argument("--launcher-home", type=Path, required=True)
+    parser.add_argument("--evidence-dir", type=Path,
+                        default=Path(__file__).resolve().parents[1] / ".local/app2136-millstone-evidence")
     verify(parser.parse_args())
 
 

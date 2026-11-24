@@ -51,8 +51,13 @@ def main():
           menu / "creative_motor.json")
     recipes = OUTPUT / "data/create/recipe"
     recipes.mkdir(parents=True, exist_ok=True)
-    copy2(SOURCE / "data/create/recipe/migration_probe_wheat_to_bread.json",
-          recipes / "migration_probe_wheat_to_bread.json")
+    production_recipe = ROOT / "content/data/create/recipe/milling/wheat.json"
+    (recipes / "milling").mkdir(parents=True, exist_ok=True)
+    copy2(production_recipe, recipes / "milling/wheat.json")
+    items = OUTPUT / "data/create/horizon/item"
+    items.mkdir(parents=True, exist_ok=True)
+    copy2(ROOT / "content/data/create/horizon/item/wheat_flour.json",
+          items / "wheat_flour.json")
     blocks = OUTPUT / "data/create/horizon/block"
     blocks.mkdir(parents=True, exist_ok=True)
     for name in (

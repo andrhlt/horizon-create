@@ -1319,14 +1319,12 @@ Headless/offscreen results on that candidate:
   `ScrollValue` survived save/reopen. This fixture changes the setting with a
   server command; it does not substitute for ordinary board input.
 
-The ordinary board-opening fixture remains failed: after placement and right
-click, the client reports `screen=playing`, `menu=None`, and no controls. Thus
-normal motor setting input and distinct offline host/guest convergence remain
-open. The production Millstone runtime is also unverified. The bounded bearing
-probe passed separately, but does not establish the full glued train/contraption
-flow. These results establish a working typed server-side kinetic graph and
-placement/render/persistence baseline, not completion of APP-2136's normal
-player/multiplayer gates.
+The earlier no-board result is superseded by the container-registration result
+below. Distinct offline host/guest convergence remains open; the production
+Millstone runtime is also unverified. The bounded bearing probe passed
+separately, but does not establish the full glued train/contraption flow.
+These results establish the kinetic server graph and ordinary motor settings,
+not completion of APP-2136's multiplayer and follow-on flow gates.
 
 The reproducible command for the new managed-flow fixture is:
 
@@ -1342,3 +1340,104 @@ python3 tools/test-typed-kinetic-flow.py \
 
 The runtime and instance paths are local to this workstation; the candidate,
 pack hashes, fixture and result above identify the tested inputs.
+
+### Ordinary board click and setter target (2026-11-23)
+
+APP-2164's `fc6dd08` fix registered a `ModContainer` for
+`create:creative_motor`. Without it, the server accepted `open_mod_menu` but the
+client had no container screen. With the registration, managed offscreen Play
+opens a container showing both RPM controls. The setting bridge accepts right
+clicks, matching the retained Java input fixture.
+
+The real click trace compared the old command setter and the callback target on
+candidate `native-0a875da-af98b100d7b0`. It reported position `[8, 101, -10]`,
+dimension `minecraft:overworld`, the expected motor block, event-view id
+`create:motor`, and a present world entity identity. `host.block_entity_identity`
+therefore found the target, but reading `.data(host)` returned `None`; the old
+setter returned false with `world_entity_data_missing`. The pinned SDK documents
+that the menu-button block entity is temporarily out of world during the
+callback. The callback's `MenuButtonEvent.entity` view is the writable target.
+The new path updates that view and recomputes the connected graph; the same
+click then wrote `ScrollValue=-24` and propagated `Speed=-24` to both motor and
+shaft. The position, dimension, block key, and kinetic-node lookup were
+correct; the first failing operation was reading data back through the world
+identity.
+
+The repeatable `tools/test-typed-motor-board.py` fixture passed in managed
+developer-offline Play, headless/offscreen: the board opened with both labels;
+ordinary clicks set +64, -24, 0, then +64 RPM; the shaft followed each value;
+and the active +64 setting and shaft speed survived save/reopen. The menu
+remained open after selecting a value, and the offscreen client reported
+`pointer_grabbed=false`. Candidate `native-mods.json` SHA-256 is
+`c52e067b99f32d1d47d507baa2ad6d9497810b078d2ecd9d8ffadc4b379e7f73`; the
+typed kinetic probe dylib SHA-256 is
+`162e43b7a7905d2af7e04f283e14a4ce33dc4db058a0da69f9a577b9b39d1b4d`.
+Tracked adapter source hashes are `a5cec1e4ff223bfeed51c3f2041f405cdc2db27fdaddbd9315a2155c21c0c774`
+for `native/kinetic_adapter.rs` and
+`167bf6e2de3e2daf5e12c60492edd1665969c65ee3537b430e79e85f9fd591c3` for
+`native/motor_board.rs`. The SDK source check passed; optimized mod compilation
+completed in about 2 seconds. The full click-plus-reopen fixture took about 10
+seconds across its two managed Play launches.
+
+Repeat the UI and persistence case on the installed managed candidate with:
+
+```sh
+python3 tools/test-typed-motor-board.py \
+  '/Users/andrewholt/Library/Application Support/horizon-launcher/versions/native-0a875da-af98b100d7b0' \
+  --instance app-2136-motor-offline-base \
+  --instance-dir '/Users/andrewholt/Library/Application Support/horizon/instances/app-2136-motor-offline-base' \
+  --launcher '/Applications/Horizon.app/Contents/MacOS/horizon-launcher' \
+  --launcher-home '/Users/andrewholt/Library/Application Support/horizon-launcher' \
+  --pack .local/create.hmod
+```
+
+The host/guest gate remains blocked by the allowed no-sign-in runtime route,
+not by the motor setter. Pinned launcher source
+`launcher/src/cli_tools.rs` documents that
+`HORIZON_LAUNCHER_DEVELOPER_OFFLINE=1` supplies no session and blocks normal
+external connections and LAN hosting while preserving managed launch leases.
+Its developer-offline notice says “single-player only”. The existing
+`tools/test-multiplayer.py` does use a local `online-mode=false` dedicated
+server and distinct local names, but its clients are launched through
+`horizon-ctl`; the earlier direct control launch was rejected by the managed
+cache-lease check. No guest convergence result is claimed. An approved
+lease-compliant offline guest route or narrowly scoped test runtime capability
+is needed; production authentication must remain unchanged.
+
+### Three-flow integration checkpoint (2026-11-23)
+
+The integrated PR4 candidate is `native-98a0fff-7f133e2da334`. Its exact
+managed build manifest and source/resource hashes are retained in
+`.local/app2136-evidence/pr4-combined/build-receipt.json` and the copied
+`native-mods.json`. It used Horizon `98a0fff291b65f8098700f08e9dd0f29df2985b4`,
+Rust 1.99.1, launcher 0.2.105, the offline developer base
+`developer-5f20246...`, and the 26.3 resources identified by the receipt.
+
+| Flow | Result on the integrated candidate | Remaining baseline gate |
+| --- | --- | --- |
+| Motor → shaft → cogwheel | Pass. `tools/test-typed-motor-board.py` opened the ordinary board, clicked +64, −24, 0, then +64, observed matching motor/shaft speeds, and retained active +64 through save/reopen. The click setter is deferred to the next server task because the bound block entity has no world data during `menu_button`. | Distinct-UUID offline guest convergence is not verified: the supported managed developer-offline route enforces single-player-only. No lease bypass or sign-in was used. |
+| Production Millstone | Pass. `tools/test-typed-millstone-production.py` used shipped wheat flour + recipe resources, processed wheat, retained flour through save/reopen, held wheat while all nine output slots were full, and resumed after an output slot was freed. | Other recipe families and logistics remain outside this checkpoint. |
+| Glued bearing payload | Fails on the current SDK cohort. `tools/test-typed-bearing-glue.py` found the real marker NBT but the candidate returned `GlueBoxes=0`; it captured the chest only, then stalled against the adjacent barrel and disassembled before carrying the extension. No glue-flow pass is claimed. | Horizon commit `3fa53d4b99ca22bba5897c6544b9515fd5521948` fixes bounded queries for zero-volume marker entities. Rebuild a matching SDK/runtime from that commit, then rerun the exact fixture including active save/reopen and item conservation. |
+
+The PR4 glue run's exact result was bearing `Angle=42`, `MotionOffset=7`,
+`Moving=0`, `Disassembled=1`, one captured chest at `[1,101,-1]`, and no barrel
+extension; the marker contained `CreateSuperGlue`, `From`, and `To`. The defect
+is in the `98a0fff` runtime's `special_entities_in` AABB filter: a zero-volume
+marker does not intersect the query box. The fork fix preserves ordinary
+`entities_in`; its matching SDK/runtime has not yet been published to this
+candidate.
+
+Earlier frozen-SDK adjacency evidence (`native-0a875da-615d7c802370`) remains
+valid for the separate chest+barrel probe: 90-degree motion, seven plus three
+items, rider transport, save/reopen continuity, collision and safe dismount.
+It does not cover glue traversal and is not substituted for the failed PR4
+glue test. The bounded probe's staging still omits `BlockProperties.waterloggable`
+because the frozen schema rejects it; waterlogging equivalence remains open.
+
+This checkpoint is not Done yet: the matching runtime test for real glue and
+the supported distinct-player offline guest path remain open. The full
+ownership inventory remains recorded above (174 entries including 11 exact-ID
+registry rows; 163 matrix rows/160 distinct families). Current family owners
+remain APP-2136 for shared adapter/kinetic integration, APP-2163 for processing
+and logistics, APP-2164 for interactions/static content, and APP-2165 for
+moving assemblies/trains. PR #192 stays draft until the remaining gates pass.

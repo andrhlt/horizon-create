@@ -22,4 +22,12 @@ impl mod_api::Hooks for Mod {
         }
         moving_probe::register(registrar);
     }
+
+    fn scheduled_task(
+        &self,
+        host: &mut dyn mod_api::ServerHost,
+        event: &mut mod_api::ScheduledTaskEvent<'_>,
+    ) {
+        motor_board::scheduled_task(host, event);
+    }
 }
