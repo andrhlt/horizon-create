@@ -424,6 +424,23 @@ impl BlockEntityPart for KineticPart {
             return;
         };
         let node_here = node(host, level, event.pos, *self);
+        // Fan processing belongs to the Fan's own server tick. Kinetic motors
+        // recompute and persist its signed effective speed, while this hook
+        // advances airflow and processing exactly once per active Fan tick.
+        if node_here.is_some_and(|node| matches!(node, Node::Fan { .. })) {
+            let speed = match event.entity.nbt.get(&"Speed".into()) {
+                Some(Tag::Float(value)) => f32::from_bits(*value),
+                _ => 0.0,
+            };
+            super::create_fan_nozzle_adapter::tick_fan(
+                host,
+                level,
+                event.pos,
+                &mut event.entity.nbt,
+                speed,
+            );
+            return;
+        }
         if node_here.is_some_and(|node| matches!(node, Node::ChainDrive { .. }))
             && level.block(host, event.pos) == Some(self.chain_gearshift)
         {
@@ -447,14 +464,6 @@ impl BlockEntityPart for KineticPart {
         if graph.is_empty() {
             return;
         }
-        // A shared network may have several motors, but its fan work must run
-        // only once per server tick. Use the lowest-position motor as the
-        // deterministic tick owner.
-        let fan_tick_owner = graph
-            .keys()
-            .copied()
-            .filter(|pos| matches!(node(host, level, *pos, *self), Some(Node::Motor { .. })))
-            .min();
         for (pos, state) in graph {
             let generated_speed = if pos == event.pos {
                 motor_generated_speed(host, level, pos, Some(&event.entity.nbt), *self)
@@ -466,17 +475,6 @@ impl BlockEntityPart for KineticPart {
             } else if let Some(entity) = host.block_entity_identity(level, pos) {
                 let mut data = entity.data(host).unwrap_or_default();
                 persist_network(&mut data, state, generated_speed);
-                if fan_tick_owner == Some(event.pos)
-                    && matches!(node(host, level, pos, *self), Some(Node::Fan { .. }))
-                {
-                    super::create_fan_nozzle_adapter::tick_fan(
-                        host,
-                        level,
-                        pos,
-                        &mut data,
-                        state.speed(),
-                    );
-                }
                 let _ = entity.merge_data(host, data);
             }
         }
