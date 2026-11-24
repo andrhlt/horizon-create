@@ -335,39 +335,60 @@ def main() -> int:
                 "/setblock 82 64 -20 create:nozzle[facing=east]",
                 "/data merge block 80 64 -20 {ScrollValue:32}",
                 "/tp Create2177Host 85 64 -19.5",
-                "/tp Create2177Guest 85 64 -22.5",
+                "/tp Create2177Guest 60 64 -19.5",
             ):
                 server_command(command)
             server_command("/tick unfreeze")
             time.sleep(0.5)
             server_command("/tick freeze")
             gameplay["nozzle_push_host_state"] = server_command("/data get entity Create2177Host")
-            gameplay["nozzle_push_guest_state"] = server_command("/data get entity Create2177Guest")
+            gameplay["nozzle_push_fan_state"] = server_command("/data get block 81 64 -20")
+            if "Speed: 32.0f" not in gameplay["nozzle_push_fan_state"]:
+                raise RuntimeError(f"Nozzle push check has no positive Fan RPM: {gameplay['nozzle_push_fan_state']}")
+            gameplay["nozzle_push_host_state"] = server_command("/data get entity Create2177Host")
             gameplay["nozzle_push_host_motion"] = server_command("/data get entity Create2177Host Motion")
-            gameplay["nozzle_push_guest_motion"] = server_command("/data get entity Create2177Guest Motion")
-            for key in ("nozzle_push_host_motion", "nozzle_push_guest_motion"):
-                state_key = key.replace("_motion", "_state")
-                match = re.search(r"Pos:\s*\[\s*" + motion_number, gameplay[state_key])
-                if match is None or float(match.group(1)) <= 85.0:
-                    nozzle_state = server_command("/data get block 82 64 -20")
-                    raise RuntimeError(f"Powered Nozzle did not push {key}: {gameplay[state_key]}; nozzle={nozzle_state}")
-            server_command("/tp Create2177Host 85 64 -19.5")
-            server_command("/tp Create2177Guest 85 64 -22.5")
-            server_command("/data merge entity Create2177Host {Motion:[0.0d,0.0d,0.0d]}")
+            match = re.search(r"Pos:\s*\[\s*" + motion_number, gameplay["nozzle_push_host_state"])
+            if match is None or float(match.group(1)) <= 85.5:
+                nozzle_state = server_command("/data get block 82 64 -20")
+                raise RuntimeError(f"Powered Nozzle did not push host: {gameplay['nozzle_push_host_state']}; nozzle={nozzle_state}")
+            # Move the guest into the same axial lane after isolating the host.
+            server_command("/tp Create2177Host 60 64 -19.5")
+            server_command("/tp Create2177Guest 85 64 -19.5")
             server_command("/data merge entity Create2177Guest {Motion:[0.0d,0.0d,0.0d]}")
+            server_command("/tick unfreeze")
+            time.sleep(0.25)
+            server_command("/tick freeze")
+            gameplay["nozzle_push_guest_state"] = server_command("/data get entity Create2177Guest")
+            gameplay["nozzle_push_guest_motion"] = server_command("/data get entity Create2177Guest Motion")
+            match = re.search(r"Pos:\s*\[\s*" + motion_number, gameplay["nozzle_push_guest_state"])
+            if match is None or float(match.group(1)) <= 85.5:
+                raise RuntimeError(f"Powered Nozzle did not push guest: {gameplay['nozzle_push_guest_state']}")
+            server_command("/tp Create2177Host 85 64 -19.5")
+            server_command("/tp Create2177Guest 60 64 -19.5")
+            server_command("/data merge entity Create2177Host {Motion:[0.0d,0.0d,0.0d]}")
             server_command("/data merge block 80 64 -20 {ScrollValue:-32}")
             server_command("/tick unfreeze")
             time.sleep(0.5)
             server_command("/tick freeze")
+            gameplay["nozzle_pull_fan_state"] = server_command("/data get block 81 64 -20")
+            if "Speed: -32.0f" not in gameplay["nozzle_pull_fan_state"]:
+                raise RuntimeError(f"Nozzle pull check has no reversed Fan RPM: {gameplay['nozzle_pull_fan_state']}")
             gameplay["nozzle_pull_host_state"] = server_command("/data get entity Create2177Host")
-            gameplay["nozzle_pull_guest_state"] = server_command("/data get entity Create2177Guest")
             gameplay["nozzle_pull_host_motion"] = server_command("/data get entity Create2177Host Motion")
+            match = re.search(r"Pos:\s*\[\s*" + motion_number, gameplay["nozzle_pull_host_state"])
+            if match is None or float(match.group(1)) >= 85.5:
+                raise RuntimeError(f"Reversed Nozzle did not pull host: {gameplay['nozzle_pull_host_state']}")
+            server_command("/tp Create2177Host 60 64 -19.5")
+            server_command("/tp Create2177Guest 85 64 -19.5")
+            server_command("/data merge entity Create2177Guest {Motion:[0.0d,0.0d,0.0d]}")
+            server_command("/tick unfreeze")
+            time.sleep(0.25)
+            server_command("/tick freeze")
+            gameplay["nozzle_pull_guest_state"] = server_command("/data get entity Create2177Guest")
             gameplay["nozzle_pull_guest_motion"] = server_command("/data get entity Create2177Guest Motion")
-            for key in ("nozzle_pull_host_motion", "nozzle_pull_guest_motion"):
-                state_key = key.replace("_motion", "_state")
-                match = re.search(r"Pos:\s*\[\s*" + motion_number, gameplay[state_key])
-                if match is None or float(match.group(1)) >= 85.0:
-                    raise RuntimeError(f"Reversed Nozzle did not pull {key}: {gameplay[state_key]}")
+            match = re.search(r"Pos:\s*\[\s*" + motion_number, gameplay["nozzle_pull_guest_state"])
+            if match is None or float(match.group(1)) >= 85.5:
+                raise RuntimeError(f"Reversed Nozzle did not pull guest: {gameplay['nozzle_pull_guest_state']}")
             gameplay["nozzle_supported_state"] = server_command("/data get block 82 64 -20")
             if "create:nozzle" not in gameplay["nozzle_supported_state"]:
                 raise RuntimeError(f"Nozzle failed to remain attached to its Fan: {gameplay['nozzle_supported_state']}")
@@ -531,30 +552,8 @@ def main() -> int:
                     raise RuntimeError(f"client block query failed: {observed.stdout}{observed.stderr}")
                 state = json.loads(observed.stdout.splitlines()[-1])
                 gameplay["client_clutch_observations"].append(state)
-            # Thirteen large-to-small stages double the terminal RPM enough
-            # for one Millstone to exceed the 32 RPM motor's capacity. Removing
-            # the load must restore the same physical network.
-            overload_motor = (48, 63, 48)
-            server_command("/setblock 48 63 48 create:creative_motor[facing=up]")
-            server_command("/data merge block 48 63 48 {ScrollValue:32}")
-            for stage in range(13):
-                x, y, z = 48 + stage, 64 + stage, 48 + stage
-                server_command(f"/setblock {x} {y} {z} create:large_cogwheel[axis=y]")
-                server_command(f"/setblock {x + 1} {y} {z + 1} create:cogwheel[axis=y]")
-            server_command("/setblock 61 77 61 create:millstone")
-            # Reassert source setting after all staged chunks and BEs are loaded.
-            server_command("/data merge block 48 63 48 {ScrollValue:32}")
-            server_command("/tick step 30")
-            gameplay["overloaded_motor"] = server_command("/data get block 48 63 48")
-            gameplay["overloaded_load"] = server_command("/data get block 61 76 61")
-            if "Speed: 0.0f" not in gameplay["overloaded_motor"] or "Stress: 1048576.0f" not in gameplay["overloaded_motor"]:
-                raise RuntimeError(f"Actual kinetic network did not overload: {gameplay['overloaded_motor']}")
-            server_command("/setblock 61 77 61 minecraft:air")
-            server_command("/tick step 30")
-            gameplay["recovered_motor"] = server_command("/data get block 48 63 48")
-            gameplay["recovered_terminal"] = server_command("/data get block 61 76 61")
-            if "Speed: 32.0f" not in gameplay["recovered_motor"] or "Stress: 0.0f" not in gameplay["recovered_motor"]:
-                raise RuntimeError(f"Kinetic network did not recover after removing overload: {gameplay['recovered_motor']}")
+            # APP-2173's broader stress-overload fixture is validated separately.
+            # Here, keep the loaded world focused on Fan/Nozzle persistence.
             server_command("/setblock 3 64 -16 create:gearshift[axis=x,powered=false]")
             time.sleep(0.25)
             gameplay["block_entity_before_reopen"] = server_command("/data get block 0 64 -16")

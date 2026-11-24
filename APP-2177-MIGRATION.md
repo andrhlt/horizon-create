@@ -1,57 +1,59 @@
-# APP-2177 fan and Nozzle migration
+# APP-2177 Fan and Nozzle migration
 
-## Starting state and finite case list
+## Delivered scope
 
-The legacy runtime already has broad Encased Fan coverage: four processing
-types, speed interruption, loose-item traces, obstruction/distance boundaries,
-idle and active item reopen, and a LAN Depot output flow. Nozzle placement,
-item impulses, support removal and survival crafting also have legacy evidence.
-Those results remain valid for that runtime; they do not verify the frozen SDK
-adapter.
+The pinned 0a content schema rejected `waterloggable` as a block property and
+`place_block` on block items. Waterlogging remains represented by supported
+`waterlogged` state properties (including their false defaults), and placeable
+items use the supported `block` target. `tools/test-app2177-content-schema.py`
+checks all 52 affected block definitions and five item definitions.
 
-This ticket's bounded SDK pass is:
+`native/create_fan_nozzle_adapter.rs` registers the production Nozzle part and
+implements powered Fan airflow, saved processing state, recipe output,
+obstruction/range queries, and Nozzle item/living-player impulses through the
+typed SDK. The Fan is registered as a terminal on the existing
+`create:simple_kinetic` part. Its signed RPM is supplied by APP-2173's kinetic
+graph; fan processing and airflow advance from that Fan's own block-entity
+server tick, so a multi-motor graph cannot multiply the per-Fan work. Fan
+processing state and Nozzle range/entity tracking are stored on their block
+entities for normal synchronization and saves.
 
-| Area | Cases | Current result |
-| --- | --- | --- |
-| Shared airflow rules | RPM 0, ±16, ±256 and over-range; axis sign; 3–20 block reach | Pure production helper, 4 focused tests pass |
-| Depot processing | Washing, smoking, blasting and haunting; 16/17-item timer boundary; output conservation and full-output recovery | Existing legacy checks; SDK adapter open |
-| Loose item airflow | Positive/reversed flow, velocity easing and obstruction/distance boundary | Existing legacy checks; SDK adapter open |
-| Nozzle entities | Item, mob and player push/pull; 1.5-block pull exclusion; crouching, line of sight and 20-block cap | Impulse kernel tested; SDK query/effect adapter open |
-| Persistence | Idle and active Fan/Nozzle save and reopen, retaining operation and affected inventory/entities | SDK runtime check open |
-| Multiplayer | Host action and guest observation of processing and Nozzle movement | SDK host/guest check open |
+## Pinned production verification
 
-Exact particles, animation phase, exhaustive recipes and packet-arrival timing
-remain outside this pass unless they expose a gameplay defect.
+Built through the typed `horizon-launcher native-build` route with optimized
+profile against Horizon `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, Rust 1.99.1,
+and the prebuilt API. No legacy mixin tool bundle was used. The combined Create
+package loaded with no omitted mods, registry warnings, or unknown feature
+references. Compiled package tree SHA-256:
+`6d07d1315a72060b69e976ba1610eebed6ac16b80d889651457868db7d85d351`.
 
-## Changes in this checkpoint
+`tools/test-app2177-production-offline-route.py` ran two distinct whitelisted
+offline UUIDs on an isolated localhost dedicated server and offscreen clients.
+The run passed these gameplay checks:
 
-`native/fan_airflow_math.rs` extracts the small numerical rules needed by both
-adapters: fan reach and direction, batched Depot timer transitions, loose-item
-velocity easing, and Nozzle impulses for items, mobs or players. The legacy Fan,
-loose-item and Nozzle item paths now call that shared module, so the existing
-runtime and the next typed adapter can use the same equations.
+- A 32 RPM Fan registered as a kinetic terminal with 64 stress and moved a
+  representative item forward; -32 RPM reversed its item motion; zero RPM
+  stopped the Fan.
+- A crushed raw zinc item in the water lane became a zinc nugget through the
+  production recipe path.
+- The supported Nozzle pushed and pulled both host and guest players under
+  positive and reversed Fan RPM. Both clients observed the Nozzle facing state.
+- The Fan's speed and item tracking, the Nozzle's active range and tracked
+  entities, the processed output, and a signed geared output survived server
+  save/reopen. The reopened server retained `Speed: 32.0f`, `Stress: 64.0f`,
+  `CreateNozzleRange: 5.125f`, and `create:zinc_nugget`.
 
-This is a preparation checkpoint, not the gameplay migration. No production
-typed-Part registration, real fan/entity query, recipe transfer, save/reopen,
-offscreen render, or LAN result is claimed here. The production package owner
-(APP-2172) owns the shared package registration seam, and the kinetic/transmission
-adapter owner (APP-2173) owns fan speed integration. The pinned 0a875da API
-surface includes [`LevelRef::entities_in`](https://github.com/arismoko/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-mod-vocab/src/host/levels.rs),
-[`entity_set_velocity`](https://github.com/arismoko/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-mod-vocab/src/host/entities.rs)
-and [`player_set_velocity`](https://github.com/arismoko/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-mod-vocab/src/host/players.rs),
-so entity effects can be implemented through the selected SDK; no API gap has
-been established.
+Run receipt for the pinned package is available at
+`/private/tmp/app2177-production-final-15311-r4/two-client-proof.json` in the
+verification environment. The run used content hash
+`252cddb41a7acd475012a3e482ec6225030384f44889f40057b6d1bb05d4d06d` and two
+separate offline identities. The committed route script is the reproducible
+record of setup and assertions.
 
-## Reproduction
+## Bounded remaining parity
 
-Source baseline: Create `ac0c444d9828da3453ae8cc65338e8de063286fb`; repository
-baseline `cc12664`. The focused production-rule test is dependency-free:
-
-```sh
-rustc --edition=2024 --test native/fan_airflow_math.rs -o /tmp/app2177-fan-airflow-tests
-/tmp/app2177-fan-airflow-tests
-```
-
-Result: 4 passed. This does not identify a Horizon native build or content-pack
-hash. The frozen-SDK build, actual headless gameplay, persistence, host/guest and
-render checks remain open.
+The production runtime route covers representative item processing and player
+movement. The broader legacy Fan/Nozzle suites remain useful evidence, but this
+pass does not claim every recipe, mob/item Nozzle combination, visual effect,
+or exact Java timing. Those details remain Full 1:1 follow-ups in the feature
+matrix; they do not block the practical gameplay scope delivered here.
