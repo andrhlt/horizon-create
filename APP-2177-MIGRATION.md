@@ -22,10 +22,11 @@ entities for normal synchronization and saves.
 
 Built through the typed `horizon-launcher native-build` route with optimized
 profile against Horizon `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, Rust 1.99.1,
-and the prebuilt API. No legacy mixin tool bundle was used. The combined Create
-package loaded with no omitted mods, registry warnings, or unknown feature
-references. Compiled package tree SHA-256:
-`6d07d1315a72060b69e976ba1610eebed6ac16b80d889651457868db7d85d351`.
+and the prebuilt API. The selected build was `native-0a875da-ee0f9e377c6f`.
+No legacy mixin tool bundle was used. The combined Create package loaded with
+no omitted mods, registry warnings, or unknown feature references. Compiled
+package tree SHA-256:
+`75d8cc987d88b8ac5f8b2e8c7eef35011d38d6dc9f19b8b9360bb6298f755ede`.
 
 `tools/test-app2177-production-offline-route.py` ran two distinct whitelisted
 offline UUIDs on an isolated localhost dedicated server and offscreen clients.
@@ -44,7 +45,7 @@ The run passed these gameplay checks:
   `CreateNozzleRange: 5.125f`, and `create:zinc_nugget`.
 
 Run receipt for the pinned package is available at
-`/private/tmp/app2177-production-final-15311-r4/two-client-proof.json` in the
+`/private/tmp/app2177-production-rebased-final/two-client-proof.json` in the
 verification environment. The run used content hash
 `252cddb41a7acd475012a3e482ec6225030384f44889f40057b6d1bb05d4d06d` and two
 separate offline identities. The committed route script is the reproducible
