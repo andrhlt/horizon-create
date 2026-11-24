@@ -10,7 +10,7 @@ static KINETIC_PART: OnceLock<KineticPart> = OnceLock::new();
 use mod_api::{
     BlockEntityOnLoadEvent, BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent, BlockKey,
     BlockPart, BlockState, Compound, HostBlockStates, HostSide, LevelHost, LevelRef, ServerHost,
-    Tag,
+    Tag, Text,
 };
 
 pub fn register(registrar: &mut dyn mod_api::Registrar) {
@@ -52,17 +52,40 @@ impl KineticPart {
         pos: [i32; 3],
         setting: i32,
     ) -> bool {
-        if !matches!(node(host, level, pos, *self), Some(Node::Motor { .. })) {
+        let node = node(host, level, pos, *self);
+        if node.is_none() {
+            setter_trace(
+                host,
+                format!(
+                    "CREATE_KINETIC_SET_FALSE branch=node pos={pos:?} block={:?} dimension={:?}",
+                    level.block(host, pos),
+                    level.dimension().id(host),
+                ),
+            );
             return false;
         }
         let Some(entity) = host.block_entity_identity(level, pos) else {
+            setter_trace(
+                host,
+                format!("CREATE_KINETIC_SET_FALSE branch=entity pos={pos:?}"),
+            );
             return false;
         };
         let Some(mut data) = entity.data(host) else {
+            setter_trace(
+                host,
+                format!("CREATE_KINETIC_SET_FALSE branch=data pos={pos:?}"),
+            );
             return false;
         };
         let value = setting.clamp(-256, 256);
         if scroll_value(&data) == value {
+            setter_trace(
+                host,
+                format!(
+                    "CREATE_KINETIC_SET_FALSE branch=unchanged pos={pos:?} value={value}"
+                ),
+            );
             return false;
         }
         data.insert("ScrollValue".into(), Tag::Int(value));
@@ -75,7 +98,17 @@ impl KineticPart {
         let _ = entity.merge_data(host, data.clone());
         let graph = network(host, level, pos, Some(&data), *self);
         apply_speeds(host, level, graph, *self);
+        setter_trace(
+            host,
+            format!("CREATE_KINETIC_SET_TRUE pos={pos:?} value={value}"),
+        );
         true
+    }
+}
+
+fn setter_trace(host: &dyn ServerHost, message: String) {
+    if std::env::var_os("CREATE_MOTOR_BOARD_CONTROL_TRACE").is_some() {
+        host.messages().broadcast(Text::literal(message));
     }
 }
 
