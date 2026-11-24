@@ -375,13 +375,16 @@ impl BlockEntityPart for KineticPart {
             return;
         }
         for (pos, state) in graph {
-            let is_motor =
-                node(host, level, pos, *self).is_some_and(|n| matches!(n, Node::Motor { .. }));
+            let generated_speed = if pos == event.pos {
+                motor_generated_speed(host, level, pos, Some(&event.entity.nbt), *self)
+            } else {
+                motor_generated_speed(host, level, pos, None, *self)
+            };
             if pos == event.pos {
-                persist_network(&mut event.entity.nbt, state, is_motor);
+                persist_network(&mut event.entity.nbt, state, generated_speed);
             } else if let Some(entity) = host.block_entity_identity(level, pos) {
                 let mut data = Compound::new();
-                persist_network(&mut data, state, is_motor);
+                persist_network(&mut data, state, generated_speed);
                 let _ = entity.merge_data(host, data);
             }
         }
@@ -399,19 +402,38 @@ fn apply_speeds(
             continue;
         };
         let mut data = Compound::new();
-        let is_motor =
-            node(host, level, pos, part).is_some_and(|n| matches!(n, Node::Motor { .. }));
-        persist_network(&mut data, state, is_motor);
+        let generated_speed = motor_generated_speed(host, level, pos, None, part);
+        persist_network(&mut data, state, generated_speed);
         let _ = entity.merge_data(host, data);
     }
 }
 
-fn persist_network(data: &mut Compound, state: kinetic_slice::Network, is_motor: bool) {
-    data.insert("Speed".into(), Tag::Float(state.rpm.to_bits()));
-    if is_motor {
+fn motor_generated_speed(
+    host: &dyn mod_api::Host,
+    level: LevelRef,
+    pos: [i32; 3],
+    current_data: Option<&Compound>,
+    part: KineticPart,
+) -> Option<f32> {
+    let Node::Motor { facing } = node(host, level, pos, part)? else {
+        return None;
+    };
+    let data = current_data
+        .cloned()
+        .or_else(|| host.block_entity(level, pos)?.data(host))?;
+    Some(kinetic_slice::motor_speed(facing, scroll_value(&data)))
+}
+
+fn persist_network(
+    data: &mut Compound,
+    state: kinetic_slice::Network,
+    motor_generated_speed: Option<f32>,
+) {
+    data.insert("Speed".into(), Tag::Float(state.speed().to_bits()));
+    if let Some(motor_generated_speed) = motor_generated_speed {
         data.insert(
             "MotorGeneratedSpeed".into(),
-            Tag::Float(state.rpm.to_bits()),
+            Tag::Float(motor_generated_speed.to_bits()),
         );
     }
     let mut saved = match data.get(&"Network".into()) {

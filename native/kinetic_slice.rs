@@ -214,7 +214,11 @@ pub struct Network {
 
 impl Network {
     pub fn speed(self) -> f32 {
-        effective_speed(self.rpm, self.capacity, self.stress)
+        if self.source_conflict {
+            0.0
+        } else {
+            effective_speed(self.rpm, self.capacity, self.stress)
+        }
     }
 }
 
@@ -347,6 +351,7 @@ mod tests {
         assert_eq!(network.capacity, 524_288.0);
         assert_eq!(network.rpm.abs(), 16.0);
         assert!(network.source_conflict);
+        assert_eq!(network.speed(), 0.0);
     }
 
     #[test]

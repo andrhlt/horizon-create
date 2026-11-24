@@ -10,7 +10,7 @@ production-package or full-family acceptance run.
 
 | Assigned matrix row | Starting state | This pass |
 | --- | --- | --- |
-| Kinetic propagation, speed, stress, overload | Adapted motor/shaft/cogwheel graph; source and load subset only | Directional transmission rules and the legacy loop-ratio tolerance extended; full load, loop rejection, overload, reconnect/split gates remain open |
+| Kinetic propagation, speed, stress, overload | Adapted motor/shaft/cogwheel graph; source and Millstone load subset only | Directional transmission rules, effective-speed persistence, and the legacy loop-ratio tolerance extended; runtime load, loop rejection, overload boundaries/recovery, and reconnect/split gates remain open |
 | Small/large/encased cogwheels | Small/large cogwheel typed path in checkpoint | Encased cogwheel registration, gear ratios, and open-half shaft connection rules added; runtime remains open |
 | Shafts and encased shafts | Straight Shaft typed path in checkpoint | Andesite, Brass, and Metal Girder encased shaft registrations added; runtime and lifecycle remain open |
 | Gearbox and Vertical Gearbox | Legacy implementation only | Typed block-entity registration and axis node added; runtime cases remain open |
@@ -40,6 +40,12 @@ The typed graph records inconsistent loop ratios using the same `1e-5`
 tolerance as the legacy loop walk. It does not yet reproduce the legacy
 Gearbox join ordering or select the newly added block for safe loop rejection;
 that runtime behavior remains open.
+
+Persisted `Speed` now uses effective network speed, so an overloaded or
+opposing-source graph does not continue driving downstream parts. A motor's
+own generated speed remains separate from its network speed. The production
+logic cases cover source conflict and below/at/above-capacity calculations;
+the connected typed-runtime behavior still awaits the pinned package run.
 
 The direct production-logic check is:
 
