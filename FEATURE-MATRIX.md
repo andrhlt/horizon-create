@@ -130,6 +130,14 @@ classification and acceptance evidence are recorded in
 
 ## Redstone and displays
 
+The statuses below are from the audited legacy build. APP-2184 adds an
+in-progress SDK implementation for Horizon 0a; its current build and open
+acceptance gates are recorded in [APP-2184 0a evidence](migration/APP-2184-REDSTONE-0A.md).
+Legacy Java traces and LAN results are references for migration, not verification
+of the SDK package. In particular, Redstone Link, Linked Controller, Smart
+Observer, Display Link/Board, Stockpile Switch and Nixie behavior have not been
+ported in this pass.
+
 | Feature | In game | Basic tested | Java comparison | Full 1:1 | Remaining work |
 | --- | --- | --- | --- | --- | --- |
 | Redstone Contact | Yes | Pass | Original vertical Gantry trace; static matching/mismatched and Redstone/Elevator Contact pairs, separation, idle and active reopen (`tools/test-redstone-contacts.py`); dedicated host/guest state agreement (`tools/test-multiplayer-redstone-contact.py`) | Open | Remaining contraption geometries, timing and effects |

@@ -24,6 +24,9 @@
     "powering": {
       "type": "boolean"
     },
+    "activate": {
+      "type": "boolean"
+    },
     "inverted": {
       "type": "boolean"
     }
@@ -32,6 +35,7 @@
     "facing": "north",
     "powered": "false",
     "powering": "false",
+    "activate": "false",
     "inverted": "false"
   },
   "shapes": {
