@@ -88,6 +88,75 @@ fn deployer_rotation_axis(facing: Direction, along_first: bool) -> u8 {
     }
 }
 
+/// The state transition shared by the legacy Millstone hook and the typed-Part
+/// migration.  Keeping timer arithmetic independent of Horizon IO prevents the
+/// adapter from growing a second processing implementation.
+pub(super) mod millstone_processing {
+    pub const DEFAULT_PROCESSING_TIME: i32 = 100;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum Tick {
+        Idle,
+        Started { timer: i32 },
+        Progressed { timer: i32, finished: bool },
+    }
+
+    pub fn tick(timer: i32, rpm: f32, recipe_time: Option<i32>, has_input: bool) -> Tick {
+        if rpm == 0.0 {
+            return Tick::Idle;
+        }
+        if timer <= 0 {
+            return recipe_time
+                .filter(|_| has_input)
+                .map_or(Tick::Idle, |time| Tick::Started { timer: time });
+        }
+        let step = ((rpm / 16.0).abs() as i32).clamp(1, 512);
+        let next = timer - step;
+        Tick::Progressed {
+            timer: next,
+            finished: next <= 0,
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn speed_controls_progress_without_skipping_a_started_cycle() {
+            assert_eq!(tick(0, 0.0, Some(100), true), Tick::Idle);
+            assert_eq!(tick(0, 16.0, Some(100), true), Tick::Started { timer: 100 });
+            assert_eq!(
+                tick(100, 16.0, Some(100), true),
+                Tick::Progressed {
+                    timer: 99,
+                    finished: false
+                }
+            );
+            assert_eq!(
+                tick(3, 64.0, Some(100), true),
+                Tick::Progressed {
+                    timer: -1,
+                    finished: true
+                }
+            );
+        }
+
+        #[test]
+        fn invalid_or_empty_inputs_do_not_start_or_consume() {
+            assert_eq!(tick(0, 16.0, None, true), Tick::Idle);
+            assert_eq!(tick(0, 16.0, Some(100), false), Tick::Idle);
+            assert_eq!(
+                tick(100, -256.0, Some(100), true),
+                Tick::Progressed {
+                    timer: 84,
+                    finished: false
+                }
+            );
+        }
+    }
+}
+
 pub(super) const DIRECTIONS: [[i32; 3]; 6] = [
     [1, 0, 0],
     [-1, 0, 0],
@@ -600,6 +669,16 @@ enum Kinetic {
 }
 
 impl Kinetic {
+    fn kinetic_slice(self) -> Option<super::create_kinetic_slice::Node> {
+        use super::create_kinetic_slice::Node;
+        match self {
+            Self::Motor(facing) => Some(Node::Motor { facing }),
+            Self::Shaft(axis) => Some(Node::Shaft { axis }),
+            Self::Cog(axis, large) => Some(Node::Cogwheel { axis, large }),
+            _ => None,
+        }
+    }
+
     fn at(game: &Game<'_>, pos: [i32; 3]) -> Option<Self> {
         match game.native_block(pos).as_str() {
             MOTOR => {
@@ -903,6 +982,9 @@ impl Kinetic {
     }
 
     fn ratio_to(self, other: Self, offset: [i32; 3]) -> Option<f32> {
+        if let (Some(from), Some(to)) = (self.kinetic_slice(), other.kinetic_slice()) {
+            return from.ratio_to(to, offset);
+        }
         let adjacent = offset.iter().map(|value| value.abs()).sum::<i32>() == 1;
         if adjacent && self.shaft(offset) && other.shaft(offset.map(|v| -v)) {
             return Some(1.0);

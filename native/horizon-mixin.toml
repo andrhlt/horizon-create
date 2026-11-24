@@ -18,6 +18,18 @@ name = "create_machines"
 source = "machines.rs"
 
 [[module]]
+id = "millstone_processing"
+file = "crates/horizon-client/src/game.rs"
+name = "create_millstone_processing"
+source = "millstone_processing.rs"
+
+[[module]]
+id = "kinetic_slice"
+file = "crates/horizon-client/src/game.rs"
+name = "create_kinetic_slice"
+source = "kinetic_slice.rs"
+
+[[module]]
 id = "chain_conveyor"
 file = "crates/horizon-client/src/game.rs"
 name = "create_chain_conveyor"

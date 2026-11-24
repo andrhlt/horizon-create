@@ -5,6 +5,7 @@
 //! LAN guests and non-overworld dimensions use the same path as the host.
 
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use mod_api::{
@@ -12,12 +13,14 @@ use mod_api::{
     UseWithoutItemEvent,
 };
 
-use crate::kinetic_adapter;
+use super::kinetic_adapter;
 
 const MENU_ID: &str = "create:creative_motor";
-const MOTOR_SETTING_TASK: u64 = 0x4352_4541_5445_2164;
+const MOTOR_SETTING_TASK_PREFIX: u64 = 0x4352_4541_5400_0000;
+static NEXT_MOTOR_SETTING_TASK: AtomicU64 = AtomicU64::new(MOTOR_SETTING_TASK_PREFIX);
 
 struct PendingSetting {
+    token: u64,
     dimension: String,
     pos: [i32; 3],
     setting: i32,
@@ -47,28 +50,6 @@ fn menu_key(host: &dyn ServerHost) -> Option<mod_api::MenuKey> {
     found
 }
 
-fn control_trace(host: &dyn ServerHost, message: &'static str) {
-    if std::env::var_os("CREATE_MOTOR_BOARD_CONTROL_TRACE").is_some() {
-        host.messages().broadcast(Text::literal(message));
-    }
-}
-
-fn control_trace_setting(host: &dyn ServerHost, pos: [i32; 3], setting: i32, updated: bool) {
-    if std::env::var_os("CREATE_MOTOR_BOARD_CONTROL_TRACE").is_some() {
-        host.messages().broadcast(Text::literal(format!(
-            "CREATE_MOTOR_BOARD_SETTING pos={pos:?} setting={setting} updated={updated}"
-        )));
-    }
-}
-
-fn control_trace_queued(host: &dyn ServerHost, pos: [i32; 3], setting: i32, scheduled: bool) {
-    if std::env::var_os("CREATE_MOTOR_BOARD_CONTROL_TRACE").is_some() {
-        host.messages().broadcast(Text::literal(format!(
-            "CREATE_MOTOR_BOARD_SETTING_QUEUED pos={pos:?} setting={setting} scheduled={scheduled}"
-        )));
-    }
-}
-
 pub fn register(registrar: &mut dyn mod_api::Registrar) {
     let kind = registrar.block_entity_type_key("create:motor");
     let block = registrar.block_key(MENU_ID);
@@ -87,9 +68,7 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         .expect("creative motor board part registration");
 }
 
-/// Open the board once the caller has resolved the content menu's opaque key.
-/// The pinned SDK has no supported content-id -> `MenuKey` lookup, so the
-/// normal block-use adapter is intentionally kept as a typed seam here.
+/// Open the board after resolving its content menu key from the host registry.
 pub fn open_with_menu(
     host: &mut dyn ServerHost,
     click: &mod_api::BlockClick<'_>,
@@ -115,14 +94,6 @@ pub fn open_with_menu(
             return None;
         }
     };
-    control_trace(
-        host,
-        if result.is_some() {
-            "CREATE_MOTOR_BOARD_OPEN_OK"
-        } else {
-            "CREATE_MOTOR_BOARD_OPEN_NONE"
-        },
-    );
     if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
         eprintln!("CREATE_MOTOR_BOARD_OPEN result={result:?}");
     }
@@ -137,7 +108,6 @@ impl BlockPart for MotorBoard {
         host: &mut dyn ServerHost,
         event: &mut UseWithoutItemEvent<'_>,
     ) -> Option<InteractionResult> {
-        control_trace(host, "CREATE_MOTOR_BOARD_USE_HOOK");
         if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
             eprintln!(
                 "CREATE_MOTOR_BOARD_USE pos={:?} block={:?} expected={MENU_ID}",
@@ -148,20 +118,9 @@ impl BlockPart for MotorBoard {
         if host.block_key(MENU_ID) != Some(event.state.block()) {
             return None;
         }
-        // `MenuKey` is opaque and the pinned API provides no supported lookup
-        // from the content id declared in creative_motor.json. Keep the empty
-        // hand hook installed so the integration owner can pass the resolved
-        // key without changing the authority/hand contract.
-        let menu = match menu_key(host) {
-            Some(menu) => {
-                control_trace(host, "CREATE_MOTOR_BOARD_MENU_KEY_OK");
-                menu
-            }
-            None => {
-                control_trace(host, "CREATE_MOTOR_BOARD_MENU_KEY_NONE");
-                return None;
-            }
-        };
+        // Resolve by canonical menu id, keeping the opaque key out of content
+        // code and preserving the normal main-hand interaction contract.
+        let menu = menu_key(host)?;
         open_with_menu(host, &event.click, menu)
     }
 }
@@ -173,10 +132,7 @@ impl BlockEntityPart for MotorBoard {
         _host: &dyn mod_api::Host,
         event: &mut mod_api::ScreenEvent<'_>,
     ) -> Option<mod_api::Screen> {
-        if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
-            eprintln!("CREATE_MOTOR_BOARD_SCREEN block={}", event.block);
-        }
-        (event.block == "create:creative_motor").then(|| mod_api::Screen {
+        (event.block == MENU_ID).then(|| mod_api::Screen {
             width: 334.0,
             height: 166.0,
             slots: vec![Some([8.0, 84.0])],
@@ -193,18 +149,15 @@ impl BlockEntityPart for MotorBoard {
         _host: &dyn mod_api::ClientHost,
         event: &mut mod_api::ScreenDrawEvent<'_>,
     ) {
-        if event.block != "create:creative_motor" {
+        if event.block != MENU_ID {
             return;
-        }
-        if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
-            eprintln!("CREATE_MOTOR_BOARD_DRAW block={}", event.block);
         }
         const ROWS: [&str; 2] = ["Counterclockwise RPM", "Clockwise RPM"];
         for (row, label) in ROWS.into_iter().enumerate() {
             let y = event.origin[1] + 19.0 + row as f32 * 11.0;
             let _ = event.draw.widget_button(
                 [event.origin[0] + 25.0, y, 294.0, 11.0],
-                &mod_api::Text::literal(label),
+                &Text::literal(label),
                 true,
                 false,
             );
@@ -216,13 +169,7 @@ impl BlockEntityPart for MotorBoard {
         _host: &dyn mod_api::ClientHost,
         event: &mut mod_api::ScreenClickEvent<'_>,
     ) -> Option<i32> {
-        if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
-            eprintln!(
-                "CREATE_MOTOR_BOARD_CLICK block={} right={}",
-                event.block, event.right
-            );
-        }
-        if event.block != "create:creative_motor" || event.right {
+        if event.block != MENU_ID {
             return None;
         }
         let [x, y] = event.at;
@@ -246,7 +193,6 @@ impl BlockEntityPart for MotorBoard {
     }
 
     fn menu_button(&self, host: &mut dyn ServerHost, event: &mut mod_api::MenuButtonEvent<'_>) {
-        control_trace(host, "CREATE_MOTOR_BOARD_MENU_BUTTON_HOOK");
         let Some(player) = host.player(event.context.player) else {
             return;
         };
@@ -256,38 +202,63 @@ impl BlockEntityPart for MotorBoard {
         // Button ids are the signed board value shifted into the menu's
         // non-negative protocol range. The shared adapter clamps again.
         let setting = setting_from_button(event.context.id);
+        if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+            let _ = host.messages().broadcast(Text::literal(format!(
+                "CREATE_MOTOR_BOARD_MENU_BUTTON_QUEUED pos={:?} setting={setting}",
+                event.context.pos
+            )));
+        }
         let Some(dimension) = level.dimension().id(host) else {
             return;
         };
+        let token = NEXT_MOTOR_SETTING_TASK.fetch_add(1, Ordering::Relaxed);
         pending_settings()
             .lock()
             .expect("motor setting queue")
             .push_back(PendingSetting {
+                token,
                 dimension: dimension.to_string(),
                 pos: event.context.pos,
                 setting,
             });
-        let scheduled = host.schedule_task(0, MOTOR_SETTING_TASK).is_ok();
-        control_trace_queued(host, event.context.pos, setting, scheduled);
+        let scheduled = host.schedule_task(0, token).is_ok();
+        if !scheduled {
+            pending_settings()
+                .lock()
+                .expect("motor setting queue")
+                .retain(|item| item.token != token);
+        }
+        if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+            let _ = host.messages().broadcast(Text::literal(format!(
+                "CREATE_MOTOR_BOARD_SETTING_SCHEDULED scheduled={scheduled}"
+            )));
+        }
     }
 }
 
 pub fn scheduled_task(host: &mut dyn ServerHost, event: &mut mod_api::ScheduledTaskEvent<'_>) {
-    if event.token != MOTOR_SETTING_TASK {
+    if event.token & 0xffff_ffff_ffff_0000 != MOTOR_SETTING_TASK_PREFIX {
         return;
     }
-    let pending = pending_settings()
-        .lock()
-        .expect("motor setting queue")
-        .drain(..)
-        .collect::<Vec<_>>();
-    for request in pending {
-        let Some(level) = host.level(&request.dimension) else {
-            control_trace(host, "CREATE_MOTOR_BOARD_SETTING_LEVEL_MISSING");
-            continue;
-        };
-        let updated = kinetic_adapter::set_motor_setting(host, level, request.pos, request.setting);
-        control_trace_setting(host, request.pos, request.setting, updated);
+    let request = {
+        let mut pending = pending_settings().lock().expect("motor setting queue");
+        pending
+            .iter()
+            .position(|item| item.token == event.token)
+            .and_then(|index| pending.remove(index))
+    };
+    let Some(request) = request else {
+        return;
+    };
+    let Some(level) = host.level(&request.dimension) else {
+        return;
+    };
+    let updated = kinetic_adapter::set_motor_setting(host, level, request.pos, request.setting);
+    if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+        let _ = host.messages().broadcast(Text::literal(format!(
+            "CREATE_MOTOR_BOARD_SETTING_APPLIED pos={:?} setting={} updated={updated}",
+            request.pos, request.setting
+        )));
     }
 }
 
