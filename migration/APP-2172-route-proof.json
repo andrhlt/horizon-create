@@ -1,0 +1,37 @@
+{
+  "ticket": "APP-2172",
+  "result": "supported offline localhost route passed",
+  "tested_at": "2026-11-23",
+  "engine": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "sdk": "1.99.1",
+  "launcher_build": "native-0a875da-4388e6fde41d",
+  "mixins": "e59da9094f0c2fdda6c627fe9eff22dec6a906f0",
+  "rust": "1.99.1",
+  "route": {
+    "server": "horizon-server run",
+    "clients": "horizon-ctl launch --headless with horizon-client --server",
+    "server_bind": "127.0.0.1",
+    "offline_mode": true,
+    "whitelist": true,
+    "credential_or_lease_changes": false
+  },
+  "players": {
+    "Create2172Host": "799b198e-b7b6-3d66-a793-3cf3375643a2",
+    "Create2172Guest": "eb0e20a5-f85d-3404-84a7-e4b4f64ae0ae"
+  },
+  "artifacts": {
+    "horizon-server_sha256": "2b0f3d7bd318f52a8385b7d7b28db78d13f7752d25fd30d824d487aef5fe1f1d",
+    "horizon-client_sha256": "012bf6dbfecb095bfb27f9b84452105639501cc5444aca15517360cd90547935",
+    "horizon-ctl_sha256": "61ab9be5b1f232446f1d6d5be4b296b954d538986bbac38dc5f54ba8c7e11372",
+    "native-mods_json_sha256": "6787909799c342d75d26f5e925ac9b1168ed4a611924fe805dff95a4cbd7192d",
+    "loaded_mod": "create_kinetic_probe",
+    "loaded_mod_package_sha256": "b4ee29d1d040851f615bbe53856e62aac0889257b218e4a757091fff9649725f"
+  },
+  "selected_engine_fix": {
+    "commit": "3fa53d4b99ca22bba5897c6544b9515fd5521948",
+    "present_in_tested_build": false,
+    "behavior_verified": false
+  },
+  "production_create_package_verified": false,
+  "server_log": "retained under /private/tmp/app-2172-offline-route-final/server.log on this host"
+}
