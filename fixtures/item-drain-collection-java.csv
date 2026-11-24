@@ -1,0 +1,6 @@
+case,result,cargo,inventory_iron,held_tool
+block_pass,PASS_TO_DEFAULT_BLOCK_INTERACTION,3,0,1
+stick_collect,SUCCESS,0,3,1
+stick_repeat,SUCCESS,0,3,1
+empty_collect,SUCCESS,0,3,0
+empty_repeat,SUCCESS,0,3,0

@@ -1,10 +1,11 @@
 use horizon_core::geometry::Direction;
 use horizon_core::random::RandomSource;
-use horizon_world::level::flags;
+use horizon_world::level::{PlaceContext, flags};
 use horizon_world::nbt::{Compound, Tag};
 use horizon_world::registry::BlockStateId;
 
 use crate::items::ItemStack;
+use horizon_core::{geometry::Vec3, position::BlockPos};
 
 use super::Game;
 use super::create_bearing::{cargo_items, deposit, relative};
@@ -38,6 +39,36 @@ fn xyz(data: &Compound, key: &str) -> Option<[i32; 3]> {
 
 fn store_pos(data: &mut Compound, key: &str, pos: [i32; 3]) {
     data.insert(key.into(), Tag::IntArray(pos.to_vec()));
+}
+
+pub(super) fn redirect_placement(game: &mut Game<'_>, context: &mut PlaceContext) {
+    if context.item != ROLLER {
+        return;
+    }
+    let clicked = context.clicked_pos;
+    let support = [clicked.x, clicked.y - 1, clicked.z];
+    let full_top = game.native_block_collision(support).iter().any(|bounds| {
+        bounds[4] == 1.0
+            && bounds[0] == 0.0
+            && bounds[2] == 0.0
+            && bounds[3] == 1.0
+            && bounds[5] == 1.0
+    });
+    if !full_top {
+        return;
+    }
+    let target = [clicked.x, clicked.y + 1, clicked.z];
+    if !game.with_level(|behaviours, level, _| {
+        behaviours.is_replaceable(level.world.block(target[0], target[1], target[2]))
+    }) {
+        return;
+    }
+    context.clicked_pos = BlockPos::new(target[0], target[1], target[2]);
+    context.hit = Vec3::new(
+        f64::from(target[0]) + 0.5,
+        f64::from(target[1]) + 1.0,
+        f64::from(target[2]) + 0.5,
+    );
 }
 
 fn find_stock(blocks: &mut [Compound], item: &str, take: bool) -> bool {
@@ -396,8 +427,70 @@ pub(super) fn tick(
     stalled
 }
 
+fn full_outline(outline: &[[f64; 6]]) -> bool {
+    !outline.is_empty()
+        && (0..3).all(|axis| {
+            outline.iter().map(|bounds| bounds[axis]).reduce(f64::min) == Some(0.0)
+                && outline.iter().map(|bounds| bounds[axis + 3]).reduce(f64::max) == Some(1.0)
+        })
+}
+
+fn filter_state(game: &mut Game<'_>, stack: &ItemStack, pos: [i32; 3]) -> Option<BlockStateId> {
+    let mut state = game.native_default_state(&stack.item)?;
+    if game.native_block_state_property(state, "type").is_some() {
+        state = game.with_level(|_, level, _| {
+            level
+                .native_state_with_property(state, "type", "double")
+                .unwrap_or(state)
+        });
+    }
+    let facts = game.res.facts().get(state);
+    if facts.block_entity || facts.has_class("EntityBlock") || facts.has_class("StairBlock")
+        || !full_outline(&facts.outline)
+    {
+        return None;
+    }
+    let mut scene = horizon_client::collisions::SceneCollisions {
+        world: &game.world,
+        binding: game.collision,
+        subject: None,
+    };
+    if !game.collision.collision_shape(&mut scene, state, pos).is_ok_and(|shape| !shape.is_empty()) {
+        return None;
+    }
+    Some(state)
+}
+
+pub(super) fn invalid_filter_item(game: &mut Game<'_>, stack: &ItemStack, pos: [i32; 3]) -> bool {
+    filter_state(game, stack, pos).is_none()
+}
+
+pub(super) fn valid_filter_item(game: &mut Game<'_>, stack: &ItemStack, pos: [i32; 3]) -> bool {
+    filter_state(game, stack, pos).is_some()
+}
+
+pub(super) fn claims_filter_box(game: &mut Game<'_>, pos: [i32; 3]) -> bool {
+    let Some(hit) = game.pick() else { return false; };
+    if hit.pos != pos || game.native_block(pos) != ROLLER { return false; }
+    let state = game.world.block(pos[0], pos[1], pos[2]);
+    let (x, z) = match game.native_block_state_property(state, "facing") {
+        Some("north") => (11.0 / 16.0, 11.0 / 16.0),
+        Some("south") => (5.0 / 16.0, 5.0 / 16.0),
+        Some("west") => (15.5 / 16.0, 11.0 / 16.0),
+        Some("east") => (0.5 / 16.0, 5.0 / 16.0),
+        _ => return false,
+    };
+    let dx = hit.point[0] - f64::from(pos[0]) - x;
+    let dy = hit.point[1] - f64::from(pos[1]) - 15.5 / 16.0;
+    let dz = hit.point[2] - f64::from(pos[2]) - z;
+    dx * dx + dy * dy + dz * dz < 1.0 / 9.0
+}
+
 pub(super) fn set_filter(game: &mut Game<'_>, pos: [i32; 3], stack: &ItemStack) -> bool {
-    if game.native_block(pos) != ROLLER || game.native_default_state(&stack.item).is_none() {
+    if !claims_filter_box(game, pos)
+        || game.native_block(pos) != ROLLER
+        || filter_state(game, stack, pos).is_none()
+    {
         return false;
     }
     let sample = ItemStack {
@@ -415,4 +508,20 @@ pub(super) fn set_filter(game: &mut Game<'_>, pos: [i32; 3], stack: &ItemStack) 
     game.native_block_entity_sync(pos);
     game.swing_arm();
     true
+}
+
+pub(super) fn set_mode(game: &mut Game<'_>, pos: [i32; 3], mode: i32) {
+    if !(0..=2).contains(&mode) {
+        return;
+    }
+    let changed = game.native_with_mod_block_entity(pos, |roller| {
+        if roller.id != ROLLER || int(&roller.nbt, "ScrollValue") == Some(mode) {
+            return false;
+        }
+        roller.nbt.insert("ScrollValue".into(), Tag::Int(mode));
+        true
+    });
+    if changed == Some(true) {
+        game.native_block_entity_sync(pos);
+    }
 }

@@ -5,6 +5,17 @@ fn depot_click(
     canceled: &mut bool,
 ) {
     if !*canceled
+        && game.native_block(pos) == "create:deployer"
+        && game.hand == super::Hand::Main
+        && !game
+            .held()
+            .is_some_and(|stack| stack.item.as_ref() == "create:wrench")
+        && crate::game::create_machines::deployer_interact(game, pos, face)
+    {
+        *canceled = true;
+        return;
+    }
+    if !*canceled
         && (crate::game::create_chain_conveyor_target::click(game, pos)
             || crate::game::create_chain_conveyor_connect::click(game, pos)
             || crate::game::create_clipboard_block::sneak_pickup(game, pos)
@@ -14,10 +25,23 @@ fn depot_click(
         *canceled = true;
         return;
     }
-    if !*canceled && crate::game::create_table_cloth::click(game, pos, face) { *canceled = true; return; }
-    if !*canceled && crate::game::create_placard::click(game, pos) { *canceled = true; return; }
-    if !*canceled && crate::game::create_steam_whistle::grow(game, pos) { *canceled = true; return; }
-    if !*canceled && crate::game::create_crafter::click_cover(game, pos, face) {
+    if !*canceled && crate::game::create_table_cloth::click(game, pos, face) {
+        *canceled = true;
+        return;
+    }
+    if !*canceled && crate::game::create_shopping_list::ticker_click(game, pos) {
+        *canceled = true;
+        return;
+    }
+    if !*canceled && crate::game::create_placard::click(game, pos) {
+        *canceled = true;
+        return;
+    }
+    if !*canceled && crate::game::create_steam_whistle::grow(game, pos) {
+        *canceled = true;
+        return;
+    }
+    if !*canceled && crate::game::create_crafter::click(game, pos, face) {
         *canceled = true;
         return;
     }
@@ -69,10 +93,21 @@ fn depot_click(
         *canceled = true;
         return;
     }
+    // Cannon loading must run before the container block opens its menu.
+    if !*canceled
+        && game.native_block(pos) == crate::game::create_schematicannon::CANNON
+        && let Some(stack) = game.held().cloned()
+        && crate::game::create_schematicannon::use_item(game, pos, face, &stack)
+    {
+        *canceled = true;
+        return;
+    }
     if !*canceled
         && (crate::game::create_station::open(game, pos)
             || crate::game::create_display_link::open(game, pos)
             || crate::game::create_chain_conveyor_packages::open_port(game, pos)
+            || crate::game::create_schematicannon::open(game, pos)
+            || crate::game::create_schematic_table::open(game, pos)
             || crate::game::create_brass_tunnel::click(game, pos, face))
     {
         *canceled = true;

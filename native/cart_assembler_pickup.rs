@@ -1,6 +1,6 @@
 // The portable item shares the mounted payload's entity lifecycle.
-// This first codec handles ordinary solid blocks;
-// mounted inventories, actors and glue must remain mounted until supported.
+// Plain blocks and vanilla chest/barrel block data round-trip through the item.
+// Other mounted inventories, actors and glue remain mounted until supported.
 use super::Game;
 use super::create_bearing::{display, relative};
 use super::create_cart_assembler::{cell, payload_ref, save};
@@ -61,8 +61,12 @@ fn portable_blocks(data: &Compound) -> Option<Vec<Compound>> {
                 return None;
             }
             if block.contains_key(&"Entity".into())
-                || block.contains_key(&"VanillaEntity".into())
                 || block.contains_key(&"Items".into())
+            {
+                return None;
+            }
+            if block.contains_key(&"VanillaEntity".into())
+                && !matches!(name.as_str(), "minecraft:chest" | "minecraft:barrel")
             {
                 return None;
             }
@@ -83,10 +87,16 @@ fn encode_portable(blocks: &[Compound], anchor: [i32; 3], orientation: &str) -> 
                 palette.push(state);
                 palette.len() - 1
             });
-        entries.push(Tag::Compound(Compound::from([
+        let mut entry = Compound::from([
             ("Pos".into(), Tag::Long(packed_pos(relative(block)))),
             ("State".into(), Tag::Int(index as i32)),
-        ])));
+        ]);
+        // Java palette entries carry saved block-entity NBT in Data. Horizon
+        // retains inventory in the vanilla NBT, including item components.
+        if let Some(data) = block.get(&"VanillaEntity".into()) {
+            entry.insert("Data".into(), data.clone());
+        }
+        entries.push(Tag::Compound(entry));
     }
     let mut low = [0; 3];
     let mut high = [1; 3];
@@ -176,7 +186,7 @@ fn decode_portable(data: &Compound) -> Option<Vec<Compound>> {
             let Tag::Compound(entry) = entry else {
                 return None;
             };
-            if entry.contains_key(&"Data".into()) || entry.contains_key(&"UpdateTag".into()) {
+            if entry.contains_key(&"UpdateTag".into()) {
                 return None;
             }
             let Tag::Long(pos) = entry.get(&"Pos".into())? else {
@@ -192,10 +202,19 @@ fn decode_portable(data: &Compound) -> Option<Vec<Compound>> {
             if !plain_state(&name) {
                 return None;
             }
-            Some(Compound::from([
+            let mut block = Compound::from([
                 ("Pos".into(), Tag::IntArray(unpacked_pos(*pos).to_vec())),
                 ("BlockState".into(), Tag::Compound(state.clone())),
-            ]))
+            ]);
+            if let Some(data) = entry.get(&"Data".into()) {
+                if !matches!(name.as_str(), "minecraft:chest" | "minecraft:barrel")
+                    || !matches!(data, Tag::Compound(_))
+                {
+                    return None;
+                }
+                block.insert("VanillaEntity".into(), data.clone());
+            }
+            Some(block)
         })
         .collect()
 }

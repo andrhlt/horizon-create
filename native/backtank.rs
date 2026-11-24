@@ -12,6 +12,9 @@ use crate::{
     save::item_to_nbt,
 };
 
+use horizon_client::text::Text;
+use std::{cell::RefCell, collections::BTreeMap};
+
 use super::{
     Game, GameLevel,
     create_machines::{int, mod_entity},
@@ -24,6 +27,12 @@ pub(super) const AIR: &str = "create:banktank_air";
 const CAPACITY_ENCHANTMENT: &str = "create:capacity";
 const MAX_BASE: i32 = 900;
 const EXTRA_CAPACITY: i32 = 300;
+const COPPER_DIVING_BOOTS: &str = "create:copper_diving_boots";
+const NETHERITE_DIVING_BOOTS: &str = "create:netherite_diving_boots";
+
+thread_local! {
+    static LAST_PLAYER_AIR: RefCell<BTreeMap<u128, i32>> = RefCell::default();
+}
 
 pub(super) fn block(id: &str) -> bool {
     matches!(id, TANK | NETHERITE_TANK)
@@ -64,6 +73,123 @@ pub(super) fn breathe_player(
     let remaining = (*air).min(capacity) - 1;
     tank.data_mut().set_other(AIR, Some(Tag::Int(remaining)));
     true
+}
+
+pub(super) fn player_tick(game: &mut Game<'_>) {
+    if !game.native_authoritative() {
+        return;
+    }
+
+    let player_id = horizon_client::lan::playerdata::ints_uuid(game.acting_player_uuid());
+    let air = game.armor[1]
+        .as_ref()
+        .filter(|tank| block(&tank.item))
+        .and_then(|tank| match tank.data().and_then(|data| data.other(AIR)) {
+            Some(Tag::Int(air)) => Some(*air),
+            _ => None,
+        });
+    if let Some(air) = air {
+        warn_air_crossing(game, player_id, air);
+    } else {
+        LAST_PLAYER_AIR.with_borrow_mut(|last| {
+            last.remove(&player_id);
+        });
+    }
+}
+
+/// Apply Create's `EntityTickEvent.Pre` boots rule before the local player's
+/// controlled movement tick. `native_player_tick` is a server Post hook and
+/// cannot change the client player movement that it has already simulated.
+pub(super) fn diving_movement_tick(game: &mut Game<'_>) {
+    if game.armor[3]
+        .as_ref()
+        .is_none_or(|boots| {
+            !matches!(boots.item.as_ref(), COPPER_DIVING_BOOTS | NETHERITE_DIVING_BOOTS)
+        })
+    {
+        return;
+    }
+    let Some(player) = game.player.as_mut() else {
+        return;
+    };
+    let in_water = player.fluids.was_touching_water
+        || player.is_eye_in_fluid(horizon_client::motion::WATER);
+    if !in_water
+        || player.pose == horizon_client::pose::Pose::Swimming
+        || player.flying
+    {
+        return;
+    }
+
+    if player.jumping && player.ground.on_ground {
+        player.velocity.y += 0.5;
+        player.ground.on_ground = false;
+    } else {
+        player.velocity.y -= 0.05;
+    }
+
+    let input = player.applied_input;
+    let horizontal_speed = (player.velocity.x * player.velocity.x
+        + player.velocity.z * player.velocity.z)
+        .sqrt();
+    if horizontal_speed < 0.145
+        && (input[0] != 0.0 || input[1] > 0.0)
+        && !player.shift_key_down
+    {
+        player.velocity.x *= 1.3;
+        player.velocity.z *= 1.3;
+    }
+}
+
+fn warn_air_crossing(game: &mut Game<'_>, player: u128, air: i32) {
+    let previous = LAST_PLAYER_AIR.with_borrow_mut(|last| last.insert(player, air));
+    let Some(previous) = previous else {
+        return;
+    };
+    if previous != air + 1 {
+        return;
+    }
+
+    let max = game.armor[1]
+        .as_ref()
+        .map_or(MAX_BASE, |tank| {
+            MAX_BASE + EXTRA_CAPACITY * tank.enchantment_level(CAPACITY_ENCHANTMENT) as i32
+        });
+    let warnings = [
+        (max / 10, "create.backtank.low", 0xffaa00),
+        (1, "create.backtank.depleted", 0xff0000),
+    ];
+    for (threshold, key, color) in warnings {
+        if previous > threshold && air <= threshold {
+            let subtitle = Text::literal("⚠ ")
+                .with_color(color)
+                .append(Text::translate(key, &[]).with_color(0xaaaaaa));
+            let _ = game.native_title(
+                player,
+                &Text::literal(""),
+                &subtitle,
+                10,
+                40,
+                10,
+            );
+            let _ = game.native_play_sound_to(
+                player,
+                "create:deny",
+                "block",
+                None,
+                1.0,
+                1.25,
+            );
+            let _ = game.native_play_sound_to(
+                player,
+                "create:steam",
+                "block",
+                None,
+                0.5,
+                0.5,
+            );
+        }
+    }
 }
 
 pub(super) fn place(

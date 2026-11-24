@@ -141,6 +141,41 @@ def configure(args):
     print("Survival placement, receiver mode, and both frequency slots worked without consuming their samples.")
 
 
+def persistence(args):
+    """Save and reopen a wired idle rig and a running rig in the same world."""
+    with fixture_world(args, "Redstone-link-persistence", STRUCTURE, pack=args.pack) as control:
+        setup(control)
+        control.commands((
+            f"/setblock {pos(SOURCE_A)} minecraft:redstone_block",
+            "/save-all flush",
+        ))
+        control.step_to(control.clock() + 1)
+        active = sample(control)
+        if active[1] != "true" or active[5] != "true":
+            raise RuntimeError(f"Active Redstone Link rig did not power before save: {active}")
+        control.command("/save-all flush")
+        control.restart()
+        resumed = sample(control)
+        if resumed[1] != "true" or resumed[5] != "true" or resumed[4] != 15:
+            raise RuntimeError(f"Active Redstone Link rig did not resume after reopen: {resumed}")
+
+        control.command(f"/setblock {pos(SOURCE_A)} minecraft:air")
+        control.step_to(control.clock() + 1)
+        idle = sample(control)
+        if idle[1] != "false" or idle[5] != "false":
+            raise RuntimeError(f"Redstone Link rig did not return to idle: {idle}")
+        control.command("/save-all flush")
+        control.restart()
+        reopened_idle = sample(control)
+        if reopened_idle[1] != "false" or reopened_idle[5] != "false":
+            raise RuntimeError(f"Idle Redstone Link state changed after reopen: {reopened_idle}")
+        for at in (*SENDERS, *RECEIVERS):
+            data = control.command(f"/data get block {pos(at)}")
+            if "FrequencyFirst" not in data or "FrequencyLast" not in data:
+                raise RuntimeError(f"Frequency binding was lost at {at}: {data}")
+    print("Active and idle Redstone Link states and both frequency bindings survived save/reopen.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("ctl", "client", "resources"):
@@ -149,5 +184,6 @@ if __name__ == "__main__":
     parser.add_argument("--visual", action="store_true")
     parser.add_argument("--diagnostics", action="store_true")
     parser.add_argument("--configure", action="store_true")
+    parser.add_argument("--persistence", action="store_true")
     args = parser.parse_args()
-    (configure if args.configure else run)(args)
+    (persistence if args.persistence else configure if args.configure else run)(args)

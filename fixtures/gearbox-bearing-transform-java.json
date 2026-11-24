@@ -1,0 +1,96 @@
+[
+  {
+    "phase": "before",
+    "running": false,
+    "angle": 0.0,
+    "points": {
+      "center": {
+        "block": "create:gearbox",
+        "axis": "x",
+        "rpm": -32.0,
+        "source": "up"
+      },
+      "east": {
+        "block": "create:gearbox",
+        "axis": "z",
+        "rpm": 0.0,
+        "source": "none"
+      },
+      "north": {
+        "block": "minecraft:air"
+      },
+      "south": {
+        "block": "minecraft:air"
+      }
+    }
+  },
+  {
+    "phase": "quarter_turn",
+    "running": true,
+    "angle": 90.0,
+    "points": {
+      "center": {
+        "block": "minecraft:air"
+      },
+      "east": {
+        "block": "minecraft:air"
+      },
+      "north": {
+        "block": "minecraft:air"
+      },
+      "south": {
+        "block": "minecraft:air"
+      }
+    }
+  },
+  {
+    "phase": "restored",
+    "running": false,
+    "angle": 0.0,
+    "points": {
+      "center": {
+        "block": "create:gearbox",
+        "axis": "z",
+        "rpm": 0.0,
+        "source": "none"
+      },
+      "east": {
+        "block": "minecraft:air"
+      },
+      "north": {
+        "block": "create:gearbox",
+        "axis": "x",
+        "rpm": 0.0,
+        "source": "none"
+      },
+      "south": {
+        "block": "minecraft:air"
+      }
+    }
+  },
+  {
+    "phase": "settled",
+    "running": false,
+    "angle": 0.0,
+    "points": {
+      "center": {
+        "block": "create:gearbox",
+        "axis": "z",
+        "rpm": -32.0,
+        "source": "up"
+      },
+      "east": {
+        "block": "minecraft:air"
+      },
+      "north": {
+        "block": "create:gearbox",
+        "axis": "x",
+        "rpm": 0.0,
+        "source": "none"
+      },
+      "south": {
+        "block": "minecraft:air"
+      }
+    }
+  }
+]

@@ -155,13 +155,6 @@ pub(super) fn click(game: &mut Game<'_>, at: [i32; 3], hit: [f64; 3]) -> bool {
     }
 
     let storage = offset(at, direction.normal());
-    let access = direction.opposite();
-    if game
-        .native_container_slots(game.native_dimension(), storage, access)
-        .is_none()
-    {
-        return true;
-    }
     let Some(filter) = mod_entity(game, at).map(|entity| entity.nbt.clone()) else {
         return true;
     };
@@ -186,7 +179,9 @@ pub(super) fn click(game: &mut Game<'_>, at: [i32; 3], hit: [f64; 3]) -> bool {
             continue;
         }
         let before = stack.count;
-        let rest = game.native_insert_item(storage, access, stack);
+        // A horizontal Item Hatch exposes furnace inputs from above; feeding
+        // from its attached horizontal face would only reach the fuel slot.
+        let rest = game.native_insert_item(storage, Direction::Up, stack);
         if rest.as_ref().is_some_and(|left| left.count == before) {
             continue;
         }

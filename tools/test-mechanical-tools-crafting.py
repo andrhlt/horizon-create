@@ -7,6 +7,12 @@ from pathlib import Path
 from fixture_world import fixture_world
 
 RECIPES = {
+    "extendo_grip": (
+        (" L ", " R ", "SSS", "SSS", " H "),
+        (" v ", " v ", ">v<", ">v<", " v "),
+        {"L": "create:brass_ingot", "R": "create:precision_mechanism",
+         "S": "minecraft:stick", "H": "create:brass_hand"},
+    ),
     "wand_of_symmetry": (
         (" G ", "GEG", " P ", " B ", " O "),
         (" v ", ">v<", " v ", " v ", " v "),

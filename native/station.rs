@@ -183,6 +183,7 @@ const CASING: &str = "create:railway_casing";
 pub(super) const SMALL_BOGEY: &str = "create:small_bogey";
 pub(super) const LARGE_BOGEY: &str = "create:large_bogey";
 const ASSEMBLY_LIMIT: i32 = 128;
+pub(super) const MAX_BOGEYS: usize = 20;
 
 pub(super) fn targeting_position(nbt: &Compound, pos: [i32; 3]) -> Option<([i32; 3], bool)> {
     let delta = block_pos(nbt.get(&"TargetTrack".into())?)?;
@@ -315,6 +316,7 @@ pub(super) fn tick(game: &Game<'_>, pos: [i32; 3], entity: &mut crate::container
         track.map_or(0, |(origin, axis)| {
             (1..=assembly_length(game, origin, axis))
                 .filter(|&i| is_bogey(game, bogey_at(along(origin, axis, i))))
+                .take(MAX_BOGEYS)
                 .count()
         })
     } else {
@@ -529,6 +531,7 @@ pub(super) fn menu_button(
             };
             let bogeys: Vec<_> = (1..=assembly_length(game, origin, axis))
                 .filter(|&i| is_bogey(game, bogey_at(along(origin, axis, i))))
+                .take(MAX_BOGEYS)
                 .collect();
             match super::create_train::assemble(game, pos, origin, axis, &bogeys) {
                 Ok(()) => Some(false),

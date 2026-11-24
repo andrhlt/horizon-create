@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use horizon_core::geometry::Direction;
 use horizon_core::position::BlockPos;
 use horizon_world::level::PlaceContext;
@@ -12,6 +14,7 @@ use super::native_block_entity_draw::BlockEntityDraw;
 use super::{Game, GameLevel};
 
 pub(super) const CONTROLLER: &str = "create:rotation_speed_controller";
+pub(super) const MAX_ROTATION_SPEED: i32 = 256;
 const BRACKET: &str = "create:block/rotation_speed_controller/bracket";
 const SHAFT: &str = "create:block/shaft";
 const CENTER: [f32; 3] = [0.5; 3];
@@ -20,7 +23,7 @@ pub(super) fn target(entity: Option<&ModBlockEntity>) -> f32 {
     entity
         .and_then(|entity| int(&entity.nbt, "ScrollValue"))
         .unwrap_or(16)
-        .clamp(-256, 256) as f32
+        .clamp(-MAX_ROTATION_SPEED, MAX_ROTATION_SPEED) as f32
 }
 
 pub(super) fn update_tag(entity: &ModBlockEntity) -> Compound {
@@ -55,14 +58,17 @@ pub(super) fn render(
     let parity = pos[(axis + 1) % 3] + pos[(axis + 2) % 3];
     let phase = if parity % 2 == 0 { 22.5 } else { 0.0 };
     let angle = super::create_visuals::wheel_angle(draw.game_time, draw.partial, rpm, phase);
+    let start = draw.vertices_mut().len();
     super::create_visuals::draw_rotating(game, draw, axis, angle, SHAFT);
+    let end_shaft = draw.vertices_mut().len();
 
     let above = [pos[0], pos[1] + 1, pos[2]];
-    if game.native_block(above) == super::create_machines::LARGE_COG
-        && game
-            .native_block_property(above, "axis")
-            .is_some_and(|axis| axis != "y")
-    {
+    let above_block = game.native_block(above);
+    let above_axis = game.native_block_property(above, "axis");
+    if above_block == LARGE_COG && above_axis.as_deref().is_some_and(|axis| axis != "y") {
+        let body_light = draw.light;
+        let (block, sky) = game.native_light(above);
+        draw.light = horizon_client::block_entity_render::vertex_light((sky << 4) | block);
         draw.push();
         draw.translate([0.0, 1.0, 0.0]);
         draw.rotate_about(
@@ -72,7 +78,54 @@ pub(super) fn render(
         );
         game.native_draw_model(draw, BRACKET, 0xffffff);
         draw.pop();
+        draw.light = body_light;
     }
+
+    static TRACE: OnceLock<bool> = OnceLock::new();
+    if *TRACE.get_or_init(|| std::env::var_os("CREATE_CONTROLLER_RENDER").is_some()) {
+        let (block_light, _) = game.native_light(pos);
+        let (above_light, _) = game.native_light(above);
+        let vertices = draw.vertices_mut();
+        let shaft = trace_part(&vertices[start..end_shaft], axis, angle);
+        let bracket = trace_part(&vertices[end_shaft..], axis, 0.0);
+        let axis = ["x", "y", "z"][axis];
+        let above_axis = above_axis.as_deref().unwrap_or("-");
+        println!(
+            "HORIZON_CONTROLLER_FRAME {},{axis},{above_block},{above_axis},{},{:.8},{:.8},{rpm:.6},{angle:.6},{block_light},{above_light},{shaft},{bracket}",
+            pos[0],
+            draw.game_time,
+            draw.partial,
+            draw.game_time as f64 + f64::from(draw.partial),
+        );
+    }
+}
+
+fn trace_part(vertices: &[horizon_client::mesher::Vertex], axis: usize, angle: f32) -> String {
+    let Some(first) = vertices.first() else {
+        return "0,-1,-1,0,0,0,0,0,0".into();
+    };
+    use glam::{Quat, Vec3};
+    let turn = Quat::from_axis_angle([Vec3::X, Vec3::Y, Vec3::Z][axis], -angle.to_radians());
+    let center = Vec3::splat(0.5);
+    let mut min = Vec3::splat(f32::INFINITY);
+    let mut max = Vec3::splat(f32::NEG_INFINITY);
+    for vertex in vertices {
+        let pos = turn * (Vec3::from(vertex.pos) - center) + center;
+        min = min.min(pos);
+        max = max.max(pos);
+    }
+    let block_light = (first.light >> 12) & 15;
+    let sky_light = (first.light >> 4) & 15;
+    format!(
+        "{},{block_light},{sky_light},{:.7},{:.7},{:.7},{:.7},{:.7},{:.7}",
+        vertices.len(),
+        min.x,
+        min.y,
+        min.z,
+        max.x,
+        max.y,
+        max.z,
+    )
 }
 
 pub(super) fn cross_axis(axis: &str) -> &'static str {
@@ -118,7 +171,7 @@ pub(super) fn place(
     }
     let above = level.world.block(pos.x, pos.y + 1, pos.z);
     if let Some(above) = level.registry.state(above)
-        && above.name == LARGE_COG
+        && super::create_cogwheel::large_cog(&above.name)
         && let Some(axis) = above.properties.get("axis")
         && axis != "y"
     {
@@ -154,7 +207,6 @@ const ROWS: [&str; 2] = ["⟳", "⟲"];
 const HEIGHT: f32 = 59.0;
 const ROW_TOP: f32 = 19.0;
 const BAR_LEFT: f32 = 25.0;
-const MAX_SETTING: i32 = 256;
 
 #[derive(Clone, Copy)]
 pub(super) enum ValueBoard {
@@ -167,7 +219,7 @@ pub(super) enum ValueBoard {
 impl ValueBoard {
     pub(super) fn maximum(self) -> i32 {
         match self {
-            Self::Speed => MAX_SETTING,
+            Self::Speed => MAX_ROTATION_SPEED,
             Self::Angle => 180,
             Self::StackSize => super::create_ejector::STACK_SIZE,
             Self::Interval => 60,
@@ -306,7 +358,7 @@ pub(super) fn set_value(
     block: ValueBlock,
     selection: Selection,
 ) {
-    let speed = selection.value.clamp(1, MAX_SETTING) * if selection.row == 0 { -1 } else { 1 };
+    let speed = signed_speed(selection);
     let changed = game.native_with_mod_block_entity(pos, |entity| {
         if block.speed_entity() != Some(entity.id.as_str()) || target(Some(entity)) == speed as f32
         {
@@ -319,10 +371,28 @@ pub(super) fn set_value(
         return;
     }
     setting_feedback(game, pos);
-    if matches!(block, ValueBlock::Motor) {
-        super::create_machines::motor_setting_changed(game, pos);
+    match block {
+        ValueBlock::Motor => super::create_machines::motor_setting_changed(game, pos),
+        ValueBlock::Controller => super::create_machines::controller_setting_changed(game, pos),
+        _ => {}
     }
     game.native_block_entity_sync(pos);
+}
+
+/// Convert the board's row/column selection into Create's signed setting.
+///
+/// Zero is the center detent, not the smallest non-zero RPM. Keeping this
+/// conversion here makes client board clicks and server-side replay share the
+/// same bounded rule (including the ±256 limit).
+pub(super) fn signed_speed(selection: Selection) -> i32 {
+    let magnitude = selection.value.clamp(0, MAX_ROTATION_SPEED);
+    if magnitude == 0 {
+        0
+    } else if selection.row == 0 {
+        -magnitude
+    } else {
+        magnitude
+    }
 }
 
 pub(super) fn setting_feedback(game: &mut Game<'_>, pos: [i32; 3]) {
@@ -500,6 +570,26 @@ impl ValueBoard {
             0x442000,
             false,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn board_center_is_zero_and_directions_keep_their_sign() {
+        assert_eq!(signed_speed(Selection { row: 0, value: 0 }), 0);
+        assert_eq!(signed_speed(Selection { row: 1, value: 0 }), 0);
+        assert_eq!(signed_speed(Selection { row: 0, value: 24 }), -24);
+        assert_eq!(signed_speed(Selection { row: 1, value: 64 }), 64);
+    }
+
+    #[test]
+    fn board_values_are_bounded_before_authoritative_apply() {
+        assert_eq!(signed_speed(Selection { row: 0, value: 999 }), -256);
+        assert_eq!(signed_speed(Selection { row: 1, value: 999 }), 256);
+        assert_eq!(signed_speed(Selection { row: 1, value: -12 }), 0);
     }
 }
 

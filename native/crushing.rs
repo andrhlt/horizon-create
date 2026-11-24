@@ -19,6 +19,62 @@ pub(super) const CASED_SHAFT: &str = "create:andesite_encased_shaft";
 pub(super) const MODEL: &str = "create:block/crushing_wheel/block";
 pub(super) const SLOTS: usize = 16;
 
+pub(super) fn placement(
+    level: &super::GameLevel<'_>,
+    state: horizon_world::registry::BlockStateId,
+    context: &horizon_world::level::PlacementContext,
+    answer: &mut Option<Option<horizon_world::registry::BlockStateId>>,
+) {
+    if answer.is_some() || level.native_state_block(state) != Some(WHEEL) {
+        return;
+    }
+    let preferred = super::create_hand_crank::preferred_direction(level, context.pos);
+    let axis = if context.sneaking {
+        preferred.map_or_else(
+            || context.nearest_looking_direction().normal(),
+            |_| context.face.normal(),
+        )
+    } else {
+        preferred.map_or_else(
+            || context.nearest_looking_direction().normal(),
+            |face| face.normal(),
+        )
+    };
+    let axis_index = axis
+        .iter()
+        .position(|component| *component != 0)
+        .unwrap_or(1);
+    let axis_name = ["x", "y", "z"][axis_index];
+    let Some(placed) = level.native_state_with_property(state, "axis", axis_name) else {
+        *answer = Some(None);
+        return;
+    };
+
+    for direction in Direction::ALL {
+        let step = direction.normal();
+        let pos = offset([context.pos.x, context.pos.y, context.pos.z], step);
+        let neighbor = level.world.block(pos[0], pos[1], pos[2]);
+        let Some(block) = level.native_state_block(neighbor) else {
+            continue;
+        };
+        if block == WHEEL {
+            let neighbor_axis = level
+                .registry
+                .state(neighbor)
+                .and_then(|state| state.properties.get("axis"))
+                .map(String::as_str);
+            if step[axis_index] == 0 || neighbor_axis != Some(axis_name) {
+                *answer = Some(None);
+                return;
+            }
+        } else if block == CONTROLLER && step[axis_index] == 0 {
+            *answer = Some(None);
+            return;
+        }
+    }
+    *answer = Some(Some(placed));
+}
+
 fn axis(game: &Game<'_>, pos: [i32; 3]) -> Option<usize> {
     if game.native_block(pos) != WHEEL {
         return None;

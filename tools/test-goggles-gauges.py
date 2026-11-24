@@ -59,6 +59,15 @@ def test_draw(args, cases):
                 control.command(f"/data merge block {x} {y} {z} {tag}")
                 control.call("look-at", x + 0.5, y + 0.5, z + 0.5)
                 control.call("wait", 8)
+        control.commands((
+            "/setblock 10 98 -10 create:chute[facing=down]",
+            "/setblock 11 98 -8 create:fluid_tank",
+            '/data merge block 11 98 -8 {TankContent:{Fluid:{id:"minecraft:water",amount:2500}}}',
+        ))
+        control.call("look-at", 10.5, 98.5, -9.5)
+        control.call("wait", 8)
+        control.call("look-at", 11.5, 98.5, -7.5)
+        control.call("wait", 8)
 
 
 def render_samples(lines):
@@ -79,6 +88,13 @@ def check(fixture):
     observed = [sample for _, sample in render_samples(logfile.read_text().splitlines())]
     if not observed:
         raise RuntimeError("Horizon did not draw a Goggles readout")
+    observed_text = ["".join(char for char, _ in row) for sample in observed for row in sample]
+    for target_line in (
+        "Chute Information", "No attached fans", "Items move Downward",
+        "Fluid Container Info:", "Water", "2500 mB / 8000 mB",
+    ):
+        if not any(target_line in line for line in observed_text):
+            raise RuntimeError(f"Missing scoped processing/fluid Goggles readout: {target_line!r}")
     samples = iter(observed)
     for key, wanted in expected.items():
         for sample in samples:

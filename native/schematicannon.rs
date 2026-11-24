@@ -62,6 +62,10 @@ fn valid_id(id: &str) -> bool {
         })
 }
 
+pub(super) fn valid_template_id(id: &str) -> bool {
+    valid_id(id)
+}
+
 fn start(
     game: &mut Game<'_>,
     pos: [i32; 3],
@@ -86,17 +90,13 @@ fn start(
     let registry = game.pack.assets.registry;
     let template = StructureTemplate::from_nbt(&id.tag, registry, transforms);
     let palette = template.palettes().first().ok_or("schematicExpired")?;
-    let mode = options(&entity.nbt)
-        .and_then(|tag| int(tag, "replace_mode"))
-        .unwrap_or(2);
     let mut blocks: Vec<_> = palette
         .blocks()
         .iter()
         .filter(|block| {
-            registry.state(block.state).is_some_and(|state| {
-                state.name != "minecraft:structure_void"
-                    && (mode == 3 || !game.res.behaviours().is_air(block.state))
-            })
+            registry
+                .state(block.state)
+                .is_some_and(|state| state.name != "minecraft:structure_void")
         })
         .collect();
     if blocks.is_empty() {
@@ -130,15 +130,40 @@ fn start(
                     ),
                 ]),
             );
+            // Java prepares safe block-entity data, never a raw saved inventory.
+            // Full safe-writer support is separate; keep ordinary container names only.
             if let Some(data) = &block.nbt {
-                entry.insert("BlockEntity".into(), Tag::Compound((**data).clone()));
+                let mut safe = if state.name.starts_with("create:")
+                    && game
+                        .native_block_name_in_tag(&state.name, "create:safe_nbt")
+                        .unwrap_or(false)
+                {
+                    (**data).clone()
+                } else {
+                    Compound::new()
+                };
+                if let Some(name) = data.get(&"CustomName".into()) {
+                    safe.insert("CustomName".into(), name.clone());
+                }
+                if !safe.is_empty() {
+                    if let Some(id) = data.get(&"id".into()) {
+                        safe.insert("id".into(), id.clone());
+                    }
+                    entry.insert("BlockEntity".into(), Tag::Compound(safe));
+                }
             }
             Some(Tag::Compound(entry))
         })
         .collect();
-    entity
-        .nbt
-        .insert("AmountToPlace".into(), Tag::Int(queue.len() as i32));
+    entity.nbt.insert(
+        "AmountToPlace".into(),
+        Tag::Int(
+            blocks
+                .iter()
+                .filter(|block| !game.res.behaviours().is_air(block.state))
+                .count() as i32,
+        ),
+    );
     entity.nbt.insert("Queue".into(), Tag::List(queue));
     entity.nbt.insert("Cursor".into(), Tag::Int(0));
     entity.nbt.insert("AmountPlaced".into(), Tag::Int(0));
@@ -153,7 +178,7 @@ fn options(nbt: &Compound) -> Option<&Compound> {
 }
 
 fn clear_job(entity: &mut ModBlockEntity, finished: bool) {
-    for field in ["Queue", "Cursor", "Cooldown"] {
+    for field in ["Queue", "Cursor", "Cooldown", "MissingItem", "MissingCount"] {
         entity.nbt.remove(&field.into());
     }
     for field in ["AmountPlaced", "AmountToPlace"] {
@@ -210,7 +235,10 @@ fn mark_flight(game: &mut Game<'_>, entity: &mut ModBlockEntity) {
         .insert("FlyingBlocks".into(), Tag::List(remaining));
 }
 
-fn take_adjacent(game: &mut Game<'_>, pos: [i32; 3], name: &str) -> bool {
+fn take_adjacent(game: &mut Game<'_>, pos: [i32; 3], name: &str, count: u32) -> bool {
+    // Plan the whole extraction first: a short supply must not eat partial inputs.
+    let mut sources = Vec::new();
+    let mut needed = count;
     let dim = game.native_dimension();
     for face in Direction::ALL {
         let at = offset(pos, face.normal());
@@ -219,16 +247,22 @@ fn take_adjacent(game: &mut Game<'_>, pos: [i32; 3], name: &str) -> bool {
             continue;
         };
         for slot in slots {
-            if slot.can_take
-                && slot
+            if slot.can_take {
+                if let Some(stack) = slot
                     .stack
                     .as_ref()
-                    .is_some_and(|item| item.item.as_ref() == name)
-                && game
-                    .native_extract_item(dim, at, face, slot.slot, 1)
-                    .is_some()
-            {
-                return true;
+                    .filter(|item| item.item.as_ref() == name)
+                {
+                    let take = needed.min(stack.count);
+                    sources.push((at, face, slot.slot, take));
+                    needed -= take;
+                    if needed == 0 {
+                        for (at, face, slot, count) in sources {
+                            game.native_extract_item(dim, at, face, slot, count);
+                        }
+                        return true;
+                    }
+                }
             }
         }
     }
@@ -259,7 +293,7 @@ fn ready_fuel(
             entity.items[4] = None;
         }
         SHOTS_PER_GUNPOWDER
-    } else if take_adjacent(game, pos, GUNPOWDER) {
+    } else if take_adjacent(game, pos, GUNPOWDER, 1) {
         SHOTS_PER_GUNPOWDER
     } else {
         0
@@ -337,22 +371,31 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
             != 0;
         let skip_missing = opts.and_then(|nbt| int(nbt, "skip_missing")).unwrap_or(1) != 0;
         let mode = opts.and_then(|nbt| int(nbt, "replace_mode")).unwrap_or(2);
+        if !game.world.loaded(target[0], target[2]) {
+            set_status(&mut entity.nbt, "PAUSED", "targetNotLoaded");
+            break;
+        }
         let target_state = game.world.block(target[0], target[1], target[2]);
+        let conductor = |state| {
+            game.res.behaviours().facts(state).flags
+                & horizon_world::level::data::state_flags::CONDUCTOR
+                != 0
+        };
         if state.is_none()
+            || state == Some(target_state)
+            || mode != 3 && state.is_some_and(|state| game.res.behaviours().is_air(state))
+            || game.res.behaviours().facts(target_state).hardness == -1.0
             || within(target, pos, 2.0)
             || !replace_entities
                 && game
                     .world
                     .block_entities
                     .contains_key(&(target[0], target[1], target[2]))
-            || mode == 0 && !game.res.behaviours().is_air(target_state)
+            || mode == 0 && conductor(target_state)
+            || mode == 1 && conductor(target_state) && !state.is_some_and(conductor)
         {
             cursor += 1;
             continue;
-        }
-        if !game.world.loaded(target[0], target[2]) {
-            set_status(&mut entity.nbt, "PAUSED", "targetNotLoaded");
-            break;
         }
         let fuel = if creative {
             0
@@ -365,18 +408,52 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], entity: &mut ModBlockEnti
         }
         let state = state.expect("resolved block state");
         let air = game.res.behaviours().is_air(state);
-        let item = game
-            .native_state_block(state)
-            .unwrap_or("minecraft:air")
-            .to_owned();
-        if !air && !creative && !take_adjacent(game, pos, &item) {
+        let name = game.native_state_block(state).unwrap_or("minecraft:air");
+        let item = match name {
+            "minecraft:farmland" | "minecraft:dirt_path" => "minecraft:dirt",
+            "minecraft:wall_torch" => "minecraft:torch",
+            "minecraft:redstone_wall_torch" => "minecraft:redstone_torch",
+            "minecraft:soul_wall_torch" => "minecraft:soul_torch",
+            _ => name,
+        }
+        .to_owned();
+        if !air && game.items().get(&item).is_none() {
+            cursor += 1;
+            continue;
+        }
+        let required = game.pack.assets.registry.state(state).map_or(1, |state| {
+            if state
+                .properties
+                .get("type")
+                .is_some_and(|value| value == "double")
+            {
+                2
+            } else {
+                ["eggs", "pickles", "layers"]
+                    .into_iter()
+                    .find_map(|key| {
+                        state
+                            .properties
+                            .get(key)
+                            .and_then(|value| value.parse::<i32>().ok())
+                    })
+                    .unwrap_or(1)
+            }
+        });
+        if !air && !creative && !take_adjacent(game, pos, &item, required as u32) {
             if skip_missing {
                 cursor += 1;
                 continue;
             }
+            entity
+                .nbt
+                .insert("MissingItem".into(), Tag::String(item.as_str().into()));
+            entity.nbt.insert("MissingCount".into(), Tag::Int(required));
             set_status(&mut entity.nbt, "PAUSED", "missingBlock");
             break;
         }
+        entity.nbt.remove(&"MissingItem".into());
+        entity.nbt.remove(&"MissingCount".into());
         let distance_sq: f64 = (0..3)
             .map(|axis| (f64::from(target[axis]) - f64::from(pos[axis])).powi(2))
             .sum();
@@ -455,6 +532,9 @@ pub(super) fn use_item(
     }
     if stack.item.as_ref() == GUNPOWDER && block == CANNON {
         let accepted = game.native_with_mod_block_entity(pos, |entity| {
+            if entity.items.len() < 5 {
+                entity.items.resize(5, None);
+            }
             let Some(slot) = entity.items.get_mut(4) else {
                 return false;
             };
@@ -482,13 +562,18 @@ pub(super) fn use_item(
             return false;
         }
         let accepted = game.native_with_mod_block_entity(pos, |entity| {
+            if entity.items.len() < 5 {
+                entity.items.resize(5, None);
+            }
             let Some(slot) = entity.items.first_mut() else {
                 return false;
             };
             if slot.is_some() {
                 return false;
             }
-            *slot = Some(stack.clone());
+            let mut input = stack.clone();
+            input.count = 1;
+            *slot = Some(input);
             set_status(&mut entity.nbt, "RUNNING", "running");
             true
         });
@@ -589,4 +674,198 @@ pub(super) fn render(
     draw.translate([0.0, -recoil / 100.0, 0.0]);
     game.native_draw_model(draw, "create:block/schematicannon/pipe", 0xFFFFFF);
     draw.pop();
+}
+
+pub(super) fn open(game: &mut Game<'_>, pos: [i32; 3]) -> bool {
+    if game.hand != super::Hand::Main
+        || game.native_sneaking()
+        || game.held().is_some()
+        || game.native_block(pos) != CANNON
+    {
+        return false;
+    }
+    game.open_menu(pos);
+    true
+}
+
+pub(super) fn layout() -> crate::mod_api::NativeScreen {
+    crate::mod_api::NativeScreen {
+        width: 250.0,
+        height: 240.0,
+        slots: vec![
+            Some([16.0, 25.0]),
+            Some([52.0, 25.0]),
+            None,
+            None,
+            Some([88.0, 25.0]),
+        ],
+        inventory_x: 44.0,
+        inventory_y: 158.0,
+        own_labels: true,
+        own_background: true,
+    }
+}
+
+const CONTROLS: [(&str, [f32; 4]); 6] = [
+    ("Start", [118.0, 23.0, 38.0, 20.0]),
+    ("Pause", [160.0, 23.0, 38.0, 20.0]),
+    ("Stop", [202.0, 23.0, 36.0, 20.0]),
+    ("Skip missing", [12.0, 51.0, 104.0, 18.0]),
+    ("Replace mode", [124.0, 51.0, 114.0, 18.0]),
+    ("Replace containers", [12.0, 73.0, 146.0, 18.0]),
+];
+
+pub(super) fn screen_click([x, y]: [f32; 2]) -> Option<i32> {
+    CONTROLS
+        .iter()
+        .position(|(_, [left, top, width, height])| {
+            (*left..left + width).contains(&x) && (*top..top + height).contains(&y)
+        })
+        .map(|id| id as i32)
+}
+
+pub(super) fn menu_button(
+    game: &mut Game<'_>,
+    pos: [i32; 3],
+    entity: &mut ModBlockEntity,
+    id: i32,
+) {
+    match id {
+        0 => set_status(&mut entity.nbt, "RUNNING", "running"),
+        1 => set_status(&mut entity.nbt, "PAUSED", "paused"),
+        2 => {
+            clear_job(entity, false);
+            set_status(&mut entity.nbt, "STOPPED", "stopped");
+        }
+        3..=5 => {
+            let mut opts = options(&entity.nbt).cloned().unwrap_or_default();
+            let (key, default) = match id {
+                3 => ("skip_missing", 1),
+                4 => ("replace_mode", 2),
+                _ => ("replace_block_entities", 0),
+            };
+            let old = int(&opts, key).unwrap_or(default);
+            opts.insert(
+                key.into(),
+                Tag::Int(if id == 4 {
+                    (old + 1) % 4
+                } else {
+                    i32::from(old == 0)
+                }),
+            );
+            entity.nbt.insert("Options".into(), Tag::Compound(opts));
+        }
+        _ => return,
+    }
+    game.native_block_entity_sync(pos);
+}
+
+pub(super) fn draw_screen(
+    game: &Game<'_>,
+    draw: &mut horizon_client::hud::HudBatch,
+    [x, y]: [f32; 2],
+) {
+    use crate::containers::BlockEntity;
+    game.native_fill(draw, [x, y, 250.0, 240.0], 0xFF303030);
+    game.native_text(draw, "Schematicannon", [x + 12.0, y + 7.0], 0xFFFFFF, false);
+    game.native_text(draw, "Inventory", [x + 44.0, y + 147.0], 0xFFFFFF, false);
+    for slot in 0..36 {
+        let (left, top) = game.slot_position(slot);
+        game.native_fill(
+            draw,
+            [x + left - 1.0, y + top - 1.0, 18.0, 18.0],
+            0xFF777777,
+        );
+        game.native_fill(draw, [x + left, y + top, 16.0, 16.0], 0xFF444444);
+    }
+    for [left, top] in [[16.0, 25.0], [52.0, 25.0], [88.0, 25.0]] {
+        game.native_fill(
+            draw,
+            [x + left - 1.0, y + top - 1.0, 18.0, 18.0],
+            0xFF777777,
+        );
+    }
+    for (label, [left, top, width, height]) in CONTROLS {
+        let bounds = [x + left, y + top, width, height];
+        horizon_client::widgets::record(label, bounds, true);
+        game.native_fill(draw, bounds, 0xFF606060);
+        game.native_text(
+            draw,
+            if label == "Replace mode" { "" } else { label },
+            [bounds[0] + 3.0, bounds[1] + 5.0],
+            0xFFFFFF,
+            false,
+        );
+    }
+    if let Some(pos) = game.native_screen_pos()
+        && let Some(BlockEntity::Mod(entity)) =
+            game.world.block_entities.get(&(pos[0], pos[1], pos[2]))
+    {
+        let status = string(&entity.nbt, "Status").unwrap_or_else(|| "idle".into());
+        let status = game.translate(&format!("create.schematicannon.status.{status}"), &status);
+        let fuel = int(&entity.nbt, "RemainingFuel").unwrap_or(0);
+        let opts = options(&entity.nbt);
+        let skip = opts.and_then(|nbt| int(nbt, "skip_missing")).unwrap_or(1) != 0;
+        let mode = opts.and_then(|nbt| int(nbt, "replace_mode")).unwrap_or(2);
+        let replace = opts
+            .and_then(|nbt| int(nbt, "replace_block_entities"))
+            .unwrap_or(0)
+            != 0;
+        game.native_text(
+            draw,
+            &format!("{status}"),
+            [x + 12.0, y + 98.0],
+            0xFFFFFF,
+            false,
+        );
+        let mode_name = match mode {
+            0 => "Fill gaps",
+            1 => "Replace solid",
+            3 => "Clear and replace",
+            _ => "Replace blocks",
+        };
+        game.native_text(
+            draw,
+            mode_name,
+            [x + 124.0, y + 51.0 + 5.0],
+            0xFFFFFF,
+            false,
+        );
+        game.native_text(
+            draw,
+            &format!("Ammo: {fuel}  Skip missing: {skip}"),
+            [x + 12.0, y + 112.0],
+            0xFFFFFF,
+            false,
+        );
+        game.native_text(
+            draw,
+            if replace { "ON" } else { "OFF" },
+            [x + 168.0, y + 78.0],
+            0xFFFFFF,
+            false,
+        );
+        if let Some(item) = string(&entity.nbt, "MissingItem").filter(|item| !item.is_empty()) {
+            game.native_text(
+                draw,
+                "Missing material:",
+                [x + 12.0, y + 134.0],
+                0xFFFFFF,
+                false,
+            );
+            game.native_item_stack(
+                draw,
+                &ItemStack::new(&item, int(&entity.nbt, "MissingCount").unwrap_or(1) as u32),
+                [x + 116.0, y + 128.0],
+                16.0,
+            );
+            game.native_text(
+                draw,
+                &format!("{} needed", int(&entity.nbt, "MissingCount").unwrap_or(1)),
+                [x + 140.0, y + 134.0],
+                0xFFFFFF,
+                false,
+            );
+        }
+    }
 }

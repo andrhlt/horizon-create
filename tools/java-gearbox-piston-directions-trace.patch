@@ -1,0 +1,137 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..b5452aa 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().startsWith("TestMisc.gearboxPistonDirection"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..cd7be56 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -2,18 +2,27 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ 
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
++import com.google.gson.JsonArray;
++import com.google.gson.JsonObject;
+ import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.content.contraptions.glue.SuperGlueEntity;
++import com.simibubi.create.content.contraptions.piston.LinearActuatorBlockEntity;
++import com.simibubi.create.content.contraptions.piston.MechanicalPistonBlock;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+ import com.simibubi.create.content.schematics.SchematicItem;
+ import com.simibubi.create.content.schematics.cannon.SchematicannonBlockEntity;
+ import com.simibubi.create.content.schematics.cannon.SchematicannonBlockEntity.State;
+ import com.simibubi.create.foundation.utility.CreatePaths;
++import com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollValueBehaviour;
+ import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
+ import com.simibubi.create.infrastructure.gametest.GameTestGroup;
+ 
+ import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.core.registries.BuiltInRegistries;
+ import net.minecraft.gametest.framework.GameTest;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.sounds.SoundSource;
+@@ -26,6 +35,9 @@ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.item.Items;
+ import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.RedstoneLampBlock;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
++import net.minecraft.world.phys.AABB;
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
+@@ -115,4 +127,80 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 50)
++	public static void gearboxPistonDirectionWest(CreateGameTestHelper helper) {
++		gearboxPistonDirection(helper, Direction.WEST, Direction.NORTH, 64, Direction.Axis.Y, false);
++	}
++
++	@GameTest(template = "shearing", timeoutTicks = 50)
++	public static void gearboxPistonDirectionUp(CreateGameTestHelper helper) {
++		gearboxPistonDirection(helper, Direction.UP, Direction.WEST, -64, Direction.Axis.X, true);
++	}
++
++	private static void gearboxPistonDirection(CreateGameTestHelper helper, Direction direction,
++		Direction drive, int motorSetting, Direction.Axis gearboxAxis, boolean glued) {
++		var level = helper.getLevel();
++		BlockPos pos = new BlockPos(12, 7, 5);
++		BlockPos absolute = helper.absolutePos(pos);
++		helper.setBlock(pos, AllBlocks.STICKY_MECHANICAL_PISTON.getDefaultState()
++			.setValue(BlockStateProperties.FACING, direction)
++			.setValue(MechanicalPistonBlock.AXIS_ALONG_FIRST_COORDINATE, glued));
++		helper.getBlockEntity(AllBlockEntityTypes.MECHANICAL_PISTON.get(), pos)
++			.getBehaviour(ScrollValueBehaviour.TYPE).setValue(0);
++		helper.setBlock(pos.relative(direction.getOpposite()), AllBlocks.PISTON_EXTENSION_POLE.getDefaultState()
++			.setValue(BlockStateProperties.FACING, direction));
++		BlockState gearbox = AllBlocks.GEARBOX.getDefaultState().setValue(BlockStateProperties.AXIS, gearboxAxis);
++		BlockPos first = pos.relative(direction);
++		if (glued) {
++			helper.setBlock(first, Blocks.STONE);
++			helper.setBlock(first.east(), gearbox);
++			level.addFreshEntity(new SuperGlueEntity(level, new AABB(helper.absolutePos(first)).expandTowards(1, 0, 0)));
++		} else {
++			helper.setBlock(first, gearbox);
++		}
++		helper.setBlock(pos.relative(drive), AllBlocks.CREATIVE_MOTOR.getDefaultState()
++			.setValue(BlockStateProperties.FACING, drive.getOpposite()));
++		var motor = helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), pos.relative(drive));
++		motor.generatedSpeed.setValue(motorSetting);
++		for (int tick = 0; tick < 24; tick++) {
++			int sample = tick;
++			helper.runAtTickTime(tick + 2, () -> {
++				if (sample == 10)
++					motor.generatedSpeed.setValue(-motorSetting);
++				var piston = (LinearActuatorBlockEntity) level.getBlockEntity(absolute);
++				JsonObject row = new JsonObject();
++				row.addProperty("case", direction.getSerializedName());
++				row.addProperty("tick", sample);
++				row.addProperty("state", level.getBlockState(absolute).getValue(MechanicalPistonBlock.STATE).getSerializedName());
++				row.addProperty("offset", piston.offset);
++				row.addProperty("rpm", piston.getSpeed());
++				JsonArray line = new JsonArray();
++				for (int distance = -1; distance <= 3; distance++)
++					line.add(gearboxPistonBlock(level.getBlockState(absolute.relative(direction, distance))));
++				row.add("line", line);
++				JsonArray side = new JsonArray();
++				if (glued) {
++					for (int distance = 1; distance <= 2; distance++)
++						side.add(gearboxPistonBlock(level.getBlockState(absolute.relative(direction, distance).east())));
++				}
++				row.add("side", side);
++				JsonArray payload = new JsonArray();
++				if (piston.movedContraption != null)
++					piston.movedContraption.getContraption().getBlocks().values().stream()
++						.map(info -> gearboxPistonBlock(info.state())).sorted().forEach(payload::add);
++				row.add("payload", payload);
++				System.out.println("CREATE_GEARBOX_PISTON_DIRECTION " + row);
++				if (sample == 23)
++					helper.succeed();
++			});
++		}
++	}
++
++	private static String gearboxPistonBlock(BlockState state) {
++		String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
++		if (AllBlocks.GEARBOX.has(state))
++			return id + "[axis=" + state.getValue(BlockStateProperties.AXIS).getSerializedName() + "]";
++		return id;
++	}
+ }

@@ -8,6 +8,13 @@ fn stockpile_right_click_prediction(
     use crate::game::create_smart_observer::OBSERVER;
     use crate::game::create_threshold_switch::{THRESHOLD_SWITCH, filter_hit};
 
+    if !game.remote_shift_down()
+        && crate::game::create_fluids::filter_target(game, hit, held)
+    {
+        // Sample buckets also have a vanilla air-use action. Consume the
+        // click here so client prediction sends only the targeted block use.
+        return std::ops::ControlFlow::Break((InteractionResult::Consume, DryUse::default()));
+    }
     let block = game.native_block(hit.pos);
     if game.may_build()
         && held

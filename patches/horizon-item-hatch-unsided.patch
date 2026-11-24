@@ -1,0 +1,53 @@
+--- a/crates/horizon-client/src/game/machines/native_items.rs
++++ b/crates/horizon-client/src/game/machines/native_items.rs
+@@ -101,6 +101,50 @@
+         }
+         if left < stack.count {
+             self.view_changed(&view);
++        }
++        (left > 0).then_some(ItemStack {
++            count: left,
++            ..stack
++        })
++    }
++    /// Insert as an unsided ItemHandler, as Create's Item Hatch does.
++    /// Keep the target's item rules and stack limits, but do not narrow the
++    /// available slots to a hopper face. Merge before filling empty slots.
++    pub(in crate::game) fn native_insert_item_unsided(
++        &mut self,
++        pos: [i32; 3],
++        stack: ItemStack,
++    ) -> Option<ItemStack> {
++        if !self.native_simulates() {
++            return Some(stack);
++        }
++        let Some(view) = self.containers().view((pos[0], pos[1], pos[2]), false) else {
++            return Some(stack);
++        };
++        // A composter is a synthetic hopper container, not a block entity
++        // with an unsided inventory capability.
++        if matches!(view.kind, Kind::Composter(_)) {
++            return Some(stack);
++        }
++        let mut slots = Vec::new();
++        for occupied in [true, false] {
++            let c = self.containers();
++            slots.extend((0..view.len()).filter(|&slot| c.get(&view, slot).is_some() == occupied));
++        }
++        let mut left = stack.count;
++        while left > 0 {
++            let mut rest = Some(ItemStack {
++                count: 1,
++                ..stack.clone()
++            });
++            for &slot in &slots {
++                let Some(one) = rest.take() else { break };
++                rest = self.try_move_in_item(None, &view, one, slot, None);
++            }
++            if rest.is_some() {
++                break;
++            }
++            left -= 1;
+         }
+         (left > 0).then_some(ItemStack {
+             count: left,

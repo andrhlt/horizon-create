@@ -221,6 +221,7 @@ pub(super) fn write(game: &mut Game<'_>, root: [i32; 3], fluid: Fluid) {
         }
         entity.nbt.insert("TankContent".into(), Tag::Compound(tank));
     });
+    game.mark_block_entity_updated((root[0], root[1], root[2]));
     if let Some((width, parts)) = parts(game, root) {
         if let Some(entity) = mod_entity(game, root).cloned() {
             super::create_tank_lighting::sync(game, root, width, &parts, &entity);

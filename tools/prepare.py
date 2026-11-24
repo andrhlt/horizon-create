@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import hashlib
 import json
 from pathlib import Path
 from shutil import copy2, copytree
@@ -22,6 +23,7 @@ from window_ctm import prepare_industrial_window, prepare_vertical_windows
 from window_palettes import WINDOW_BLOCKS, prepare_windows
 
 ROOT = Path(__file__).resolve().parents[1]
+MOTOR_MENU = Path("data/create/horizon/menu/creative_motor.json")
 CREATE_REVISION = "ac0c444d9828da3453ae8cc65338e8de063286fb"
 FIXTURES = ("processing/wheat_milling", "processing/track_crafting", "processing/crushing_wheel_crafting", "processing/precision_mechanism_crafting", "processing/water_filling_bottle", "processing/sand_washing", "processing/stone_cobble_sand_crushing", "processing/brass_mixing", "processing/potion_brewing", "processing/brass_mixing_2", "processing/spout_crafting", "fluids/small_waterwheel", "fluids/large_waterwheel", "fluids/waterwheel_materials", "fluids/in_world_pumping_in", "fluids/in_world_pumping_out", "fluids/3_pipe_split", "fluids/3_pipe_combine", "fluids/steam_engine", "fluids/hose_pulley_transfer", "fluids/spouting", "fluids/threshold_switch", "fluids/smart_observer_pipes", "items/depot_comparator_output", "items/threshold_switch",
     *(f"items/brass_tunnel_{mode}" for mode in ("filtering", "prefer_nearest", "round_robin", "split", "sync_input")),
@@ -488,6 +490,11 @@ def build_pack(source, content, archive, *, worldgen=True):
     resources = source / "src/main/resources"
     generated = source / "src/generated/resources"
     copytree(ROOT / "content", content)
+    menu = content / MOTOR_MENU
+    if not menu.is_file():
+        raise RuntimeError(f"required Creative Motor menu is missing: {menu}")
+    menu_hash = hashlib.sha256(menu.read_bytes()).hexdigest()
+    print(f"Creative Motor menu staged: {MOTOR_MENU} sha256={menu_hash}")
     copy_zinc_data(generated, content)
     packages_tag = Path("data/create/tags/item/packages.json")
     (content / packages_tag).parent.mkdir(parents=True, exist_ok=True)
@@ -798,7 +805,7 @@ def build_pack(source, content, archive, *, worldgen=True):
                  *(Path(f"recipe/filling/{name}.json") for name in ("redstone", "gunpowder", "glowstone", "grass_block", "blaze_cake", "sweet_roll", "chocolate_glazed_berries", "honeyed_apple", "builders_tea", "honey_bottle"))):
         relative = Path("data/create") / path
         (content / relative).parent.mkdir(parents=True, exist_ok=True)
-        if path.parent == Path("loot_table/blocks") and path.stem in (*ZINC_BLOCKS, *ALL_PALETTE_BLOCKS, *COPPER_ROOFS, *METAL_SCAFFOLDING, *BRASS_DIODES, *DYED_NIXIES, *METAL_BLOCKS, *ROSE_QUARTZ_PALETTE, "chain_conveyor", "package_frogport", "lectern_controller", "cuckoo_clock", "mysterious_cuckoo_clock", "nixie_tube", "cardboard_block", "bound_cardboard_block", "factory_gauge", "rose_quartz_lamp", "powered_latch", "powered_toggle_latch", "desk_bell", "placard", "clutch", "gearshift", "turntable", "nozzle", "train_trapdoor", "framed_glass_trapdoor", "experience_block", "item_hatch", "copper_backtank", "netherite_backtank", "encased_fluid_pipe", *SEATS, *POSTBOXES):
+        if path.parent == Path("loot_table/blocks") and path.stem in (*ZINC_BLOCKS, *ALL_PALETTE_BLOCKS, *COPPER_ROOFS, *METAL_SCAFFOLDING, *METAL_DECORATIONS, *BRASS_DIODES, *DYED_NIXIES, *METAL_BLOCKS, *ROSE_QUARTZ_PALETTE, "chain_conveyor", "package_frogport", "lectern_controller", "cuckoo_clock", "mysterious_cuckoo_clock", "nixie_tube", "cardboard_block", "bound_cardboard_block", "factory_gauge", "rose_quartz_lamp", "powered_latch", "powered_toggle_latch", "desk_bell", "placard", "clutch", "gearshift", "turntable", "nozzle", "train_trapdoor", "framed_glass_trapdoor", "experience_block", "item_hatch", "copper_backtank", "netherite_backtank", "encased_fluid_pipe", "fluid_pipe", "glass_fluid_pipe", "smart_fluid_pipe", "track", "railway_casing", "andesite_casing", "brass_casing", "copper_casing", *SEATS, *POSTBOXES):
             table = json.loads((generated / relative).read_bytes())
             upgrade_block_loot(table)
             write_json(content / relative, table)
@@ -989,6 +996,11 @@ def build_pack(source, content, archive, *, worldgen=True):
         for path in sorted(content.rglob("*")):
             if path.is_file():
                 package.write(path, path.relative_to(content))
+    with ZipFile(archive) as package:
+        packed = package.read(str(MOTOR_MENU))
+    if hashlib.sha256(packed).hexdigest() != menu_hash:
+        raise RuntimeError(f"Creative Motor menu changed while packaging: {MOTOR_MENU}")
+    print(f"Creative Motor menu packaged: {MOTOR_MENU} sha256={menu_hash}")
 
 
 def main():

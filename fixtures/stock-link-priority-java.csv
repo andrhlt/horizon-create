@@ -1,0 +1,2 @@
+accepted,lower_power,higher_power,requested_iron,shipped_from_lower_power,shipped_from_higher_power,lower_inventory_remaining,higher_inventory_remaining
+true,1,7,7,4,3,0,6

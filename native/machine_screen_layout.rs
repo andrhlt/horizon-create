@@ -9,6 +9,10 @@ fn machine_screen_layout(block: &str, screen: &mut Option<crate::mod_api::Native
         *screen = Some(crate::game::create_brass_tunnel::layout());
     } else if block == crate::game::create_display_link::LINK {
         *screen = Some(crate::game::create_display_link::layout());
+    } else if block == crate::game::create_schematicannon::CANNON {
+        *screen = Some(crate::game::create_schematicannon::layout());
+    } else if block == crate::game::create_schematic_table::BLOCK {
+        *screen = Some(crate::game::create_schematic_table::layout());
     } else if block == crate::game::create_machines::FROGPORT
         || crate::game::create_postbox::block(block)
     {

@@ -1,0 +1,9 @@
+{
+  "revision": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "patch_sha256": "48edd159971f5683d3f8de68bb06946f4dc5948e6fec991777da9b3abcc27d63",
+  "records": 3,
+  "scope": "Actual PumpBlock placement and getRotatedBlockState callbacks: yaw=180, pitch=0; ordinary, sneaking, west Tank neighbor. Mock survival player; no network or save claim.",
+  "java": "Homebrew OpenJDK 21.0.13.1",
+  "command": "./gradlew --offline --no-daemon --max-workers=2 runGameTestServer",
+  "runtime_log": ".local/mechanical-pump-java-placement.log"
+}

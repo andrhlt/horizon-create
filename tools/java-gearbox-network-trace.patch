@@ -1,0 +1,131 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..bf91422 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.gearboxNetworkHandoff"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..7f013d9 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -2,8 +2,16 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ 
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Map;
++
++import com.google.gson.JsonObject;
+ import com.simibubi.create.AllBlockEntityTypes;
++import com.simibubi.create.AllBlocks;
+ import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
++import com.simibubi.create.content.kinetics.gearbox.GearboxBlockEntity;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+ import com.simibubi.create.content.schematics.SchematicItem;
+@@ -14,6 +22,8 @@ import com.simibubi.create.infrastructure.gametest.CreateGameTestHelper;
+ import com.simibubi.create.infrastructure.gametest.GameTestGroup;
+ 
+ import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.core.registries.BuiltInRegistries;
+ import net.minecraft.gametest.framework.GameTest;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.sounds.SoundSource;
+@@ -26,6 +36,7 @@ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.item.Items;
+ import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.RedstoneLampBlock;
++import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+ 
+ @GameTestGroup(path = "misc")
+ public class TestMisc {
+@@ -115,4 +126,78 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 60)
++	public static void gearboxNetworkHandoff(CreateGameTestHelper helper) {
++		BlockPos a = new BlockPos(12, 6, 5);
++		BlockPos b = a.east();
++		Map<String, BlockPos> points = new LinkedHashMap<>();
++		points.put("a", a);
++		points.put("b", b);
++		points.put("primary", a.north());
++		points.put("backup", b.below());
++		points.put("a_west", a.west());
++		points.put("a_south", a.south());
++		points.put("b_east", b.east());
++		points.put("b_up", b.above());
++		points.put("a_closed", a.above());
++		points.put("b_closed", b.north());
++
++		gearboxNetworkMotor(helper, points.get("primary"), Direction.SOUTH, 32);
++		gearboxNetworkMotor(helper, points.get("backup"), Direction.UP, -16);
++		for (String shaft : List.of("a_west", "b_east"))
++			gearboxNetworkShaft(helper, points.get(shaft), Direction.Axis.X);
++		for (String shaft : List.of("a_south", "b_closed"))
++			gearboxNetworkShaft(helper, points.get(shaft), Direction.Axis.Z);
++		for (String shaft : List.of("b_up", "a_closed"))
++			gearboxNetworkShaft(helper, points.get(shaft), Direction.Axis.Y);
++		helper.setBlock(a, AllBlocks.GEARBOX.getDefaultState().setValue(BlockStateProperties.AXIS, Direction.Axis.Y));
++		helper.setBlock(b, AllBlocks.GEARBOX.getDefaultState().setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
++
++		for (int tick = 0; tick < 34; tick++) {
++			int sample = tick;
++			helper.runAtTickTime(8 + tick, () -> {
++				JsonObject row = new JsonObject();
++				row.addProperty("tick", sample);
++				JsonObject measured = new JsonObject();
++				for (var point : points.entrySet()) {
++					var pos = helper.absolutePos(point.getValue());
++					var level = helper.getLevel();
++					var state = level.getBlockState(pos);
++					JsonObject reading = new JsonObject();
++					reading.addProperty("block", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
++					if (level.getBlockEntity(pos) instanceof KineticBlockEntity kinetic) {
++						reading.addProperty("rpm", kinetic.getSpeed());
++						if (kinetic instanceof GearboxBlockEntity gearbox) {
++							reading.addProperty("axis", state.getValue(BlockStateProperties.AXIS).getSerializedName());
++							String source = gearbox.hasSource() ? gearbox.getSourceFacing().getSerializedName() : "none";
++							reading.addProperty("source", source);
++						}
++					}
++					measured.add(point.getKey(), reading);
++				}
++				row.add("points", measured);
++				System.out.println("CREATE_GEARBOX_NETWORK " + row);
++
++				switch (sample) {
++					case 3 -> helper.setBlock(points.get("primary"), Blocks.AIR);
++					case 9 -> helper.setBlock(points.get("backup"), Blocks.AIR);
++					case 15 -> gearboxNetworkMotor(helper, points.get("primary"), Direction.SOUTH, -48);
++					case 21 -> helper.setBlock(b, Blocks.AIR);
++					case 27 -> helper.setBlock(b, AllBlocks.GEARBOX.getDefaultState()
++						.setValue(BlockStateProperties.AXIS, Direction.Axis.Z));
++					case 33 -> helper.succeed();
++				}
++			});
++		}
++	}
++
++	private static void gearboxNetworkMotor(CreateGameTestHelper helper, BlockPos pos, Direction facing, int speed) {
++		helper.setBlock(pos, AllBlocks.CREATIVE_MOTOR.getDefaultState().setValue(BlockStateProperties.FACING, facing));
++		helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), pos).generatedSpeed.setValue(speed);
++	}
++
++	private static void gearboxNetworkShaft(CreateGameTestHelper helper, BlockPos pos, Direction.Axis axis) {
++		helper.setBlock(pos, AllBlocks.SHAFT.getDefaultState().setValue(BlockStateProperties.AXIS, axis));
++	}
+ }

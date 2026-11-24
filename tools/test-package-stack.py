@@ -34,6 +34,17 @@ def summon(host, case):
     above = placement.editor.xyz((x + offset, y + 2.5, z))
     host.command(f'/summon create:package {above} {{Tags:["StackUpper"],Health:5f,Fire:-1s,'
                  'equipment:{mainhand:{id:"create:cardboard_package_10x8",count:1}},Motion:[0d,-0.12d,0d]}')
+    if case != "pig":
+        for selector, address, item, count in (
+            (SUPPORT, "Lower fixture", "minecraft:gold_ingot", 2),
+            (UPPER, "Upper fixture", "minecraft:diamond", 3),
+        ):
+            merge = (
+                f'{{equipment:{{mainhand:{{components:{{"create:package_address":"{address}",'
+                f'"create:package_contents":[{{slot:0,item:{{id:"{item}",count:{count}}}}}]}}}}}}}}'
+            )
+            result = host.command(f"/data merge entity {selector} {merge}")
+            assert result.startswith("Modified entity data"), result
 
 
 def vector(reply):
@@ -60,6 +71,7 @@ def run_case(host, actor, case, reference):
             f"/data get entity {target} {field}"
             for target, field in OBSERVATIONS
         )
+        assert all("entity data: " in reply for reply in replies), replies
         coords = relative(vector(replies[0])), vector(replies[1]), relative(vector(replies[2]))
         for observed, fields in zip(coords, FIELDS, strict=True):
             expected = tuple(float(row[field]) for field in fields)
@@ -90,7 +102,35 @@ def check_reopened_stack(host, player_position, reference):
         for reply, expected in zip(replies, (expected_upper, expected_lower), strict=True):
             actual = relative(vector(reply))
             assert placement.same(actual, expected, TOLERANCE), (tick, actual, expected)
-    print("The saved stack retained the original settled positions for all 10 ticks after cold reopen.", flush=True)
+    upper = placement.package.parse(host.command(
+        f"/data get entity {UPPER} equipment.mainhand"
+    ).split("entity data: ", 1)[1])
+    lower = placement.package.parse(host.command(
+        f"/data get entity {SUPPORT} equipment.mainhand"
+    ).split("entity data: ", 1)[1])
+    assert upper == {
+        "id": "create:cardboard_package_10x8",
+        "count": 1,
+        "components": {
+            "create:package_address": "Upper fixture",
+            "create:package_contents": [
+                {"slot": 0, "item": {"id": "minecraft:diamond", "count": 3}},
+            ],
+        },
+    }, upper
+    assert lower == {
+        "id": "create:cardboard_package_12x12",
+        "count": 1,
+        "components": {
+            "create:package_address": "Lower fixture",
+            "create:package_contents": [
+                {"slot": 0, "item": {"id": "minecraft:gold_ingot", "count": 2}},
+            ],
+        },
+    }, lower
+    assert len(placement.witness(host)) == 2, placement.witness(host)
+    assert not host.call("entities", 8, "minecraft:item")["entities"]
+    print("Cold reopen retained both packages, their addresses and exact cargo, with no duplicate drops.", flush=True)
 
 
 def main():

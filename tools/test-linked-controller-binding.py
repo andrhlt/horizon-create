@@ -74,6 +74,28 @@ def run(args):
         print('second binding:', data, flush=True)
         assert re.search(r'slot:\s*4', data) and re.search(r'slot:\s*5', data), data
 
+        if args.persistence:
+            world.command('/save-all flush')
+            if args.lan:
+                actor.call('quit')
+                mp.until('guest disconnected before host reopen', lambda: not any(
+                    guest['name'] == player and guest['placed']
+                    for guest in world.call('lan', 'status')['guests']))
+            world.restart()
+            if args.lan:
+                port = world.call('lan', 'open', '0', 'commands', 'force')['port']
+                actor = scope.enter_context(mp.joined_client(
+                    args, scratch, f'127.0.0.1:{port}', player, render=True,
+                    scenario='controller-binding-reopen', pack=args.pack, env=env,
+                ))
+                mp.until('guest rejoined after host reopen', lambda: any(
+                    guest['name'] == player and guest['placed']
+                    for guest in world.call('lan', 'status')['guests']))
+            reopened = world.command(f'/data get entity {player} SelectedItem')
+            assert all(value in reopened for value in ('diamond', 'emerald', 'gold_ingot', 'iron_ingot', 'marker')), reopened
+            assert re.search(r'slot:\s*0', reopened) and re.search(r'slot:\s*5', reopened), reopened
+            print('saved controller bindings survived host save/reopen and player resumption', flush=True)
+
         if args.binding_only:
             return
 
@@ -267,4 +289,5 @@ if __name__ == '__main__':
     parser.add_argument('--dimensions', action='store_true', help='tick another guest in the Nether during mounted use')
     parser.add_argument('--owner-dimension', action='store_true', help='move mounted owner to another dimension')
     parser.add_argument('--binding-only', action='store_true')
+    parser.add_argument('--persistence', action='store_true', help='save/reopen the host and resume the controller player before testing wireless input')
     run(parser.parse_args())

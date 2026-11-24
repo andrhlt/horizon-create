@@ -28,27 +28,31 @@ pub(super) fn matches(
     {
         return result;
     }
-    if sample.item.as_ref() != "create:filter" {
-        let same_item = sample.item == stack.item
-            && (!components || (sample.damage == stack.damage && sample.extra == stack.extra));
-        if sample.item.as_ref() == "create:package_filter" && sample.data().is_some() {
-            let request = package_address(&sample);
-            let same_filter = if components && stack.item == sample.item {
-                same_trimmed_filter(&sample, stack)
-            } else {
-                same_item
-            };
-            return (create_package_address::is_blank(&request) && same_filter)
-                || (is_package(items, stack)
-                    && create_package_address::matches(&package_address(stack), &request));
-        }
-        return same_item
-            || (!components && is_package(items, &sample) && is_package(items, stack));
+    // Java only wraps List Filters with a component patch. A fresh List Filter
+    // is an ordinary item sample, including when placed in another List Filter.
+    if sample.item.as_ref() == "create:filter"
+        && (compound(filter, "tag").is_some()
+            || compound(filter, "components").is_some_and(|patch| !patch.is_empty()))
+    {
+        return list_matches(filter, |candidate, respect| {
+            matches(items, candidate, stack, respect)
+        });
     }
 
-    list_matches(filter, |candidate, respect| {
-        matches(items, candidate, stack, respect)
-    })
+    let same_item = sample.item == stack.item
+        && (!components || (sample.damage == stack.damage && sample.extra == stack.extra));
+    if sample.item.as_ref() == "create:package_filter" && sample.data().is_some() {
+        let request = package_address(&sample);
+        let same_filter = if components && stack.item == sample.item {
+            same_trimmed_filter(&sample, stack)
+        } else {
+            same_item
+        };
+        return (create_package_address::is_blank(&request) && same_filter)
+            || (is_package(items, stack)
+                && create_package_address::matches(&package_address(stack), &request));
+    }
+    same_item || (!components && is_package(items, &sample) && is_package(items, stack))
 }
 
 fn same_trimmed_filter(sample: &ItemStack, candidate: &ItemStack) -> bool {
@@ -90,7 +94,7 @@ pub(super) fn accepts_fluid(nbt: &Compound, fluid: &Fluid) -> bool {
     compound(nbt, "Filter").is_none_or(|filter| matches_fluid(filter, fluid, true))
 }
 
-fn matches_fluid(filter: &Compound, fluid: &Fluid, respect: bool) -> bool {
+pub(super) fn matches_fluid(filter: &Compound, fluid: &Fluid, respect: bool) -> bool {
     let Some(sample) = ItemStack::from_nbt(filter) else {
         return true;
     };

@@ -52,5 +52,8 @@ pub(super) fn use_planks(game: &mut Game<'_>, at: [i32; 3], stack: &ItemStack) -
         wheel.nbt.insert("Material".into(), Tag::Compound(state));
     });
     game.native_block_entity_sync(pos);
+    // LAN clients predict ordinary plank placement. Reconcile that consumed
+    // stack even though Java's material application leaves inventory unchanged.
+    game.guest_inventory_resend |= game.lan_acting.is_some();
     true
 }

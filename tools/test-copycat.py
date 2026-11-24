@@ -27,8 +27,8 @@ def expected_inventory(text):
         entry.split("=", 1) for entry in text.split("|") if entry
     )}
 
-def material_tag(control):
-    message = control.command("/data get block 8 170 23 Material")
+def material_tag(control, pos=POS):
+    message = control.command(f"/data get block {pos[0]} {pos[1]} {pos[2]} Material")
     if (name := SNBT_NAME.search(message)) is None:
         return "create:copycat_base", {}
     return name[1], {key: val for key, val in KEY.findall(message) if key != "Name"}

@@ -1,0 +1,127 @@
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+index 2c97ae1..e05bcba 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
+@@ -34,6 +34,8 @@ public class CreateGameTests {
+ 
+ 	@GameTestGenerator
+ 	public static Collection<TestFunction> generateTests() {
+-		return CreateTestFunction.getTestsFrom(testHolders);
++		return CreateTestFunction.getTestsFrom(testHolders).stream()
++			.filter(test -> test.testName().equals("TestMisc.itemFilterChute"))
++			.toList();
+ 	}
+ }
+diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+index 7c53116..18f5248 100644
+--- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
++++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
+@@ -2,8 +2,19 @@ package com.simibubi.create.infrastructure.gametest.tests;
+ 
+ import static com.simibubi.create.infrastructure.gametest.CreateGameTestHelper.FIFTEEN_SECONDS;
+ 
++import java.util.List;
++
+ import com.simibubi.create.AllBlockEntityTypes;
+ import com.simibubi.create.AllDataComponents;
++import com.simibubi.create.AllBlocks;
++import com.simibubi.create.AllItems;
++import com.simibubi.create.content.logistics.box.PackageStyles;
++import com.simibubi.create.content.logistics.chute.SmartChuteBlock;
++import com.simibubi.create.content.logistics.filter.AttributeFilterWhitelistMode;
++import com.simibubi.create.content.logistics.item.filter.attribute.ItemAttribute;
++import com.simibubi.create.content.logistics.item.filter.attribute.attributes.InTagAttribute;
++import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
++import com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour;
+ import com.simibubi.create.content.redstone.thresholdSwitch.ThresholdSwitchBlockEntity;
+ import com.simibubi.create.content.schematics.SchematicExport;
+ import com.simibubi.create.content.schematics.SchematicItem;
+@@ -17,6 +28,9 @@ import net.minecraft.core.BlockPos;
+ import net.minecraft.gametest.framework.GameTest;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.sounds.SoundSource;
++import net.minecraft.tags.ItemTags;
++import net.minecraft.world.item.component.ItemContainerContents;
++import net.minecraft.world.level.block.entity.BarrelBlockEntity;
+ import net.minecraft.world.entity.EntityType;
+ import net.minecraft.world.entity.EquipmentSlot;
+ import net.minecraft.world.entity.animal.Sheep;
+@@ -115,4 +129,78 @@ public class TestMisc {
+ 			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
+ 		});
+ 	}
++
++	@GameTest(template = "shearing", timeoutTicks = 25)
++	public static void itemFilterChute(CreateGameTestHelper helper) {
++		var compact = AllDataComponents.FILTER_ITEMS;
++		var deny = AllDataComponents.FILTER_ITEMS_BLACKLIST;
++		var mode = AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE;
++		var attributes = AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES;
++		var address = AllDataComponents.PACKAGE_ADDRESS;
++		var filters = AllItems.FILTER;
++		var plain = filters.asStack();
++		var stone = new ItemStack(Items.STONE);
++		var planks = new ItemStack(Items.OAK_PLANKS);
++		var apple = new ItemStack(Items.APPLE);
++		var allowStone = filters.asStack();
++		allowStone.set(compact, ItemContainerContents.fromItems(List.of(stone)));
++		var denyStone = allowStone.copy();
++		denyStone.set(deny, true);
++		var nested = filters.asStack();
++		nested.set(compact, ItemContainerContents.fromItems(List.of(denyStone)));
++		var nestedBlank = filters.asStack();
++		nestedBlank.set(compact, ItemContainerContents.fromItems(List.of(plain)));
++		var attr = AllItems.ATTRIBUTE_FILTER.asStack();
++		var tag = new InTagAttribute(ItemTags.PLANKS);
++		var entry = new ItemAttribute.ItemAttributeEntry(tag, false);
++		attr.set(attributes, List.of(entry));
++		var attrDeny = attr.copy();
++		attrDeny.set(mode, AttributeFilterWhitelistMode.BLACKLIST);
++		var packageFilter = AllItems.PACKAGE_FILTER.asStack();
++		packageFilter.set(address, "Dock-*");
++		var packageMatch = new ItemStack(PackageStyles.ALL_BOXES.getFirst());
++		packageMatch.set(address, "Dock-East");
++		var packageReject = packageMatch.copy();
++		packageReject.set(address, "Other");
++		var mixed = filters.asStack();
++		mixed.set(compact, ItemContainerContents.fromItems(List.of(attr, packageFilter)));
++		record Probe(String name, ItemStack filter, ItemStack cargo) {}
++		var cases = List.of(
++			new Probe("blank_match", plain, plain), new Probe("blank_reject", plain, stone),
++			new Probe("allow_match", allowStone, stone), new Probe("allow_reject", allowStone, planks),
++			new Probe("deny_match", denyStone, planks), new Probe("deny_reject", denyStone, stone),
++			new Probe("nested_match", nested, planks), new Probe("nested_reject", nested, stone),
++			new Probe("nested_blank_match", nestedBlank, plain), new Probe("nested_blank_reject", nestedBlank, stone),
++			new Probe("tag_match", attr, planks), new Probe("tag_reject", attr, stone),
++			new Probe("tag_deny_match", attrDeny, stone), new Probe("tag_deny_reject", attrDeny, planks),
++			new Probe("package_match", packageFilter, packageMatch), new Probe("package_reject", packageFilter, packageReject),
++			new Probe("mixed_tag", mixed, planks), new Probe("mixed_package", mixed, packageMatch),
++			new Probe("mixed_reject", mixed, apple), new Probe("cleared", ItemStack.EMPTY, apple)
++		);
++		var world = helper.getLevel();
++		for (int i = 0; i < cases.size(); i++) {
++			var probe = cases.get(i);
++			var pos = new BlockPos(2 + (i % 5) * 2, 8, 2 + (i / 5) * 2);
++			helper.setBlock(pos.above(), Blocks.BARREL);
++			helper.setBlock(pos.below(), Blocks.BARREL);
++			helper.setBlock(pos, AllBlocks.SMART_CHUTE.getDefaultState().setValue(SmartChuteBlock.POWERED, false));
++			var chute = world.getBlockEntity(helper.absolutePos(pos));
++			var behaviour = BlockEntityBehaviour.get(
++				chute, FilteringBehaviour.TYPE);
++			if (!behaviour.setFilter(probe.filter()))
++				throw new IllegalStateException("Failed to install Smart Chute filter for " + probe.name());
++			var input = (BarrelBlockEntity) world.getBlockEntity(helper.absolutePos(pos.above()));
++			input.setItem(0, probe.cargo().copy());
++		}
++		helper.runAfterDelay(16, () -> {
++			for (int i = 0; i < cases.size(); i++) {
++				var probe = cases.get(i);
++				var pos = new BlockPos(2 + (i % 5) * 2, 8, 2 + (i / 5) * 2);
++				var input = (BarrelBlockEntity) world.getBlockEntity(helper.absolutePos(pos.above()));
++				var output = (BarrelBlockEntity) world.getBlockEntity(helper.absolutePos(pos.below()));
++				System.out.printf("ITEM_FILTER_CHUTE,%s,%d,%d%n", probe.name(), input.getItem(0).getCount(), output.getItem(0).getCount());
++			}
++			helper.succeed();
++		});
++	}
+ }

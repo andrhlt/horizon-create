@@ -2,6 +2,16 @@ fn block_entity_update_tag(
     entity: &crate::containers::ModBlockEntity,
     tag: &mut Option<horizon_world::nbt::Compound>,
 ) {
+    if matches!(
+        entity.id.as_str(),
+        crate::game::create_fluid_tank::TANK | crate::game::create_fluid_tank::CREATIVE
+    ) {
+        // Tank fluid and controller dimensions drive the client-side tank
+        // renderer. Keep the update tag in step with the authoritative entity
+        // so both chunk loads and later fill/drain changes reach clients.
+        tag.get_or_insert_with(Default::default)
+            .extend(entity.nbt.clone());
+    }
     if entity.id == crate::game::create_sticker::STICKER { tag.get_or_insert_with(Default::default); }
     if crate::game::create_elevator_doors::sliding(&entity.id) {
         crate::game::create_elevator_doors::world_door_update(entity, tag);
@@ -13,6 +23,17 @@ fn block_entity_update_tag(
         use horizon_world::nbt::{Compound, Tag};
         let item = entity.nbt.get(&"Item".into()).cloned().unwrap_or_else(|| Tag::Compound(Compound::new()));
         tag.get_or_insert_with(Default::default).insert("Item".into(), item);
+    }
+    if entity.id == crate::game::create_schematicannon::CANNON {
+        use horizon_world::nbt::{Compound, Tag};
+        let update = tag.get_or_insert_with(Compound::new);
+        for key in ["State", "Status", "RemainingFuel", "Options", "FlyingBlocks", "AmountPlaced", "AmountToPlace", "Progress"] {
+            if let Some(value) = entity.nbt.get(&key.into()) {
+                update.insert(key.into(), value.clone());
+            }
+        }
+        update.insert("MissingItem".into(), entity.nbt.get(&"MissingItem".into()).cloned().unwrap_or_else(|| Tag::String("".into())));
+        update.insert("MissingCount".into(), entity.nbt.get(&"MissingCount".into()).cloned().unwrap_or(Tag::Int(0)));
     }
     crate::game::create_bracket::update_tag(entity, tag);
     crate::game::create_toolbox_menu::update_tag(entity, tag);
@@ -74,6 +95,7 @@ fn block_entity_update_tag(
         entity.id.as_str(),
         crate::game::create_threshold_switch::THRESHOLD_SWITCH
             | crate::game::create_smart_observer::OBSERVER
+            | crate::game::create_track_observer::OBSERVER
     ) && let Some(filter) = entity.nbt.get(&"Filter".into())
     {
         tag.get_or_insert_with(Default::default)

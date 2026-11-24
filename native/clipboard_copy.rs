@@ -14,6 +14,8 @@ use super::{
     create_latches as diode,
     create_machines::{int, mod_entity},
     create_redstone_link as link,
+    create_speed_controller::CONTROLLER,
+    create_speed_controller_controls::{self, Selection, ValueBlock},
 };
 
 fn pages(content: &Compound) -> impl Iterator<Item = &Tag> {
@@ -181,6 +183,41 @@ pub(super) fn interact(game: &mut Game<'_>, pos: [i32; 3], paste: bool) -> bool 
         };
         copy_board(&mut target, &source);
         "create.clipboard.copied_from_clipboard"
+    } else if block == CONTROLLER {
+        if paste {
+            let Some(settings) =
+                compound(&target, "copied_values").and_then(|values| compound(values, "Speed"))
+            else {
+                return false;
+            };
+            let (Some(row), Some(value)) = (int(settings, "Row"), int(settings, "Value")) else {
+                return true;
+            };
+            create_speed_controller_controls::apply_clipboard_setting(
+                game,
+                pos,
+                ValueBlock::Controller,
+                Selection {
+                    row: u8::from(row != 0),
+                    value,
+                },
+            );
+            message(game, "create.clipboard.pasted_to", &block);
+            return true;
+        }
+        let selection = ValueBlock::Controller.selection(game, pos);
+        target.insert("type".into(), Tag::String("written".into()));
+        target.insert(
+            "copied_values".into(),
+            Tag::Compound(Compound::from([(
+                "Speed".into(),
+                Tag::Compound(Compound::from([
+                    ("Row".into(), Tag::Int(i32::from(selection.row))),
+                    ("Value".into(), Tag::Int(selection.value)),
+                ])),
+            )])),
+        );
+        "create.clipboard.copied_from"
     } else if diode::is_pulse(&block) {
         if paste {
             let Some(values) = compound(&target, "copied_values") else {

@@ -9,6 +9,7 @@ use crate::items::ItemStack;
 
 use super::create_machines::{float, int, mod_entity, offset};
 use super::create_smart_observer::OBSERVER;
+use super::create_track_observer::OBSERVER as TRACK_OBSERVER;
 use super::{Game, GameLevel};
 
 pub(super) const THRESHOLD_SWITCH: &str = "create:stockpile_switch";
@@ -214,9 +215,15 @@ pub(super) fn filter_hit(game: &Game<'_>, hit: &super::Hit, bottom: bool) -> boo
 }
 
 pub(super) fn filter_click(game: &mut Game<'_>, pos: [i32; 3], normal: [i32; 3]) -> bool {
+    // Block use is attempted for both hands.  FilteringBehaviour handles the
+    // main-hand interaction; allowing the empty off-hand fallback through
+    // would immediately clear a filter just written by the main hand.
+    if game.hand != super::Hand::Main {
+        return false;
+    }
     let bottom = match game.native_block(pos).as_str() {
         THRESHOLD_SWITCH => true,
-        OBSERVER => false,
+        OBSERVER | TRACK_OBSERVER => false,
         _ => return false,
     };
     if !game.may_build() || game.native_sneaking() {
@@ -429,11 +436,12 @@ pub(super) fn release_observer_filter(
     let Some(BlockEntity::Mod(entity)) = level.world.block_entities.get(&(pos.x, pos.y, pos.z)) else {
         return;
     };
-    if entity.id != OBSERVER {
+    if !matches!(entity.id.as_str(), OBSERVER | TRACK_OBSERVER | super::create_fluids::SMART_PIPE) {
         return;
     }
     let Some(stack) = super::create_depot::compound(&entity.nbt, "Filter")
-        .and_then(ItemStack::from_nbt).filter(is_filter_item) else {
+        .and_then(ItemStack::from_nbt)
+        .filter(is_filter_item) else {
         return;
     };
     level.spill.spawns.push(super::spill::Spawn {
@@ -444,7 +452,7 @@ pub(super) fn release_observer_filter(
     });
 }
 
-fn is_filter_item(stack: &ItemStack) -> bool {
+pub(super) fn is_filter_item(stack: &ItemStack) -> bool {
     matches!(
         stack.item.as_ref(),
         "create:filter" | "create:attribute_filter" | "create:package_filter"

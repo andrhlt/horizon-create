@@ -1,0 +1,79 @@
+{
+  "reference": "Create ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "expected_basis": "Java source invariants; this is a Horizon reproduction summary, not a captured Java runtime trace",
+  "placement": [
+    {
+      "runtime": "native-9f42064-342fc62b27be",
+      "case": "small aligned Z pair then side-by-side Z wheel",
+      "expected": "aligned pair allowed; side-by-side rejected with one item retained",
+      "observed": "aligned pair placed; side-by-side wheel placed facing north, remaining item count 0"
+    },
+    {
+      "runtime": "native-9f42064-d6dc2ad18d3f",
+      "case": "small X west and Y up placement",
+      "expected": [
+        "west",
+        "up"
+      ],
+      "observed": [
+        "north",
+        "north"
+      ]
+    }
+  ],
+  "lan_material": {
+    "runtime": "native-9f42064-d6dc2ad18d3f",
+    "debug_override": "Only small wheel placement assertion changed south to north in a disposable runtime monkeypatch; tracked harness retains Java source facing assertion",
+    "cases": [
+      {
+        "wheel": "small",
+        "actor": "host",
+        "material": "minecraft:oak_planks",
+        "starting_count": 3,
+        "local_after_15_seconds": 2,
+        "server_inventory_count": 3,
+        "server_material": "minecraft:oak_planks",
+        "front_axle_block": "minecraft:air"
+      },
+      {
+        "wheel": "small",
+        "actor": "guest",
+        "material": "minecraft:birch_planks",
+        "starting_count": 3,
+        "local_after_15_seconds": 2,
+        "server_inventory_count": 3,
+        "server_material": "minecraft:birch_planks",
+        "front_axle_block": "minecraft:air"
+      },
+      {
+        "wheel": "large",
+        "actor": "host",
+        "material": "minecraft:oak_planks",
+        "starting_count": 3,
+        "local_after_15_seconds": 2,
+        "server_inventory_count": 3,
+        "server_material": "minecraft:oak_planks",
+        "front_axle_block": "minecraft:air"
+      },
+      {
+        "wheel": "large",
+        "actor": "guest",
+        "material": "minecraft:birch_planks",
+        "starting_count": 3,
+        "local_after_15_seconds": 2,
+        "server_inventory_count": 3,
+        "server_material": "minecraft:birch_planks",
+        "front_axle_block": "minecraft:air"
+      }
+    ],
+    "scope": "Proves incorrect predicted inventory after successful material application. Diagnostic later died before activation because players had no safe floor; it is not active-generation gate evidence. Tracked harness adds a safe floor."
+  },
+  "final_build_validation": {
+    "runtime": "native-9f42064-be0b42422906",
+    "scoped_gates": "7/7 pass: placement, axes, survival crafting, small/large idle-active reopen, small/large host-guest LAN",
+    "affected_regressions": "19/19 pass: small/large flow, award, LAN, reopen, magma awards, materials and loaded stressometer",
+    "placement_ray_fix": "Offscreen placement harness now verifies target position, hit face, reach, held wheel and actual sneak state before mouse click; the small fixture clears its adjacent stressometer before testing the south-facing no-shaft case.",
+    "lan_material_fix": "Host/guest local plank inventory converges without a predicted decrement; authoritative wheel materials and active generation pass for both sizes.",
+    "limitations": "Source-aligned save/reopen and guest convergence are verified; exact Java reload and network arrival/interpolation timing remain unverified."
+  }
+}

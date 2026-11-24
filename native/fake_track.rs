@@ -34,16 +34,7 @@ pub(super) fn rasterise(curve: Curve) -> Vec<[i32; 3]> {
         f64::from(origin[1]),
         f64::from(origin[2]),
     );
-    let mut lut = vec![1.0_f32; count + 1];
-    let mut combined = 0.0_f32;
-    let mut previous = curve.point(0.0);
-    for (i, item) in lut.iter_mut().enumerate().skip(1) {
-        let t = i as f32 / count as f32;
-        let point = curve.point(f64::from(t));
-        combined = (f64::from(combined) + point.distance(previous) / curve.length) as f32;
-        *item = t / combined;
-        previous = point;
-    }
+    let lut = curve.step_lut();
     let center = curve.starts[0]
         .add_vector(curve.starts[1])
         .scale(0.5)
@@ -155,52 +146,45 @@ pub(super) fn manage(game: &mut super::Game<'_>, curve: Curve, remove: bool) {
                 entity.data = vec![3];
             }
         });
+        game.native_block_entity_sync(pos);
     }
 }
 
-pub(super) fn remove_owner(
+pub(super) fn remove_markers(
     level: &mut super::GameLevel<'_>,
     ticks: &mut horizon_world::level::Ticks,
-    pos: horizon_core::position::BlockPos,
+    curve: Curve,
 ) {
-    use crate::containers::BlockEntity;
     use horizon_world::level::flags;
-    let Some(BlockEntity::Mod(entity)) = level.world.block_entities.get(&(pos.x, pos.y, pos.z))
-    else {
-        return;
-    };
-    if entity.id != super::create_track::TRACK {
-        return;
-    }
-    let curves = super::create_track::entity_curves(entity, [pos.x, pos.y, pos.z]);
-    for curve in curves {
-        for at in rasterise(curve) {
-            let state = level.world.block(at[0], at[1], at[2]);
-            let Some(block) = level.registry.state(state) else {
-                continue;
-            };
-            if block.name != FAKE_TRACK {
-                continue;
-            }
-            let replacement = if block
-                .properties
-                .get("waterlogged")
-                .is_some_and(|v| v == "true")
-            {
-                "minecraft:water"
-            } else {
-                "minecraft:air"
-            };
-            if let Some(state) = level.registry.default_state(replacement) {
-                let behaviours = level.behaviours;
-                behaviours.set_block(
-                    level,
-                    ticks,
-                    horizon_core::position::BlockPos::new(at[0], at[1], at[2]),
-                    state,
-                    flags::UPDATE_ALL,
-                );
-            }
+    for at in rasterise(curve) {
+        if super::create_track::marker_owned_by_other(level, at, curve) {
+            continue;
+        }
+        let state = level.world.block(at[0], at[1], at[2]);
+        let Some(block) = level.registry.state(state) else {
+            continue;
+        };
+        if block.name != FAKE_TRACK {
+            continue;
+        }
+        let replacement = if block
+            .properties
+            .get("waterlogged")
+            .is_some_and(|v| v == "true")
+        {
+            "minecraft:water"
+        } else {
+            "minecraft:air"
+        };
+        if let Some(state) = level.registry.default_state(replacement) {
+            let behaviours = level.behaviours;
+            behaviours.set_block(
+                level,
+                ticks,
+                horizon_core::position::BlockPos::new(at[0], at[1], at[2]),
+                state,
+                flags::UPDATE_ALL,
+            );
         }
     }
 }

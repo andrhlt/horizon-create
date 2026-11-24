@@ -39,6 +39,7 @@ fn show(game: &mut Game<'_>, mut pointed: NativeStack, uses: bool, selected: usi
                     | "create:milling"
                     | "create:sawing"
                     | "create:mixing"
+                    | "create:filling"
                     | "create:crushing"
                     | "create:fan_washing"
             )
@@ -80,17 +81,14 @@ fn show(game: &mut Game<'_>, mut pointed: NativeStack, uses: bool, selected: usi
                     return None;
                 }
                 let mixing = category.id == "create:mixing";
-                if (!recipe.fluid_inputs.is_empty()
-                    && !game.gui.atlas.sprites.contains_key("block/water_still"))
-                    || recipe.fluid_outputs.iter().any(|fluid| {
-                        let sprite = match fluid.fluid.as_str() {
-                            "create:honey" => "create:fluid/honey_still",
-                            "create:chocolate" => "create:fluid/chocolate_still",
-                            "minecraft:lava" => "block/lava_still",
-                            _ => return true,
-                        };
-                        !game.gui.atlas.sprites.contains_key(sprite)
-                    })
+                if recipe
+                    .fluid_inputs
+                    .iter()
+                    .any(|(_, fluid)| !has_fluid_sprite(game, &fluid.fluid))
+                    || recipe
+                        .fluid_outputs
+                        .iter()
+                        .any(|fluid| !has_fluid_sprite(game, &fluid.fluid))
                 {
                     return None;
                 }
@@ -116,6 +114,7 @@ fn show(game: &mut Game<'_>, mut pointed: NativeStack, uses: bool, selected: usi
                     String::new()
                 };
                 let input_count = recipe.inputs.len();
+                let grid = matches!(category.id.as_str(), "create:mixing" | "create:filling");
                 let mut slots = recipe.inputs;
                 let mut outputs = recipe
                     .outputs
@@ -132,13 +131,13 @@ fn show(game: &mut Game<'_>, mut pointed: NativeStack, uses: bool, selected: usi
                 Some(NativeRecipeView {
                     layout: if multiple {
                         NativeRecipeLayout::Processing
-                    } else if mixing {
+                    } else if grid {
                         NativeRecipeLayout::Grid
                     } else {
                         NativeRecipeLayout::Single
                     },
-                    width: if mixing { input_count.min(3) as u32 } else { 1 },
-                    height: if mixing {
+                    width: if grid { input_count.min(3) as u32 } else { 1 },
+                    height: if grid {
                         input_count.div_ceil(3) as u32
                     } else {
                         1
@@ -188,6 +187,16 @@ fn show(game: &mut Game<'_>, mut pointed: NativeStack, uses: bool, selected: usi
     pointed.count = if uses { 2 } else { 1 };
     game.native_panel_items("create", vec![pointed]);
     game.native_panel_recipes("create", &title, tabs, selected as u32, views);
+}
+
+fn has_fluid_sprite(game: &Game<'_>, fluid: &str) -> bool {
+    let sprite = match fluid {
+        "minecraft:water" => "block/water_still".to_owned(),
+        "minecraft:lava" => "block/lava_still".to_owned(),
+        id if id.starts_with("create:") => format!("create:fluid/{}_still", &id[7..]),
+        _ => return false,
+    };
+    game.gui.atlas.sprites.contains_key(&sprite)
 }
 
 pub(super) fn panel(game: &mut Game<'_>, id: &str, event: &NativePanelEvent) {

@@ -1,5 +1,5 @@
 diff --git a/build.gradle b/build.gradle
-index 3d15f9821..218ffcfa5 100644
+index 3d15f98..218ffcf 100644
 --- a/build.gradle
 +++ b/build.gradle
 @@ -165,7 +165,7 @@ dependencies {
@@ -12,7 +12,7 @@ index 3d15f9821..218ffcfa5 100644
          exclude(group: "curse.maven") // Pulls in a old version of journey map which is for forge
      }
 diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
-index 2c97ae188..9a3fd45e9 100644
+index 2c97ae1..9a3fd45 100644
 --- a/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
 +++ b/src/main/java/com/simibubi/create/infrastructure/gametest/CreateGameTests.java
 @@ -34,6 +34,8 @@ public class CreateGameTests {
@@ -26,10 +26,10 @@ index 2c97ae188..9a3fd45e9 100644
  	}
  }
 diff --git a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
-index 7c531165b..572da1e62 100644
+index 7c53116..145aff1 100644
 --- a/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
 +++ b/src/main/java/com/simibubi/create/infrastructure/gametest/tests/TestMisc.java
-@@ -115,4 +115,70 @@ public class TestMisc {
+@@ -115,4 +115,158 @@ public class TestMisc {
  			helper.assertEntityPresent(EntityType.ZOMBIE, lava);
  		});
  	}
@@ -97,6 +97,94 @@ index 7c531165b..572da1e62 100644
 +			System.out.printf("CREATE_SPEED_CONTROLLER_PLACEMENT,%d,%s,%s,%s,%d%n",
 +				index, installedAxis, topAxis, sideAxis, held.getCount());
 +		}
-+		helper.succeed();
++		traceEncasedControllerConnections(helper, player, hand);
++	}
++
++	private record EncasedControllerRig(BlockPos base, BlockPos source, BlockPos output,
++		String axis, int remaining) {}
++
++	private static void traceEncasedControllerConnections(CreateGameTestHelper helper,
++		net.minecraft.server.level.ServerPlayer player, net.minecraft.world.InteractionHand hand) {
++		var level = helper.getLevel();
++		var controller = com.simibubi.create.AllBlocks.ROTATION_SPEED_CONTROLLER;
++		var shaft = com.simibubi.create.AllBlocks.SHAFT;
++		var motor = com.simibubi.create.AllBlocks.CREATIVE_MOTOR;
++		var axis = net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
++		var horizontal = net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_AXIS;
++		var facing = net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
++		var x = net.minecraft.core.Direction.Axis.X;
++		var y = net.minecraft.core.Direction.Axis.Y;
++		var z = net.minecraft.core.Direction.Axis.Z;
++		var east = net.minecraft.core.Direction.EAST;
++		var up = net.minecraft.core.Direction.UP;
++		var rigs = new java.util.ArrayList<EncasedControllerRig>();
++		var sourceState = motor.getDefaultState().setValue(facing, east);
++		for (int test = 0; test < 6; test++) {
++			var base = new BlockPos(12 + test * 4, 2, 6);
++			var cog = switch (test) {
++				case 0, 2, 5 -> com.simibubi.create.AllBlocks.BRASS_ENCASED_LARGE_COGWHEEL;
++				case 1, 3 -> com.simibubi.create.AllBlocks.ANDESITE_ENCASED_LARGE_COGWHEEL;
++				default -> com.simibubi.create.AllBlocks.BRASS_ENCASED_COGWHEEL;
++			};
++			var cogAxis = test == 1 ? z : test == 3 ? y : x;
++			boolean shaftDrives = test == 1 || test == 3;
++			var block = cog.getDefaultState().setValue(axis, cogAxis)
++				.setValue(com.simibubi.create.content.kinetics.simpleRelays.encased.EncasedCogwheelBlock.BOTTOM_SHAFT, !shaftDrives)
++				.setValue(com.simibubi.create.content.kinetics.simpleRelays.encased.EncasedCogwheelBlock.TOP_SHAFT, !shaftDrives);
++			helper.setBlock(base.above(), block);
++
++			var shaftAxis = test == 0 || test == 5 ? z : x;
++			int remaining = -1;
++			if (test == 2 || test == 5) {
++				helper.setBlock(base, controller.getDefaultState().setValue(horizontal, shaftAxis));
++			} else {
++				helper.setBlock(base.below(), Blocks.STONE);
++				var clicked = helper.absolutePos(base.below());
++				player.setPos(clicked.getX() - 2, clicked.getY() + 1, clicked.getZ());
++				player.setYRot(test == 1 ? 90 : 0);
++				var held = new ItemStack(controller.asItem(), 2);
++				player.setItemInHand(hand, held);
++				var hit = new net.minecraft.world.phys.BlockHitResult(
++					net.minecraft.world.phys.Vec3.atLowerCornerWithOffset(clicked, 0.5, 1, 0.5),
++					up, clicked, false);
++				held.useOn(new net.minecraft.world.item.context.UseOnContext(player, hand, hit));
++				remaining = held.getCount();
++			}
++			var installed = helper.getBlockState(base).getValue(horizontal);
++			var sourcePos = shaftDrives ? base.west() : base.above().west();
++			var outputPos = shaftAxis == z ? base.south() : base.east();
++			helper.setBlock(outputPos, shaft.getDefaultState().setValue(axis, shaftAxis));
++			rigs.add(new EncasedControllerRig(base, sourcePos, outputPos, installed.getName(), remaining));
++			helper.setBlock(sourcePos, sourceState);
++			helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), sourcePos).generatedSpeed.setValue(24);
++		}
++
++		helper.succeedWhen(() -> {
++			long tick = helper.getTick();
++			for (int test = 0; test < rigs.size(); test++) {
++				var rig = rigs.get(test);
++				var controllerEntity = (com.simibubi.create.content.kinetics.base.KineticBlockEntity)
++					level.getBlockEntity(helper.absolutePos(rig.base()));
++				var cogEntity = (com.simibubi.create.content.kinetics.base.KineticBlockEntity)
++					level.getBlockEntity(helper.absolutePos(rig.base().above()));
++				var outputEntity = (com.simibubi.create.content.kinetics.base.KineticBlockEntity)
++					level.getBlockEntity(helper.absolutePos(rig.output()));
++				System.out.printf(java.util.Locale.ROOT,
++					"CREATE_SPEED_CONTROLLER_ENCASED,%d,%d,%s,%d,%.4f,%.4f,%.4f%n",
++					test, tick, rig.axis(), rig.remaining(), controllerEntity.getSpeed(),
++					cogEntity.getSpeed(), outputEntity.getSpeed());
++			}
++			if (tick == 4)
++				for (var rig : rigs)
++					helper.setBlock(rig.source(), Blocks.AIR);
++			if (tick == 8)
++				for (var rig : rigs) {
++					var source = rig.source();
++					helper.setBlock(source, sourceState);
++					helper.getBlockEntity(AllBlockEntityTypes.MOTOR.get(), source).generatedSpeed.setValue(32);
++				}
++			if (tick < 12)
++				helper.fail("Waiting for final encased controller observation");
++		});
 +	}
  }

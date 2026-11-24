@@ -198,6 +198,33 @@ def replay_collection(args):
     print("Visible, occluded and unlit blocks matched Java's first light collection tick.")
 
 
+def replay_transport(args):
+    component = 'Item.components."create:chromatic_compound_collecting_light"'
+    env = {**ENV, "CREATE_RADIANCE_TRACE_SEED": "4100"}
+    with fixture_world(args, "LegacyRadianceTransport", pack=args.pack, env=env) as host:
+        host.commands(("/setblock 6 177 5 minecraft:stone",
+                       "/setblock 6 178 5 create:depot",
+                       '/data modify block 6 178 5 Items set value '
+                       '[{Slot:0b,id:"minecraft:glowstone",count:1}]',
+                       "/tp @s 4.5 177 8.5"))
+        assert host.command('/execute if data block 6 178 5 Items[{id:"minecraft:glowstone"}]').startswith(
+            "Test passed")
+        host.command('/summon minecraft:item 3.5 178.5 5.5 '
+                     '{Item:{id:"create:chromatic_compound",count:2},'
+                     'PickupDelay:32767s,Tags:["RadianceTransport"]}')
+        host.step_to(host.clock() + 1)
+        plain = "@e[type=minecraft:item,tag=RadianceTransport,limit=1]"
+        charged = ('@e[type=minecraft:item,x=3.5,y=178.5,z=5.5,distance=..2,'
+                   'tag=!RadianceTransport,limit=1]')
+        assert legacy.query(host, plain, "Item.count") == "1", plain
+        assert host.command('/execute if data block 6 178 5 Items[{id:"minecraft:glowstone"}]').startswith(
+            "Test failed")
+        assert legacy.query(host, charged, "Item.id").strip('"') == "create:chromatic_compound"
+        assert legacy.query(host, charged, "Item.count") == "1"
+        assert legacy.query(host, charged, component) == "1"
+    print("A Depot Glowstone was consumed and charged one item from a compound stack of two.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("ctl", "client", "resources"):
@@ -208,6 +235,7 @@ if __name__ == "__main__":
     mode.add_argument("--reload", action="store_true")
     mode.add_argument("--charge", action="store_true")
     mode.add_argument("--collection", action="store_true")
+    mode.add_argument("--transport", action="store_true")
     args = parser.parse_args()
     if args.reload:
         replay_reload(args)
@@ -215,5 +243,7 @@ if __name__ == "__main__":
         replay_charge(args)
     elif args.collection:
         replay_collection(args)
+    elif args.transport:
+        replay_transport(args)
     else:
         run(args)

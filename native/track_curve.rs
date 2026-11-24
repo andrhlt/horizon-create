@@ -242,6 +242,21 @@ impl Curve {
         result
     }
 
+    pub(super) fn step_lut(self) -> Vec<f32> {
+        let count = self.segments as usize;
+        let mut lut = vec![1.0; count + 1];
+        let mut distance = 0.0_f32;
+        let mut previous = self.point(0.0);
+        for (i, factor) in lut.iter_mut().enumerate().skip(1) {
+            let t = i as f32 / count as f32;
+            let point = self.point(f64::from(t));
+            distance = (f64::from(distance) + point.distance(previous) / self.length) as f32;
+            *factor = t / distance;
+            previous = point;
+        }
+        lut
+    }
+
     fn control_points(self) -> [Vec3; 4] {
         let [start, end] = self.starts;
         let first = start.add_vector(self.ends[0].axis.normalize().scale(self.handle));

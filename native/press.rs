@@ -16,6 +16,7 @@ use super::create_machines::{
     advancement_owner, facing_axis, float, ingredient_matches, int, offset, reading, set_float,
 };
 use super::create_mixer::{apply, compacting_recipe};
+use super::create_press_processing;
 use super::create_visuals::{draw_rotating, wheel_angle};
 use super::native_block_entity_draw::BlockEntityDraw;
 use super::{Game, GameLevel};
@@ -23,7 +24,7 @@ use super::{Game, GameLevel};
 pub(super) const PRESS: &str = "create:mechanical_press";
 const HEAD_MODEL: &str = "create:block/mechanical_press/head";
 const SHAFT_MODEL: &str = "create:block/shaft";
-const CYCLE: i32 = 240;
+const CYCLE: i32 = create_press_processing::CYCLE;
 const WORLD_MODE: i32 = 0;
 const BELT_MODE: i32 = 1;
 const BASIN_MODE: i32 = 2;
@@ -157,17 +158,7 @@ pub(super) fn tick(
                     _ => {}
                 }
             }
-            let step = if rpm == 0.0 {
-                0
-            } else {
-                (1.0 + 59.0 * (rpm.abs() / 512.0).min(1.0)) as i32
-            };
-            let next = ticks + step;
-            let advanced = if ticks < CYCLE / 2 && next >= CYCLE / 2 {
-                CYCLE / 2
-            } else {
-                next
-            };
+            let advanced = create_press_processing::advance(ticks, rpm).next;
             nbt.insert("PrevTicks".into(), Tag::Int(ticks));
             nbt.insert("Ticks".into(), Tag::Int(advanced));
         }
@@ -253,7 +244,11 @@ fn apply_world(game: &mut Game<'_>, pos: [i32; 3], data: &mut Vec<i32>) -> bool 
     let Some(index) = game
         .dropped
         .iter()
-        .position(|item| item.on_ground && item.bounds().intersects(area))
+        .position(|item| {
+            item.on_ground
+                && item.bounds().intersects(area)
+                && pressing_result(game, &item.stack).is_some()
+        })
     else {
         return false;
     };
