@@ -1,6 +1,8 @@
 pub(crate) mod create_kinetic_slice;
 pub(crate) mod kinetic_adapter;
 pub(crate) mod kinetic_controls;
+pub(crate) mod fan_airflow_math;
+pub(crate) mod create_fan_nozzle_adapter;
 
 #[derive(Default)]
 struct Create;
@@ -36,5 +38,6 @@ impl mod_api::Hooks for Create {
         }
         kinetic_adapter::register(registrar);
         kinetic_controls::register(registrar);
+        create_fan_nozzle_adapter::register(registrar);
     }
 }

@@ -139,6 +139,17 @@ hashes, save/reopen observations, and server configuration. It binds only to
 `127.0.0.1`, uses the supported offline server path, and makes no account,
 credential, lease, or authentication changes.
 
+## Fan and Nozzle package integration
+
+The staged native package also includes `native/create_fan_nozzle_adapter.rs`
+and `native/fan_airflow_math.rs`. `migration/create/src/lib.rs` declares both
+modules and registers the Nozzle block-entity part; the package builder copies
+both canonical source files into the package's `src/` directory. The Fan tick
+callback is exposed for the kinetic part to call after graph recomputation.
+This adapter addition has not yet been exercised in the captured APP-2172
+two-client proof above; its runtime behavior remains open until the combined
+package is rebuilt and checked.
+
 ## Remaining acceptance notes
 
 The production package, registrations, representative gameplay, save/reopen,

@@ -12,6 +12,8 @@ SOURCES = {
     "create_kinetic_slice.rs": ROOT / "native/kinetic_slice.rs",
     "kinetic_adapter.rs": ROOT / "native/kinetic_adapter.rs",
     "kinetic_controls.rs": ROOT / "native/kinetic_controls.rs",
+    "fan_airflow_math.rs": ROOT / "native/fan_airflow_math.rs",
+    "create_fan_nozzle_adapter.rs": ROOT / "native/create_fan_nozzle_adapter.rs",
 }
 
 def main() -> None:
