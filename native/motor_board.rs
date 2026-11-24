@@ -37,10 +37,10 @@ fn control_trace(host: &dyn ServerHost, message: &'static str) {
     }
 }
 
-fn control_trace_setting(host: &dyn ServerHost, setting: i32, updated: bool) {
+fn control_trace_setting(host: &dyn ServerHost, pos: [i32; 3], setting: i32, updated: bool) {
     if std::env::var_os("CREATE_MOTOR_BOARD_CONTROL_TRACE").is_some() {
         host.messages().broadcast(Text::literal(format!(
-            "CREATE_MOTOR_BOARD_SETTING setting={setting} updated={updated}"
+            "CREATE_MOTOR_BOARD_SETTING pos={pos:?} setting={setting} updated={updated}"
         )));
     }
 }
@@ -233,7 +233,7 @@ impl BlockEntityPart for MotorBoard {
         // non-negative protocol range. The shared adapter clamps again.
         let setting = setting_from_button(event.context.id);
         let updated = kinetic_adapter::set_motor_setting(host, level, event.context.pos, setting);
-        control_trace_setting(host, setting, updated);
+        control_trace_setting(host, event.context.pos, setting, updated);
     }
 }
 
