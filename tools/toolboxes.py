@@ -75,7 +75,7 @@ def prepare_toolboxes(resources, generated, content, write_json, crafting_ingred
             "template": "minecraft:oak_planks",
             "item": True,
             "properties": {
-                "occludes": False, "waterloggable": True, "map_color": map_color,
+                "occludes": False, "map_color": map_color,
                 "hardness": 2.0, "explosion_resistance": 2.0,
                 "sounds": "minecraft:stripped_spruce_wood",
             },

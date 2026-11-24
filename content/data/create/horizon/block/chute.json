@@ -1,5 +1,4 @@
 {
-  "properties": {"waterloggable": true},
   "template": "minecraft:stone",
   "item": true,
   "state_properties": {

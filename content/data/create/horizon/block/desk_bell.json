@@ -7,8 +7,7 @@
     "explosion_resistance": 0,
     "requires_tool": false,
     "sounds": "minecraft:stone",
-    "occludes": false,
-    "waterloggable": true
+    "occludes": false
   },
   "state_properties": {
     "facing": {

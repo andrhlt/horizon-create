@@ -51,7 +51,6 @@
     "hardness": 0.7,
     "explosion_resistance": 0.7,
     "occludes": false,
-    "waterloggable": true,
     "straight_rail": true,
     "sounds": "minecraft:powered_rail"
   },

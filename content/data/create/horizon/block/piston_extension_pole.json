@@ -22,7 +22,6 @@
     "waterlogged": "false"
   },
   "properties": {
-    "waterloggable": true,
     "occludes": false
   },
   "shapes": {

@@ -14,7 +14,6 @@
     "render_shape": "ENTITYBLOCK_ANIMATED",
     "occludes": false,
     "map_color": 6,
-    "waterloggable": true,
     "sounds": "minecraft:stone"
   },
   "shapes": {

@@ -5,7 +5,6 @@
     "hardness": 3.0,
     "explosion_resistance": 6.0,
     "requires_tool": true,
-    "waterloggable": true,
     "sounds": "minecraft:netherite_block",
     "map_color": 45,
     "trapdoor_sound_source": "minecraft:iron_trapdoor"

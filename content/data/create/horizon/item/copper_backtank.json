@@ -25,5 +25,5 @@
     "!minecraft:max_damage": {},
     "!minecraft:damage": {}
   },
-  "place_block": "create:copper_backtank"
+  "block": "create:copper_backtank"
 }

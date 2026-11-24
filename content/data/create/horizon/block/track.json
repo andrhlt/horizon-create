@@ -40,7 +40,6 @@
   },
   "properties": {
     "hardness": 0.8,
-    "waterloggable": true,
     "occludes": false,
     "sounds": "minecraft:iron_block"
   },

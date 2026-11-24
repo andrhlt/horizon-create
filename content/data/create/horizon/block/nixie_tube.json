@@ -2,7 +2,6 @@
   "template": "minecraft:gold_block",
   "item": true,
   "properties": {
-    "waterloggable": true,
     "occludes": false,
     "map_color": 15,
     "light": 5

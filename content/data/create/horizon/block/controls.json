@@ -1,7 +1,7 @@
 {
   "template": "minecraft:stone",
   "item": true,
-  "properties": {"waterloggable": true,  "occludes": false },
+  "properties": {"occludes": false },
   "state_properties": {
     "facing": { "type": "enum", "values": ["north", "east", "south", "west"] },
     "virtual": { "type": "boolean" },
