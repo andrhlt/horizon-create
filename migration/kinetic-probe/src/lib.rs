@@ -4,6 +4,7 @@ pub(crate) mod millstone_adapter;
 pub(crate) mod millstone_processing;
 pub(crate) mod motor_board;
 pub(crate) mod moving_probe;
+pub(crate) mod power_sources;
 
 #[derive(Default)]
 struct Mod;

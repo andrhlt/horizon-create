@@ -19,6 +19,11 @@ Gameplay ticket completion follows [the finite completion standard](COMPLETION-S
 A merged gameplay ticket may be Done while its Full 1:1 column remains Open;
 the two measure different levels of evidence.
 
+Frozen SDK migration is tracked separately from this historical matrix. Existing
+Pass entries below describe the `9f42064` baseline and are not evidence for the
+Minecraft 26.3 / Horizon `0a875da` cohort. See the [APP-2174 power-source
+migration assessment](APP-2174-MIGRATION.md) for its assigned family statuses.
+
 ## Kinetic power and transmission
 
 | Feature | In game | Basic tested | Java comparison | Full 1:1 | Remaining work |
