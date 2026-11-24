@@ -37,6 +37,14 @@ fn control_trace(host: &dyn ServerHost, message: &'static str) {
     }
 }
 
+fn control_trace_setting(host: &dyn ServerHost, setting: i32, updated: bool) {
+    if std::env::var_os("CREATE_MOTOR_BOARD_CONTROL_TRACE").is_some() {
+        host.messages().broadcast(Text::literal(format!(
+            "CREATE_MOTOR_BOARD_SETTING setting={setting} updated={updated}"
+        )));
+    }
+}
+
 pub fn register(registrar: &mut dyn mod_api::Registrar) {
     let kind = registrar.block_entity_type_key("create:motor");
     let block = registrar.block_key(MENU_ID);
@@ -214,6 +222,7 @@ impl BlockEntityPart for MotorBoard {
     }
 
     fn menu_button(&self, host: &mut dyn ServerHost, event: &mut mod_api::MenuButtonEvent<'_>) {
+        control_trace(host, "CREATE_MOTOR_BOARD_MENU_BUTTON_HOOK");
         let Some(player) = host.player(event.context.player) else {
             return;
         };
@@ -223,7 +232,8 @@ impl BlockEntityPart for MotorBoard {
         // Button ids are the signed board value shifted into the menu's
         // non-negative protocol range. The shared adapter clamps again.
         let setting = setting_from_button(event.context.id);
-        let _ = kinetic_adapter::set_motor_setting(host, level, event.context.pos, setting);
+        let updated = kinetic_adapter::set_motor_setting(host, level, event.context.pos, setting);
+        control_trace_setting(host, setting, updated);
     }
 }
 
