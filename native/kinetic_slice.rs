@@ -27,6 +27,9 @@ pub enum Node {
     Millstone,
     MechanicalPress,
     Mixer,
+    Fan {
+        axis: usize,
+    },
     Gauge {
         axis: usize,
     },
@@ -74,6 +77,7 @@ impl Node {
             | Self::Gearshift { axis, .. }
             | Self::SequencedGearshift { axis, .. }
             | Self::RotationSpeedController { axis, .. } => face[axis] != 0,
+            Self::Fan { axis } => face[axis] != 0,
             Self::EncasedCogwheel {
                 axis,
                 top_shaft,

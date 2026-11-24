@@ -1,7 +1,6 @@
 {
   "template": "minecraft:iron_block",
   "properties": {
-    "waterloggable": true,
     "occludes": false
   },
   "state_properties": {

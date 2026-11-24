@@ -28,7 +28,6 @@
     "explosion_resistance": 6.0,
     "requires_tool": true,
     "occludes": false,
-    "waterloggable": true,
     "sounds": "minecraft:netherite_block",
     "map_color": 47
   },

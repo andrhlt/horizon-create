@@ -2,7 +2,6 @@
   "template": "minecraft:stone",
   "item": false,
   "properties": {
-    "waterloggable": true,
     "sounds": "minecraft:oak_planks",
     "occludes": false
   },

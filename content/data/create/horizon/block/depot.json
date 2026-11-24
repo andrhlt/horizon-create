@@ -2,7 +2,6 @@
   "template": "minecraft:oak_planks",
   "item": true,
   "properties": {
-    "waterloggable": true,
     "occludes": false
   },
   "state_properties": {

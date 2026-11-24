@@ -2,7 +2,6 @@
   "template": "minecraft:copper_block",
   "item": false,
   "properties": {
-    "waterloggable": true,
     "occludes": false,
     "requires_tool": true
   },

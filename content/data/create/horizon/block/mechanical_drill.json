@@ -2,7 +2,6 @@
   "template": "minecraft:stone",
   "item": true,
   "properties": {
-    "waterloggable": true,
     "occludes": false,
     "map_color": 34
   },

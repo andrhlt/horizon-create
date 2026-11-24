@@ -1,7 +1,6 @@
 {
   "template": "minecraft:stone",
   "properties": {
-    "waterloggable": true,
     "occludes": false
   },
   "state_properties": {

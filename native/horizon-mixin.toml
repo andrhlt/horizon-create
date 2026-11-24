@@ -637,6 +637,12 @@ bindings = [
 ]
 
 [[module]]
+id = "fan_airflow_math"
+file = "crates/horizon-client/src/game.rs"
+name = "create_fan_airflow_math"
+source = "fan_airflow_math.rs"
+
+[[module]]
 id = "item_filters"
 file = "crates/horizon-client/src/game.rs"
 name = "create_item_filters"

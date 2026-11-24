@@ -28,6 +28,7 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
             "create:speedometer",
             "create:stressometer",
             "create:turntable",
+            "create:encased_fan",
         ])
         .build();
     let encased_cogwheel = registrar
@@ -107,6 +108,7 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         speedometer: registrar.block_key("create:speedometer"),
         stressometer: registrar.block_key("create:stressometer"),
         turntable: registrar.block_key("create:turntable"),
+        fan: registrar.block_key("create:encased_fan"),
     };
     let _ = KINETIC_PART.set(part);
     registrar.block_entity_part(&motor, part).unwrap();
@@ -155,6 +157,7 @@ pub struct KineticPart {
     speedometer: BlockKey,
     stressometer: BlockKey,
     turntable: BlockKey,
+    fan: BlockKey,
 }
 
 impl KineticPart {
@@ -467,6 +470,22 @@ impl BlockEntityPart for KineticPart {
             return;
         };
         let node_here = node(host, level, event.pos, *self);
+        // Fan work advances on the Fan BE's own server tick. Motors persist
+        // signed effective speed into this BE as part of graph recomputation.
+        if node_here.is_some_and(|node| matches!(node, Node::Fan { .. })) {
+            let speed = match event.entity.nbt.get(&"Speed".into()) {
+                Some(Tag::Float(value)) => f32::from_bits(*value),
+                _ => 0.0,
+            };
+            super::create_fan_nozzle_adapter::tick_fan(
+                host,
+                level,
+                event.pos,
+                &mut event.entity.nbt,
+                speed,
+            );
+            return;
+        }
         if node_here.is_some_and(|node| matches!(node, Node::ChainDrive { .. }))
             && level.block(host, event.pos) == Some(self.chain_gearshift)
         {
@@ -718,6 +737,16 @@ fn node(
     if block == part.turntable {
         return Some(Node::Turntable);
     }
+    if block == part.fan {
+        let facing = level.block_property(host, pos, "facing")?;
+        let axis = match facing.as_str() {
+            "east" | "west" => 0,
+            "up" | "down" => 1,
+            "north" | "south" => 2,
+            _ => return None,
+        };
+        return Some(Node::Fan { axis });
+    }
     if block == part.cogwheel || block == part.large_cogwheel {
         return Some(Node::Cogwheel {
             axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
@@ -943,6 +972,9 @@ fn network(
         }
         if matches!(block, Node::CrushingWheel { .. }) {
             impact_per_rpm += 8.0 / ratio.abs();
+        }
+        if matches!(block, Node::Fan { .. }) {
+            impact_per_rpm += 2.0 / ratio.abs();
         }
         let Node::Motor { facing } = block else {
             continue;

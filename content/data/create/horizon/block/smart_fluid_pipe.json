@@ -7,6 +7,6 @@
     "waterlogged": {"type": "boolean"}
   },
   "default_state": {"facing": "north", "face": "floor", "waterlogged": "false"},
-  "properties": {"waterloggable": true, "occludes": false},
+  "properties": {"occludes": false},
   "shapes": {"default": [[0.125, 0.125, 0.125, 0.875, 0.875, 0.875]]}
 }

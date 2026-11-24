@@ -30,8 +30,7 @@
     "type": "normal"
   },
   "properties": {
-    "occludes": false,
-    "waterloggable": true
+    "occludes": false
   },
   "shapes": {
     "property": "facing",

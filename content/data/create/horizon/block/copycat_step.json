@@ -3,8 +3,7 @@
   "item": true,
   "properties": {
     "occludes": false,
-    "map_color": 0,
-    "waterloggable": true
+    "map_color": 0
   },
   "state_properties": {
     "facing": {

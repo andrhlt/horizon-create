@@ -1,7 +1,6 @@
 {
   "template": "minecraft:white_wool",
   "properties": {
-    "waterloggable": true,
     "occludes": false
   },
   "state_properties": {

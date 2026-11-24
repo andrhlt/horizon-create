@@ -543,7 +543,7 @@ def build_pack(source, content, archive, *, worldgen=True):
         write_json(blocks / f"{color}_postbox.json", {
             "template": "minecraft:oak_planks", "item": True,
             "properties": {
-                "occludes": False, "map_color": map_color, "waterloggable": True,
+                "occludes": False, "map_color": map_color,
                 "hardness": 2.0, "explosion_resistance": 2.0,
                 "sounds": "minecraft:stripped_spruce_wood",
             },
