@@ -34,6 +34,9 @@ def main():
         "millstone_processing.rs",
         "millstone_adapter.rs",
         "motor_board.rs",
+        "gauge_logic.rs",
+        "turntable_motion.rs",
+        "gauge_readout.rs",
     ):
         source = ROOT / "native" / name
         destination = output / "src" / name
@@ -82,6 +85,7 @@ def main():
         "brass_encased_shaft", "metal_girder_encased_shaft",
         "brass_encased_cogwheel", "sequenced_gearshift",
         "rotation_speed_controller",
+        "speedometer", "stressometer", "turntable",
     ):
         source = ROOT / f"content/data/create/horizon/block/{name}.json"
         definition = json.loads(source.read_text())

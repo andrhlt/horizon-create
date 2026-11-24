@@ -1,6 +1,10 @@
 pub(crate) mod create_kinetic_slice;
+pub(crate) mod gauge_logic;
+pub(crate) mod gauge_readout;
 pub(crate) mod kinetic_adapter;
 pub(crate) mod kinetic_controls;
+pub(crate) mod turntable_motion;
+pub(crate) use create_kinetic_slice as kinetic_slice;
 
 #[derive(Default)]
 struct Create;
@@ -36,5 +40,14 @@ impl mod_api::Hooks for Create {
         }
         kinetic_adapter::register(registrar);
         kinetic_controls::register(registrar);
+        gauge_readout::register(registrar);
+    }
+
+    fn gui_render_post(
+        &self,
+        host: &dyn mod_api::ClientHost,
+        event: &mut mod_api::GuiRenderPostEvent<'_>,
+    ) {
+        gauge_readout::draw(host, event);
     }
 }

@@ -22,6 +22,10 @@ pub enum Node {
         bottom_shaft: bool,
     },
     Millstone,
+    Gauge {
+        axis: usize,
+    },
+    Turntable,
     Flywheel {
         axis: usize,
     },
@@ -73,6 +77,8 @@ impl Node {
             Self::ChainDrive { shaft_axis, .. } => face[shaft_axis] != 0,
             Self::Gearbox { axis } => face[axis] == 0,
             Self::Millstone => face == [0, -1, 0],
+            Self::Gauge { axis } => face[axis] != 0,
+            Self::Turntable => face == [0, -1, 0],
         }
     }
 
@@ -111,7 +117,10 @@ impl Node {
         let mut result = DIRECTIONS.to_vec();
         if matches!(
             self,
-            Self::Cogwheel { .. } | Self::EncasedCogwheel { .. } | Self::Millstone
+            Self::Cogwheel { .. }
+                | Self::EncasedCogwheel { .. }
+                | Self::Millstone
+                | Self::Turntable
         ) {
             result.extend(DIAGONALS);
         }
@@ -310,6 +319,17 @@ pub fn axis_index(axis: &str) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gauges_and_turntable_join_the_kinetic_shaft_and_turntable_adds_stress() {
+        let shaft = Node::Shaft { axis: 1 };
+        let gauge = Node::Gauge { axis: 1 };
+        let table = Node::Turntable;
+        assert_eq!(shaft.ratio_to(gauge, [0, 1, 0]), Some(1.0));
+        assert_eq!(table.ratio_to(shaft, [0, -1, 0]), Some(1.0));
+        assert_eq!(table.ratio_to(shaft, [0, 1, 0]), None);
+        assert_eq!(resolve_network(&[motor_source(16.0)], 4.0).stress, 64.0);
+    }
 
     #[test]
     fn motor_shaft_and_cogwheel_ratios_match_the_existing_gear_trace() {

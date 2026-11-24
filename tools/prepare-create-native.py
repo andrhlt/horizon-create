@@ -10,8 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "migration/create"
 SOURCES = {
     "create_kinetic_slice.rs": ROOT / "native/kinetic_slice.rs",
+    "gauge_logic.rs": ROOT / "native/gauge_logic.rs",
+    "gauge_readout.rs": ROOT / "native/gauge_readout.rs",
     "kinetic_adapter.rs": ROOT / "native/kinetic_adapter.rs",
     "kinetic_controls.rs": ROOT / "native/kinetic_controls.rs",
+    "turntable_motion.rs": ROOT / "native/turntable_motion.rs",
 }
 
 def main() -> None:
