@@ -226,7 +226,7 @@ impl BlockEntityPart for MotorBoard {
         let Some(player) = host.player(event.context.player) else {
             return;
         };
-        let Some(level): Option<LevelRef> = player.entity().level(host) else {
+        let Some(level): Option<LevelRef> = host.player_level(player) else {
             return;
         };
         // Button ids are the signed board value shifted into the menu's
