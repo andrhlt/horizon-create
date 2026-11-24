@@ -3,19 +3,64 @@
 //! This module has no Horizon host access. The caller supplies block identity,
 //! orientation, positions and motor setting, which keeps the SDK adapter thin.
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Node {
-    Motor { facing: [i32; 3] },
-    Shaft { axis: usize },
-    Cogwheel { axis: usize, large: bool },
+    Motor {
+        facing: [i32; 3],
+    },
+    Shaft {
+        axis: usize,
+    },
+    Cogwheel {
+        axis: usize,
+        large: bool,
+    },
+    EncasedCogwheel {
+        axis: usize,
+        large: bool,
+        top_shaft: bool,
+        bottom_shaft: bool,
+    },
     Millstone,
+    Flywheel {
+        axis: usize,
+    },
+    Gearbox {
+        axis: usize,
+    },
+    Clutch {
+        axis: usize,
+        powered: bool,
+    },
+    Gearshift {
+        axis: usize,
+        powered: bool,
+    },
+    ChainDrive {
+        shaft_axis: usize,
+        link_axis: usize,
+        part: i8,
+        modifier: f32,
+    },
 }
 
 impl Node {
     fn shaft(self, face: [i32; 3]) -> bool {
         match self {
             Self::Motor { facing } => face == facing,
-            Self::Shaft { axis } | Self::Cogwheel { axis, .. } => face[axis] != 0,
+            Self::Shaft { axis }
+            | Self::Cogwheel { axis, .. }
+            | Self::Flywheel { axis }
+            | Self::Clutch { axis, .. }
+            | Self::Gearshift { axis, .. } => face[axis] != 0,
+            Self::EncasedCogwheel {
+                axis,
+                top_shaft,
+                bottom_shaft,
+                ..
+            } => face[axis] > 0 && top_shaft || face[axis] < 0 && bottom_shaft,
+            Self::ChainDrive { shaft_axis, .. } => face[shaft_axis] != 0,
+            Self::Gearbox { axis } => face[axis] == 0,
             Self::Millstone => face == [0, -1, 0],
         }
     }
@@ -23,6 +68,7 @@ impl Node {
     fn gear(self) -> Option<(usize, bool)> {
         match self {
             Self::Cogwheel { axis, large } => Some((axis, large)),
+            Self::EncasedCogwheel { axis, large, .. } => Some((axis, large)),
             Self::Millstone => Some((1, false)),
             _ => None,
         }
@@ -52,7 +98,10 @@ impl Node {
             [0, 1, 1],
         ];
         let mut result = DIRECTIONS.to_vec();
-        if matches!(self, Self::Cogwheel { .. } | Self::Millstone) {
+        if matches!(
+            self,
+            Self::Cogwheel { .. } | Self::EncasedCogwheel { .. } | Self::Millstone
+        ) {
             result.extend(DIAGONALS);
         }
         result
@@ -64,6 +113,30 @@ impl Node {
         let adjacent = offset.iter().map(|v| v.abs()).sum::<i32>() == 1;
         if adjacent && self.shaft(offset) && other.shaft(offset.map(|v| -v)) {
             return Some(1.0);
+        }
+        if let (
+            Self::ChainDrive {
+                link_axis,
+                part,
+                modifier,
+                ..
+            },
+            Self::ChainDrive {
+                link_axis: other_link_axis,
+                part: other_part,
+                modifier: other_modifier,
+                ..
+            },
+        ) = (self, other)
+            && adjacent
+            && link_axis == other_link_axis
+            && offset[link_axis] != 0
+            && part != 2
+            && other_part != 2
+            && (part == 0 || i32::from(part) == offset[link_axis])
+            && (other_part == 0 || i32::from(other_part) == -offset[link_axis])
+        {
+            return Some(modifier / other_modifier);
         }
         let (Some((axis, large)), Some((other_axis, other_large))) = (self.gear(), other.gear())
         else {
@@ -91,6 +164,37 @@ impl Node {
             _ => None,
         }
     }
+
+    /// Direction-dependent transmission modifier from the incoming face to
+    /// an outgoing neighbor. `entered` points from this node back to its
+    /// predecessor, matching Create's `getRotationSpeedModifier` convention.
+    pub fn direction_ratio(self, entered: [i32; 3], outgoing: [i32; 3]) -> f32 {
+        if entered == [0; 3] || entered == outgoing {
+            return 1.0;
+        }
+        match self {
+            Self::Clutch { powered: true, .. } => 0.0,
+            Self::Gearshift { powered: true, .. } => -1.0,
+            Self::Gearbox { .. } => gearbox_multiplier(entered, outgoing),
+            _ => 1.0,
+        }
+    }
+}
+
+pub fn gearbox_multiplier(from: [i32; 3], to: [i32; 3]) -> f32 {
+    if from == [0; 3] || from == to {
+        return 1.0;
+    }
+    if from == to.map(|component| -component) || from.iter().sum::<i32>() == to.iter().sum::<i32>()
+    {
+        -1.0
+    } else {
+        1.0
+    }
+}
+
+pub fn inconsistent_loop_ratio(expected: f32, existing: f32) -> bool {
+    (expected - existing).abs() > 1e-5
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -105,6 +209,7 @@ pub struct Network {
     pub capacity: f32,
     pub stress: f32,
     pub source_conflict: bool,
+    pub topology_conflict: bool,
 }
 
 impl Network {
@@ -250,5 +355,113 @@ mod tests {
         assert_eq!(motor_speed([-1, 0, 0], 64), -64.0);
         assert_eq!(motor_speed([1, 0, 0], -24), -24.0);
         assert_eq!(motor_speed([1, 0, 0], 999), 256.0);
+    }
+
+    #[test]
+    fn transmissions_apply_powered_clutch_and_gearshift_only_across_the_output() {
+        let input = [1, 0, 0];
+        let output = [0, 0, 1];
+        assert_eq!(
+            Node::Clutch {
+                axis: 0,
+                powered: true
+            }
+            .direction_ratio(input, output),
+            0.0
+        );
+        assert_eq!(
+            Node::Gearshift {
+                axis: 0,
+                powered: true
+            }
+            .direction_ratio(input, output),
+            -1.0
+        );
+        assert_eq!(
+            Node::Gearshift {
+                axis: 0,
+                powered: true
+            }
+            .direction_ratio(input, input),
+            1.0
+        );
+        assert_eq!(gearbox_multiplier([1, 0, 0], [0, 0, 1]), -1.0);
+        assert_eq!(gearbox_multiplier([1, 0, 0], [0, 0, -1]), 1.0);
+    }
+
+    #[test]
+    fn gearbox_connects_matching_perpendicular_shafts() {
+        let gearbox = Node::Gearbox { axis: 1 };
+        assert_eq!(
+            gearbox.ratio_to(Node::Shaft { axis: 0 }, [1, 0, 0]),
+            Some(1.0)
+        );
+        assert_eq!(gearbox.ratio_to(Node::Shaft { axis: 1 }, [0, 1, 0]), None);
+        assert_eq!(
+            Node::Clutch {
+                axis: 2,
+                powered: false
+            }
+            .ratio_to(Node::Flywheel { axis: 2 }, [0, 0, 1]),
+            Some(1.0)
+        );
+    }
+
+    #[test]
+    fn chain_links_require_matching_axis_and_open_endpoints() {
+        let start = Node::ChainDrive {
+            shaft_axis: 0,
+            link_axis: 1,
+            part: 1,
+            modifier: 1.0,
+        };
+        let end = Node::ChainDrive {
+            shaft_axis: 0,
+            link_axis: 1,
+            part: -1,
+            modifier: 1.5,
+        };
+        assert_eq!(start.ratio_to(end, [0, 1, 0]), Some(1.0 / 1.5));
+        assert_eq!(start.ratio_to(end, [0, -1, 0]), None);
+        assert_eq!(
+            start.ratio_to(
+                Node::ChainDrive {
+                    shaft_axis: 0,
+                    link_axis: 2,
+                    part: -1,
+                    modifier: 1.5,
+                },
+                [0, 1, 0]
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn encased_cogwheel_shaft_connections_follow_open_halves() {
+        let cog = Node::EncasedCogwheel {
+            axis: 1,
+            large: true,
+            top_shaft: false,
+            bottom_shaft: true,
+        };
+        assert!(!cog.shaft([0, 1, 0]));
+        assert!(cog.shaft([0, -1, 0]));
+        assert_eq!(
+            cog.ratio_to(
+                Node::Cogwheel {
+                    axis: 1,
+                    large: false
+                },
+                [1, 0, 1]
+            ),
+            Some(-2.0)
+        );
+    }
+
+    #[test]
+    fn loop_validation_uses_the_existing_ratio_tolerance() {
+        assert!(!inconsistent_loop_ratio(2.0, 2.0 + 5e-6));
+        assert!(inconsistent_loop_ratio(2.0, 2.0 + 2e-5));
     }
 }

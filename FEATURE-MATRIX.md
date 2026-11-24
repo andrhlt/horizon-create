@@ -21,6 +21,11 @@ the two measure different levels of evidence.
 
 ## Kinetic power and transmission
 
+The kinetic-family passes below are historical `9f42064` gameplay evidence;
+they do not establish the frozen `0a875da` SDK migration. Current migration
+classification, adapted typed-part scope, and open gates are recorded in
+[APP-2173-MIGRATION.md](APP-2173-MIGRATION.md).
+
 | Feature | In game | Basic tested | Java comparison | Full 1:1 | Remaining work |
 | --- | --- | --- | --- | --- | --- |
 | Kinetic network propagation, speed, stress and overload | Yes | Pass | Small and large wheel networks, loaded meter, competing sources and controller cascades. APP-1943 adds weaker/equal/stronger source transitions, matching-source merge, split, idle/active reopen, and below/at/above-capacity recovery on `native-9f42064-b2e225daec86` | Open | Branch layouts and direct LAN guest interaction for source-network merges |

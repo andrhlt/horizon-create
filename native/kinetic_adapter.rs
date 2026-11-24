@@ -22,16 +22,85 @@ pub fn register(registrar: &mut dyn mod_api::Registrar) {
         .block_entity_type("create:simple_kinetic")
         .blocks(&["create:shaft", "create:cogwheel", "create:large_cogwheel"])
         .build();
+    let encased_cogwheel = registrar
+        .block_entity_type("create:encased_cogwheel")
+        .blocks(&[
+            "create:brass_encased_cogwheel",
+            "create:andesite_encased_cogwheel",
+        ])
+        .build();
+    let encased_large_cogwheel = registrar
+        .block_entity_type("create:encased_large_cogwheel")
+        .blocks(&[
+            "create:brass_encased_large_cogwheel",
+            "create:andesite_encased_large_cogwheel",
+        ])
+        .build();
+    let encased_shaft = registrar
+        .block_entity_type("create:encased_shaft")
+        .blocks(&[
+            "create:andesite_encased_shaft",
+            "create:brass_encased_shaft",
+            "create:metal_girder_encased_shaft",
+            "create:encased_chain_drive",
+        ])
+        .build();
+    let flywheel = registrar
+        .block_entity_type("create:flywheel")
+        .blocks(&["create:flywheel"])
+        .build();
+    let gearbox = registrar
+        .block_entity_type("create:gearbox")
+        .blocks(&["create:gearbox"])
+        .build();
+    let clutch = registrar
+        .block_entity_type("create:clutch")
+        .blocks(&["create:clutch"])
+        .build();
+    let gearshift = registrar
+        .block_entity_type("create:gearshift")
+        .blocks(&["create:gearshift"])
+        .build();
+    let chain_gearshift = registrar
+        .block_entity_type("create:adjustable_chain_gearshift")
+        .blocks(&["create:adjustable_chain_gearshift"])
+        .build();
     let part = KineticPart {
         motor: registrar.block_key("create:creative_motor"),
         shaft: registrar.block_key("create:shaft"),
         cogwheel: registrar.block_key("create:cogwheel"),
         large_cogwheel: registrar.block_key("create:large_cogwheel"),
         millstone: registrar.block_key("create:millstone"),
+        flywheel: registrar.block_key("create:flywheel"),
+        gearbox: registrar.block_key("create:gearbox"),
+        clutch: registrar.block_key("create:clutch"),
+        gearshift: registrar.block_key("create:gearshift"),
+        encased_cogwheel: registrar.block_key("create:brass_encased_cogwheel"),
+        encased_andesite_cogwheel: registrar.block_key("create:andesite_encased_cogwheel"),
+        encased_large_cogwheel: registrar.block_key("create:brass_encased_large_cogwheel"),
+        encased_andesite_large_cogwheel: registrar
+            .block_key("create:andesite_encased_large_cogwheel"),
+        andesite_shaft: registrar.block_key("create:andesite_encased_shaft"),
+        brass_shaft: registrar.block_key("create:brass_encased_shaft"),
+        girder_shaft: registrar.block_key("create:metal_girder_encased_shaft"),
+        chain_drive: registrar.block_key("create:encased_chain_drive"),
+        chain_gearshift: registrar.block_key("create:adjustable_chain_gearshift"),
     };
     let _ = KINETIC_PART.set(part);
     registrar.block_entity_part(&motor, part).unwrap();
     registrar.block_entity_part(&kinetic, part).unwrap();
+    registrar
+        .block_entity_part(&encased_cogwheel, part)
+        .unwrap();
+    registrar
+        .block_entity_part(&encased_large_cogwheel, part)
+        .unwrap();
+    registrar.block_entity_part(&encased_shaft, part).unwrap();
+    registrar.block_entity_part(&flywheel, part).unwrap();
+    registrar.block_entity_part(&gearbox, part).unwrap();
+    registrar.block_entity_part(&clutch, part).unwrap();
+    registrar.block_entity_part(&gearshift, part).unwrap();
+    registrar.block_entity_part(&chain_gearshift, part).unwrap();
 }
 
 #[derive(Clone, Copy)]
@@ -41,6 +110,19 @@ pub struct KineticPart {
     cogwheel: BlockKey,
     large_cogwheel: BlockKey,
     millstone: BlockKey,
+    flywheel: BlockKey,
+    gearbox: BlockKey,
+    clutch: BlockKey,
+    gearshift: BlockKey,
+    encased_cogwheel: BlockKey,
+    encased_andesite_cogwheel: BlockKey,
+    encased_large_cogwheel: BlockKey,
+    encased_andesite_large_cogwheel: BlockKey,
+    andesite_shaft: BlockKey,
+    brass_shaft: BlockKey,
+    girder_shaft: BlockKey,
+    chain_drive: BlockKey,
+    chain_gearshift: BlockKey,
 }
 
 impl KineticPart {
@@ -372,8 +454,82 @@ fn node(
             large: block == part.large_cogwheel,
         });
     }
+    if block == part.encased_cogwheel
+        || block == part.encased_andesite_cogwheel
+        || block == part.encased_large_cogwheel
+        || block == part.encased_andesite_large_cogwheel
+    {
+        return Some(Node::EncasedCogwheel {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+            large: block == part.encased_large_cogwheel
+                || block == part.encased_andesite_large_cogwheel,
+            top_shaft: level.block_property(host, pos, "top_shaft")? == "true",
+            bottom_shaft: level.block_property(host, pos, "bottom_shaft")? == "true",
+        });
+    }
+    if block == part.andesite_shaft || block == part.brass_shaft || block == part.girder_shaft {
+        return Some(Node::Shaft {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+        });
+    }
     if block == part.millstone {
         return Some(Node::Millstone);
+    }
+    if block == part.flywheel {
+        return Some(Node::Flywheel {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+        });
+    }
+    if block == part.gearbox {
+        return Some(Node::Gearbox {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+        });
+    }
+    if block == part.clutch {
+        return Some(Node::Clutch {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+            powered: level.block_property(host, pos, "powered")? == "true",
+        });
+    }
+    if block == part.gearshift {
+        return Some(Node::Gearshift {
+            axis: kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?,
+            powered: level.block_property(host, pos, "powered")? == "true",
+        });
+    }
+    if block == part.chain_drive || block == part.chain_gearshift {
+        let shaft_axis = kinetic_slice::axis_index(&level.block_property(host, pos, "axis")?)?;
+        let first = level.block_property(host, pos, "axis_along_first")? == "true";
+        let link_axis = [0, 1, 2]
+            .into_iter()
+            .filter(|candidate| *candidate != shaft_axis)
+            .nth(usize::from(!first))?;
+        let part = match level.block_property(host, pos, "part")?.as_str() {
+            "start" => 1,
+            "middle" => 0,
+            "end" => -1,
+            _ => 2,
+        };
+        let signal = host
+            .block_entity(level, pos)
+            .and_then(|entity| entity.data(host))
+            .and_then(|data| match data.get(&"Signal".into()) {
+                Some(Tag::Int(value)) => Some(*value),
+                _ => None,
+            })
+            .unwrap_or(0)
+            .clamp(0, 15);
+        let modifier = if signal == 0 {
+            1.0
+        } else {
+            1.0 + (signal + 1) as f32 / 16.0
+        };
+        return Some(Node::ChainDrive {
+            shaft_axis,
+            link_axis,
+            part,
+            modifier,
+        });
     }
     None
 }
@@ -389,16 +545,14 @@ fn network(
         return HashMap::new();
     };
     let mut ratios = HashMap::from([(start, 1.0f32)]);
-    let mut pending = VecDeque::from([(start, start_node)]);
+    let mut pending = VecDeque::from([(start, start_node, [0; 3])]);
     let mut order = Vec::new();
-    while let Some((pos, block)) = pending.pop_front() {
+    let mut topology_conflict = false;
+    while let Some((pos, block, entered)) = pending.pop_front() {
         order.push(pos);
         let ratio = ratios[&pos];
         for delta in block.neighbors() {
             let next = [pos[0] + delta[0], pos[1] + delta[1], pos[2] + delta[2]];
-            if ratios.contains_key(&next) {
-                continue;
-            }
             let Some(other) = node(host, level, next, part) else {
                 continue;
             };
@@ -408,9 +562,18 @@ fn network(
             if edge == 0.0 {
                 continue;
             }
-            let next_ratio = ratio / edge;
+            let direction = block.direction_ratio(entered, delta);
+            if direction == 0.0 {
+                continue;
+            }
+            let next_ratio = ratio * direction / edge;
+            if let Some(previous_ratio) = ratios.get(&next).copied() {
+                topology_conflict |=
+                    kinetic_slice::inconsistent_loop_ratio(next_ratio, previous_ratio);
+                continue;
+            }
             ratios.insert(next, next_ratio);
-            pending.push_back((next, other));
+            pending.push_back((next, other, delta.map(|value| -value)));
         }
     }
     let mut sources = Vec::new();
@@ -451,6 +614,7 @@ fn network(
         .map(|(pos, ratio)| {
             let mut state = resolved;
             state.rpm /= ratio;
+            state.topology_conflict = topology_conflict;
             (pos, state)
         })
         .collect()
