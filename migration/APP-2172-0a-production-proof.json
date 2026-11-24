@@ -1,0 +1,179 @@
+{
+  "route": "supported offline localhost dedicated server",
+  "bind": "127.0.0.1",
+  "engine": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "native_mods": {
+    "base": "nightly-2026-11-20-0a875da",
+    "horizon": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+    "horizon_mixins": "e59da9094f0c2fdda6c627fe9eff22dec6a906f0",
+    "rust": "1.99.1",
+    "profile": "optimized",
+    "route": "prebuilt-api",
+    "left_out": [],
+    "target": "client",
+    "rust_target": null,
+    "secs": 4,
+    "mods": [
+      {
+        "id": "create",
+        "version": "0.1.0",
+        "sha256": "727100d25161181795e378118c383dda1ec305f465bfc5fd10d950336ebd42aa",
+        "internals": []
+      }
+    ],
+    "libraries": [
+      {
+        "file": "libmod_create.dylib",
+        "sha256": "c71a6ceb54054c61a7449cbed9aa736d7a8b07a6efaf68ca5d1a64b70b84d56b",
+        "kind": "mod",
+        "mod": "create",
+        "identity": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a create 0.1.0 1.99.1"
+      }
+    ]
+  },
+  "sha256": {
+    "/private/tmp/app2172-launcher-0a-prod/versions/native-0a875da-fafbebe41f0f/horizon-server": "2b0f3d7bd318f52a8385b7d7b28db78d13f7752d25fd30d824d487aef5fe1f1d",
+    "/private/tmp/app2172-launcher-0a-prod/versions/native-0a875da-fafbebe41f0f/horizon-client": "012bf6dbfecb095bfb27f9b84452105639501cc5444aca15517360cd90547935",
+    "/private/tmp/app2172-launcher-0a-prod/versions/native-0a875da-fafbebe41f0f/horizon-ctl": "61ab9be5b1f232446f1d6d5be4b296b954d538986bbac38dc5f54ba8c7e11372",
+    "/private/tmp/app2172-launcher-0a-prod/versions/native-0a875da-fafbebe41f0f/native-mods.json": "a90b7b508eec80ff867e3db2f5d22ad50906c7d6428c52344a1958a9837254f1"
+  },
+  "production_package": {
+    "native_id": "create",
+    "native_package_path": "/private/tmp/app2172-launcher-0a-prod/versions/native-0a875da-fafbebe41f0f/horizon-native-mods/create",
+    "native_package_tree_sha256": "a8712458841000595e526072776df6c9d1772749804a5bcddce8edb6e8dec59d",
+    "source_content_hmod": "/private/tmp/create-0a-content-v9.hmod",
+    "source_content_hmod_sha256": "a250e64669a078792354ca91a3894f223d9e61eabe6b051338f8bf3d0a4afa83"
+  },
+  "resources": "/private/tmp/app2173-production-content-route-v45/server/resources",
+  "launcher": {
+    "path": "/private/tmp/horizon-app-2172/.local/toolchains/launcher-0.2.105/Horizon.app/Contents/MacOS/horizon-launcher",
+    "version": "horizon-launcher 0.2.105",
+    "sha256": "616af1a099421ee02370f4c4c11227ad4d5bdfbcfa968688c71085d9c074647c"
+  },
+  "content_compatibility": {
+    "source_hmod": "/private/tmp/create-0a-content-v9.hmod",
+    "source_hmod_sha256": "a250e64669a078792354ca91a3894f223d9e61eabe6b051338f8bf3d0a4afa83",
+    "recipes_skipped_for_unsupported_load_conditions": 27,
+    "unknown_feature_references": [
+      "Horizon:   create:striated_ores_overworld: unknown feature reference create:striated_ores_overworld",
+      "Horizon:   create:zinc_ore: unknown feature reference create:zinc_ore"
+    ]
+  },
+  "players": {
+    "Create2172Guest": "eb0e20a5-f85d-3404-84a7-e4b4f64ae0ae",
+    "Create2172Host": "799b198e-b7b6-3d66-a793-3cf3375643a2"
+  },
+  "online_names": [
+    "Create2172Guest",
+    "Create2172Host"
+  ],
+  "registry_counts": {
+    "minecraft:block": 658,
+    "minecraft:item": 711,
+    "minecraft:fluid": 4,
+    "minecraft:entity_type": 3
+  },
+  "registry_warnings": "",
+  "gameplay": {
+    "give_registered_item": "Gave 4 [Shaft] to Create2172Host",
+    "force_load_test_chunk": "Marked chunk [0, -1] in minecraft:overworld to be force loaded",
+    "forward_motor": "-1, 64, -16 has the following block data: {MotorGeneratedSpeed: 32.0f, Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: -1, y: 64, ScrollValue: 32, z: -16, id: \"create:motor\"}",
+    "forward_shaft": "0, 64, -16 has the following block data: {Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 0, y: 64, z: -16, id: \"create:simple_kinetic\"}",
+    "clutch_running": "2, 64, -16 has the following block data: {Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 2, y: 64, z: -16, id: \"create:simple_kinetic\"}",
+    "gearshift_forward": "4, 64, -16 has the following block data: {Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 4, y: 64, z: -16, id: \"create:simple_kinetic\"}",
+    "client_clutch_powered": [
+      {
+        "block": "create:clutch",
+        "loaded": true,
+        "pos": [
+          1,
+          64,
+          -16
+        ],
+        "state": "create:clutch[axis=x,powered=true]"
+      },
+      {
+        "block": "create:clutch",
+        "loaded": true,
+        "pos": [
+          1,
+          64,
+          -16
+        ],
+        "state": "create:clutch[axis=x,powered=true]"
+      }
+    ],
+    "clutch_stopped": "2, 64, -16 has the following block data: {Speed: 0.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 0.0f, Stress: 0.0f}, x: 2, y: 64, z: -16, id: \"create:simple_kinetic\"}",
+    "gearshift_reverse": "4, 64, -16 has the following block data: {Speed: -32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 4, y: 64, z: -16, id: \"create:simple_kinetic\"}",
+    "opposing_source_join": "[Not Secure] [Server] conflicting-source-rejected",
+    "source_after_rejection": "0, 64, -16 has the following block data: {Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 0, y: 64, z: -16, id: \"create:simple_kinetic\"}",
+    "ratio_large": "8, 64, -16 has the following block data: {Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 8, y: 64, z: -16, id: \"create:simple_kinetic\"}",
+    "ratio_small": "8, 65, -15 has the following block data: {Speed: -64.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 8, y: 65, z: -15, id: \"create:simple_kinetic\"}",
+    "ratio_output": "9, 65, -15 has the following block data: {Speed: -64.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 9, y: 65, z: -15, id: \"create:simple_kinetic\"}",
+    "controller_ui_state": "30, 64, -16 has the following block data: {Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 30, y: 64, ScrollValue: 64, z: -16, id: \"create:rotation_speed_controller\"}",
+    "sequencer_ui_state": "30, 64, -30 has the following block data: {Speed: 32.0f, InstructionIndex: -1, Instructions: [{Type: \"TURN_ANGLE\", Value: 90, Modifier: \"BACK\"}, {Type: \"END\", Value: 0, Modifier: \"FORWARD\"}, {Type: \"TURN_ANGLE\", Value: 90, Modifier: \"FORWARD\"}, {Type: \"TURN_ANGLE\", Value: 90, Modifier: \"FORWARD\"}, {Type: \"TURN_ANGLE\", Value: 90, Modifier: \"FORWARD\"}], InputSide: 1, InputSpeed: 32.0f, KineticDimension: \"minecraft:overworld\", Timer: 0, InstructionDuration: -1, Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 30, y: 64, z: -30, id: \"create:sequenced_gearshift\", PrevPowered: 0b}",
+    "consistent_loop_output": "41, 64, -38 has the following block data: {Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 41, y: 64, z: -38, id: \"create:simple_kinetic\"}",
+    "gearbox_output": "17, 64, -16 has the following block data: {Speed: -32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 17, y: 64, z: -16, id: \"create:simple_kinetic\"}",
+    "flywheel_speed": "18, 64, -16 has the following block data: {Speed: -32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 18, y: 64, z: -16, id: \"create:flywheel\"}",
+    "chain_signal_state": "23, 65, -16 has the following block data: {Speed: 16.0f, Signal: 15, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 23, y: 65, z: -16, id: \"create:adjustable_chain_gearshift\"}",
+    "chain_output": "24, 65, -16 has the following block data: {Speed: 16.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 24, y: 65, z: -16, id: \"create:simple_kinetic\"}",
+    "controller_state": "30, 64, -16 has the following block data: {Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 30, y: 64, ScrollValue: 64, z: -16, id: \"create:rotation_speed_controller\"}",
+    "controller_output": "30, 65, -15 has the following block data: {Speed: 64.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 30, y: 65, z: -15, id: \"create:simple_kinetic\"}",
+    "sequencer_state": "30, 64, -30 has the following block data: {Speed: 32.0f, InstructionIndex: 0, Instructions: [{Type: \"TURN_ANGLE\", Value: 360, Modifier: \"BACK\"}, {Type: \"END\", Value: 0, Modifier: \"FORWARD\"}], InputSide: 1, InputSpeed: 32.0f, KineticDimension: \"minecraft:overworld\", Timer: 7, InstructionDuration: 40, Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 30, y: 64, z: -30, id: \"create:sequenced_gearshift\", PrevPowered: 1b}",
+    "sequencer_output": "31, 64, -30 has the following block data: {Speed: -32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 31, y: 64, z: -30, id: \"create:simple_kinetic\"}",
+    "gearbox_loop_conflict": "37, 65, -16 has the following block data: {Speed: 0.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 37, y: 65, z: -16, id: \"create:gearbox\"}",
+    "client_clutch_observations": [
+      {
+        "block": "create:clutch",
+        "loaded": true,
+        "pos": [
+          1,
+          64,
+          -16
+        ],
+        "state": "create:clutch[axis=x,powered=false]"
+      },
+      {
+        "block": "create:clutch",
+        "loaded": true,
+        "pos": [
+          1,
+          64,
+          -16
+        ],
+        "state": "create:clutch[axis=x,powered=false]"
+      }
+    ],
+    "overloaded_motor": "48, 63, 48 has the following block data: {MotorGeneratedSpeed: 32.0f, Speed: 0.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 1048576.0f}, x: 48, y: 63, ScrollValue: 32, z: 48, id: \"create:motor\"}",
+    "overloaded_load": "61, 76, 61 has the following block data: {Speed: 0.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 1048576.0f}, x: 61, y: 76, z: 61, id: \"create:simple_kinetic\"}",
+    "recovered_motor": "48, 63, 48 has the following block data: {MotorGeneratedSpeed: 32.0f, Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 48, y: 63, ScrollValue: 32, z: 48, id: \"create:motor\"}",
+    "recovered_terminal": "61, 76, 61 has the following block data: {Speed: -262144.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 61, y: 76, z: 61, id: \"create:simple_kinetic\"}",
+    "block_entity_before_reopen": "0, 64, -16 has the following block data: {Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 0, y: 64, z: -16, id: \"create:simple_kinetic\"}",
+    "save_flush": "Saving the game (this may take a moment!)\nSaved the game",
+    "block_entity_after_reopen": "0, 64, -16 has the following block data: {Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 0, y: 64, z: -16, id: \"create:simple_kinetic\"}",
+    "ratio_output_after_reopen": "9, 65, -15 has the following block data: {Speed: -64.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 9, y: 65, z: -15, id: \"create:simple_kinetic\"}",
+    "controller_after_reopen": "30, 64, -16 has the following block data: {Speed: 32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 30, y: 64, ScrollValue: 64, z: -16, id: \"create:rotation_speed_controller\"}",
+    "controller_output_after_reopen": "30, 65, -15 has the following block data: {Speed: 64.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 30, y: 65, z: -15, id: \"create:simple_kinetic\"}",
+    "sequencer_after_reopen": "30, 64, -30 has the following block data: {Speed: 32.0f, InstructionIndex: 0, Instructions: [{Type: \"TURN_ANGLE\", Value: 360, Modifier: \"BACK\"}, {Type: \"END\", Value: 0, Modifier: \"FORWARD\"}], InputSide: 1, InputSpeed: 32.0f, KineticDimension: \"minecraft:overworld\", Timer: 39, InstructionDuration: 40, Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 30, y: 64, z: -30, id: \"create:sequenced_gearshift\", PrevPowered: 1b}",
+    "sequencer_output_after_reopen": "31, 64, -30 has the following block data: {Speed: -32.0f, KineticDimension: \"minecraft:overworld\", Network: {Capacity: 524288.0f, Stress: 0.0f}, x: 31, y: 64, z: -30, id: \"create:simple_kinetic\"}",
+    "config_after_reopen": {
+      "server": {
+        "bind": "127.0.0.1",
+        "whitelist": true,
+        "enforce_whitelist": true,
+        "max_players": 2,
+        "view_distance": 3,
+        "simulation_distance": 3,
+        "online_mode": false
+      },
+      "world": {
+        "name": "APP2172",
+        "seed": "2172",
+        "game_mode": "survival"
+      }
+    }
+  },
+  "production_package_installed": true,
+  "production_package_verified": true,
+  "package_scope_note": "Combined production native Create package with full 0a-normalized content and kinetic adapters"
+}

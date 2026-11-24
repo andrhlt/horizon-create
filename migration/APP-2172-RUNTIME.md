@@ -77,53 +77,84 @@ save/reopen, configuration persistence, and the supported local two-client
 route on the current compatible 9f production build. It does not prove every
 legacy callback, optional integration failure behavior, or config hot-reload.
 
-## Pinned 0a route result
+## Production package on the pinned 0a runtime
 
-On 2026-11-23, runtime `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, SDK
-`1.99.1`, and launcher build `native-0a875da-4388e6fde41d`, one local
-dedicated server accepted both headless clients. The server log records both
-join events. Its whitelist assigned `Create2172Host` UUID
-`799b198e-b7b6-3d66-a793-3cf3375643a2` and `Create2172Guest` UUID
-`eb0e20a5-f85d-3404-84a7-e4b4f64ae0ae`. Both clients disconnected cleanly and
-the server saved and stopped. The captured build contains only the kinetic
-probe package; this verifies the supported runtime route, not the production
-Create package or APP-2165's marker-query fix.
+On 2026-11-24, the full native package `create` was loaded by the pinned
+Horizon `0a875da91dbb0fdcb7ba8c42c11341aa229af51a` runtime with Rust/SDK
+1.99.1 and mixins `e59da9094f0c2fdda6c627fe9eff22dec6a906f0`. The tested
+launcher was 0.2.105. The package contains the canonical Rust root at
+`migration/create`, kinetic and controls adapters, and the normalized full
+Create content at the same flat package root under `assets/` and `data/`.
+`native-mods.json` listed `create` with no omitted native modules. The tested
+package tree SHA-256 was
+`a8712458841000595e526072776df6c9d1772749804a5bcddce8edb6e8dec59d`.
 
-## Remaining package and provenance gates
+A localhost-only dedicated server accepted two whitelisted headless clients
+with distinct UUIDs. The server registered 658 blocks, 711 items, four fluids,
+and three entity types with no registry warnings. Representative server and
+two-client behavior covered motor and shaft rotation, clutch stop/restart,
+gearshift reversal, rejection of opposing sources, speed ratios, controller
+and sequencer UI/state, gearbox and flywheel behavior, chain signal/output,
+loop conflict handling, stress overload and recovery. The shaft, ratio output,
+controller, sequencer, and whitelist/world configuration survived save, clean
+stop, and reopen. Full captured evidence is in
+`migration/APP-2172-0a-production-proof.json`.
 
-The full package gameplay route above passed, but the issue's pinned 0a
-production build and selected `3fa53d4b99ca22bba5897c6544b9515fd5521948`
-marker-query fix are still unverified. The available 0a runtime contains only
-`create_kinetic_probe`; it is not the production Create native module. The
-0a/3fa build must produce and load the full package on both client and server,
-then repeat the focused fixed-runtime behavior with matching receipts before
-APP-2172 can meet its pinned build contract or declare companion provenance.
-At this checkpoint, the GitHub PR-authentication status had not yet been
-rechecked; the current connector state is recorded below.
+The tested normalized source content archive was
+`/private/tmp/create-0a-content-v9.hmod` (SHA-256
+`a250e64669a078792354ca91a3894f223d9e61eabe6b051338f8bf3d0a4afa83`). Its
+original source was `.local/create.hmod` (SHA-256
+`253311260017a64c37c2b1506fa6e7cd9010c280beaa0970167a15ae08b6e7be`). The
+compatibility conversion removed 203 block fields unsupported by Horizon 0a,
+translated 9 field groups, added 2 menu definitions, normalized one loot
+condition array, and deduplicated 2 fluid block/item definitions. This is a
+working package with known data limitations; those source-to-0a omissions are
+recorded in the converter report.
 
-## 3fa source build attempt (2026-11-24)
+A follow-up converter change now evaluates optional NeoForge recipe conditions
+against tags in the pack and moves three configured worldgen features to the
+0a `worldgen/feature` registry path. Its normalized archive passed structural
+checks: 30 genuinely optional recipes omitted, no retained recipe contains a
+NeoForge load condition, and no configured-feature paths remain. This revised
+content archive has **not** yet been rebuilt into a native runtime package or
+run through gameplay, so the acceptance proof above applies to the earlier
+v9 package. The v2 report is retained at
+`migration/APP-2172-0a-content-report.json`; the follow-up should be folded
+into the next full runtime acceptance when a writable pinned build is
+available.
 
-The selected public Horizon source commit
-`3fa53d4b99ca22bba5897c6544b9515fd5521948` was checked out in a task-local
-clone and built with Rust 1.99.1 using the `fast` profile. The resulting
-`horizon-client`, `horizon-server`, and `horizon-ctl` binaries had SHA-256
-`9e97d48a98020df11cbaa4b5c662c1e2a75c2b6b508dcbd8d8236081f0e8a5dc`,
-`08956bdf64181fef1f82e09c942ee8bd9824f925657589566e82fc8e405ef883`, and
-`f9e771f81e545375a6d04885ece82352603dab188e8e359b36f5af0939573202`
-respectively. This is a source-built
-local runtime cohort, not an indexed 3fa SDK cohort.
+The repeatable source preparation commands are:
 
-The source's `tools/prebuilt_game.py build` route stages the 3fa API, then
-exhausts the host filesystem while compiling the SDK's `horizon-client`
-library, both with its published `release` profile and with a temporary
-`fast`-profile attempt matching the runtime binaries. Both builds were stopped
-before producing a complete SDK. The failed outputs were removed; the source
-checkout and three game binaries remain under task-local `.local/` storage.
-Consequently, no native Create module was built for the 3fa binaries and the
-full production package route was not run on 3fa.
+```sh
+python3 tools/prepare-0a-content-pack.py .local/create.hmod /path/to/create-0a-content.hmod --report /path/to/content-report.json
+python3 tools/prepare-create-native.py --output /path/to/create-native --content-pack /path/to/create-0a-content.hmod
+```
 
-The completed production package gameplay proof remains the 9f cohort above.
-The earlier 0a two-client proof remains probe-only. Do not treat either as
-fixed-runtime 3fa acceptance. The configured GitHub connector currently has
-push permission, and the branch is pushed; the missing PR is waiting on this
-runtime/package acceptance, not a credential reconnection.
+Build the staged native project against the exact 0a launcher SDK, then install
+that one package as the `create` native module. Use
+`tools/test-create-production-offline-route.py` with the matching dedicated
+server/client/ctl binaries and content resources to repeat the isolated route.
+The runner uses distinct player homes and UUIDs and retains logs, package/runtime
+hashes, save/reopen observations, and server configuration. It binds only to
+`127.0.0.1`, uses the supported offline server path, and makes no account,
+credential, lease, or authentication changes.
+
+## Remaining acceptance notes
+
+The production package, registrations, representative gameplay, save/reopen,
+and distinct-UUID offline route now pass on the pinned 0a runtime. The 3fa
+marker-query behavior has not been separately verified against this package;
+small rendering/audio variants and optional integrations absent from the pack
+remain follow-up coverage rather than claimed passes. The later converter
+cleanup described above still needs incorporation into a fresh runtime build
+and route run. Keep the issue open until the updated package is reviewed and
+the user-requested `/close`/PR delivery can proceed through an authorized
+GitHub route.
+
+## Historical 3fa build attempt
+
+A source build of Horizon `3fa53d4b99ca22bba5897c6544b9515fd5521948` with Rust
+1.99.1 exhausted available disk while compiling the matching SDK. Partial build
+outputs were removed. That attempt is superseded for package acceptance by the
+successful pinned 0a production runtime route above; it did not establish
+behavior for the 3fa marker-query change.
