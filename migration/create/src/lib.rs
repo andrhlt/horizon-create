@@ -4,6 +4,8 @@ pub(crate) mod gauge_readout;
 pub(crate) mod kinetic_adapter;
 pub(crate) mod kinetic_controls;
 pub(crate) mod turntable_motion;
+pub(crate) mod fan_airflow_math;
+pub(crate) mod create_fan_nozzle_adapter;
 pub(crate) use create_kinetic_slice as kinetic_slice;
 
 #[derive(Default)]
@@ -41,6 +43,7 @@ impl mod_api::Hooks for Create {
         kinetic_adapter::register(registrar);
         kinetic_controls::register(registrar);
         gauge_readout::register(registrar);
+        create_fan_nozzle_adapter::register(registrar);
     }
 
     fn gui_render_post(
