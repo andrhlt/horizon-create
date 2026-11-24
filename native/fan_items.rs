@@ -135,12 +135,10 @@ pub(super) fn tick(
         let at = [p.x, p.y, p.z];
         let difference = std::array::from_fn::<_, 3, _>(|i| at[i] - (f64::from(source[i]) + 0.5));
         let range = difference.iter().map(|d| d * d).sum::<f64>().sqrt();
-        let acceleration =
-            f64::from((f64::from(rpm.abs() / 512.0) / (range / f64::from(distance))) as f32);
         let velocity = [entity.velocity.x, entity.velocity.y, entity.velocity.z];
-        let next = std::array::from_fn::<_, 3, _>(|i| {
-            velocity[i] + (f64::from(normal[i]) * acceleration - velocity[i]).clamp(-5.0, 5.0) / 8.0
-        });
+        let next = super::create_fan_airflow_math::fan_item_velocity(
+            velocity, normal, rpm, range, distance,
+        );
         entity.velocity.x = next[0];
         entity.velocity.y = next[1];
         entity.velocity.z = next[2];

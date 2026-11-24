@@ -225,21 +225,24 @@ pub(super) fn tick(game: &mut Game<'_>, pos: [i32; 3], nozzle: &mut ModBlockEnti
             continue;
         };
         let position = entity.position;
-        let (distance, diff) = distance_and_offset(center, [position.x, position.y, position.z]);
+        let (distance, _) = distance_and_offset(center, [position.x, position.y, position.z]);
         if distance > range {
             continue;
         }
         active_items.push(id);
-        if !pushing && distance < 1.5 {
+        let Some(impulse) = super::fan_airflow_math::nozzle_impulse(
+            center,
+            [position.x, position.y, position.z],
+            range,
+            pushing,
+            128.0,
+            false,
+        ) else {
             continue;
-        }
-        if distance >= 1e-4 {
-            let sign = if pushing { 1.0 } else { -1.0 };
-            let scale = sign * (range - distance) / 128.0 / distance;
-            entity.velocity.x += diff[0] * scale;
-            entity.velocity.y += diff[1] * scale;
-            entity.velocity.z += diff[2] * scale;
-        }
+        };
+        entity.velocity.x += impulse[0];
+        entity.velocity.y += impulse[1];
+        entity.velocity.z += impulse[2];
         entity.fall_distance = 0.0;
         entity.needs_sync = true;
     }

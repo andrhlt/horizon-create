@@ -19,7 +19,7 @@ use super::native_block_entity_draw::BlockEntityDraw;
 
 pub(super) const FAN: &str = "create:encased_fan";
 const PROPELLER: &str = "create:block/encased_fan/propeller";
-pub(super) const FAN_TIME: i32 = 150;
+pub(super) const FAN_TIME: i32 = super::create_fan_airflow_math::FAN_PROCESSING_TIME;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Kind {
@@ -222,37 +222,37 @@ fn tick_depot(game: &mut Game<'_>, pos: [i32; 3], kind: Kind) {
         return;
     }
 
+    let recipe_exists = recipe(game, kind, &stack).is_some();
+    let step = super::create_fan_airflow_math::depot_step(
+        before,
+        same_item,
+        same_type,
+        recipe_exists,
+        stack.count,
+    );
     let mut completed = None;
-    let next = if !same_item || !same_type {
-        if recipe(game, kind, &stack).is_some() {
-            FAN_TIME * (((stack.count - 1) / 16 + 1) as i32) + 1
-        } else {
-            -1
+    if step.complete {
+        if let Some(results) = recipe(game, kind, &stack) {
+            completed = Some(
+                results
+                    .into_iter()
+                    .filter_map(|(mut output, chance)| {
+                        let count = output.count * stack.count;
+                        output.count = if chance == 1.0 {
+                            count
+                        } else {
+                            (0..count)
+                                .filter(|_| game.world.random.next_float() <= chance)
+                                .count() as u32
+                        };
+                        let cap = game.native_max_stack_size(&output.item).unwrap_or(64);
+                        (output.count != 0).then_some((output, cap))
+                    })
+                    .collect::<Vec<_>>(),
+            );
         }
-    } else {
-        if before == 0 {
-            if let Some(results) = recipe(game, kind, &stack) {
-                completed = Some(
-                    results
-                        .into_iter()
-                        .filter_map(|(mut output, chance)| {
-                            let count = output.count * stack.count;
-                            output.count = if chance == 1.0 {
-                                count
-                            } else {
-                                (0..count)
-                                    .filter(|_| game.world.random.next_float() <= chance)
-                                    .count() as u32
-                            };
-                            let cap = game.native_max_stack_size(&output.item).unwrap_or(64);
-                            (output.count != 0).then_some((output, cap))
-                        })
-                        .collect::<Vec<_>>(),
-                );
-            }
-        }
-        before - 1
-    };
+    }
+    let next = step.timer;
     let transformed = completed.is_some();
     let excess = game
         .native_with_mod_block_entity(pos, |depot| {
