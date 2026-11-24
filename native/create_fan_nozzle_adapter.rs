@@ -6,12 +6,10 @@
 //! compound so ordinary saves and client updates travel through the engine's
 //! existing block-entity path.
 
-use std::sync::OnceLock;
-
 use mod_api::{
-    BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent, BlockKey, BlockPart,
-    BlockShapeKind, BlockState, Compound, EntityRef, Host, HostTransaction, ItemStack, LevelHost,
-    LevelRef, RandomSource, Registrar, ServerHost, Tag,
+    BlockEntityPart, BlockEntityTickEvent, BlockEntityTicksEvent, BlockPart, BlockShapeKind,
+    BlockState, Compound, Host, HostTransaction, ItemStack, LevelHost, LevelRef, RandomSource,
+    Registrar, ServerHost, Tag,
 };
 
 use super::fan_airflow_math as rules;
@@ -19,8 +17,6 @@ use super::fan_airflow_math as rules;
 const FAN: &str = "create:encased_fan";
 const NOZZLE: &str = "create:nozzle";
 const DEPOT: &str = "create:depot";
-
-static NOZZLE_PART: OnceLock<NozzlePart> = OnceLock::new();
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Process {
@@ -52,20 +48,14 @@ impl Process {
 }
 
 #[derive(Clone, Copy)]
-pub struct NozzlePart {
-    nozzle: BlockKey,
-}
+pub struct NozzlePart;
 
 pub fn register(registrar: &mut dyn Registrar) {
     let nozzle = registrar
         .block_entity_type("create:nozzle")
         .blocks(&[NOZZLE])
         .build();
-    let part = NozzlePart {
-        nozzle: registrar.block_key(NOZZLE),
-    };
-    let _ = NOZZLE_PART.set(part);
-    registrar.block_entity_part(&nozzle, part).unwrap();
+    registrar.block_entity_part(&nozzle, NozzlePart).unwrap();
 }
 
 fn property(host: &dyn Host, level: LevelRef, pos: [i32; 3], key: &str) -> Option<String> {
@@ -140,6 +130,44 @@ fn blocked(host: &dyn Host, level: LevelRef, source: [i32; 3], along: [i32; 3], 
         }) {
             return distance as f32;
         }
+        let axis = along.iter().position(|step| *step != 0).unwrap_or(1);
+        let cross_a = (axis + 1) % 3;
+        let cross_b = (axis + 2) % 3;
+        let forward = along[axis] > 0;
+        let mut depth = 0.0_f64;
+        let mut open_ray = false;
+        for (a, b) in [
+            (0.25, 0.25),
+            (0.25, 0.75),
+            (0.5, 0.5),
+            (0.75, 0.25),
+            (0.75, 0.75),
+        ] {
+            let nearest = boxes
+                .iter()
+                .filter(|bounds| {
+                    a >= bounds[cross_a]
+                        && a < bounds[cross_a + 3]
+                        && b >= bounds[cross_b]
+                        && b < bounds[cross_b + 3]
+                })
+                .map(|bounds| {
+                    if forward {
+                        bounds[axis]
+                    } else {
+                        1.0 - bounds[axis + 3]
+                    }
+                })
+                .fold(f64::INFINITY, f64::min);
+            if nearest.is_infinite() {
+                open_ray = true;
+                break;
+            }
+            depth = depth.max(nearest);
+        }
+        if !open_ray {
+            return (distance as f32 + depth as f32 + 1.0 / 32.0).min(max);
+        }
     }
     max
 }
@@ -152,13 +180,8 @@ fn recipe_outputs(
 ) -> Option<Vec<(ItemStack, f32)>> {
     let mut outputs = Vec::new();
     match process {
-        Process::Smoking | Process::Blasting => {
-            let recipe_type = if process == Process::Smoking {
-                "minecraft:smoking"
-            } else {
-                "minecraft:blasting"
-            };
-            let recipe_type_id = mod_api::Identifier::parse(recipe_type).ok()?;
+        Process::Smoking => {
+            let recipe_type_id = mod_api::Identifier::parse("minecraft:smoking").ok()?;
             let matched = level
                 .recipe_for(
                     host,
@@ -167,6 +190,29 @@ fn recipe_outputs(
                 )
                 .ok()??;
             return Some(vec![(matched.output, 1.0)]);
+        }
+        Process::Blasting => {
+            let lookup = |recipe_type: &str| {
+                let id = mod_api::Identifier::parse(recipe_type).ok()?;
+                level
+                    .recipe_for(host, &id, &mod_api::RecipeInput::Single(input.clone()))
+                    .ok()?
+            };
+            let smelt = lookup("minecraft:smelting").or_else(|| lookup("minecraft:blasting"));
+            let smoke = lookup("minecraft:smoking");
+            if let Some(smelt) = smelt.filter(|smelt| {
+                smoke
+                    .as_ref()
+                    .is_none_or(|smoke| smoke.output.item() != smelt.output.item())
+            }) {
+                return Some(vec![(smelt.output, 1.0)]);
+            }
+            let fire_resistant = mod_api::Identifier::parse("minecraft:fire_resistant")
+                .ok()
+                .and_then(|id| host.tags().key(&id))
+                .and_then(|tag| host.tags().is_in_tag(input.item(), tag))
+                == Some(true);
+            return (!fire_resistant).then_some(Vec::new());
         }
         Process::Splashing | Process::Haunting => {
             let recipes = host.recipes_of_type(process.id());
