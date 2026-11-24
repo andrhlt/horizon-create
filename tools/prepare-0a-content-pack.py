@@ -8,6 +8,7 @@ actually present in this pack. Every omission or translation is reported.
 """
 from __future__ import annotations
 import argparse
+import copy
 import json
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -151,7 +152,9 @@ def normalize(source: Path, output: Path, report: Path) -> None:
             if "/worldgen/configured_feature/" in target_name:
                 target_name = target_name.replace("/worldgen/configured_feature/", "/worldgen/feature/")
                 translated_worldgen_paths.append({"source": entry.filename, "target": target_name})
-            normalized.writestr(target_name, payload)
+            output_entry = copy.copy(entry)
+            output_entry.filename = target_name
+            normalized.writestr(output_entry, payload)
         for menu in ("sequenced_gearshift", "rotation_speed_controller"):
             name = f"data/create/horizon/menu/{menu}.json"
             if name not in original.namelist():

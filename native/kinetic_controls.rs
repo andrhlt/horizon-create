@@ -271,9 +271,6 @@ impl BlockEntityPart for KineticControls {
         _: &dyn mod_api::ClientHost,
         event: &mut mod_api::ScreenClickEvent<'_>,
     ) -> Option<i32> {
-        if std::env::var_os("CREATE_KINETIC_CONTROLS_TRACE").is_some() {
-            eprintln!("CREATE_KINETIC_CONTROLS_CLICK block={} at={:?} right={}", event.block, event.at, event.right);
-        }
         if event.right {
             return None;
         }
@@ -295,12 +292,8 @@ impl BlockEntityPart for KineticControls {
         None
     }
 
-    fn menu_button(&self, host: &mut dyn ServerHost, event: &mut mod_api::MenuButtonEvent<'_>) {
-        let _ = host;
+    fn menu_button(&self, _: &mut dyn ServerHost, event: &mut mod_api::MenuButtonEvent<'_>) {
         let id = event.context.id;
-        if std::env::var_os("CREATE_KINETIC_CONTROLS_TRACE").is_some() {
-            eprintln!("CREATE_KINETIC_CONTROLS_BUTTON id={} pos={:?}", id, event.context.pos);
-        }
         if !(0..=512).contains(&id) && !(1024..1044).contains(&id) {
             return;
         }
