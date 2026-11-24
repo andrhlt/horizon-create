@@ -106,6 +106,9 @@ impl BlockEntityPart for MotorBoard {
         _host: &dyn mod_api::Host,
         event: &mut mod_api::ScreenEvent<'_>,
     ) -> Option<mod_api::Screen> {
+        if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+            eprintln!("CREATE_MOTOR_BOARD_SCREEN block={}", event.block);
+        }
         (event.block == "create:creative_motor").then(|| mod_api::Screen {
             width: 334.0,
             height: 166.0,
@@ -126,6 +129,9 @@ impl BlockEntityPart for MotorBoard {
         if event.block != "create:creative_motor" {
             return;
         }
+        if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+            eprintln!("CREATE_MOTOR_BOARD_DRAW block={}", event.block);
+        }
         const ROWS: [&str; 2] = ["Counterclockwise RPM", "Clockwise RPM"];
         for (row, label) in ROWS.into_iter().enumerate() {
             let y = event.origin[1] + 19.0 + row as f32 * 11.0;
@@ -143,6 +149,12 @@ impl BlockEntityPart for MotorBoard {
         _host: &dyn mod_api::ClientHost,
         event: &mut mod_api::ScreenClickEvent<'_>,
     ) -> Option<i32> {
+        if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
+            eprintln!(
+                "CREATE_MOTOR_BOARD_CLICK block={} right={}",
+                event.block, event.right
+            );
+        }
         if event.block != "create:creative_motor" || event.right {
             return None;
         }
