@@ -98,4 +98,32 @@ marker-query fix are still unverified. The available 0a runtime contains only
 0a/3fa build must produce and load the full package on both client and server,
 then repeat the focused fixed-runtime behavior with matching receipts before
 APP-2172 can meet its pinned build contract or declare companion provenance.
-The GitHub PR-authentication blocker is also still open.
+At this checkpoint, the GitHub PR-authentication status had not yet been
+rechecked; the current connector state is recorded below.
+
+## 3fa source build attempt (2026-11-24)
+
+The selected public Horizon source commit
+`3fa53d4b99ca22bba5897c6544b9515fd5521948` was checked out in a task-local
+clone and built with Rust 1.99.1 using the `fast` profile. The resulting
+`horizon-client`, `horizon-server`, and `horizon-ctl` binaries had SHA-256
+`9e97d48a98020df11cbaa4b5c662c1e2a75c2b6b508dcbd8d8236081f0e8a5dc`,
+`08956bdf64181fef1f82e09c942ee8bd9824f925657589566e82fc8e405ef883`, and
+`f9e771f81e545375a6d04885ece82352603dab188e8e359b36f5af0939573202`
+respectively. This is a source-built
+local runtime cohort, not an indexed 3fa SDK cohort.
+
+The source's `tools/prebuilt_game.py build` route stages the 3fa API, then
+exhausts the host filesystem while compiling the SDK's `horizon-client`
+library, both with its published `release` profile and with a temporary
+`fast`-profile attempt matching the runtime binaries. Both builds were stopped
+before producing a complete SDK. The failed outputs were removed; the source
+checkout and three game binaries remain under task-local `.local/` storage.
+Consequently, no native Create module was built for the 3fa binaries and the
+full production package route was not run on 3fa.
+
+The completed production package gameplay proof remains the 9f cohort above.
+The earlier 0a two-client proof remains probe-only. Do not treat either as
+fixed-runtime 3fa acceptance. The configured GitHub connector currently has
+push permission, and the branch is pushed; the missing PR is waiting on this
+runtime/package acceptance, not a credential reconnection.
