@@ -72,8 +72,7 @@ impl MovingPart {
             .filter_map(|entity| {
                 let kind = entity.kind(host).map(|kind| kind.id(host));
                 let data = entity.nbt(host)?;
-                let is_marker = kind.as_deref() == Some("minecraft:marker")
-                    && data.get(&"CreateSuperGlue".into()) == Some(&Tag::Byte(1));
+                let is_marker = data.get(&"CreateSuperGlue".into()) == Some(&Tag::Byte(1));
                 if kind.as_deref() != Some("create:super_glue") && !is_marker {
                     return None;
                 }
