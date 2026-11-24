@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Normalize a Create .hmod content pack for the pinned Horizon 0a schema.
 
-The 0a block definition schema rejects newer Create content-only properties
-instead of ignoring them. This converter preserves pack entries and removes
-only enumerated properties that 0a cannot represent. It writes a report so
-those omissions remain reviewable.
+The 0a block definition schema and registry paths differ from the upstream
+Create pack. This converter makes the narrow schema/path translations needed
+for 0a and evaluates optional NeoForge recipe conditions against the content
+actually present in this pack. Every omission or translation is reported.
 """
 from __future__ import annotations
 import argparse
+import copy
 import json
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -25,7 +26,20 @@ def normalize(source: Path, output: Path, report: Path) -> None:
     loot_condition_arrays: list[str] = []
     removed_duplicate_fluid_blocks: list[str] = []
     removed_duplicate_fluid_items: list[str] = []
+    skipped_optional_recipes: list[dict[str, str]] = []
+    translated_worldgen_paths: list[dict[str, str]] = []
     with ZipFile(source) as original, ZipFile(output, "w", ZIP_DEFLATED) as normalized:
+        nonempty_tags: set[str] = set()
+        for name in original.namelist():
+            parts = Path(name).parts
+            if (len(parts) < 6 or parts[0] != "data" or parts[2] != "tags"
+                    or not name.endswith(".json")):
+                continue
+            namespace, registry = parts[1], parts[3]
+            tag_path = "/".join(parts[4:])[:-5]
+            definition = json.loads(original.read(name))
+            if definition.get("values"):
+                nonempty_tags.add(f"{namespace}:{tag_path}")
         fluid_names = {
             Path(name).stem for name in original.namelist()
             if name.startswith("data/create/horizon/fluid/") and name.endswith(".json")
@@ -40,6 +54,39 @@ def normalize(source: Path, output: Path, report: Path) -> None:
                 removed_duplicate_fluid_items.append(entry.filename)
                 continue
             payload = original.read(entry.filename)
+            if entry.filename.startswith("data/create/recipe/") and entry.filename.endswith(".json"):
+                definition = json.loads(payload)
+                conditions = definition.get("neoforge:conditions")
+                if conditions is not None:
+                    if not isinstance(conditions, list):
+                        raise ValueError(f"invalid neoforge:conditions in {entry.filename}")
+                    keep = True
+                    for condition in conditions:
+                        if (not isinstance(condition, dict)
+                                or condition.get("type") != "neoforge:not"
+                                or not isinstance(condition.get("value"), dict)):
+                            raise ValueError(f"unsupported optional recipe condition in {entry.filename}: {condition!r}")
+                        nested = condition["value"]
+                        kind = nested.get("type")
+                        if kind == "neoforge:tag_empty":
+                            tag = nested.get("tag")
+                            if not isinstance(tag, str):
+                                raise ValueError(f"invalid tag_empty condition in {entry.filename}")
+                            keep &= tag in nonempty_tags
+                            if tag not in nonempty_tags:
+                                skipped_optional_recipes.append({"file": entry.filename, "reason": f"optional tag is empty or absent: {tag}"})
+                        elif kind == "neoforge:mod_loaded":
+                            mod = nested.get("modid")
+                            if not isinstance(mod, str):
+                                raise ValueError(f"invalid mod_loaded condition in {entry.filename}")
+                            keep = False
+                            skipped_optional_recipes.append({"file": entry.filename, "reason": f"optional integration is not installed: {mod}"})
+                        else:
+                            raise ValueError(f"unsupported optional recipe condition in {entry.filename}: {kind!r}")
+                    if not keep:
+                        continue
+                    definition.pop("neoforge:conditions")
+                    payload = (json.dumps(definition, indent=2, ensure_ascii=False) + "\n").encode()
             if (entry.filename.startswith("data/create/horizon/") or entry.filename.startswith("data/create/loot_table/")) and entry.filename.endswith(".json"):
                 definition = json.loads(payload)
                 changed = False
@@ -101,7 +148,13 @@ def normalize(source: Path, output: Path, report: Path) -> None:
                     normalize_conditions(definition)
                 if changed:
                     payload = (json.dumps(definition, indent=2, ensure_ascii=False) + "\n").encode()
-            normalized.writestr(entry, payload)
+            target_name = entry.filename
+            if "/worldgen/configured_feature/" in target_name:
+                target_name = target_name.replace("/worldgen/configured_feature/", "/worldgen/feature/")
+                translated_worldgen_paths.append({"source": entry.filename, "target": target_name})
+            output_entry = copy.copy(entry)
+            output_entry.filename = target_name
+            normalized.writestr(output_entry, payload)
         for menu in ("sequenced_gearshift", "rotation_speed_controller"):
             name = f"data/create/horizon/menu/{menu}.json"
             if name not in original.namelist():
@@ -117,6 +170,8 @@ def normalize(source: Path, output: Path, report: Path) -> None:
         "removed_duplicate_fluid_blocks": removed_duplicate_fluid_blocks,
         "removed_duplicate_fluid_items": removed_duplicate_fluid_items,
         "loot_condition_arrays_normalized": loot_condition_arrays,
+        "optional_recipes_skipped": skipped_optional_recipes,
+        "worldgen_configured_feature_path_translations": translated_worldgen_paths,
     }, indent=2) + "\n")
 
 def main() -> None:
