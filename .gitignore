@@ -1,4 +1,5 @@
 .local/
+.horizon/
 __pycache__/
 
 # Runtime diagnostics and local machine state

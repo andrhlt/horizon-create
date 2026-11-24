@@ -4,7 +4,8 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::OnceLock;
 
-use super::create_kinetic_slice::{self, Node};
+use super::create_kinetic_slice as kinetic_slice;
+use super::create_kinetic_slice::Node;
 
 static KINETIC_PART: OnceLock<KineticPart> = OnceLock::new();
 use mod_api::{
