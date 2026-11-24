@@ -12,6 +12,7 @@ SOURCES = {
     "create_kinetic_slice.rs": ROOT / "native/kinetic_slice.rs",
     "kinetic_adapter.rs": ROOT / "native/kinetic_adapter.rs",
     "kinetic_controls.rs": ROOT / "native/kinetic_controls.rs",
+    "postbox.rs": TEMPLATE / "src/postbox.rs",
 }
 
 def main() -> None:
