@@ -31,8 +31,25 @@ fn menu_key(host: &dyn ServerHost) -> Option<mod_api::MenuKey> {
     found
 }
 
+fn control_trace(host: &dyn ServerHost, message: &'static str) {
+    if std::env::var_os("CREATE_MOTOR_BOARD_CONTROL_TRACE").is_some() {
+        host.messages().broadcast(Text::literal(message));
+    }
+}
+
 pub fn register(registrar: &mut dyn mod_api::Registrar) {
     let kind = registrar.block_entity_type_key("create:motor");
+    let block = registrar.block_key(MENU_ID);
+    registrar.block_container(
+        &block,
+        mod_api::ModContainer {
+            slots: 1,
+            faces: std::array::from_fn(|_| vec![0]),
+            inputs: vec![0],
+            outputs: vec![0],
+            menu: Some(MENU_ID.to_owned()),
+        },
+    );
     registrar
         .block_entity_part(&kind, MotorBoard)
         .expect("creative motor board part registration");
@@ -66,6 +83,14 @@ pub fn open_with_menu(
             return None;
         }
     };
+    control_trace(
+        host,
+        if result.is_some() {
+            "CREATE_MOTOR_BOARD_OPEN_OK"
+        } else {
+            "CREATE_MOTOR_BOARD_OPEN_NONE"
+        },
+    );
     if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
         eprintln!("CREATE_MOTOR_BOARD_OPEN result={result:?}");
     }
@@ -80,6 +105,7 @@ impl BlockPart for MotorBoard {
         host: &mut dyn ServerHost,
         event: &mut UseWithoutItemEvent<'_>,
     ) -> Option<InteractionResult> {
+        control_trace(host, "CREATE_MOTOR_BOARD_USE_HOOK");
         if std::env::var_os("CREATE_MOTOR_BOARD_TRACE").is_some() {
             eprintln!(
                 "CREATE_MOTOR_BOARD_USE pos={:?} block={:?} expected={MENU_ID}",
@@ -94,7 +120,16 @@ impl BlockPart for MotorBoard {
         // from the content id declared in creative_motor.json. Keep the empty
         // hand hook installed so the integration owner can pass the resolved
         // key without changing the authority/hand contract.
-        let menu = menu_key(host)?;
+        let menu = match menu_key(host) {
+            Some(menu) => {
+                control_trace(host, "CREATE_MOTOR_BOARD_MENU_KEY_OK");
+                menu
+            }
+            None => {
+                control_trace(host, "CREATE_MOTOR_BOARD_MENU_KEY_NONE");
+                return None;
+            }
+        };
         open_with_menu(host, &event.click, menu)
     }
 }
