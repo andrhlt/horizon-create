@@ -32,6 +32,58 @@ pub struct Rider {
     pub relative: [i32; 3],
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GlueBox {
+    pub low: [f64; 3],
+    pub high: [f64; 3],
+}
+
+fn inside_glue(area: GlueBox, position: [i32; 3]) -> bool {
+    (0..3).all(|axis| {
+        let center = f64::from(position[axis]) + 0.5;
+        center >= area.low[axis] && center < area.high[axis]
+    })
+}
+
+/// Expand a seeded payload through the legacy six-sided glue relation.
+/// Marker discovery is deliberately separate so an engine adapter can provide
+/// the saved `From`/`To` boxes without changing the graph rule.
+pub fn expand_glued_payload(
+    seeds: &[[i32; 3]],
+    solids: &[[i32; 3]],
+    glue: &[GlueBox],
+) -> Vec<[i32; 3]> {
+    let mut result: Vec<_> = seeds
+        .iter()
+        .copied()
+        .filter(|position| solids.contains(position))
+        .collect();
+    let mut index = 0;
+    while index < result.len() {
+        let current = result[index];
+        for neighbor in [
+            [current[0] + 1, current[1], current[2]],
+            [current[0] - 1, current[1], current[2]],
+            [current[0], current[1] + 1, current[2]],
+            [current[0], current[1] - 1, current[2]],
+            [current[0], current[1], current[2] + 1],
+            [current[0], current[1], current[2] - 1],
+        ] {
+            if result.contains(&neighbor)
+                || !solids.contains(&neighbor)
+                || !glue
+                    .iter()
+                    .any(|area| inside_glue(*area, current) && inside_glue(*area, neighbor))
+            {
+                continue;
+            }
+            result.push(neighbor);
+        }
+        index += 1;
+    }
+    result
+}
+
 impl Payload {
     pub fn assemble(blocks: Vec<Block>, inventories: Vec<Inventory>, rider: Option<Rider>) -> Self {
         assert!(inventories.iter().all(|inventory| {
@@ -124,5 +176,44 @@ mod tests {
         payload.start();
         assert_eq!(payload.stop_and_dismount(), None);
         assert_eq!(payload.stop_and_dismount(), None);
+    }
+
+    #[test]
+    fn glue_bfs_keeps_connected_solid_neighbors() {
+        let found = expand_glued_payload(
+            &[[1, 101, 0]],
+            &[[1, 101, 0], [2, 101, 0], [3, 101, 0], [3, 101, 2]],
+            &[GlueBox {
+                low: [0.0, 101.0, -1.0],
+                high: [4.0, 102.0, 1.0],
+            }],
+        );
+        assert_eq!(found, vec![[1, 101, 0], [2, 101, 0], [3, 101, 0]]);
+    }
+
+    #[test]
+    fn glue_bfs_does_not_cross_unattached_or_air_cells() {
+        let found = expand_glued_payload(
+            &[[1, 101, 0]],
+            &[[1, 101, 0], [3, 101, 0], [2, 102, 0]],
+            &[GlueBox {
+                low: [0.0, 101.0, -1.0],
+                high: [3.0, 102.0, 1.0],
+            }],
+        );
+        assert_eq!(found, vec![[1, 101, 0]]);
+    }
+
+    #[test]
+    fn glue_bfs_accepts_reversed_marker_corners() {
+        let found = expand_glued_payload(
+            &[[2, 101, 0]],
+            &[[1, 101, 0], [2, 101, 0]],
+            &[GlueBox {
+                low: [0.0, 101.0, -1.0],
+                high: [3.0, 102.0, 2.0],
+            }],
+        );
+        assert_eq!(found, vec![[2, 101, 0], [1, 101, 0]]);
     }
 }

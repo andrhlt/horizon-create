@@ -78,8 +78,11 @@ def verify(args):
         control.command("/clear @s create:iron_sheet")
         control.command("/forceload add 0 0")
         control.commands((
+            "/setblock 0 101 0 create:basin",
             f"/setblock {PRESS} create:mechanical_press",
-            f"/data merge block {PRESS} {{Speed:512.0f,PressScan:0}}",
+            "/setblock 0 104 0 create:creative_motor[facing=down]",
+            "/setblock 0 103 0 create:shaft[axis=y]",
+            "/data merge block 0 104 0 {ScrollValue:256}",
             '/summon minecraft:item 0.5 101.25 0.5 {Item:{id:"minecraft:iron_ingot",count:1}}',
             "/tick step 8",
         ))

@@ -14,7 +14,6 @@ use mod_api::{
 
 use crate::press_processing::{self, CYCLE};
 
-const PRESS: &str = "create:mechanical_press";
 const SCAN_TICKS: i32 = 10;
 const INPUT_MIN_Y: f64 = -1.125;
 const INPUT_MAX_Y: f64 = 0.125;
@@ -46,11 +45,6 @@ pub fn register(registrar: &mut dyn Registrar) {
     ] {
         let _ = registrar.item_key(item);
     }
-    let kind = registrar
-        .block_entity_type(PRESS)
-        .blocks(&[PRESS])
-        .build();
-    registrar.block_entity_part(&kind, PressPart).unwrap();
 }
 
 fn int(nbt: &Compound, key: &str) -> i32 {
